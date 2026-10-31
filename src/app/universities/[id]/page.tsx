@@ -21,8 +21,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
+import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { dictionaries } from "@/i18n/messages.server";
+import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
@@ -32,10 +33,13 @@ import {
   localizeDegreeLevel,
   localizeHighlights,
   localizeMajorOrField,
-  localizeUniversityDescription,
   localizeUniversityType,
+  universityDescriptionState,
 } from "@/lib/catalogLocalizer";
 import { formatMoney, formatNumber } from "@/lib/format";
+import { SourceLanguageProse } from "@/components/SourceLanguageProse";
+import { reconcileEmbeddedRank } from "@/lib/universityProse";
+import { verifiedQsRank } from "@/lib/universityRank";
 
 /**
  * Public university profile — /universities/[id].
@@ -87,6 +91,9 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
 
   const country = localizeCountry(university.country, locale);
   const verified = university.verificationStatus === "verified";
+  // Phase AD: a rank with no recorded edition is not a QS position, so the
+  // <meta> description states "unknown" rather than an unsupported number.
+  const qsPosition = verifiedQsRank(university);
   return {
     title: formatMessage(t.metaTitle, { name: university.name, country }),
     description: formatMessage(t.metaDescription, {
@@ -98,8 +105,8 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
       ielts: verified && university.minIelts != null
         ? formatNumber(university.minIelts, { decimals: 1 })
         : t.metaUnknown,
-      rank: verified && university.worldRanking != null
-        ? `#${formatNumber(university.worldRanking)}`
+      rank: verified && qsPosition
+        ? `#${formatNumber(qsPosition.rank)}`
         : t.metaUnknown,
     }),
   };
@@ -126,6 +133,10 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // Any figure on this page depends on a verified row. Unverified institutions
   // keep their identity (name, city, links) and lose their numbers.
   const verified = u.verificationStatus === "verified";
+  // Phase AD — the one QS position this page may state: `null` when the row
+  // records no edition (`qs_rank_year`), when the number is broken, or when the
+  // row is unverified. Every rank below, and the prose reconciliation, reads it.
+  const qsPosition = verified ? verifiedQsRank(u) : null;
   const number = (value: number | null, decimals = 0) =>
     value == null ? null : formatNumber(value, { decimals });
   const verifiedValue = (value: number | null, decimals = 0) =>
@@ -135,10 +146,29 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   const place = [localizeCity(u.city, locale), country].filter(Boolean).join(", ");
   const type = u.universityType ? localizeUniversityType(u.universityType, locale) : null;
   const degree = u.degreeLevel ? localizeDegreeLevel(u.degreeLevel, locale) : null;
-  const description = u.description ? localizeUniversityDescription(u.description, locale) : null;
+  // 348 of the 356 stored descriptions are machine-generated sentences that the
+  // dictionary layer cannot render faithfully. Those keep their English text and
+  // get the "source language: English" label rather than a half-translated
+  // sentence; readable copy renders as ordinary localized prose.
+  // `u.worldRanking` is the corrected QS 2026 figure (docs/QS2026_RANK_VERIFICATION_2026-10-23.md);
+  // the stored prose and the ranking chip were generated before that correction
+  // and still state the old sequence — 178 of 194 disagree. Passing the rank in
+  // makes the page state one QS number, not two.
+  const description = u.description ? universityDescriptionState(u.description, locale, qsPosition?.rank ?? null) : null;
   // `highlights` is a JSON-array column; localize the array, then flatten it to
   // the labels the page lists.
-  const highlights = u.highlights ? listValues(localizeHighlights(u.highlights, locale)) : [];
+  // Compared against the same corrected numbers the localized chips carry, so a
+  // rank fix alone never counts as "translated" when the chip is still English.
+  const storedHighlights = u.highlights
+    ? listValues(u.highlights).map((item) => reconcileEmbeddedRank(item, qsPosition?.rank ?? null))
+    : [];
+  const highlights = u.highlights
+    ? listValues(localizeHighlights(u.highlights, locale, qsPosition?.rank ?? null))
+    : [];
+  // Badges fall under the same rule: a badge that could not be rendered cleanly
+  // stays in English, and the list says so once instead of labelling each chip.
+  const highlightsInSource =
+    locale !== "en" && highlights.some((item, index) => item === storedHighlights[index]);
   const fields = (bundle?.programFieldsByUni.get(u.id) ?? [])
     .slice(0, 16)
     .map((field) => localizeMajorOrField(field, locale));
@@ -195,7 +225,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
 
   const facts: { icon: React.ReactNode; label: string; value: string | null }[] = [
     { icon: <Building2 className="h-3.5 w-3.5" aria-hidden />, label: t.typeLabel, value: type ?? degree },
-    { icon: <Trophy className="h-3.5 w-3.5" aria-hidden />, label: t.rankLabel, value: verifiedValue(u.worldRanking) },
+    { icon: <Trophy className="h-3.5 w-3.5" aria-hidden />, label: t.rankLabel, value: verifiedValue(qsPosition?.rank ?? null) },
     { icon: <Wallet className="h-3.5 w-3.5" aria-hidden />, label: t.tuitionLabel, value: tuitionLocal ?? tuitionUsd },
     { icon: <Banknote className="h-3.5 w-3.5" aria-hidden />, label: t.livingLabel, value: livingLocal ?? livingUsd },
     { icon: <CalendarDays className="h-3.5 w-3.5" aria-hidden />, label: t.foundedLabel, value: verifiedValue(u.foundedYear) },
@@ -226,7 +256,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   ];
 
   return (
-    <LocaleProvider initialLocale={locale}>
+    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
       <PublicCatalogHeader />
       <main className="mx-auto max-w-5xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <Link
@@ -269,10 +299,10 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           {/* The three numbers a student decides with, as badges — three, not
               the eight the card used to stack. */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {verifiedValue(u.worldRanking) && (
+            {verifiedValue(qsPosition?.rank ?? null) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200">
                 <Trophy className="h-3 w-3" aria-hidden />
-                {t.rankLabel}: #{verifiedValue(u.worldRanking)}
+                {t.rankLabel}: #{verifiedValue(qsPosition?.rank ?? null)}
               </span>
             )}
             {(tuitionLocal ?? tuitionUsd) && (
@@ -300,8 +330,12 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           {/* ------------------------------------------------------- main */} 
           <div className="space-y-4">
             <Section id="overview" title={t.overview} icon={<Globe2 className="h-4 w-4" aria-hidden />}>
-              {description ? (
-                <p className="whitespace-pre-line break-words text-sm leading-relaxed text-slate-700">{description}</p>
+              {description && description.text ? (
+                <SourceLanguageProse
+                  text={description.text}
+                  showLabel={description.verbatim}
+                  label={t.sourceLanguageLabel}
+                />
               ) : (
                 <p className="text-sm text-slate-600">{t.overviewNotPublished}</p>
               )}
@@ -323,6 +357,12 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                       </li>
                     )}
                   </ul>
+                  {highlightsInSource && (
+                    <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset">
+                      <Languages className="h-3 w-3 shrink-0" aria-hidden />
+                      <span>{t.sourceLanguageLabel}</span>
+                    </p>
+                  )}
                 </>
               )}
             </Section>
@@ -442,6 +482,8 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           </aside>
         </div>
 
+
+        <PublicFeaturePromo className="mt-6" />
         <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
           {catalog.independentGuide}
         </p>

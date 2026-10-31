@@ -14,10 +14,12 @@ import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degre
 import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch, type MatchBreakdown } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
-import { localizeDetailPayload } from "@/lib/catalogLocalizer";
+import { localizeDetailPayload, localizeHighlights, localizeUniversityDescription } from "@/lib/catalogLocalizer";
 import { toMatchProfileWithActivities, chancingProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { verifiedQsRankNumber } from "@/lib/universityRank";
+import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { countriesMatch } from "@/lib/countries";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import {
@@ -250,6 +252,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           city: universities.city,
           flagEmoji: universities.flagEmoji,
           worldRanking: universities.worldRanking,
+          qsRankYear: universities.qsRankYear,
           degreeLevel: universities.degreeLevel,
           programMajor: universities.programMajor,
           annualTuitionUsd: universities.annualTuitionUsd,
@@ -284,6 +287,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!uni) {
       return privateNoStoreJson({ error: "University not found" }, { status: 404 });
     }
+    // Phase AD: only a rank whose edition is recorded counts as a position.
+    // `null` here means "publish no rank" — never "fall back to another one".
+    const qsRank = verifiedQsRankNumber(uni);
+    // The stored prose was generated before the QS 2026 rank correction and
+    // still states the old sequence — 178 of the 194 rows that name a position
+    // disagree with `world_ranking`. Correcting the figure here keeps the API
+    // (and the hub cards that read it) from contradicting the profile page.
+    // Applied before the row is cached, so no response can serve the old number.
+    // A row with no verified position is left verbatim instead of being
+    // corrected to a number the edition does not publish.
+    uni = {
+      ...withResolvedUsdCosts(uni),
+      worldRanking: qsRank,
+      description: localizeUniversityDescription(uni.description, "en", qsRank),
+      highlights: localizeHighlights(uni.highlights, "en", qsRank),
+    } as typeof uni;
     // Do not return or use unverified institutional figures as factual data.
     // This is a response-local copy; persisted catalogue/user data is untouched.
     if (uni.verificationStatus !== "verified") {

@@ -34,6 +34,7 @@ import {
   studyInterestRecommendationTerms,
 } from "@/lib/studyInterests";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { verifiedQsRankNumber } from "@/lib/universityRank";
 import { resolveProgramDepartmentProfile } from "@/lib/programChancing";
 
 export const dynamic = "force-dynamic";
@@ -266,6 +267,12 @@ export async function POST(req: Request) {
    * the two screens cannot disagree, and no tier vocabulary is exposed.
    */
   const benchmarkByUniId = new Map<number, ReturnType<typeof matchQsUniversityBenchmark>>();
+  /**
+   * QS 2026 position as stored on `universities.world_ranking` (Phase Y
+   * reconciled it to the official edition). It wins over the curated table
+   * so a card can never print a benchmark rank the profile page contradicts.
+   */
+  const verifiedRankByUniId = new Map<number, number | null>();
   try {
     const [programRows, uniRows, reqRows, cycleRows, scholarshipRows] = await Promise.all([
       db
@@ -284,6 +291,7 @@ export async function POST(req: Request) {
     const unis = new Map<number, RecommendUniversity>();
     for (const u of uniRows) {
       benchmarkByUniId.set(u.id, matchQsUniversityBenchmark(u));
+      verifiedRankByUniId.set(u.id, verifiedQsRankNumber(u));
       unis.set(u.id, {
         id: u.id,
         name: u.name,
@@ -434,7 +442,7 @@ export async function POST(req: Request) {
       return {
         ...r,
         positioning: {
-          qsRank: benchmark.qsRank,
+          qsRank: verifiedRankByUniId.get(r.university.id) ?? benchmark.qsRank ?? null,
           universityAcceptRatePct: Number.isFinite(benchmark.acceptRatePct) ? benchmark.acceptRatePct : null,
           departmentLabel: dept.label,
           gpa25,

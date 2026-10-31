@@ -183,9 +183,38 @@ Rules, enforced by `scripts/check-channel.ts`:
 An empty section disappears **with its heading and its blank line**. Length
 policy: at 1800 visible characters the `about` block is trimmed at a word
 boundary (`…`); at 4096 it is dropped; then each bullet list is cut to four; if
-it still does not fit the post is skipped rather than truncated. Eligibility,
-benefits and about are **never** generated or translated by anything: they come
-from the admin form or not at all.
+it still does not fit the post is skipped rather than truncated.
+
+### 4b-2a. One card for every award, fully in Uzbek (2026-10-29, kechqurun)
+
+The operator's reference post was reproduced field by field, and three things
+were still wrong in the live output:
+
+| Was | Now |
+| --- | --- |
+| `eligible_majors` printed as stored English (`Computer Science`) or, on 300 rows, as a whole English sentence | `fields.uz.ts` — a curated field vocabulary (`kompyuter fanlari`). An unknown name or a sentence is **dropped**, never printed |
+| `Dastur haqida` existed only when an admin had typed Uzbek copy — i.e. on almost no award | composed from stored columns (`Ushbu dastur {locative}da {degrees} bosqichini {funding} asosida…`) plus up to one sentence *read* out of `description` (`Ta'lim ingliz tilida olib boriladi.`, `Dastur muddati 2 yil.`) |
+| `urgency` (the kind readers see most often) was a 5-line nudge with no sections, no hashtags, no footer | the same card as every other award, with `⏰️ Muddat yaqin: N kun qoldi` on top; the countdown is printed once |
+| Country names outside the seeded 22 printed in English, with no flag and no locative form | `CHANNEL_COUNTRIES` covers all 58 values the catalogue stores, and `loadChannelCountries()` now inserts **missing** keys (not only seeds an empty table) |
+| A missing `coverage_type` label silently removed the `Moliyalashtirish:` line | the label table covers every value in the column (`Full Tuition Waiver`, `Tuition Credit`, `Full Ride`, …) |
+
+The headline now ends with a one-liner built from stored facts, the same way the
+reference post does:
+
+```
+🇳🇿 <b>University of Waikato Doctoral Scholarship</b> — Yangi Zelandiyada doktorantura (PhD) uchun to'liq kontrakt va stipendiya grant
+```
+
+Authored `tagline_uz` in Admin → Kanal → Kontent still wins over it. A country
+the table does not know produces no place clause at all — the sentence never
+writes a plain name where Uzbek needs `-da`.
+
+**The footer is the operator's.** `Admin → Kanal → Linklar → Post oxiridagi
+qator` holds the `💼 Label | Label | Label` line, in order, exactly as typed —
+that is where the social networks go (Instagram, Telegram, YouTube, …). It now
+prints on **every** kind including urgency; leave it empty to fall back to the
+channel and bot links. Nothing is generated there, and no third-party brand name
+is ever a default.
 
 ### 4b-3. English prose is read, never printed
 
@@ -966,6 +995,51 @@ identity as its key, so a duplicate tick sends nothing twice. Call it every
 `mode = off`, a pause, or an unconfigured channel makes the tick return
 `{"skipped": true}` without touching Telegram.
 
+### 11a-2. 2026-10-29 (kechqurun) — deploy tekshirildi: nima ishladi, nima ishlamadi
+
+PR #116 `b560af6` bilan main'ga qo'shildi. O'sha kuni kechqurun live Supabase
+o'qib chiqildi (read-only), va ikkita fakt aniqlandi:
+
+**Ishladi — lug'at o'zi o'rnatildi.** Merge 16:40:29 UTC, lug'at esa
+**16:44:10** da bazada edi:
+
+```
+translation_lexicon        12 732 satr   (admin: 0)
+translation_lexicon_meta   version = pdf-12732-1949
+```
+
+Ya'ni hech kim hech narsa qo'lda kiritmagan — birinchi tick `ensureChannelTables`
+→ `installLexicon` zanjirini o'zi ishga tushirgan. §11 dagi «birinchi tick
+o'rnatadi» degan da'vo endi deployda isbotlangan, faqat testda emas.
+
+**Ishlamadi — webhook o'zini tuzatish hech qachon ishga tushmagan.**
+`channel_audit` dagi barcha heartbeat satrlari `entity_id = "loop"`. Birorta
+`cron` satri yo'q. Ya'ni O bosqichida yozilgan o'z-o'zini tuzatish **faqat
+`/api/cron/channel` ichida** edi, uni esa bu deployment'da hech kim chaqirmaydi
+(UptimeRobot hali sozlanmagan). In-process loop — yagona ishlab turgan tick —
+webhook'ni umuman tekshirmagan. Natija: buzuq webhook buzuq qoladi, tugma o'lik
+qoladi, va buni aytadigan hech qanday satr yozilmaydi.
+
+**Tuzatildi (shu bosqich).**
+
+1. `maintainPublisherTransport()` — tick shaklidagi yagona chaqiruv: hech qachon
+   throw qilmaydi, audit uchun bitta qisqa satr qaytaradi.
+2. **Loop ham, cron ham** shu funksiyani chaqiradi (`boot.ts`, `cron/channel`).
+   Loop heartbeat'i endi `webhook: "ok"` / `"missing>repaired"` kabi maydonni
+   olib yuradi — panel "tick ishlayapti, lekin webhook o'lik" holatini ajratadi.
+3. **Preview yuborishdan oldin** (`send.ts`) transport tekshiriladi: operator
+   tugmani ko'rganda u **allaqachon** ishlaydi. Buzuq tugma bosilganda hech
+   qanday iz qolmasligi — 2026-10-29 dagi asosiy muammo edi.
+4. **Tuzatilganda admin chatga bitta xabar** ketadi
+   (`APPROVAL_TEXTS.webhookRepaired`): "Bot qayta ulandi, tugmalar endi
+   ishlaydi, kutilayotgan postni yana tasdiqlang." Busiz oxirgi bosishi
+   muvaffaqiyatsiz bo'lgan operator qayta bosishga sabab ko'rmaydi.
+
+**Shu sababli qoida:** yangi tick-bosqichi qo'shsangiz, u **ikkala** yo'lda ham
+(`boot.ts` loop va `/api/cron/channel`) bo'lishi shart. `scripts/check-channel.ts`
+buni matn darajasida qulflaydi ("BOTH tick paths verify and repair the webhook"),
+`npm run channel:rehearse` esa mock Telegram bilan 21 tekshiruvda isbotlaydi.
+
 ### 11a-1. 2026-10-29 — "Approve tugmasi hech narsa qilmayapti"
 
 **Report.** The admin chat received the preview with three buttons. Pressing
@@ -1045,6 +1119,1168 @@ the running build has no code that creates the table. The moment that build is
 deployed the first tick installs it by itself; `npm run test:integration` proves
 the claim on a fresh database ("the first bootstrap installs the whole dictionary
 into a fresh database", 12 732 terms, version `pdf-12732-1949`).
+
+## 11b. The public path: from a post to the product (2026-10-29)
+
+Every channel post ends in `/go/<code>` → `/scholarships/<id>`. Before this
+section existed, that page was the whole of a visitor's experience: no link to
+the product, no explanation of what the site does, and the app itself behind an
+account. The operator's question was exactly that — *"the site's features are
+never visible; find a way."*
+
+### What is public (no account, no session)
+
+| Page | What it proves |
+| --- | --- |
+| `/scholarships`, `/scholarships/<id>` | the award, its requirements, the official link |
+| `/universities`, `/universities/<id>` | the institution, programmes, costs |
+| **`/features`** (new) | what the platform does beyond one award |
+
+`/features` is a server component: it reads only bundled copy, needs no session
+and no client fetch, and it is in the sitemap. The Telegram bot link on it is
+printed **only** when the deployment has a configured bot (`getTelegramSettings`),
+never hardcoded.
+
+### The three entry points, all on every public page
+
+1. the header's third navigation item (`Imkoniyatlar` / `Возможности` /
+   `Features`) — added to `PublicCatalogHeader`, so it exists on every catalogue
+   page by construction;
+2. a promo strip at the end of each catalogue page
+   (`PublicFeaturePromo`): `Bu sahifa — saytning faqat bir qismi` + two buttons;
+3. the bottom of every channel-linked award page, i.e. exactly where a reader
+   from Telegram finishes reading.
+
+### One click to a real account
+
+`/?start=1` opens the onboarding wizard directly for a visitor with no session
+(the parameter is removed from the URL afterwards so Back/Forward and bookmarks
+behave). A signed-in student is never hijacked: the session restore wins.
+
+### What the page says, and what it refuses to say
+
+Browsing is free and account-free; an account is **only** for saving, deadline
+reminders and the AI assistant. The eight feature cards describe shipped
+functionality (fit score, admission chance, deadline plan, documents and essays,
+AI assistant, visa/departure, cost plan, Telegram bot) — no numbers, no
+testimonials, no promises, consistent with §4b and docs/CHANNEL.md §6.
+
+The catalogue pages now also pass the **server-resolved dictionary** to
+`LocaleProvider`. The promo is a client component, so without it the strip
+painted English for an Uzbek visitor until hydration finished.
+
+Checks: `npm run test:render` §14 (9 checks — the page exists and reads no
+session, the header links it, every catalogue page carries the strip, `start=1`
+opens the wizard, the bot link is conditional, and the copy is complete in all
+three languages).
+
+## 11c. The new-account prompt: connect the bot, for ten days (2026-10-29)
+
+The operator's instruction: *after creating an account, when the student comes
+back within ten days, ask them to connect the Telegram bot so they can use the
+site fully — and one account may have one Telegram, never more.*
+
+### What was already true (said plainly)
+
+**One account = one Telegram was already enforced**, in three layers, and no
+code changed for it in this phase:
+
+| Layer | Where | What it refuses |
+| --- | --- | --- |
+| website | `startRequest()` → `getLinkByProfile` | a second link attempt on an account that already has one → `already_linked` (409) |
+| bot | `confirmLinkAttempt()` transaction | a Telegram id already on another account → `linked_elsewhere`; an account that already has another Telegram → `account_has_other` |
+| database | `telegram_links` | `profile_id … unique` **and** `telegram_user_id … unique` — a race cannot create a second row |
+
+`npm run test:telegram` now asserts all three, and
+`npm run test:telegram-integration` already drove cases A/B/C through the real
+bot and the real database.
+
+### What was wrong with the reminder
+
+`TelegramNudge` existed, but:
+
+* it was rendered **only on the dashboard tab**, so a student who opened
+  Projects/Deadlines/anything else never saw it;
+* its dismissal was one permanent flag (`scholarbridge_tg_nudge_dismissed = "1"`):
+  a single tap on day one silenced it **for the life of the account**;
+* nothing knew the account's age, so there was no ten-day window at all — the
+  card could appear on a two-year-old account or never.
+
+### Now
+
+`src/lib/telegram/nudge.ts` (pure, no database):
+
+```
+visible ⟺ bot configured ∧ not linked ∧ account age ≤ 10 days ∧ not dismissed today
+```
+
+* The verdict is computed **on the server** (`GET /api/telegram/me` →
+  `nudge: { show, reason, daysLeft }`, `account: { ageDays, nudgeWindowDays: 10 }`)
+  from `student_profiles.created_at`. The browser cannot invent a window; it only
+  knows whether *today's* banner was dismissed.
+* Dismissal is keyed `scholarbridge_tg_nudge_<profileId>_<local day>`, so "Later"
+  means today, and the reminder returns tomorrow while the account is still new.
+  Older keys are pruned on write. Day 10 is inside the window, day 11 is not.
+* An unknown creation date is `too_old` — never a reason to nag.
+* The card renders in the **app shell**, above the tab content, so it greets the
+  student on whatever screen they open in those first days.
+* The permanent connect card in *Settings → Telegram* is untouched: nothing is
+  lost after day ten, and unlinking later does not resurrect the reminder.
+
+Copy (uz/ru/en): `telegram.nudgeTitle` = *"Saytdan to'liq foydalanish uchun
+Telegram botni ulang"*, `nudgeBody`, `nudgeDaysLeft` (`… yana {days} kun …`),
+`nudgeCta`, `dismiss` = *"Keyinroq"*.
+
+Verified live on a real `next start` against the dev database: a fresh account
+with a configured bot → `show: true, daysLeft: 10`; a 15-day-old account →
+`show: false, reason: "too_old"`; a linked account → `reason: "linked"`.
+
+## 11d. The catalogue in Uzbek: names translated, prose labelled (2026-10-30)
+
+Phase Q fixed the *channel* copy. This section is the same rule applied to the
+**website catalogue**, where 3030 active programmes and 547 scholarships are
+stored in English and rendered into uz / ru at request time.
+
+### What the live data actually contains (measured, not assumed)
+
+| Table | Rows | Distinct text |
+|---|---|---|
+| `programs` (active) | 3030 | 1138 programme names, **67** `field` values |
+| `scholarships` (active) | 547 | 446 distinct `tuition_coverage` strings, plus `description`, `requirements`, `english_requirements` |
+
+Two different problems hide in that.
+
+**Names are finite.** They are built from a small grammar — a degree token
+(`BSc`, `LLM`, `MB BChir`, `Master of Engineering`) plus a field, often a
+`(Hons)` / `(English-taught)` marker and sometimes a business school in
+parentheses. A dictionary plus a parser covers them completely.
+
+**Prose is not.** `"No scholarship-specific English score is published;
+applicants must meet the host university's English language requirement…"` has
+446 siblings. It cannot be dictionary-translated, and machine translation is
+not used in this project. The product owner's ruling (2026-10-30) is: **the text
+stays where it is, with an explicit "Manba tili: inglizcha" label directly
+above it.** Nothing is silently dropped, nothing is machine-mangled, and a
+student never mistakes English for a broken Uzbek translation.
+
+### What was wrong before this phase (verified in the code, not guessed)
+
+1. **67 field labels → 12 were not translated at all** and several were
+   machine-hybrids that read as typos: `Life fanlari`, `Applied matematika`,
+   `Information fan`, `Earth fanlari`, `Financial muhandislik`, `Sports fan`.
+2. **Programme names fell straight through the parser.** `LLB Law`,
+   `Bachelor of Design in Animation` → `of dizayn in Animation bo'yicha
+   bakalavr`, `Master of Engineering` → `of muhandislik bo'yicha magistr`,
+   `Master of Laws (LLM) in Environmental Law` → `of Laws (LLM) in ekologik
+   huquq bo'yicha magistr`. Half-translated titles were the norm, not the
+   exception.
+3. **`tuition_coverage`, `english_requirements`, `description` and
+   `requirements` were printed as raw English with no label at all** on the
+   uz/ru detail page.
+
+### The rule now
+
+* **Clean or verbatim.** `localizeMajorOrField` returns the original label when
+  any English word survives the alias pass — a half-translated label reads worse
+  than the source. `isUntranslatedLabel()` is the exported probe the gate uses.
+* **Names are parsed, not word-swapped.** Degree tokens (30+ forms, longest
+  first) → field → composition, with `(Hons)` → *imtiyozli*, `(English-taught)`
+  → *ingliz tilida*, and institution parentheticals kept verbatim because they
+  are proper nouns (`MBA — Edinburgh Business School`).
+* **Prose is labelled.** `localizeProse()` runs the deterministic translator and
+  then asks `needsSourceLanguageLabel()`; `SourceLanguageProse` renders the
+  label plus `<p lang="en">`. Text that IS translated (test scores, the common
+  coverage phrasings) gets no label.
+* **The funding cell never holds a sentence.** A long English `funding_type`
+  falls back to the localized coverage type instead of dumping prose into a
+  table cell.
+
+### Verified
+
+* `npm run test:catalogue-language` — **17/17**, against
+  `scripts/fixtures/live-catalogue-vocab.json` (all 67 live field values, 146
+  live programme titles, 12 synthetic degree shapes). 67/67 fields translated,
+  **157 of 158** titles fully localized, the one holdout a real institution
+  string returned verbatim.
+* `npm run test:render` — **354/0**, including the new section *14b*: the label
+  appears for English prose, disappears for translated copy, and `lang="en"` is
+  set only in the labelled case.
+
+Regenerate the fixture with:
+
+```sql
+-- fields
+select field, count(*) from programs where is_active group by 1 order by 2 desc;
+-- a name sample that covers every shape
+select distinct name from programs where is_active order by md5(name) limit 150;
+```
+### Two holes found by reading the output, and closed (2026-10-30, same phase)
+
+Both were invisible to the gate that shipped with the phase, because the gate
+only asked "is the result translated or verbatim?" — never "is it *right*?".
+
+1. **A foreign title was turned into a degree the catalogue never offered.**
+   `Ingeniería Civil` (Spanish, a programme name) matched the `Ingeniería → BEng`
+   token before the field dictionary and rendered as *"Qurilish bo'yicha
+   muhandislik bakalavri (BEng)"*. Fixed by consulting the exact field label
+   first whenever the title contains non-ASCII letters; the label now renders as
+   `Qurilish muhandisligi`. `Abogacía (Law)` and `Medicina (Medicine)` follow the
+   same rule and collapse to `Huquqshunoslik` / `Tibbiyot`, since the bracket
+   repeats what the field already says.
+2. **A short English value was never labelled.** `isEnglishProse()` required six
+   words and two function words, so `Merit-based tuition waiver`,
+   `Need-based aid and fee exemption` and
+   `Tuition fee reduction for international students` reached the Uzbek page
+   bare — the exact failure Phase T exists to prevent, wearing a different hat.
+   The detector now also counts *English content words* (a word a translation
+   never contains); one is enough for a value of eight words or fewer, two for a
+   longer string, so a single leftover proper noun cannot condemn a translation.
+
+Both rules are pinned by the gate: *"a foreign-language title that is also a
+field is never made into a degree"* and *"a short English value without function
+words is labelled too"* — **19/19** now, with `To'liq kontrakt`,
+`Kontraktsiz nemis davlat universiteti`, `Tibbiyot` and `Fizika (ENS)` asserted to
+stay *unlabelled*.
+
+## 11e. The catalogue leads with what a student can still apply to (2026-10-30)
+
+### What was wrong
+
+`/scholarships` — the public catalogue, the page a guest and a search engine
+see — paged in **insertion order**:
+
+```ts
+const sorted = [...bundle.entries].sort((a, b) => a.id - b.id);
+```
+
+That is a fact about the import, not about a student's choices. Page 1 showed
+whichever 24 rows were seeded first, and the cold-cache fallback ordered by
+`asc(id)` too. Nothing anywhere looked at the date, so:
+
+* an award that closed last week and one that closes in three days were equally
+  likely to be on page 1;
+* `application_status` is a value the owner set when the row was last touched.
+  When the date went by, the card and the detail page kept saying **Ochiq** —
+  the site promising an open window that had shut.
+
+### The rule now
+
+One pure module, `src/lib/catalogueOrder.ts`, with no database access and no
+clock of its own (`today` is passed in as `YYYY-MM-DD`):
+
+| state | when | where it sorts |
+|---|---|---|
+| `open` / `upcoming` | a date ≥ today | first, **soonest deadline first** |
+| `rolling` | provider accepts continuously | after the dated open rows |
+| `unknown` | the catalogue has no date | after rolling |
+| `passed` | a date < today | **last, most recently closed first** |
+
+A passed date beats a stored `open` — the database is a note the owner made,
+the date is the promise the provider made. A stored `upcoming` keeps its word
+until the date arrives, and `rolling` is never "passed". Ties break on `id`, so
+the order is identical on every request and pagination cannot shuffle rows
+between pages. The input array is never mutated.
+
+What the student sees:
+
+* **Card** — a grey *Muddat o‘tdi* chip plus *Keyingi qabulni rasmiy manbadan
+  tekshiring.* The award stays in the catalogue (its next round is usually the
+  same page) but the card no longer looks like something to apply to today.
+* **Detail page** — the status label reads `Yopilgan` when the date has passed,
+  whatever the stored status says, and an amber note states the closing date
+  (`t.deadlinePassedNote`), in all three languages.
+
+### Verified
+
+* `npm run test:catalogue-order` — **12/12** (new): the verdict table above, the
+  ordering, stability under a shuffled input, the real 45-row slice from
+  `scripts/fixtures/catalogue-slice.json` (every row kept, closed rows last,
+  open rows in ascending deadline order), and a source check that the page
+  *calls* the helper and no longer sorts by `id`.
+* `test:render` 354/0 · `test:catalogue-language` 19/0 · `test:localization`
+  16/0 · channel 196/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+  `next build` OK.
+
+### Stated limitation
+
+The cold-cache path (no bundle yet) pages by `deadline_date asc nulls last` in
+SQL and re-orders the page it receives. "Open → rolling → undated → closed"
+depends on today, which SQL does not have without a parameter; the bundle path
+is the normal one and is exact. The gate asserts the fallback no longer pages
+by `id`.
+
+## 11f. One clock: the closing day belongs to the applicant (2026-10-30)
+
+### The bug, measured before it was fixed
+
+Two engines answered "can this be applied to today?":
+
+* `computeScholarshipStatus()` (`src/lib/scholarshipStatus.ts`) — the six-state
+  filter vocabulary, also **written back** into `application_status` by
+  `runRefresh()`;
+* `deadlineStateOf()` (`src/lib/catalogueOrder.ts`) — the verdict the public
+  catalogue renders (Phase U).
+
+A `date` column arrives as **midnight UTC**, and the status engine compared it
+with `new Date()`. Measured on the live date (2026-10-30, 07:01 UTC):
+
+```
+deadline today       -> closed      ← the one day it can be applied to
+deadline yesterday   -> closed
+deadline tomorrow    -> open
+range ending today   -> closed
+```
+
+So on the closing day the app said **YOPILGAN**, while the public page (which
+compares days) said open. Worse: `runRefresh()` writes the verdict into
+`application_status`, so a nightly run at 00:05 UTC **closed the award in the
+database** for the whole final day.
+
+### The rule now
+
+All deadline comparisons are whole-day comparisons, in UTC, in one place —
+`daysBetweenYmd` / `ymdOf` / `todayYmd` in `catalogueOrder.ts`:
+
+* the deadline day itself is **open** at every hour (00:00:01 … 23:59:59);
+* a date range keeps its **last day** open;
+* with several rounds, the latest round decides and its own day counts;
+* `computeScholarshipStatus(s, now = new Date())` takes its clock as a
+  parameter, so the verdict is testable and every caller agrees.
+
+### Verified
+
+`npm run test:deadline-day` — **13/13** (new):
+
+* the closing day is open at five different hours; day before open, day after
+  closed; ranges and rounds too;
+* **the two engines never contradict**: the real 45-row slice from
+  `scripts/fixtures/catalogue-slice.json` × 7 dates, asserting the app's
+  open/closed answer and the catalogue's `passed` verdict agree on every row;
+* the dashboard countdown (`daysUntil`) is 0 on the deadline day, matching the
+  verdict;
+* source checks: `computeScholarshipStatus` has no hidden clock inside its body
+  and no `now <= deadline`-style comparison, `refresh.ts` still goes through the
+  shared engine, and the three consumers do not compute a status of their own.
+
+`test:render` 354/0 · `test:catalogue-order` 12/0 · `test:catalogue-language`
+19/0 · `test:localization` 16/0 · integration 351/0 · channel 196/0 · dataset
+50/0 · security 90 · portability 57/0 · `check:i18n` passed · `next build` OK.
+
+## 11g. The opportunities feed speaks the reader's language (2026-10-30)
+
+### Two defects, both measured
+
+**1. English inside the recommendation list.** `scoreOpportunity()`
+(`src/lib/opportunities.ts`) builds its reasons and flags as finished English
+sentences and `OpportunitiesPanel` printed them verbatim:
+
+```
++ field match: Computer Science
+! limited to Germany
+! deadline has passed
+```
+
+On an Uzbek or Russian page. Every other catalogue was made trilingual in Phase
+T; this one was missed, and a sentence cannot be translated after the fact
+without parsing it.
+
+**2. The list started with what had already expired.** `?sort=deadline` ordered
+ascending, so last year's competitions came first in the list a student opens to
+find something to enter — Phase U's `/scholarships` defect, in the second
+catalogue. The deadline test itself also compared a date-only value (midnight
+UTC) with the wall clock, so an opportunity closed at 00:00:01 on the day it
+could still be entered (Phase V's rule, not yet applied here).
+
+### The rule now
+
+* `scoreOpportunity()` returns a third field, `notes: OpportunityNote[]` —
+  `{ kind: "reason" | "flag", code, params }` — emitted *through* two local
+  helpers, so `reasons`/`flags` are always derived from `notes`, in order, and
+  the two can never drift. The English strings are unchanged: they are the API's
+  existing contract.
+* `src/lib/opportunityNotes.ts` renders the codes in **uz / ru / en** (12 codes
+  × 3 languages, parameters included: `"faqat Germany uchun"`,
+  `"целевой уровень: grad, ваш уровень: undergrad"`). An unknown code renders as
+  an empty string — never a guess.
+* The route adds `notes` to every item and sorts **expired last in both sort
+  modes** (`openFirst`), then by deadline or by match.
+* The panel renders `renderOpportunityNotes(notes, locale, kind)` and shows a
+  grey «Muddat o‘tdi» chip on a row whose notes say `deadline_passed`. A cached
+  payload without `notes` falls back to the English strings rather than showing
+  an empty list.
+* The deadline comparison is the whole-day rule from Phase V: the closing day is
+  open at every hour.
+
+### Verified
+
+`npm run test:opportunity-notes` — **10/10** (new): every code in three
+languages (Cyrillic asserted for ru, "not the English source" for uz), the
+parameters arriving in the sentence, the unknown-code rule, `reasons`/`flags`
+matching their notes exactly, the closing-day/next-day/previous-day matrix, both
+sorts consulting `deadline_passed` (and the naive deadline sort asserted gone),
+the panel wiring, and the new label present in all three message files.
+
+`test:opportunities` 27/0 · `test:render` 354/0 · `test:deadline-day` 13/0 ·
+integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+`next build` OK.
+
+## 11h. A university page that speaks the reader's language (2026-10-30)
+
+The university profile at `/universities/[id]` printed the stored English
+description verbatim under an Uzbek heading. Measured against the live
+catalogue (356 active universities):
+
+| shape | rows | before | after |
+| --- | --- | --- | --- |
+| "… is a premier global research university in …" | 194 | English paragraph | rendered in the page language |
+| "… is a <public\|private> university in …" with a funding sentence | 46 | English paragraph | rendered |
+| "… is a <public\|private> university in …" without one | 108 | English paragraph | rendered |
+| "Institution identity seed…" | 4 | translated (dictionary) | unchanged |
+| no known shape / funding headline outside the vocabulary | 4–10 | English paragraph | **verbatim + label** |
+
+`UNI_TEMPLATE_1` in `catalogLocalizer.ts` was written for a third shape
+("ranked in the top N") that the catalogue no longer produces, so it matched
+nothing. The two live shapes are now parsed as structured facts in
+`src/lib/universityProse.ts`: name, city, country, type, founded year, tuition,
+living costs, accommodation, funding headline, post-study window and the
+Top-10 guide position. The sentences are re-written per language, not
+substituted word by word.
+
+**The rule is clean or verbatim.** The funding headline keeps the scheme names
+exactly as stored (students search for them by name) and renders the payment
+side from a closed vocabulary — "Full Tuition Waiver" is
+"to‘liq kontraktdan ozod qilish" / "полное освобождение от оплаты обучения",
+never "kontrakt imtiyozi". One word outside that vocabulary and the *whole*
+description stays in English: `universityDescriptionState()` reports
+`verbatim: true` by comparing the result with the source, and the page renders
+it through `SourceLanguageProse` with the existing label
+(`Manba tili: inglizcha` / `Язык источника: английский` / `Source language: English`,
+`universityDetail.sourceLanguageLabel`). 35 of the 41 distinct funding
+headlines in live data render; the rest are labelled rather than guessed.
+
+Highlight badges follow the same rule. Three defects measured before the fix:
+
+* `Located in Cambridge, MA, United States (Founded 1861)` left the English
+  "United Statesda joylashgan" — the parser read "MA" as the country. It now
+  reads the place as city + country and prints `Joylashuvi: Kembrij, MA, AQSH`.
+* `CITY_NAMES.Cambridge` said **"Kembridge"** in Uzbek. Now "Kembrij".
+* `Post-study work visa opportunity: 3 year(s)`, `Comprehensive undergraduate,
+  master's, and doctoral research programs` and `Uzbek applicants guide:
+  United States Top-10 #1` were printed in English; all three now have
+  templates.
+
+The old phrase-substitution layer could also produce half-translated badges
+("stipendiya: MIT Need-Based stipendiya + …"). It now only counts as a
+translation when the phrases account for the **whole** badge; otherwise the
+badge is returned untouched and the list shows one source-language label under
+the chips.
+
+### Verified
+
+`npm run test:university-prose` — **17/17** (new): all three live shapes in uz
+and ru, no English sentence frame left behind, the numbers preserved, city and
+country localized (AQSH, Kembrij, Tucson, AZ), the unknown-funding row falling
+back to the exact source string, the seed note still translated, `en`
+unchanged and unlabelled, `localizeUniversityDescription` and
+`universityDescriptionState` agreeing, the six MIT badges (five rendered, the
+unknown scholarship badge returned whole), the mangled badge asserted *not*
+produced, and the type-column case-insensitivity.
+
+`npm run test:catalogue-language` 19/0 · `test:render` 354/0 ·
+`test:localization` 16/0 · `test:catalogue-order` 12/0 · `test:deadline-day`
+13/0 · `test:opportunity-notes` 10/0 · `test:opportunities` 27/0 ·
+`test:channel` 196/0 · `test:dataset` 50/0 · integration 351/0 · security 90 ·
+portability 57/0 · `check:i18n` passed · `next build` OK.
+
+## 11i. One university page states one QS rank (2026-10-30)
+
+The catalogue corrected its ranks to the official QS 2026 edition on 2026-10-23
+(`docs/QS2026_RANK_VERIFICATION_2026-10-23.md`: 181 rows fixed, 139 filled, 16
+already right). The stored **descriptions** and **ranking chips** were generated
+from the sequence that document debunked, so they still state the old numbers.
+Measured on the live catalogue (356 active universities):
+
+| | rows |
+| --- | ---: |
+| descriptions naming a QS position | 194 |
+| ranking chips naming one | 194 |
+| **disagreeing with `universities.world_ranking`** | **178** |
+| rows with no verified rank (nothing to reconcile) | 0 |
+
+Worst case: University of Latvia reads `QS World Ranking #200` in its prose and
+is **801** in QS 2026 — off by 601 places.
+
+Phase X made that prose readable in Uzbek and Russian, which turned a dormant
+contradiction into a visible one: the same profile printed
+«QS jahon reytingida 200-o'rin» in the text and «QS o'rni: #801» in the facts row.
+
+### What changed
+
+`reconcileEmbeddedRank(text, rank)` in `src/lib/universityProse.ts` replaces the
+figure inside `QS World Ranking #N` / `QS World University Ranking #N` with the
+catalogue's verified rank. The stored sentence keeps its shape and its wording;
+only the number is brought up to date. It is applied *before* translation, so:
+
+* uz, ru **and** en state the same number (an English page is not exempt);
+* `localizeUniversityDescription`, `universityDescriptionState`,
+  `localizeHighlightItem` and `localizeHighlights` take an optional rank;
+* a row with no verified rank keeps its prose untouched — the number is never
+  invented, and a non-QS position ("Top 10 in the UK #3") is never rewritten;
+* `GET /api/universities/[id]` corrects the row **before** it is cached, so the
+  hub cards that render `description`/`highlights` cannot contradict the profile
+  page, and the later uz/ru localization works from the corrected text.
+
+The chip comparison that drives the "source language: English" label is made
+against the corrected strings, so fixing a number alone never counts as a
+translation.
+
+### Verified
+
+`npm run test:university-rank` — **17/17** (new), over the real Latvia (801),
+UPC (392), MIT (1) and Macau rows: the replacement and the no-op case, a null /
+`0` / `NaN` rank, a non-QS `#`, all three locales for the description and the
+chip, the Agreeing row rendering unchanged, no invented rank when the prose
+states none, page wiring (both localizers receive `u.worldRanking`) and API
+wiring (the correction precedes the cache read and write).
+
+`test:university-prose` 17/0 · `test:catalogue-language` 19/0 · `test:render`
+354/0 · `test:localization` 16/0 · `test:catalogue-order` 12/0 ·
+`test:deadline-day` 13/0 · `test:opportunity-notes` 10/0 · `test:opportunities`
+27/0 · `test:channel` 196/0 · `test:dataset` 50/0 · integration 351/0 ·
+security 90 · portability 57/0 · `check:i18n` passed · `next build` OK.
+
+No catalogue rows were written: the correction is a read-path transform over the
+value the catalogue already verified.
+
+## 11j. The hub's university panel tells the truth about what it shows (2026-10-30)
+
+`UniversityExplorer` opens `UniversityDetail` when a student clicks a card on the
+public hub. Two things on that panel were not true.
+
+**1. The ranking edition.** The badge read «QS World Ranking **2027**» — a year
+hardcoded in all three message files — while every stored rank is the **2026**
+edition (`universities.qs_rank_year`, and every `university_rankings` row), and
+the profile page says «Ranking edition: 2026». The copy no longer carries a year;
+the panel prints `uni.qsRankYear` from the row.
+
+**2. The source language.** The About paragraph renders `uni.description` exactly
+as the API returns it. The API translates for uz/ru, but **10 of the 356**
+descriptions cannot be rendered faithfully — the four hand-written ones (WIUT,
+IUT, NewUU, CTU, which match no template) and six whose funding headline is
+outside the vocabulary. Those stayed English with no label, which is what Phase T
+and Phase X forbid on the profile page. `localizeDetailPayload` now reports
+`descriptionSourceLanguage: "en" | null`, derived from the same
+`universityDescriptionState(...).verbatim` rule the profile page uses, and the
+panel prints the same label («Manba tili: inglizcha» / «Язык источника:
+английский» / “Source language: English”) above a `lang="en"` paragraph.
+
+The label wording is asserted to be byte-identical to
+`universityDetail.sourceLanguageLabel`, so a student sees one phrase for one
+fact on both surfaces.
+
+### Verified
+
+`npm run test:university-hub` — **11/11** (new): the flag set for an
+untranslatable row (WIUT) and clear for a translated one (MIT) in uz and ru, no
+flag on the English page, no flag for an empty description, the two labels
+matching across surfaces, the ranking copy free of any four-digit year in all
+three locales, the panel reading `uni.qsRankYear`, the panel containing no
+hardcoded year outside comments, and the API wiring (the whole row is shipped,
+the flag is derived from the profile page's rule).
+
+`test:university-prose` 17/0 · `test:university-rank` 17/0 · `test:render` 354/0
+· `test:catalogue-language` 19/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+`next build` OK.
+
+## 11k. The catalogue cards match the profile page they lead to (2026-10-30)
+
+Phase Y fixed the QS figure on `/universities/[id]` and on `GET
+/api/universities/[id]`. The hub's card list is a **different** endpoint:
+`GET /api/universities` localizes every row through `localizeUniversityRow`,
+which passed neither the verified rank nor the source-language facts onward.
+Measured with the real University of Latvia row (prose `#200`, QS 2026 position
+**801**) before the fix:
+
+| locale | description | ranking chip |
+| --- | --- | --- |
+| en | still `#200` (path is a passthrough) | still `#200` |
+| uz | `200-o'rin`, from the stale text | `#200` |
+| ru | `200-е место`, from the stale text | `№200` |
+
+A student could read «QS o‘rni: #801» on the profile page and `#200` on the card
+that led there.
+
+### What changed
+
+* `localizeUniversityRow` passes `worldRanking` into the description and badge
+  translators, and reconciles the stored prose for `en` (and any locale it does
+  not translate) through the same `reconcileEmbeddedRank` Phase Y introduced.
+  An agreeing row is still returned as **the same object**, so "no translation"
+  remains a no-op.
+* `worldRanking` was added to `UNIVERSITY_LOCALIZED_FIELDS` — it is not
+  translated, but it *is* an input of the translation, so without it in the memo
+  signature a corrected rank would keep serving the translation computed for the
+  old one (asserted).
+* The row now carries `descriptionSourceLanguage` / `highlightsSourceLanguage`
+  (`"en" | null`), derived from the same rules the profile page and the detail
+  panel use, and `UniversityExplorer` prints the same label above a `lang="en"`
+  paragraph and under the badge row.
+
+### Verified
+
+`npm run test:university-list` — **15/15** (new): the verified rank in all three
+locales for both the description and the chip, the English card corrected, an
+agreeing row unchanged (and the same reference), the stored row never mutated, a
+row with no verified rank untouched, the memo not serving a translation built
+for an older rank, the two flags set exactly for the rows that need them (WIUT
+description, the untranslatable MIT scholarship badge) and clear for the rest, no
+flags on the English page, plus the route, memo and card wiring.
+
+`test:university-hub` 11/0 · `test:university-rank` 17/0 ·
+`test:university-prose` 17/0 · `test:catalogue-language` 19/0 · `test:render`
+354/0 · `test:localization` 16/0 · `test:catalogue-order` 12/0 ·
+`test:deadline-day` 13/0 · `test:opportunity-notes` 10/0 · `test:opportunities`
+27/0 · `test:channel` 196/0 · `test:dataset` 50/0 · integration 351/0 · security
+90 · portability 57/0 · `check:i18n` passed · `next build` OK.
+
+## 11l. The landing marquee states verified QS positions (2026-10-30)
+
+The first screen of the product is a 24-card university marquee, each card
+carrying a blue `QS #N` badge. It is server-rendered, so those badges are what a
+crawler and a first-time visitor read before anything else.
+
+The numbers were typed by hand when the marquee was designed and had drifted
+from the edition the catalogue itself was corrected to
+(`docs/QS2026_RANK_VERIFICATION_2026-10-23.md`, source table
+`data/qs2026_top1500.csv`). Measured against that table:
+
+| card | badge said | official QS 2026 |
+| --- | --- | ---: |
+| UC Berkeley | #18 | **17** |
+| Technical University of Munich | #23 | **22** |
+| The University of Sydney | #26 | **25** |
+| The University of Tokyo | #37 | **36** |
+| "KAIST & Seoul National University" | #39–53 | SNU **38**; **KAIST is not in the edition at all** (removed) |
+
+So 5 of 24 public cards stated a ranking they could not support — one of them a
+range that covered a university the edition does not rank.
+
+### What changed
+
+* `MarqueeUniversityItem` no longer has a free-form `rank` string. It carries
+  `qsRank: number` (the verified position) and `qsName` (the official spelling,
+  used by the gate), and the badge renders `` `QS #${university.qsRank}` ``.
+* The four wrong numbers are corrected; the KAIST & SNU card is replaced by
+  **Seoul National University — QS #38**, with SNU's own Commons photo already
+  vetted in this repository (`SNU_gate.jpg`), so no new unverified image URL is
+  introduced.
+* `scripts/check-landing-ranks.ts` reads `data/qs2026_top1500.csv` and fails the
+  build if any card disagrees with it — the numbers can no longer drift.
+
+### Verified
+
+`npm run test:landing-ranks` — **10/10** (new): every card matches the official
+table, no card claims a rank for a university missing from the edition, the badge
+value is always an integer position (never a range), the marquee is still 3 × 8
+cards with unique names and photos, each row stays ascending, every photo is a
+Commons URL, and the component renders the number rather than a stored label.
+Reintroducing two of the old values (Berkeley #18, Tokyo #37) makes the gate
+fail with both rows named.
+
+`test:university-list` 15/0 · `test:university-hub` 11/0 ·
+`test:university-rank` 17/0 · `test:university-prose` 17/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 ·
+`test:opportunity-notes` 10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 ·
+`test:dataset` 50/0 · integration 351/0 · security 90 · portability 57/0 ·
+`check:i18n` passed · `next build` OK.
+
+## 11m. The chancing benchmark table only states verified QS positions (2026-10-30)
+
+Phases Z, AA, AB and Y took the same rule to the catalogue, the university list,
+the hub panel and the landing marquee: **a QS number is the verified position of
+the edition it names, or it is not printed.** One surface was left — the
+chancing/recommendation benchmark table in `src/lib/qsTop200Benchmarks.ts`, which
+feeds three screens:
+
+* the `QS #N` badge on every chancing card (`ChancingPanel.tsx`),
+* `positioning.qsRank` on the programme recommendation cards
+  (`RecommendationStudio.tsx`, `/api/programs/recommend`),
+* the badge in the similar-profiles panel (`SimilarProfiles.tsx`).
+
+The table was hand-compiled from an older edition's top-200 and its rank column
+had drifted. Measured 2026-10-30 against `data/qs2026_top1500.csv` (the same
+official table Phase Y reconciled `universities.world_ranking` to): **46 of the
+200 ranks were wrong**, every one by 1–3 places because a row had been inserted
+or dropped upstream.
+
+| drift | rows |
+| --- | --- |
+| −3 | University of Waterloo #122 → **119** |
+| −2 | Purdue **88**, Oslo **119**, UNC Chapel Hill **140**, Liverpool **147**, Universidad de Chile **173** |
+| −1 | 40 rows, including UC Berkeley **17**, TUM **22**, Sydney **25**, UTokyo **36**, SNU **38**, U Queensland **42**, SJTU **47**, Malaya **58**, NTU **63**, UIUC **70**, Penn State **82**, FU Berlin **88**, Alberta **94**, Politecnico di Milano **98**, Utrecht **103**, RWTH **105**, Wisconsin **110**, UC Davis **114** |
+
+The 201st row, KAIST, claimed **#53** for an institution the 2026 edition does
+not rank at all — the same false claim Phase AB removed from the landing marquee.
+(The catalogue row `universities.id = 37` still carries `world_ranking = 53` with
+`qs_rank_year = NULL`; that is catalogue data, and this phase does not write to
+the catalogue tables.)
+
+### What changed
+
+* **All 46 ranks corrected** to the official QS 2026 position; every other field
+  in the tuple is untouched.
+* **`qsRank` is now `number | null`.** `null` means "this edition does not rank
+  it" — never a placeholder. KAIST keeps its admission band (it still matches a
+  profile by name and domain) but carries no position, so nothing can print
+  `QS #53` for it again.
+* **The verified catalogue value wins over the table.** `/api/programs/recommend`
+  now sends `verifiedRankByUniId.get(id) ?? benchmark.qsRank ?? null`, matching
+  what `/api/chancing` already did with `uni.worldRanking ?? qsBenchmark.qsRank`,
+  so the chancing card and the university profile page cannot disagree.
+* **Every badge guards the null**: the chancing card renders
+  `activeItem.worldRanking ?? qsBench.qsRank`, the recommendation card and the
+  similar-profiles badge hide the row entirely when there is no verified rank.
+* `programChancing.ts` treats an unranked university as the least selective band
+  (`?? Number.POSITIVE_INFINITY`) instead of comparing against `null`.
+
+### Verified
+
+`npm run test:qs-benchmarks` — **13/13** (new): every row's rank equals the
+official CSV position for its canonical name or an alias, no row claims a rank
+for an institution the edition does not rank (KAIST is named explicitly), a
+shared table rank is a tie the edition itself declares, no institution appears
+twice, every rank is an integer inside 1–200, the matcher returns the row for its
+own canonical name, the type is nullable, and no component or API can print an
+absent rank. Reintroducing Berkeley #18, TUM #23 and the KAIST #53 claim makes the
+gate fail with all three named.
+
+`test:chancing` **28/0** (TUM now asserted at 22, KAIST asserted `null`) ·
+`test:landing-ranks` 10/0 · `test:university-list` 15/0 · `test:university-hub`
+11/0 · `test:university-rank` 17/0 · `test:university-prose` 17/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration 351/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+`tsc --noEmit` clean · `next build` OK.
+
+## 11n. A rank with no recorded edition is not a QS position (2026-10-30)
+
+Phases Y, Z, AA, AB and AC took the same rule to every screen that states a
+ranking: **a QS number is the verified position of the edition it names, or it
+is not printed.** Every one of them read the rank and ignored the column beside
+it — `qs_rank_year`, the edition the number belongs to.
+
+Measured from the live catalogue on 2026-10-30:
+
+| | rows |
+| --- | ---: |
+| active universities | 356 |
+| carry a `world_ranking` | 350 |
+| … that record an edition (`qs_rank_year = 2026`) | 348 |
+| … that record **no edition** | **2** |
+
+| id | institution | `world_ranking` | `qs_rank_year` | in QS 2026? |
+| --- | --- | ---: | --- | --- |
+| 37 | KAIST (Korea Advanced Institute of Science & Technology) | 53 | `NULL` | **no** |
+| 298 | École des Ponts ParisTech | 205 | `NULL` | **no** |
+
+Both rows were imported from *"Top 300 Universities dataset (user PDF, 2026)"* —
+a dataset whose "2026" is its own label, not a QS edition — and both are marked
+`verification_status = 'verified'`. KAIST's 53 is exactly the false `QS #53`
+Phase AC removed from the chancing benchmark table; it is not in
+`data/qs2026_top1500.csv` at any rank.
+
+Until now those two numbers were printed, without a year, on: the profile page
+(hero badge, the Rank fact, the `<meta>` description), the catalogue cards and
+their modal (`QS Ranking #53`), the rank table cell, the chancing badge and the
+shortlist dropdown ("QS #53 — KAIST"), the programme recommendation cards, the
+planner comparison list and the dashboard cards.
+
+### What changed
+
+* **`src/lib/universityRank.ts`** (new, pure — no database, no React, no
+  environment) holds the rule: `verifiedQsRank(row)` returns `{ rank, year }`
+  only when the row records a plausible edition year; `verifiedQsRankNumber()`
+  is the shorthand the payloads use. `null` is the answer for an unranked row,
+  a broken number, and a number with no edition.
+* **Every read path goes through it**: `GET /api/universities` (which also stops
+  filtering and sorting on an undated rank), `GET /api/universities/[id]`,
+  `GET /api/chancing` (both the card and the shortlist), `GET /api/programs/recommend`,
+  `GET /api/planning`, `GET /api/dashboard`, and the profile page — including
+  the figure handed to the prose reconcilers, so the description is never
+  corrected *to* a number the edition does not publish.
+* **The cards omit the badge** instead of printing `QS Ranking —`: both the
+  explorer card and the explorer modal hide the block when the API published no
+  position.
+* **`scripts/check-university-rank-year.ts`** (new gate, `test:university-rank-year`)
+  pins the helper, all six endpoints, the page, the two cards and the data
+  contract. `test:university-rank` and `test:qs-benchmarks` were updated where
+  their source assertions named the old expression — the properties they protect
+  are unchanged and are re-asserted against the new one.
+* **Integration fixtures** now record the edition (`qsRankYear: 2026`) with
+  their ranks, and two new endpoint-level assertions prove the behaviour end to
+  end: a verified row with `world_ranking = 42` and `qs_rank_year = NULL` comes
+  back with `worldRanking: null` and cannot satisfy `minRank=1`.
+
+### What did **not** change (at the time)
+
+This phase was a read-path rule only: `universities.id = 37` still stored 53 and
+id 298 still stored 205, and KAIST's stored description still carried
+*"(QS World Ranking #37)"*. **Phase AE then fixed the data itself** — see §11o.
+The admin editor still has the field: set `qsRankYear = 2026` on a row and its
+rank reappears everywhere; set it back to `NULL` and the rank disappears again.
+
+### Verified
+
+`npm run test:university-rank-year` — **14/14** (new): the two live row shapes
+resolve to `null`, a recorded edition resolves to a position, broken numbers
+(0, negative, fractional, NaN, ∞) and broken editions (0, 53, 1999, 2101,
+fractional) resolve to `null`, the module stays pure, and all six endpoints, the
+page, both cards and the schema/admin contract are pinned. Making the helper
+ignore the edition year, or restoring the raw column in the chancing route,
+fails 4 of the 14 and names the file.
+
+`test:university-rank` **17/0** · `test:university-list` 15/0 ·
+`test:university-hub` 11/0 · `test:qs-benchmarks` 13/0 · `test:chancing` 28/0 ·
+`test:landing-ranks` 10/0 · `test:university-prose` 17/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration **353/0** (2 new) · security 90 · portability 57/0 · `check:i18n`
+passed · `tsc --noEmit` clean · `next build` OK.
+
+## 11o. The catalogue data itself: six ranks and two inventions corrected (2026-10-30)
+
+Phases Y–AD fixed what the screens *print*. None of them checked the numbers
+stored in `universities.world_ranking` — the column every screen repeats — against
+the edition. Phase AE did, over all 356 active rows, and then fixed the rows.
+
+### The audit
+
+`src/lib/qsRankAudit.ts` (pure, no database, no React) compares a catalogue row
+with the official table and returns a verdict: `match`, `band-match`, `mismatch`,
+`band-miss`, `not-filled`, `not-ranked`, `unverified-claim`, `undated`, `unknown`.
+Matching is **explicit** — an alias table of 40 hand-verified renames
+("Penn State University" ↔ "Pennsylvania State University", "TU Wien" ↔ "Vienna
+University of Technology", …) plus accent, apostrophe, leading-`The`,
+parenthetical and `X (Y)` ↔ `Y (X)` normalisation. A fuzzy matcher was rejected
+on purpose: attaching a rank to the wrong university is the exact failure this
+audit exists to catch.
+
+### What it found
+
+| finding | rows |
+| --- | --- |
+| rank one place low | **Basel** 157→158, **Hanyang** 158→159, **Barcelona** 159→160, **Michigan State** 160→161, **Oulu** 341→342, **SUSTech** 342→343 |
+| claimed a position the edition does not publish | **KAIST #53**, **École des Ponts ParisTech #205** |
+| correct | 334 exact + 14 inside a published range |
+| correctly unranked | 8 |
+
+All six wrong ranks sit in the single block that starts at #157, and the cause is
+a tie the two in-repo extracts render differently:
+
+| rank | `data/qs2026_top1500.csv` | `data/qs_2026_top499.tsv` |
+| ---: | --- | --- |
+| 155 | Exeter + Geneva (tie) | Exeter + Geneva (tie) |
+| 156 | (skipped) | (skipped) |
+| 157 | Lancaster | Lancaster + Basel (tie) |
+| 158 | Basel | Hanyang |
+| 159 | Hanyang | Barcelona |
+| 160 | Barcelona | Michigan State |
+| 161 | Michigan State | (skipped) |
+| 162 | Ghent | Ghent |
+
+QS numbers a tie once and then resumes **past** it, so a tie at 157 must be
+followed by 159. The top-499 extract breaks that rule (157, 157, 158 … and a gap
+at 161); the complete CSV holds it (157 … 161, no gap). The CSV is also the file
+Phases AB/AC and both ranking gates already read, so the database was aligned to
+it. If the owner's own QS page shows "=157" for Basel, `id 141` is the single
+value to revisit.
+
+KAIST is the exception QS made in this edition (excluded under the
+anti-canvassing rule), and the 2026-10-23 correction had already cleared it —
+a later import from the user-supplied *"Top 300 Universities dataset (user PDF,
+2026)"* put a number back. Neither KAIST nor École des Ponts appears anywhere in
+`data/qs2026_top1500.csv`.
+
+### What changed in the database
+
+`supabase/qs_2026_rank_correction_pass2_2026-10-30.sql` (run on the live project):
+
+* six ranks corrected, `qs_rank_year = 2026` stamped, `last_verified_at` touched;
+* `id 37` and `id 298` cleared to `world_ranking = NULL, qs_rank_year = NULL`;
+* **KAIST's stored sentence** lost its `(QS World Ranking #37)` clause, and the
+  highlight `"QS World University Ranking #37 globally"` was dropped. Nothing
+  else in the text was reworded — the clause was a false claim, not prose to
+  rewrite;
+* `university_rankings`: the 194 QS 2026 rows were a 1…200 **sequence** (Princeton
+  #13, Columbia #18, SNU #29) marked `verified`. They now carry the corrected
+  institutional positions; the two cleared universities get `rank = NULL` and
+  `verification_status = 'unverified'`. No runtime code reads that table — it was
+  a trap for whoever reads it next, not a live bug;
+* `university_rankings` THE and U.S. News rows were **left alone**: no official
+  table for either edition exists in this repository, and "cannot check" is not
+  "is wrong".
+
+Result: **348 ranked / 8 unranked**, every ranked row carrying `qs_rank_year = 2026`.
+
+### What changed in the code
+
+* **`src/lib/qsRankAudit.ts`** — the audit above.
+* **`scripts/check-qs-catalogue-ranks.ts`** (`test:qs-catalogue-ranks`) — replays
+  the audit over `scripts/fixtures/live-catalogue-ranks-2026-10-30.tsv`, a
+  committed snapshot of all 356 live rows.
+* **`scripts/audit-live-ranks.ts`** (`audit:qs-ranks`) — the same audit against
+  the real database (`DATABASE_URL`), with `-- --write-fixture` to refresh the
+  snapshot. Exits 1 on any disagreement.
+* **`src/lib/universityProse.ts`** — the "premier global research university"
+  shape now treats the `(QS World Ranking #N)` clause as optional, so a cleared
+  university still renders in uz/ru instead of falling back to English, and no
+  rank is invented to fill the gap.
+
+### Verified
+
+`npm run test:qs-catalogue-ranks` — **13/13** (new): the whole 356-row snapshot
+matches the edition, every row resolves to an official entry or to nothing, the
+eight unranked rows are pinned by name, Inha in Tashkent is proven not to take
+the Korean Inha's #643, and the audit is mutation-tested — restoring the six old
+ranks or KAIST's #53 fails it with the rows named.
+
+`test:university-prose` **19/0** (2 new: a rank-less sentence renders in uz/ru
+without inventing a position, and is never reconciled back into one) ·
+`test:university-rank-year` 14/0 · `test:university-rank` 17/0 ·
+`test:university-list` 15/0 · `test:university-hub` 11/0 ·
+`test:qs-benchmarks` 13/0 · `test:chancing` 28/0 · `test:landing-ranks` 10/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration 353/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+`tsc --noEmit` clean · `next build` OK.
+
+## 11p. One figure per cost: the tuition on the card and on the page (2026-10-30)
+
+Every university cost is stored twice — the canonical amount with its currency
+and period (`annual_tuition` + `tuition_currency` + `tuition_period`) and a
+legacy USD mirror (`annual_tuition_usd`), with the same pair for living costs
+and accommodation. All 356 active rows are USD / year on all three families, so
+the two columns describe the **same quantity in the same unit**.
+
+Measured 2026-10-30, they disagreed on:
+
+| family | rows where canonical ≠ mirror |
+| --- | ---: |
+| tuition | **160** |
+| living costs | **162** |
+| accommodation | **176** |
+
+The gaps were not rounding: MIT 64,310 vs 65,500 · Oxford 59,650 vs 48,500 ·
+ETH Zurich 4,900 vs 1,650 · TUM 5,500 vs 3,000 · KAIST 18,000 vs 6,000 ·
+UCL 45,000 vs 47,000.
+
+**What the user saw.** The explorer card prints `annualTuitionUsd` (the mirror);
+the profile page prints the canonical amount; the server-rendered catalogue
+resolves through `resolvedUsdUniversityCosts()` (canonical). So MIT's card read
+**$65,500 on first paint and $64,310 after any filter change**, while the
+profile page agreed with the second figure. Two prices for the same university,
+decided by which screen the student happened to be on.
+
+### The rule
+
+`annualUsdAmount()` in `src/lib/usdCosts.ts` already encoded it: the canonical
+amount is authoritative **when its currency is USD**, the mirror is only a
+fallback for rows with no canonical amount, an explicitly non-USD canonical
+value is never replaced by a USD mirror, and a monthly amount is annualised
+rather than copied. The gap was that two endpoints shipped the raw pair.
+
+### What changed
+
+* **`withResolvedUsdCosts(row)`** (new, in `usdCosts.ts`) publishes the resolved
+  figure in the mirror slot — one call, one rule.
+* **`GET /api/universities`** and **`GET /api/universities/[id]`** now ship
+  `withResolvedUsdCosts(row)`, so the card, the table, the filter (`maxTuition`),
+  the tuition sort and the profile page all read one number. Every other cost
+  consumer (dashboard, planner, deadlines, scholarships, autopilot, country
+  compare, the SSR catalogue) already resolved through the helper — the gate now
+  pins that too.
+* **The SSR catalogue was missing the Phase AD rank rule**: both of its branches
+  published `verified ? university.worldRanking : null`, so a verified row with
+  no recorded edition could still print a `QS #N` badge on the first paint while
+  the API and the profile page refused it. Both branches now use
+  `verifiedQsRank(university)?.rank ?? null`.
+* **The database mirrors were aligned** to the canonical amounts
+  (`supabase/university_cost_mirror_alignment_2026-10-30.sql`), so admin screens,
+  exports and any older reader see the same figure too. The canonical columns
+  were not touched — this is a copy, never a re-derivation, and no exchange rate
+  was invented. Verified after the run: 0 / 0 / 0 remaining gaps.
+
+### Verified
+
+`npm run test:university-costs` — **12/12** (new): the canonical amount wins over
+a disagreeing mirror on all 17 real pre-alignment pairs, a mirror-only row still
+resolves, a GBP canonical amount is never published as USD, a monthly amount is
+annualised, a genuine zero survives as zero, all three families follow the same
+rule, both endpoints publish the resolved figure, every other cost consumer
+resolves through the helper, the cards read the published value, the SSR
+catalogue applies the rank rule, and the migration keeps its non-USD guard.
+Reverting the list endpoint to the raw row fails it by name.
+
+**Integration (+3):** a row written with `annual_tuition = 5000` and the mirror
+`9999` comes back from `/api/universities` as **5000**, satisfies
+`maxTuition=6000`, and `/api/universities/[id]` reports the same **5000** in
+`money.annualTuition` — card and profile can no longer disagree.
+
+`test:university-rank-year` 14/0 · `test:university-rank` 17/0 ·
+`test:university-list` 15/0 · `test:university-hub` 11/0 ·
+`test:qs-catalogue-ranks` 13/0 · `test:qs-benchmarks` 13/0 · `test:chancing`
+28/0 · `test:landing-ranks` 10/0 · `test:university-prose` 19/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration **356/0** · security 90 · portability 57/0 · `check:i18n` passed ·
+`tsc --noEmit` clean · `next build` OK.
+
+## 11q. A forgotten password has a way back in (2026-10-31)
+
+Until this phase the product had a door in and no way out: `sign-in` checked a
+password, and nothing anywhere could replace one. `student_profiles.password_hash`
+is `scrypt:<salt>:<hash>` — deliberately one-way — so a student who forgot their
+password could only be rescued by someone with database access running an
+`UPDATE` by hand. That is not a support process, and it is exactly the request
+that arrived ("I cannot log in to my account").
+
+### The flow
+
+| step | route | what it does |
+| --- | --- | --- |
+| 1 | `GET /forgot-password` | asks for the email address, in the visitor's language |
+| 2 | `POST /api/auth/password-reset/request` | creates **one** link, emails it, retires older ones |
+| 3 | `GET /reset-password?token=…` | the link from the email; asks for the new password |
+| 4 | `POST /api/auth/password-reset/confirm` | spends the link, replaces the hash, revokes sessions |
+
+The sign-in card in `ProfilePicker` now carries the link
+("Parolni unutdingizmi?" / "Забыли пароль?" / "Forgot your password?") — the only
+exit from a form that cannot succeed.
+
+### The rules, and why each one exists
+
+* **The token is 256 bits of CSPRNG output**, base64url, 43 characters
+  (`src/lib/passwordReset.ts`). Guessing is not a threat model; the shape guard
+  (`^[A-Za-z0-9_-]{43}$`) exists so garbage never reaches a query.
+* **Only its SHA-256 is stored** (`password_reset_tokens.token_hash`, UNIQUE).
+  A dump of the database cannot be replayed into an account takeover — the same
+  reasoning as `user_sessions.token_hash`.
+* **60 minutes, one use.** `expires_at` is written at creation; `used_at` is
+  stamped by a *guarded* update (`used_at IS NULL`) **before** the password is
+  written, so two tabs or a retried request cannot set the password twice.
+  Requesting a new link stamps every older unused row: a leaked link dies with
+  the next request instead of living out its hour.
+* **No account enumeration.** The request endpoint answers exactly one sentence —
+  "If an account exists for this address, a reset link is on its way." — for a
+  known address, an unknown address, a Telegram-only profile with no password,
+  a deployment without SMTP, and a mail server that refused the message. Only a
+  malformed address gets its own 400.
+* **Old sessions die with the old password.** Sessions are fingerprint-bound to
+  the stored hash (`fp` in `auth.ts`), so every existing cookie stops verifying
+  the moment the hash changes; `revokeAllSessionsForProfile()` also stamps
+  `revoked_at` on the rows and clears the in-process auth cache, so audit and
+  `user_sessions` stay truthful.
+* **Nothing is created that nobody can receive.** When SMTP is not configured the
+  endpoint logs one line naming the missing variables and returns *before* a
+  token row exists — otherwise a reset request would invalidate the link the
+  student still has in their inbox while delivering nothing. When a send fails,
+  the just-created row is retired immediately.
+* **One generic 503 on error**, never a distinction between "the database is
+  down" and "mail is down".
+
+### Mail
+
+The repo had no mailer — no nodemailer, no provider SDK, nothing. `src/lib/mail.ts`
+is a ~150-line SMTP client on `node:net`/`node:tls`: EHLO, STARTTLS when offered
+(and **required** whenever a credential is set — a credential is never sent over
+a cleartext link), `AUTH LOGIN`, `MAIL FROM`/`RCPT TO`/`DATA`, dot-stuffing,
+10 s per command, 32 KB reply cap. It never throws: every failure is a reason
+(`not_configured` · `connect_failed` · `timeout` · `smtp_error` · `tls_required` ·
+`bad_recipient`), because a reset request must not 500 when the mail server is
+down. Port 465 implies TLS even if `SMTP_SECURE` is unset.
+
+Configuration is by environment only (documented in `.env.example`):
+`SMTP_HOST`, `SMTP_PORT` (587), `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`,
+`MAIL_FROM`, and `APP_URL` for the absolute link. There is no brand, host or
+credential in the source.
+
+### What changed
+
+* **`src/db/schema.ts` + `src/lib/core/ddl.ts`** — `password_reset_tokens`
+  (profile FK `ON DELETE CASCADE`, `token_hash` UNIQUE, `expires_at`, `used_at`,
+  `requested_ip`, index on `profile_id`), self-healed at startup like the other
+  core tables.
+* **`src/lib/passwordReset.ts`** (new, pure) — token creation, hashing,
+  constant-time comparison, the `valid | expired | used` state machine, the link
+  builder and the trilingual plain-text email.
+* **`src/lib/mail.ts`** (new) — the SMTP client above.
+* **`src/app/api/auth/password-reset/{request,confirm}/route.ts`** (new) — the
+  two endpoints, both rate limited (per IP and per address; the confirm bucket
+  separately).
+* **`src/app/{forgot-password,reset-password}/`** (new) — public, translated
+  pages (`noindex` — a live token must never be crawled or previewed). The reset
+  page reads `?token=` inside a `Suspense` boundary, and a link with no token is
+  reported before any round trip.
+* **`src/components/ProfilePicker.tsx`** — the sign-in card links to the flow.
+* **`src/i18n/messages/{en,uz,ru}.json`** — a `passwordReset` namespace (41 keys)
+  plus `picker.forgotPassword`.
+* **`supabase/password_reset_tokens_2026-10-31.sql`** — the same table for
+  deployments that apply SQL by hand; additive and re-runnable.
+* **`src/lib/auth.ts`** — `revokeAllSessionsForProfile()`.
+* **`src/lib/rate-limit.ts`** — `LIMITS.passwordReset` (5/hour) and
+  `LIMITS.passwordResetConfirm` (10/15 min).
+
+### Verified
+
+`npm run test:password-reset` — **38/38** (new): token entropy and shape
+(500 draws, all distinct), hash-only storage, the 60-minute boundary (valid at
+T−1 ms, dead at exactly expiry), `used` beating `expired`, ISO-string dates from
+postgres, unparsable expiry failing closed, the link builder refusing a bare
+host, the trilingual email, and a **real SMTP conversation** against a throwaway
+server — EHLO/MAIL/RCPT/DATA/QUIT, dot-stuffing proven (a lone `.` arrives
+doubled and the body survives it), `AUTH LOGIN` refused over cleartext
+(`tls_required`), and STARTTLS attempted before any credential is offered.
+
+**Integration (+18):** a real profile with a real scrypt hash — confirm sets the
+new password, `verifyPassword` accepts it and rejects the old one, the stored
+value stays `scrypt:<salt>:<hash>`, `used_at` is stamped, the replay returns
+**410 token_used**, an expired row returns **410 token_expired**, a weak
+password and a mismatched confirmation write nothing, a malformed token never
+reaches SQL, the session that was open before the reset is **revoked**
+(`checkSessionRecord` `ok` → `revoked`), known and unknown addresses get a
+byte-identical 200 with no row written when SMTP is absent, and deleting the
+account cascades its links away.
+
+`test:security` **90 → 96** (6 new assertions): both endpoints are in the
+reviewed public-write allowlist, reset limits exist and are bounded, every
+response is `no-store`, no log line can contain a token, no path stores the raw
+token, and the profile id comes from the token row, never from the request body.
+
+`test:render` 354/0 · `test:portability` 57/0 · `test:localization` 16/0 ·
+`test:channel` 196/0 · `test:university-costs` 12/0 · `test:university-rank-year`
+14/0 · `test:university-rank` 17/0 · `test:university-list` 15/0 ·
+`test:university-hub` 11/0 · `test:qs-catalogue-ranks` 13/0 ·
+`test:qs-benchmarks` 13/0 · `test:chancing` 28/0 · `test:landing-ranks` 10/0 ·
+`test:university-prose` 19/0 · `test:catalogue-language` 19/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 ·
+`test:opportunity-notes` 10/0 · `test:opportunities` 27/0 · `test:dataset` 50/0 ·
+integration **356 → 374/0** · security 96 · `check:i18n` passed · `lint:baseline`
+passed · `tsc --noEmit` clean · `next build` OK (both pages dynamic).
+
+### Still open
+
+With no `SMTP_HOST`/`MAIL_FROM` in a deployment, the pages work, the endpoint
+answers correctly, and **nothing is delivered** — the only trace is one server
+log line naming the missing variables. Configuring mail is the remaining step for
+this flow to be usable in production.
 
 ## 12. Short links
 

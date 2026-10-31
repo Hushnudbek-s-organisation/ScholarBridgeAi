@@ -322,6 +322,17 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                     {signInBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogIn className="h-3.5 w-3.5" />}
                     {signInBusy ? t("signingIn") : t("signIn")}
                   </button>
+                  {/* Phase AG: the only route out of a forgotten password. Plain
+                      navigation on purpose — the reset pages are public and must
+                      not depend on the session this form could not create. */}
+                  <p className="pt-0.5 text-center">
+                    <a
+                      href="/forgot-password"
+                      className="text-[11px] font-semibold text-indigo-600 underline-offset-2 hover:text-indigo-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    >
+                      {t("forgotPassword")}
+                    </a>
+                  </p>
                 </form>
               </div>
             )}

@@ -214,7 +214,7 @@ export const DEFAULT_CHANNEL_SETTINGS: ChannelSettings = {
     weekly: ["haftalik_eslatmalar", "reminders"],
   },
   linkPreview: {},
-  footerEnabled: { urgency: false },
+  footerEnabled: {},
   plan: {
     dailyCap: 3,
     budgetMin: 1,
@@ -484,9 +484,15 @@ export function linkPreviewFor(settings: ChannelSettings, kind: string): boolean
   return settings.linkPreview[kind] === true;
 }
 
-/** Should this kind carry the footer? Default: yes, except urgency. */
+/**
+ * Should this kind carry the footer? Default: yes, for every kind.
+ *
+ * Urgency was the one exception — and it is the kind readers see most often, so
+ * the social line the operator configured was missing from exactly the posts
+ * that matter. An operator who wants it gone can still turn it off per kind.
+ */
 export function footerEnabledFor(settings: ChannelSettings, kind: string): boolean {
-  return settings.footerEnabled[kind] ?? kind !== "urgency";
+  return settings.footerEnabled[kind] ?? true;
 }
 
 /* ------------------------------------------------------------------ storage */

@@ -102,13 +102,32 @@ export async function seedChannelCountries(): Promise<number> {
   return inserted.length;
 }
 
-/** Country table for this run: the stored rows, or the in-code defaults. */
+/**
+ * Country table for this run: the stored rows, or the in-code defaults.
+ *
+ * Missing keys are inserted, not just an empty table. Without that, adding a
+ * country to `CHANNEL_COUNTRIES` did nothing on a deployment whose table
+ * already held the first batch — the award kept its English country name, with
+ * no flag and no locative form, and nothing in the panel said why. Operator
+ * edits are never overwritten: only keys that do not exist yet are added.
+ */
 export async function loadChannelCountries(): Promise<readonly ChannelCountry[]> {
   if (!(await ensureChannelTables())) return CHANNEL_COUNTRIES;
   try {
     let rows = await db.select().from(channelCountries);
-    if (!rows.length) {
-      await seedChannelCountries();
+    const known = new Set(rows.map((row) => row.key));
+    const missing = CHANNEL_COUNTRIES.filter((country) => !known.has(country.key));
+    if (missing.length) {
+      const values = missing.map((country) => ({
+        key: country.key,
+        iso2: country.iso2 || null,
+        flag: country.flag,
+        nameUz: country.nameUz,
+        nameUzLoc: country.nameUzLoc || null,
+        hashtag: country.hashtag || null,
+        aliases: JSON.stringify(country.aliases),
+      }));
+      await db.insert(channelCountries).values(values).onConflictDoNothing();
       rows = await db.select().from(channelCountries);
     }
     return rows.length ? rows.map(countryFromRow) : CHANNEL_COUNTRIES;

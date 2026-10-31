@@ -280,6 +280,29 @@ export async function revokeSessionToken(token: string | null): Promise<void> {
   }
 }
 
+/**
+ * Revoke every stored session for one account (password reset, "sign out
+ * everywhere").
+ *
+ * The signed cookie is already invalid after a password change — `fp`
+ * fingerprints the stored hash — but `user_sessions` would otherwise keep rows
+ * that look live forever. Revoking them keeps revocation truthful and stops the
+ * in-process positive cache from vouching for an old token.
+ */
+export async function revokeAllSessionsForProfile(profileId: number): Promise<void> {
+  if (!Number.isSafeInteger(profileId) || profileId <= 0) return;
+  // Drop the memo first: a cached "this token is fine" must not outlive the call.
+  invalidateAuthCacheForProfile(profileId);
+  try {
+    await db
+      .update(userSessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(userSessions.profileId, profileId), isNull(userSessions.revokedAt)));
+  } catch (err) {
+    console.error("[auth] bulk session revocation failed:", err);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Cookie plumbing
 // ---------------------------------------------------------------------------

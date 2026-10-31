@@ -100,7 +100,13 @@ export function footerLine(footer: readonly LinkItem[] | null | undefined): stri
   return `💼 ${items.map((item) => `<a href="${esc(item.url)}">${esc(item.label)}</a>`).join(" | ")}`;
 }
 
-/** Which kinds ever carry hashtags (urgency deliberately does not). */
+/**
+ * Which kinds carry hashtags.
+ *
+ * Urgency used to be excluded — it was the thin post. It is now the same card as
+ * everything else, so it carries the same tags; only the weekly list stays
+ * tag-free because its items already fill the message.
+ */
 export function kindUsesHashtags(kind: Kind): boolean {
-  return kind !== "urgency" && kind !== "weekly_deadlines";
+  return kind !== "weekly_deadlines";
 }

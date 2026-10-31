@@ -222,6 +222,10 @@ export const LIMITS = {
   visaLiveToken: { limit: 10, windowMs: 60 * 60_000 },
   /** Public lookup endpoints: 30 / minute per IP. */
   publicLookup: { limit: 30, windowMs: 60_000 },
+  /** Password-reset requests: 5 / hour per IP and per address (mail quota). */
+  passwordReset: { limit: 5, windowMs: 60 * 60_000 },
+  /** Password-reset link submissions: 10 / 15 min per IP (token guessing). */
+  passwordResetConfirm: { limit: 10, windowMs: 15 * 60_000 },
   /** Analytics beacon: 60 / min per visitor. */
   beacon: { limit: 60, windowMs: 60_000 },
 } as const;

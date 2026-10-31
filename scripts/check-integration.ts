@@ -157,6 +157,8 @@ async function main() {
       country: "Germany",
       city: "Fixture City",
       worldRanking: 50,
+      // Phase AD: a verified rank records the edition it belongs to.
+      qsRankYear: 2026,
       programMajor: "Computer Science",
       description: "A verified integration-test university fixture.",
       websiteUrl: "https://phase12-tum-fixture.example",
@@ -178,6 +180,7 @@ async function main() {
       country: "Germany",
       city: "Fixture City",
       worldRanking: 60,
+      qsRankYear: 2026,
       programMajor: "Computer Science",
       description: "A verified integration-test university fixture.",
       websiteUrl: "https://phase12-lmu-fixture.example",
@@ -561,9 +564,85 @@ async function main() {
         undisclosedRow.postStudyWorkVisaYears === null,
       JSON.stringify(undisclosedRow)
     );
+
+    // Phase AD: a *verified* row whose rank records no edition is not a QS
+    // position either — the API must withhold the figure, not print it bare.
+    await db.update(schema.universities).set({
+      verificationStatus: "verified",
+      worldRanking: 42,
+      qsRankYear: null,
+      annualTuitionUsd: 1500,
+      annualLivingEstUsd: 11000,
+      minIelts: 6.5,
+      postStudyWorkVisaYears: 2,
+    }).where(eq(schema.universities.id, uniA.id));
+    const undatedNumbers = await catalogue();
+    const undatedRow = undatedNumbers.rows.find((row) => row.id === uniA.id);
+    check(
+      "universities: a rank with no recorded edition is withheld, not published bare",
+      undatedNumbers.status === 200 && undatedRow != null && undatedRow.worldRanking === null && undatedRow.annualTuitionUsd != null,
+      `status ${undatedNumbers.status}; row ${JSON.stringify(undatedRow)}`
+    );
+    const undatedFiltered = await catalogue("minRank=1");
+    check(
+      "universities: an undated rank cannot satisfy a rank filter",
+      undatedFiltered.status === 200 && !undatedFiltered.rows.some((row) => row.id === uniA.id),
+      `status ${undatedFiltered.status}; rows ${JSON.stringify(undatedFiltered.rows.map((row) => row.id))}`
+    );
+    await db.update(schema.universities).set({ worldRanking: uniA.worldRanking, qsRankYear: uniA.qsRankYear }).where(eq(schema.universities.id, uniA.id));
+
+    // Phase AF: the two cost columns describe the same quantity, and the live
+    // catalogue had them disagreeing on 160 rows. The API must publish the
+    // canonical amount, never the legacy mirror.
+    await db.update(schema.universities).set({
+      verificationStatus: "verified",
+      worldRanking: 50,
+      qsRankYear: 2026,
+      annualTuition: 5000,
+      tuitionCurrency: "USD",
+      tuitionPeriod: "year",
+      annualTuitionUsd: 9999,
+      annualLivingEst: 4000,
+      livingCostCurrency: "USD",
+      livingCostPeriod: "year",
+      annualLivingEstUsd: 7777,
+    }).where(eq(schema.universities.id, uniA.id));
+    const costRows = await catalogue();
+    const costRow = costRows.rows.find((row) => row.id === uniA.id);
+    check(
+      "universities: the API publishes the canonical tuition, not the legacy USD mirror",
+      costRows.status === 200 && costRow?.annualTuitionUsd === 5000 && costRow?.annualLivingEstUsd === 4000,
+      `status ${costRows.status}; tuition ${costRow?.annualTuitionUsd}; living ${costRow?.annualLivingEstUsd}`
+    );
+    const costFiltered = await catalogue("maxTuition=6000");
+    check(
+      "universities: the tuition filter uses the same published figure",
+      costFiltered.status === 200 && costFiltered.rows.some((row) => row.id === uniA.id),
+      `status ${costFiltered.status}; rows ${JSON.stringify(costFiltered.rows.map((row) => row.id))}`
+    );
+
+    const { GET: getUniversityDetail } = await import("../src/app/api/universities/[id]/route");
+    const detailResponse = await getUniversityDetail(
+      new Request(`http://localhost/api/universities/${uniA.id}`),
+      { params: Promise.resolve({ id: String(uniA.id) }) }
+    );
+    const detailBody = (await detailResponse.json()) as { money?: { annualTuition?: number } };
+    check(
+      "universities: the profile payload states the same tuition as the card",
+      detailResponse.status === 200 && detailBody.money?.annualTuition === 5000,
+      `status ${detailResponse.status}; money ${JSON.stringify(detailBody.money)}`
+    );
+    await db.update(schema.universities).set({
+      annualTuition: uniA.annualTuition,
+      tuitionCurrency: uniA.tuitionCurrency,
+      tuitionPeriod: uniA.tuitionPeriod,
+      annualLivingEst: uniA.annualLivingEst,
+      livingCostCurrency: uniA.livingCostCurrency,
+      livingCostPeriod: uniA.livingCostPeriod,
+    }).where(eq(schema.universities.id, uniA.id));
   } finally {
     for (const uni of [uniA, uniB]) {
-      await db.update(schema.universities).set({ degreeLevel: uni.degreeLevel, annualTuitionUsd: uni.annualTuitionUsd, worldRanking: uni.worldRanking, annualLivingEstUsd: uni.annualLivingEstUsd, minIelts: uni.minIelts, postStudyWorkVisaYears: uni.postStudyWorkVisaYears, verificationStatus: uni.verificationStatus }).where(eq(schema.universities.id, uni.id));
+      await db.update(schema.universities).set({ degreeLevel: uni.degreeLevel, annualTuitionUsd: uni.annualTuitionUsd, worldRanking: uni.worldRanking, qsRankYear: uni.qsRankYear, annualLivingEstUsd: uni.annualLivingEstUsd, minIelts: uni.minIelts, postStudyWorkVisaYears: uni.postStudyWorkVisaYears, verificationStatus: uni.verificationStatus }).where(eq(schema.universities.id, uni.id));
     }
     await db.update(schema.studentProfiles).set({ degreeLevel: profile.degreeLevel }).where(eq(schema.studentProfiles.id, profile.id));
     await pool.query("ALTER TABLE universities ALTER COLUMN degree_level SET NOT NULL");
@@ -2113,6 +2192,7 @@ async function main() {
       country: "Switzerland",
       city: "Zurich",
       worldRanking: 20,
+      qsRankYear: 2026,
       programMajor: "Computer Science",
       description: "A public research university.",
       websiteUrl: "https://ethz.ch",
@@ -3166,6 +3246,175 @@ async function main() {
     if (savedEnv13.model === undefined) delete process.env.AI_CUSTOM_MODEL; else process.env.AI_CUSTOM_MODEL = savedEnv13.model;
     if (savedGemini !== undefined) process.env.GEMINI_API_KEY = savedGemini;
     mock13.close();
+  }
+
+  // -----------------------------------------------------------------------
+  // 28. password reset (Phase AG) — the whole flow against real SQL, real
+  //     hashes and real session rows.
+  // -----------------------------------------------------------------------
+  section("28. password reset — emailed link, single use, sessions die with it");
+
+  {
+    const { hashPassword, verifyPassword } = await import("../src/lib/password");
+    const { createResetToken, hashResetToken } = await import("../src/lib/passwordReset");
+    const { checkSessionRecord, signSessionToken: sign } = await import("../src/lib/auth");
+    const { POST: resetRequest } = await import("../src/app/api/auth/password-reset/request/route");
+    const { POST: resetConfirm } = await import("../src/app/api/auth/password-reset/confirm/route");
+
+    const OLD_PASSWORD = "OldPassw0rd!";
+    const NEW_PASSWORD = "BrandNewPassw0rd!";
+
+    const [resetUser] = await db
+      .insert(schema.studentProfiles)
+      .values({ name: "Reset Target", email: "reset.target@example.com", passwordHash: hashPassword(OLD_PASSWORD) })
+      .returning();
+
+    const confirmCall = (body: unknown) =>
+      call(resetConfirm as any, "/api/auth/password-reset/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const requestCall = (body: unknown) =>
+      call(resetRequest as any, "/api/auth/password-reset/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const currentHash = async () => {
+      const [row] = await db
+        .select({ passwordHash: schema.studentProfiles.passwordHash })
+        .from(schema.studentProfiles)
+        .where(eq(schema.studentProfiles.id, resetUser.id));
+      return row?.passwordHash ?? "";
+    };
+
+    // A live session for this account, created exactly how the app creates one.
+    const oldToken = sign({ id: resetUser.id, passwordHash: resetUser.passwordHash });
+    const beforeReset = await checkSessionRecord(oldToken, resetUser.id, { scope: "web" });
+
+    const first = createResetToken();
+    const [firstRow] = await db
+      .insert(schema.passwordResetTokens)
+      .values({ profileId: resetUser.id, tokenHash: first.tokenHash, expiresAt: first.expiresAt, requestedIp: "203.0.113.7" })
+      .returning();
+
+    check(
+      "the token is stored as a hash — the row cannot be replayed from a database dump",
+      firstRow.tokenHash === hashResetToken(first.token) && !JSON.stringify(firstRow).includes(first.token),
+      "the raw token is recoverable from the row"
+    );
+
+    const hashBeforeAttempts = await currentHash();
+    const badPassword = await confirmCall({ token: first.token, password: "short" });
+    check(
+      "a password below the policy is rejected before anything is written",
+      badPassword.status === 400 && badPassword.body?.code === "weak_password",
+      `status=${badPassword.status} code=${badPassword.body?.code}`
+    );
+    check(
+      "a rejected attempt leaves the stored hash untouched",
+      (await currentHash()) === hashBeforeAttempts,
+      "the password changed on a rejected submission"
+    );
+
+    const mismatch = await confirmCall({ token: first.token, password: NEW_PASSWORD, passwordConfirm: "DifferentPassw0rd!" });
+    check(
+      "a confirmation that does not match is rejected",
+      mismatch.status === 400 && mismatch.body?.code === "password_mismatch",
+      `status=${mismatch.status} code=${mismatch.body?.code}`
+    );
+
+    const malformed = await confirmCall({ token: "not-a-token", password: NEW_PASSWORD });
+    check(
+      "a malformed token never reaches the database",
+      malformed.status === 400 && malformed.body?.code === "invalid_token",
+      `status=${malformed.status} code=${malformed.body?.code}`
+    );
+
+    const confirmed = await confirmCall({ token: first.token, password: NEW_PASSWORD, passwordConfirm: NEW_PASSWORD });
+    check("a valid link sets the new password", confirmed.status === 200 && confirmed.body?.ok === true, `status=${confirmed.status} ${JSON.stringify(confirmed.body)?.slice(0, 120)}`);
+
+    const hashAfter = await currentHash();
+    check("the new password verifies against the stored scrypt hash", verifyPassword(NEW_PASSWORD, hashAfter));
+    check("the old password no longer verifies", verifyPassword(OLD_PASSWORD, hashAfter) === false);
+    check(
+      "the stored value is still a scrypt hash, never the plain password",
+      /^scrypt:[0-9a-f]{32}:[0-9a-f]{128}$/.test(hashAfter) && !hashAfter.includes(NEW_PASSWORD),
+      "unexpected hash format"
+    );
+
+    const [spentRow] = await db
+      .select()
+      .from(schema.passwordResetTokens)
+      .where(eq(schema.passwordResetTokens.id, firstRow.id));
+    check("the used link is stamped used_at", Boolean(spentRow?.usedAt));
+
+    const replay = await confirmCall({ token: first.token, password: "AnotherPassw0rd!" });
+    check(
+      "a link works exactly once — the second attempt is refused",
+      replay.status === 410 && replay.body?.code === "token_used",
+      `status=${replay.status} code=${replay.body?.code}`
+    );
+
+    const expired = createResetToken(new Date(Date.now() - 61 * 60_000));
+    await db.insert(schema.passwordResetTokens).values({
+      profileId: resetUser.id,
+      tokenHash: expired.tokenHash,
+      expiresAt: expired.expiresAt,
+    });
+    const expiredCall = await confirmCall({ token: expired.token, password: "ExpiredLinkPassw0rd!" });
+    check(
+      "an expired link is refused with its own reason",
+      expiredCall.status === 410 && expiredCall.body?.code === "token_expired",
+      `status=${expiredCall.status} code=${expiredCall.body?.code}`
+    );
+
+    const afterReset = await checkSessionRecord(oldToken, resetUser.id, { scope: "web" });
+    check(
+      "the password change revokes the sessions that were open before it",
+      beforeReset === "ok" && afterReset === "revoked",
+      `before=${beforeReset} after=${afterReset}`
+    );
+    check(
+      "a session signed with the old password hash no longer verifies",
+      sign({ id: resetUser.id, passwordHash: hashAfter }) !== oldToken,
+      "the session fingerprint did not change"
+    );
+
+    // --- the request endpoint: one answer, no account enumeration
+    const rowsBeforeRequest = (
+      await db.select({ id: schema.passwordResetTokens.id }).from(schema.passwordResetTokens).where(eq(schema.passwordResetTokens.profileId, resetUser.id))
+    ).length;
+    const known = await requestCall({ email: "reset.target@example.com", locale: "uz" });
+    const unknown = await requestCall({ email: "nobody.here@example.com", locale: "uz" });
+    check(
+      "a known address and an unknown address get the same answer",
+      known.status === 200 &&
+        unknown.status === 200 &&
+        JSON.stringify(known.body) === JSON.stringify(unknown.body),
+      `known=${known.status} ${JSON.stringify(known.body)} unknown=${unknown.status} ${JSON.stringify(unknown.body)}`
+    );
+    const rowsAfterRequest = (
+      await db.select({ id: schema.passwordResetTokens.id }).from(schema.passwordResetTokens).where(eq(schema.passwordResetTokens.profileId, resetUser.id))
+    ).length;
+    check(
+      "neither request writes a token row — an unconfigured mail server sends nothing",
+      rowsAfterRequest === rowsBeforeRequest,
+      `${rowsAfterRequest - rowsBeforeRequest} row(s) created without a delivered email`
+    );
+
+    const invalidEmail = await requestCall({ email: "not-an-address" });
+    check(
+      "a malformed address is the only thing that gets its own error",
+      invalidEmail.status === 400 && invalidEmail.body?.code === "invalid_email",
+      `status=${invalidEmail.status}`
+    );
+
+    await db.delete(schema.studentProfiles).where(eq(schema.studentProfiles.id, resetUser.id));
+    const orphans = await pool.query(`SELECT count(*)::int AS n FROM password_reset_tokens WHERE profile_id = $1`, [resetUser.id]);
+    check("deleting the account deletes its reset links (cascade)", orphans.rows[0]?.n === 0, `${orphans.rows[0]?.n} row(s) survived`);
   }
 
   // -----------------------------------------------------------------------

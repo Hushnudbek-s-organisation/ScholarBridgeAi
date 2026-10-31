@@ -48,6 +48,8 @@ import { FaqSection } from "../src/components/FaqSection";
 import { AppErrorFallback } from "../src/components/AppErrorFallback";
 import { PointsBadge } from "../src/components/PointsBadge";
 import { MiniApp } from "../src/components/telegram/MiniApp";
+import { TelegramNudge } from "../src/components/telegram/TelegramNudge";
+import { SourceLanguageProse } from "../src/components/SourceLanguageProse";
 
 let passed = 0;
 let failed = 0;
@@ -1084,8 +1086,12 @@ const paginationSource = readFileSync(new URL("../src/components/Pagination.tsx"
 const catalogHeaderSource = readFileSync(new URL("../src/components/PublicCatalogHeader.tsx", import.meta.url), "utf8");
 const activeUniversitiesPredicates = universitiesPageSource.match(/from\(universitiesTable\)\s*\.where\(eq\(universitiesTable\.isActive, true\)\)/g) ?? [];
 const activeScholarshipsPredicates = scholarshipsPageSource.match(/from\(scholarshipsTable\)\s*\.where\(eq\(scholarshipsTable\.isActive, true\)\)/g) ?? [];
-check("universities page resolves locale and wraps its client controls", /getPageLocale/.test(universitiesPageSource) && /<LocaleProvider initialLocale=\{locale\}>/.test(universitiesPageSource));
-check("scholarships page resolves locale and wraps its client controls", /getPageLocale/.test(scholarshipsPageSource) && /<LocaleProvider initialLocale=\{locale\}>/.test(scholarshipsPageSource));
+// The provider must receive the server-resolved dictionary, not only the
+// locale: the promo strip on these pages is a client component, so without the
+// messages it painted English until hydration finished.
+const providerWithMessages = /<LocaleProvider initialLocale=\{locale\} initialMessages=\{clientMessagesFor\(locale\)\}>/;
+check("universities page resolves locale and wraps its client controls", /getPageLocale/.test(universitiesPageSource) && providerWithMessages.test(universitiesPageSource));
+check("scholarships page resolves locale and wraps its client controls", /getPageLocale/.test(scholarshipsPageSource) && providerWithMessages.test(scholarshipsPageSource));
 check("both public catalog pages share language/theme navigation", /<PublicCatalogHeader\s*\/>/.test(universitiesPageSource) && /<PublicCatalogHeader\s*\/>/.test(scholarshipsPageSource) && /LanguageSwitcher/.test(catalogHeaderSource) && /ThemeToggle/.test(catalogHeaderSource));
 check("public scholarship awards resolve to USD or stay unknown", /resolvedUsdScholarshipAmount\(scholarship\)/.test(scholarshipsPageSource) && /awardCurrency: scholarshipsTable\.awardCurrency/.test(scholarshipsPageSource));
 check("university total and page data both filter to active rows", activeUniversitiesPredicates.length >= 2, `found ${activeUniversitiesPredicates.length}`);
@@ -1099,6 +1105,98 @@ for (const locale of ["en", "uz", "ru"]) {
     Boolean(messages.publicCatalog?.universityHeading && messages.publicCatalog?.scholarshipHeading &&
       messages.publicCatalog?.independentGuide && messages.publicCatalog?.deadline && messages.publicCatalog?.catalogNavigation &&
       messages.journey?.opAmountUnknown && messages.pagination?.aria && messages.pagination?.goToPage));
+}
+
+// ---------------------------------------------------------------------------
+section("14a. The new-account Telegram reminder renders without data");
+
+{
+  // The card starts hidden (its verdict arrives from the API), so the first
+  // paint must not throw — and it must not render anything until told to.
+  const nudgeSource = readFileSync(new URL("../src/components/telegram/TelegramNudge.tsx", import.meta.url), "utf8");
+  let error: string | null = null;
+  let html = "";
+  try {
+    html = renderToStaticMarkup(
+      withEnglishIntl(
+        React.createElement(TelegramNudge, { profileId: null, onConnect: () => undefined }) as React.ReactElement
+      )
+    );
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+  check("TelegramNudge renders without a profile and stays silent", error === null && html.trim() === "", error ?? html.slice(0, 80));
+  check("the card asks the server for its verdict", nudgeSource.includes("/api/telegram/me") && nudgeSource.includes("d?.nudge?.show === true"));
+  check("the card has no browser-side day window", !/ageDays|createdAt/.test(nudgeSource));
+}
+
+// ---------------------------------------------------------------------------
+section("14b. English catalogue prose is labelled, translated copy is not");
+
+{
+  const englishProse =
+    "No scholarship-specific English score is published; applicants must meet the host university English requirement for the chosen programme.";
+  const labelled = renderToStaticMarkup(
+    React.createElement(SourceLanguageProse, {
+      text: englishProse,
+      showLabel: true,
+      label: "Manba tili: inglizcha",
+    }) as React.ReactElement
+  );
+  check("source-language prose carries its label", labelled.includes("Manba tili: inglizcha"));
+  check("source-language prose is marked lang=\"en\" for screen readers", labelled.includes('lang="en"'));
+  check("the prose itself is still shown in full", labelled.includes("No scholarship-specific English score"));
+
+  const translated = renderToStaticMarkup(
+    React.createElement(SourceLanguageProse, {
+      text: "IELTS 6.5 yoki unga teng ingliz tili imtihoni",
+      showLabel: false,
+      label: "Manba tili: inglizcha",
+    }) as React.ReactElement
+  );
+  check("localized copy renders without a label", !translated.includes("Manba tili") && !translated.includes('lang="en"'));
+
+  const empty = renderToStaticMarkup(
+    React.createElement(SourceLanguageProse, { text: "   ", showLabel: true, label: "x" }) as React.ReactElement
+  );
+  check("empty prose renders nothing at all", empty.trim() === "");
+}
+
+// ---------------------------------------------------------------------------
+section("14. The public site introduces itself (channel post → product)");
+
+const featuresPageSource = readFileSync(new URL("../src/app/features/page.tsx", import.meta.url), "utf8");
+const promoSource = readFileSync(new URL("../src/components/PublicFeaturePromo.tsx", import.meta.url), "utf8");
+const homeClientSource = readFileSync(new URL("../src/app/HomeClient.tsx", import.meta.url), "utf8");
+const detailPages = [
+  "../src/app/scholarships/[id]/page.tsx",
+  "../src/app/scholarships/page.tsx",
+  "../src/app/universities/page.tsx",
+  "../src/app/universities/[id]/page.tsx",
+].map((path) => [path, readFileSync(new URL(path, import.meta.url), "utf8")] as const);
+
+check("a public /features page exists and reads no session", /export default async function FeaturesPage/.test(featuresPageSource) && !/SESSION_COOKIE|getProfile|api\/auth/.test(featuresPageSource));
+check("the features page is reachable from every catalogue page's header", /href="\/features"/.test(catalogHeaderSource));
+check("every catalogue page ends with the promo strip", detailPages.every(([, source]) => /<PublicFeaturePromo/.test(source)), detailPages.filter(([, source]) => !/<PublicFeaturePromo/.test(source)).map(([path]) => path).join(", "));
+check("the promo strip links to /features and to the one-click start", /href="\/features"/.test(promoSource) && /href="\/\?start=1"/.test(promoSource));
+// Resolved on the server and passed as a prop: an effect that set state would
+// trip react-hooks/set-state-in-effect, and the wizard would only appear after
+// hydration.
+const homePageSource = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+check("start=1 opens onboarding directly for a visitor without a session",
+  /startParam === "1"/.test(homePageSource) && /startNow=\{startNow\}/.test(homePageSource) &&
+  /hasSessionCookie \? "restoring" : startNow \? "wizard" : "landing"/.test(homeClientSource));
+check("the features page offers the bot only when the deployment configured one", /getTelegramSettings\(\)/.test(featuresPageSource) && /\^\[A-Za-z0-9_\]\{4,64\}\$/.test(featuresPageSource));
+
+for (const locale of ["en", "uz", "ru"]) {
+  const messages = loadMessages(locale);
+  const copy = messages.publicFeatures;
+  const featureKeys = ["match", "chancing", "deadlines", "documents", "ai", "visa", "money", "telegram"];
+  check(`public features copy is complete in ${locale}`,
+    Boolean(copy?.metaTitle && copy?.heroTitle && copy?.heroBody && copy?.heroPrimary && copy?.heroSecondary &&
+      copy?.freeNote && copy?.promoTitle && copy?.promoBody && copy?.promoCta && copy?.promoStart && copy?.navLabel &&
+      copy?.stepOneTitle && copy?.stepTwoTitle && copy?.stepThreeTitle &&
+      featureKeys.every((key) => copy?.features?.[key]?.title && copy?.features?.[key]?.body)));
 }
 
 // ---------------------------------------------------------------------------

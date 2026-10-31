@@ -3,6 +3,7 @@ import { memoizeMatch } from "@/lib/matchMemo";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { and, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { verifiedQsRankNumber } from "@/lib/universityRank";
 import {
   admissionOffers,
   aiEvaluations,
@@ -697,7 +698,8 @@ async function recommendedFor(
       country: u.country,
       city: u.city,
       flagEmoji: u.flagEmoji,
-      worldRanking: u.worldRanking,
+      // Phase AD: a rank without a recorded edition is not a QS position.
+      worldRanking: verifiedQsRankNumber(u),
       programMajor: u.programMajor,
       minGpa: u.minGpa,
       minIelts: u.minIelts,

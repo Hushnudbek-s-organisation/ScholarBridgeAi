@@ -204,10 +204,23 @@ function ParentDashboardGate({
 
 export function Home({
   hasSessionCookie = false,
+  startNow = false,
   initialLocale = defaultLocale,
   initialMessages = null,
 }: {
   hasSessionCookie?: boolean;
+  /**
+   * `/?start=1` — the "start now" link the public pages use.
+   *
+   * A reader arriving from a channel post lands on a scholarship page, not on
+   * the landing page, so every public CTA has to open the onboarding directly.
+   * The flag is resolved on THE SERVER (see app/page.tsx) and passed in as a
+   * prop: reading the query string in an effect meant the wizard only appeared
+   * after hydration, and setting state inside an effect is exactly what
+   * react-hooks/set-state-in-effect forbids. As a prop, the first paint is
+   * already the wizard and hydration matches.
+   */
+  startNow?: boolean;
   /** Locale the server resolved from the cookie — keeps SSR and hydration in one language. */
   initialLocale?: Locale;
   /** That locale's dictionary when it is not English (English is bundled). */
@@ -231,7 +244,9 @@ export function Home({
   // Returning students still start in "restoring" so they never flash the
   // public welcome page while their valid session is being checked.
   const [view, setView] = useState<"restoring" | "landing" | "wizard" | "app">(
-    hasSessionCookie ? "restoring" : "landing"
+    // A signed-in student always starts by restoring; a visitor with `?start=1`
+    // goes straight into the wizard.
+    hasSessionCookie ? "restoring" : startNow ? "wizard" : "landing"
   );
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
@@ -1030,6 +1045,19 @@ export function Home({
       <div className="flex-1 min-w-0 flex flex-col">
       <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 md:pb-6 lg:px-8 lg:pb-6">
         <div className="mx-auto w-full max-w-7xl">
+        {/*
+          The new-account reminder lives in the shell, not in one tab: in the
+          first ten days a student may land on any screen, and the point of the
+          prompt is that they meet it when they come in. The component asks the
+          server for the verdict (account age, link, bot configured) and keeps
+          its own "dismissed today" note.
+        */}
+        {view === "app" && activeProfile && (
+          <TelegramNudge
+            profileId={activeProfile.id}
+            onConnect={() => handleNavigateTab("notifications")}
+          />
+        )}
         {/* Pillar 3 — the four-stage guided path, pinned above every screen so
             a newcomer always knows where they are and what comes next. The
             dashboard keeps its own richer journey control center instead. */}
@@ -1066,8 +1094,6 @@ export function Home({
             />
           ) : activeTab === "dashboard" && (
             <div className="space-y-4">
-              {/* "Connect Telegram" nudge — only while not connected; dismissible */}
-              <TelegramNudge profileId={activeProfile?.id ?? null} onNavigate={handleNavigateTab} />
               <DailyStreakCard profileId={activeProfile?.id ?? null} compact />
               {/* Spec §3 — the control center. Journey bar, next steps,
                   deadlines, application progress, readiness, recommendations

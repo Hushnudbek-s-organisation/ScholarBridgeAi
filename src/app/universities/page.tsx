@@ -6,8 +6,9 @@ import type { ReactElement } from "react";
 import { Building2, ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
+import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { dictionaries } from "@/i18n/messages.server";
+import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { asc, eq, sql } from "drizzle-orm";
@@ -15,6 +16,7 @@ import { db } from "@/db";
 import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import { verifiedQsRank } from "@/lib/universityRank";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { localizeCity, localizeCountry, localizeMajorOrField, localizeUniversityType } from "@/lib/catalogLocalizer";
 
@@ -93,7 +95,7 @@ export default async function UniversitiesPage({
           country: university.country,
           city: university.city,
           flag_emoji: university.flagEmoji,
-          world_ranking: verified ? university.worldRanking : null,
+          world_ranking: verifiedQsRank(university)?.rank ?? null,
           program_major: university.programMajor,
           university_type: university.universityType,
           annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
@@ -164,7 +166,7 @@ export default async function UniversitiesPage({
           country: university.country,
           city: university.city,
           flag_emoji: university.flagEmoji,
-          world_ranking: verified ? university.worldRanking : null,
+          world_ranking: verifiedQsRank(university)?.rank ?? null,
           program_major: university.programMajor,
           university_type: university.universityType,
           annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
@@ -179,7 +181,7 @@ export default async function UniversitiesPage({
     // Keep database/provider details out of the public response and logs.
     console.error("University catalogue query failed", error instanceof Error ? error.name : "unknown error");
     return (
-      <LocaleProvider initialLocale={locale}>
+      <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
         <PublicCatalogHeader />
         <main className="mx-auto max-w-7xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
           <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
@@ -204,7 +206,7 @@ export default async function UniversitiesPage({
   });
 
   return (
-    <LocaleProvider initialLocale={locale}>
+    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
       <PublicCatalogHeader />
       <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <header className="mb-6">
@@ -328,6 +330,8 @@ export default async function UniversitiesPage({
         )}
 
         <Pagination currentPage={currentPage} totalPages={totalPages} />
+
+        <PublicFeaturePromo className="mt-6" />
 
         <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
           {copy.independentGuide}

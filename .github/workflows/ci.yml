@@ -51,6 +51,11 @@ jobs:
       - name: Security regression tests
         run: bash ci/run-step.sh "Security regression tests" npm run test:security
 
+      # Phase AG: the reset-link lifetime, the hash-only storage, and a real SMTP
+      # conversation against a throwaway server (no network, no credentials).
+      - name: Password reset tests (token lifetime, single use, SMTP)
+        run: bash ci/run-step.sh "Password reset tests (token lifetime, single use, SMTP)" npm run test:password-reset
+
       # The apps open the hosted site: which address, does it answer, is the
       # session kept, is the offline copy ever entered silently. Pure logic, no
       # network, no Electron — it runs on every push so a change to

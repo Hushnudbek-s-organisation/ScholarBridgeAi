@@ -958,6 +958,10 @@ async function main() {
     // provider signature, signed Telegram data) and is reviewed in SECURITY.md.
     const PUBLIC = new Set([
       "auth/sign-in POST", "auth/sign-out POST", "auth/telegram/status POST", "auth/telegram/verify POST",
+      // Phase AG: recovery exists precisely for someone who cannot authenticate.
+      // Both are throttled (per IP and per address), answer one generic sentence
+      // and only ever act on a 256-bit token that is stored as a hash.
+      "auth/password-reset/request POST", "auth/password-reset/confirm POST",
       "profiles POST", "track POST", "visa/chat POST",
     ]);
     const unguarded: string[] = [];
@@ -1345,6 +1349,86 @@ async function main() {
       new NextRequest("https://app.example.org/api/config/branding", { headers: { cookie: "sb_session=abc" } })
     );
     assert.equal(branding.headers.get("cache-control"), null);
+  });
+
+  console.log("\n— password reset (Phase AG) —");
+
+  /**
+   * A reset flow is the one place were an email address is enough to try to take
+   * an account over, so its guard rails are part of the security baseline, not
+   * just product behaviour. `npm run test:password-reset` covers the token
+   * lifetime and the SMTP conversation; these are the abuse paths.
+   */
+  const resetRequestRoute = readFileSync(
+    join(ROOT, "src/app/api/auth/password-reset/request/route.ts"),
+    "utf8"
+  );
+  const resetConfirmRoute = readFileSync(
+    join(ROOT, "src/app/api/auth/password-reset/confirm/route.ts"),
+    "utf8"
+  );
+
+  check("password reset is throttled per IP and per address", () => {
+    assert.ok(rateLimit.LIMITS.passwordReset, "LIMITS.passwordReset is missing");
+    assert.ok(rateLimit.LIMITS.passwordReset.limit <= 10, "the reset mailer can be flooded");
+    assert.ok(
+      rateLimit.LIMITS.passwordReset.windowMs >= 15 * 60_000,
+      "a short window makes the mail quota unbounded"
+    );
+    assert.match(resetRequestRoute, /checkSharedRateLimit\(`pwreset:ip:/, "no per-IP limiter");
+    assert.match(resetRequestRoute, /checkSharedRateLimit\(`pwreset:email:/, "no per-address limiter");
+  });
+
+  check("submitting reset links is throttled and cannot be brute-forced", () => {
+    assert.ok(rateLimit.LIMITS.passwordResetConfirm, "LIMITS.passwordResetConfirm is missing");
+    assert.ok(rateLimit.LIMITS.passwordResetConfirm.limit <= 20);
+    assert.match(resetConfirmRoute, /checkSharedRateLimit\(`pwreset-confirm:ip:/, "the confirm endpoint is unthrottled");
+    // 32 CSPRNG bytes: guessing is not the attack, but the shape guard still
+    // keeps garbage out of the query.
+    assert.match(resetConfirmRoute, /isWellFormedResetToken\(token\)/);
+  });
+
+  check("reset responses are never cached — a link must not land in a shared cache", () => {
+    for (const [name, source] of [
+      ["request", resetRequestRoute],
+      ["confirm", resetConfirmRoute],
+    ] as const) {
+      const responses = source.match(/NextResponse\.json\(/g)?.length ?? 0;
+      const noStore = source.match(/"Cache-Control": "no-store"/g)?.length ?? 0;
+      assert.ok(responses > 0, `${name} route has no responses`);
+      assert.equal(
+        noStore >= responses - 1,
+        true,
+        `${name} route has ${responses} responses but only ${noStore} marked no-store`
+      );
+    }
+  });
+
+  check("a reset token is never logged and never stored in the clear", () => {
+    for (const [name, source] of [
+      ["request", resetRequestRoute],
+      ["confirm", resetConfirmRoute],
+    ] as const) {
+      const logs = [...source.matchAll(/console\.(?:log|info|warn|error)\(([\s\S]{0,300}?)\);/g)].map((m) => m[1]);
+      for (const line of logs) {
+        assert.doesNotMatch(line, /\btoken\b(?![A-Z])/i, `${name} logs a token value: ${line.slice(0, 80)}`);
+      }
+      assert.doesNotMatch(source, /tokenHash\s*:\s*token\b/, `${name} stores the raw token`);
+    }
+  });
+
+  check("the reset request answers identically for known and unknown addresses", () => {
+    // One message literal, no branch that says "sent" vs "no such user".
+    const messages = [...resetRequestRoute.matchAll(/message: "([^"]+)"/g)].map((m) => m[1]);
+    assert.equal(new Set(messages).size, 1);
+    const code = resetRequestRoute.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
+    assert.doesNotMatch(code, /AccountExists|NoAccount|notFound.*json|emailSent/i);
+  });
+
+  check("the reset flow never trusts a client-supplied profile id", () => {
+    assert.doesNotMatch(resetConfirmRoute, /body\.(?:profileId|profile_id|userId)/, "the client can choose the account");
+    assert.match(resetConfirmRoute, /row\.profileId/, "the profile must come from the token row");
+    assert.match(resetConfirmRoute, /\.returning\(\{ id: passwordResetTokens\.id \}\)/, "the consume step is not guarded");
   });
 }
 

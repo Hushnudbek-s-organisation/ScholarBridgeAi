@@ -15,7 +15,15 @@ import { Home } from "./HomeClient";
  * The language cookie is resolved here too so the server-rendered page is in
  * the same language as the `<html lang>` the layout already sets.
  */
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  /** `?start=1` — the "start now" link every public page uses. */
+  searchParams: Promise<{ start?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const startParam = Array.isArray(params.start) ? params.start[0] : params.start;
+  const startNow = startParam === "1";
   const jar = await cookies();
   const hasSessionCookie = Boolean(jar.get(SESSION_COOKIE)?.value);
   const stored = jar.get(LOCALE_COOKIE)?.value;
@@ -23,5 +31,12 @@ export default async function Page() {
   // English ships inside the client bundle; Uzbek and Russian travel with the
   // page (one language, not all three). This is what keeps the landing page's
   // first load small enough to stay responsive on a phone.
-  return <Home hasSessionCookie={hasSessionCookie} initialLocale={initialLocale} initialMessages={clientMessagesFor(initialLocale)} />;
+  return (
+    <Home
+      hasSessionCookie={hasSessionCookie}
+      startNow={startNow}
+      initialLocale={initialLocale}
+      initialMessages={clientMessagesFor(initialLocale)}
+    />
+  );
 }

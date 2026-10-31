@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
+import { verifiedQsRankNumber } from "@/lib/universityRank";
 import { savedScholarships, savedUniversities, scholarships, studentActivities, studentProfiles, universities } from "@/db/schema";
 import { asc, eq, inArray, sql } from "drizzle-orm";
 import { requireProfileAccess } from "@/lib/auth";
@@ -342,7 +343,8 @@ export async function GET(req: Request) {
         name: u.name,
         country: u.country,
         city: u.city,
-        worldRanking: u.worldRanking,
+        // Phase AD: no recorded edition, no position.
+        worldRanking: verifiedQsRankNumber(u),
         acceptanceRate: u.acceptanceRate,
         annualTuitionUsd: costsUsd.annualTuitionUsd,
         annualLivingEstUsd: costsUsd.annualLivingEstUsd,

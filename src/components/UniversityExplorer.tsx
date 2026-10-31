@@ -50,6 +50,7 @@ import {
   Star,
   BookOpen,
   Sparkles,
+  Languages,
   X,
   CheckCircle2,
   AlertCircle,
@@ -85,6 +86,9 @@ export interface University {
   applicationFeeUsd?: number | null;
   description: string | null;
   highlights: string | null;
+  /** Set by the API when the prose could not be translated (Phase Z rule). */
+  descriptionSourceLanguage?: "en" | null;
+  highlightsSourceLanguage?: "en" | null;
   websiteUrl: string | null;
   imageUrl: string | null;
   matchScore?: number | null;
@@ -1056,11 +1060,15 @@ export function UniversityExplorer({
                     )}
                   </div>
 
-                  {/* World Rank Badge */}
-                  <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-amber-300" />
-                    {t("exWorldRank", { rank: formatNumber(uni.worldRanking, { placeholder: "—" }) })}
-                  </div>
+                  {/* World Rank Badge — only when the API published a position
+                      (Phase AD: a rank with no recorded edition is dropped
+                      upstream, so the card shows no badge at all). */}
+                  {uni.worldRanking != null && (
+                    <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
+                      <Star className="h-3 w-3 fill-amber-300" />
+                      {t("exWorldRank", { rank: formatNumber(uni.worldRanking, { placeholder: "—" }) })}
+                    </div>
+                  )}
 
                   {/* Title & Country Overlay */}
                   <div className="absolute bottom-3 left-3 right-3 text-white">
@@ -1234,8 +1242,17 @@ export function UniversityExplorer({
                         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
                       </summary>
                       <div className="mt-2 space-y-2 border-t border-slate-200/70 pt-2 text-slate-600 dark:border-slate-800/60">
+                        {uni.description && uni.descriptionSourceLanguage === "en" && (
+                          <p className="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
+                            <Languages className="h-3 w-3 shrink-0" aria-hidden />
+                            <span>{t("sourceLanguageLabel")}</span>
+                          </p>
+                        )}
                         {uni.description && (
-                          <p className="break-words text-xs leading-relaxed text-slate-600">
+                          <p
+                            className="break-words text-xs leading-relaxed text-slate-600"
+                            lang={uni.descriptionSourceLanguage === "en" ? "en" : undefined}
+                          >
                             {uni.description}
                           </p>
                         )}
@@ -1248,6 +1265,12 @@ export function UniversityExplorer({
                               </span>
                             ))}
                           </div>
+                        )}
+                        {highlightsList.length > 0 && uni.highlightsSourceLanguage === "en" && (
+                          <p className="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
+                            <Languages className="h-3 w-3 shrink-0" aria-hidden />
+                            <span>{t("sourceLanguageLabel")}</span>
+                          </p>
                         )}
 
                         {/* Why this match (spec §23) */}

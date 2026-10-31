@@ -3,12 +3,14 @@
  *
  * Two rules:
  *  1. Nothing is transliterated by guesswork. A value we know how to say in
- *     Uzbek is translated from a curated table; anything else is either shown
- *     exactly as stored (proper nouns such as major names) or dropped.
+ *     Uzbek is translated from a curated table; anything else is dropped. No
+ *     stored English sentence ever reaches a post (docs/CHANNEL.md §4b-3).
  *  2. HTML is escaped here, at the single place text enters a template, so no
  *     template has to remember it.
  */
 import { escapeHtml } from "@/lib/telegram/core";
+import { resolveCountry } from "../countries";
+import { majorListUz } from "./fields.uz";
 
 export const MONTHS_UZ = [
   "yanvar",
@@ -133,16 +135,38 @@ export function lines(parts: (string | null | undefined | false)[]): string {
     .trim();
 }
 
-/** Coverage labels we can say in Uzbek. Anything not listed is dropped. */
+/**
+ * Coverage labels we can say in Uzbek. Anything not listed is dropped.
+ *
+ * The list must cover every value the live `coverage_type` column actually
+ * holds: a missing entry does not print English, it prints **nothing**, so the
+ * `Moliyalashtirish:` line silently disappears from the post. The four values
+ * added below (`Full Tuition Waiver`, `Tuition Credit`, `Full Ride`,
+ * `Living-expenses grant`, …) were exactly that hole — 23 active awards had no
+ * funding line at all.
+ */
 const COVERAGE_UZ: Record<string, string> = {
   "full funding": "to'liq moliyalashtirish",
+  "full scholarship": "to'liq grant",
+  "full ride": "to'liq moliyalashtirish (barcha xarajatlar)",
   "full tuition": "to'liq o'qish kontrakti",
   "full tuition + stipend": "to'liq kontrakt va stipendiya",
+  "full tuition waiver": "kontraktdan to'liq ozod qilish",
+  "tuition waiver": "kontraktdan ozod qilish",
+  "tuition credit": "kontrakt hisobiga kredit",
+  "fee waiver": "to'lovdan ozod qilish",
+  "registration fee waiver": "ro'yxatdan o'tish to'lovidan ozod qilish",
   "partial funding": "qisman moliyalashtirish",
+  "partial scholarship": "qisman grant",
   "partial tuition": "kontraktning bir qismi",
   "partial (monthly stipend)": "oylik stipendiya",
   "living stipend": "yashash uchun stipendiya",
-  "tuition waiver": "kontraktdan ozod qilish",
+  "living-expenses grant": "yashash xarajatlari uchun grant",
+  "stipend": "stipendiya",
+  "stipend only": "faqat stipendiya",
+  "accommodation": "turar joy",
+  "travel grant": "yo'l xarajatlari granti",
+  "research grant": "tadqiqot granti",
 };
 
 export function coverageUz(raw: string | null | undefined): string | null {
@@ -184,14 +208,16 @@ export function degreesUz(raw: string | null | undefined): string | null {
   return unique.length ? unique.join(", ") : null;
 }
 
-/** "All Majors" → "barcha yo'nalishlar"; otherwise at most three as stored. */
+/**
+ * `eligible_majors` → Uzbek.
+ *
+ * The column used to fall through to the stored English ("Computer Science",
+ * "Mechanical Engineering") or, worse, an entire English sentence. It is now
+ * translated by the curated field list in `fields.uz.ts`: a known name becomes
+ * one Uzbek phrase, anything unknown is dropped rather than printed.
+ */
 export function majorsUz(raw: string | null | undefined): string | null {
-  const list = parseList(raw);
-  if (!list.length) return null;
-  if (list.some((m) => /^all( majors)?$/i.test(m))) return "barcha yo'nalishlar";
-  const shown = list.slice(0, 3);
-  const suffix = list.length > shown.length ? " va boshqalar" : "";
-  return shown.join(", ") + suffix;
+  return majorListUz(raw);
 }
 
 /**
@@ -269,10 +295,20 @@ export function isCountryName(text: string | null | undefined): boolean {
   return Object.values(COUNTRY_UZ).some((name) => name.toLowerCase() === key);
 }
 
+/**
+ * Stored country → the Uzbek name a post prints.
+ *
+ * `channel_countries` is the single source of truth: the same row that supplies
+ * the flag and the locative form supplies the name, so an award cannot be
+ * flagged in one line and named differently in the next. `COUNTRY_UZ` stays as
+ * a last resort for a handful of values the table does not carry (`Global`,
+ * `Israel`, …); an unknown country keeps its stored spelling rather than being
+ * transliterated by guesswork.
+ */
 export function countryUz(raw: string | null | undefined): string | null {
   const name = (raw ?? "").trim();
   if (!name) return null;
-  const mapped = COUNTRY_UZ[name.toLowerCase()];
+  const mapped = resolveCountry(name)?.nameUz ?? COUNTRY_UZ[name.toLowerCase()];
   return esc(mapped ?? name);
 }
 

@@ -1,5 +1,6 @@
 import type { scholarships } from "@/db/schema";
 import type { Locale } from "@/i18n/config";
+import { daysBetweenYmd, todayYmd, ymdOf } from "@/lib/catalogueOrder";
 
 /** Runtime display labels — the database keeps the canonical English values;
  *  these strings only localize the outgoing UI text. */
@@ -78,52 +79,66 @@ interface ScholarshipLike {
   isActive: boolean | null;
 }
 
-function toDate(v: string | Date | null | undefined): Date | null {
-  if (!v) return null;
-  const d = v instanceof Date ? v : new Date(v);
-  return isNaN(d.getTime()) ? null : d;
+/**
+ * Days from `today` to a stored date — NEGATIVE when the date is in the past.
+ *
+ * Every comparison below is a *whole-day* comparison, not a timestamp one. A
+ * `date` column arrives as midnight UTC, so the obvious `now <= deadline`
+ * reported an award closed at 00:00:01 on the very day it could still be
+ * applied to — and `runRefresh()` writes this verdict back into
+ * `application_status`, so a nightly refresh on the deadline day closed the
+ * award in the database too. The day itself belongs to the applicant.
+ */
+function daysUntil(today: string, v: string | Date | null | undefined): number | null {
+  return daysBetweenYmd(today, ymdOf(v));
 }
 
 /**
  * Compute the current application status from dates (spec §6).
  * Pure function — the UI and API both use it, so status is always consistent.
  */
-export function computeScholarshipStatus(s: ScholarshipLike): ScholarshipApplicationStatus {
-  const now = new Date();
-  const opening = toDate(s.openingDate);
-  const deadline = toDate(s.deadlineDate);
-  const rangeStart = toDate(s.deadlineRangeStart);
-  const rangeEnd = toDate(s.deadlineRangeEnd);
+export function computeScholarshipStatus(
+  s: ScholarshipLike,
+  now: Date = new Date()
+): ScholarshipApplicationStatus {
+  // One clock per call, in UTC days — the same unit `daysUntil` and the
+  // dashboard's countdown use.
+  const today = todayYmd(now);
+  const openingIn = daysUntil(today, s.openingDate);
+  const deadlineIn = daysUntil(today, s.deadlineDate);
+  const rangeStartIn = daysUntil(today, s.deadlineRangeStart);
+  const rangeEndIn = daysUntil(today, s.deadlineRangeEnd);
 
   if (s.deadlineType === "rolling") return "rolling";
   if (s.deadlineType === "not_announced") return "not_announced";
 
-  // Exact deadline known.
-  if (deadline) {
-    if (opening && now < opening) return "upcoming";
-    if (now <= deadline) return "open";
+  // Exact deadline known. The deadline day itself is still open.
+  if (deadlineIn != null) {
+    if (openingIn != null && openingIn > 0) return "upcoming";
+    if (deadlineIn >= 0) return "open";
     return "closed";
   }
 
-  // Deadline range.
-  if (rangeStart && rangeEnd) {
-    if (opening && now < opening) return "upcoming";
-    if (now >= rangeStart && now <= rangeEnd) return "open";
-    if (now > rangeEnd) return "closed";
-    if (now < rangeStart) return "upcoming";
+  // Deadline range — the last day of the range is still open.
+  if (rangeStartIn != null && rangeEndIn != null) {
+    if (openingIn != null && openingIn > 0) return "upcoming";
+    if (rangeStartIn <= 0 && rangeEndIn >= 0) return "open";
+    if (rangeEndIn < 0) return "closed";
+    if (rangeStartIn > 0) return "upcoming";
   }
 
   // Multiple rounds: check the latest round deadline.
   if (s.rounds && s.rounds !== "[]") {
     try {
       const rounds = JSON.parse(s.rounds) as { deadline?: string }[];
-      const deadlines = rounds
-        .map((r) => toDate(r.deadline))
-        .filter((d): d is Date => d !== null)
-        .sort((a, b) => b.getTime() - a.getTime());
-      if (deadlines.length > 0) {
-        const latest = deadlines[0];
-        if (now <= latest) return "open";
+      const remaining = rounds
+        .map((r) => daysUntil(today, r.deadline))
+        .filter((d): d is number => d !== null)
+        .sort((a, b) => a - b);
+      if (remaining.length > 0) {
+        // The LATEST round decides: any round still ahead keeps it open, and
+        // the last round's own day counts.
+        if (remaining[remaining.length - 1] >= 0) return "open";
         return "closed";
       }
     } catch {
@@ -180,9 +195,10 @@ export type ScholarshipWithStatus = typeof scholarships.$inferSelect & {
 /** Attach computed status fields to a scholarship row. */
 export function withStatus(
   s: ScholarshipLike & Record<string, unknown>,
-  locale: Locale = "en"
+  locale: Locale = "en",
+  now: Date = new Date()
 ): ScholarshipWithStatus {
-  const computedStatus = computeScholarshipStatus(s);
+  const computedStatus = computeScholarshipStatus(s, now);
   return {
     ...s,
     computedStatus,

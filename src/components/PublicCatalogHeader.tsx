@@ -13,6 +13,7 @@ export function PublicCatalogHeader() {
   const meta = useTranslations("meta");
   const nav = useTranslations("nav");
   const catalog = useTranslations("publicCatalog");
+  const features = useTranslations("publicFeatures");
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 shadow-xs backdrop-blur-sm">
@@ -46,6 +47,18 @@ export function PublicCatalogHeader() {
             className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${pathname === "/scholarships" ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
           >
             {nav("scholarships")}
+          </Link>
+          {/*
+            The site's own product was unreachable from the catalogue: a reader
+            arriving from a channel post saw scholarships and universities and
+            nothing else. This link is on every public page by construction.
+          */}
+          <Link
+            href="/features"
+            aria-current={pathname === "/features" ? "page" : undefined}
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${pathname === "/features" ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
+          >
+            {features("navLabel")}
           </Link>
         </nav>
       </div>

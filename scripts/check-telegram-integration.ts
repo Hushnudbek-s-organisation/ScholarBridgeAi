@@ -663,6 +663,52 @@ async function main() {
   }
 
   // ===========================================================================
+  section("New-account reminder — the API's ten-day window");
+  // ===========================================================================
+  {
+    const { GET: meGet } = await import("../src/app/api/telegram/me/route");
+
+    const fresh = await P("Nodira", "nodira@example.com");
+    const old = await P("Olim", "olim@example.com");
+    await db.update(schema.studentProfiles).set({ createdAt: new Date(Date.now() - 20 * 86_400_000) }).where(eq(schema.studentProfiles.id, old.id));
+
+    /**
+     * A website session cookie, which is how a student actually reaches this
+     * route. A Telegram-channel bearer would not do here: it is only valid for
+     * a profile that *already* has a Telegram link — the exact case this test
+     * has to keep unlinked.
+     */
+    const reqFor = (profileId: number) => {
+      const token = auth.signSessionToken({ id: profileId, passwordHash: "$2b$10$x" });
+      return new Request("http://x/api/telegram/me", { headers: { cookie: `${auth.SESSION_COOKIE}=${token}` } });
+    };
+
+    // Fresh account (created seconds ago), no Telegram → the reminder shows.
+    const freshJson = await (await meGet(reqFor(fresh.id))).json();
+    check("a brand-new account is reminded", freshJson.nudge?.show === true && freshJson.nudge?.reason === "shown");
+    check("the window is ten days", freshJson.account?.nudgeWindowDays === 10 && freshJson.account?.ageDays === 0);
+    check("the reminder says how long it has left", freshJson.nudge?.daysLeft === 10);
+
+    // Same account, now linked → the reminder stops (it never nags a linked user).
+    await db.insert(schema.telegramLinks).values({ profileId: fresh.id, telegramUserId: "2001", chatId: "2001" } as any);
+    const linkedJson = await (await meGet(reqFor(fresh.id))).json();
+    check("a connected account is never reminded", linkedJson.nudge?.show === false && linkedJson.nudge?.reason === "linked");
+
+    // An old account is out of the window even with no link.
+    const oldJson = await (await meGet(reqFor(old.id))).json();
+    check("an account older than ten days is not reminded", oldJson.nudge?.show === false && oldJson.nudge?.reason === "too_old");
+    check("and the API says how old it is", (oldJson.account?.ageDays ?? 0) >= 20);
+
+    // Day 10 is still inside the window; day 11 is not.
+    await db.update(schema.studentProfiles).set({ createdAt: new Date(Date.now() - 10 * 86_400_000) }).where(eq(schema.studentProfiles.id, old.id));
+    const day10 = await (await meGet(reqFor(old.id))).json();
+    check("day ten is still inside the window", day10.nudge?.show === true && day10.nudge?.daysLeft === 0);
+    await db.update(schema.studentProfiles).set({ createdAt: new Date(Date.now() - 11 * 86_400_000) }).where(eq(schema.studentProfiles.id, old.id));
+    const day11 = await (await meGet(reqFor(old.id))).json();
+    check("day eleven is outside it", day11.nudge?.show === false);
+  }
+
+  // ===========================================================================
   section("Deadline reminders — offsets, timezone, dedup, stale-safety, retries");
   // ===========================================================================
   {

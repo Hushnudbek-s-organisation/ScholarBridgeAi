@@ -37,6 +37,8 @@ export interface Facts {
   requirementsRaw: string | null;
   englishRequirementRaw: string | null;
   tuitionCoverageRaw: string | null;
+  /** English `description`, read for programme facts — never printed as-is. */
+  descriptionRaw: string | null;
   /** Site origin, "" when the deployment URL is unknown. */
   siteUrl: string;
   /** Internal path — the only thing a `/r/<code>` link may ever point at. */
@@ -55,6 +57,7 @@ export interface FactsRow extends ScholarshipLike {
   requirements: string | null;
   englishRequirements: string | null;
   tuitionCoverage: string | null;
+  description?: string | null;
   websiteUrl: string | null;
   applicationUrl: string | null;
 }
@@ -94,6 +97,7 @@ export function buildFacts(row: FactsRow, opts: FactsOptions): Facts {
     requirementsRaw: trimOrNull(row.requirements),
     englishRequirementRaw: trimOrNull(row.englishRequirements),
     tuitionCoverageRaw: trimOrNull(row.tuitionCoverage),
+    descriptionRaw: trimOrNull(row.description),
     siteUrl: opts.siteUrl.replace(/\/+$/, ""),
     sitePath: `/scholarships/${row.id}`,
     providerUrl: safeHttpsUrl(row.applicationUrl) ?? safeHttpsUrl(row.websiteUrl),

@@ -71,6 +71,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.9,
     },
+    {
+      // The public product tour: the one page that explains what the site does
+      // beyond a single award, and the target of every catalogue promo strip.
+      url: `${SITE_URL}/features`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
     ...universityUrls,
     ...scholarshipUrls,
     {

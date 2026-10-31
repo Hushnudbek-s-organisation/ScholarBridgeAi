@@ -38,6 +38,7 @@ import {
   essayVersions,
   notifications,
   opportunities,
+  passwordResetTokens,
   programRequirements,
   programSources,
   savedScholarships,
@@ -90,6 +91,9 @@ export const CORE_TABLES: PgTable[] = [
   // the outage look like a password problem. It has no other lazy-DDL owner
   // (telegram_links gets ensureTelegramTables; user_sessions had nothing).
   userSessions,
+  // Password reset links (Phase AG) — read on /forgot-password and
+  // /reset-password; without the table every reset request answers 503.
+  passwordResetTokens,
 ];
 
 function quote(name: string): string {

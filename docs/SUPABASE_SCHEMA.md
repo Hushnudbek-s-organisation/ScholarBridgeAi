@@ -831,6 +831,18 @@ Migration: `supabase/add_ai_cost_accounting.sql` (additive; rollback notes insid
 | `decided_at` | timestamp | yes | — |  |
 | `decided_by` | integer | yes | — | FK → student_profiles(id) on delete set null |
 
+### `password_reset_tokens`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `profile_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
+| `token_hash` | text |  | — | Unique SHA-256 hash of the emailed token; the token itself is never stored |
+| `created_at` | timestamp |  | yes |  |
+| `expires_at` | timestamp |  | — | Request time + 60 minutes |
+| `used_at` | timestamp | yes | — | Stamped when the link is spent, or when a newer link replaces it |
+| `requested_ip` | text | yes | — | For abuse review; never shown to users |
+
 ### `payments`
 
 | column | type | null | default | notes |

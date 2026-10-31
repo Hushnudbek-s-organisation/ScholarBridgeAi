@@ -28,7 +28,12 @@ import type { PostChrome, Rendered } from "./chrome";
 import { ctaLine, footerLine, hashtagLine } from "./chrome";
 import type { Facts } from "./facts";
 import { bullets, esc, daysLeftUz, formatDateUz } from "./format";
-import { translateCoverage, translateEnglishRequirement, translateRequirements } from "./translate.uz";
+import {
+  aboutSentences,
+  translateCoverage,
+  translateEnglishRequirement,
+  translateRequirements,
+} from "./translate.uz";
 
 /** Soft target — past this the "about" paragraph is trimmed first. */
 export const CARD_SOFT_LIMIT = 1800;
@@ -43,6 +48,11 @@ export interface CardInput {
   content?: ScholarshipContent | null;
   country: CountryDisplay | null;
   chrome: PostChrome;
+  /**
+   * True when the message already says how many days are left (the urgency
+   * banner), so the deadline line does not repeat the countdown.
+   */
+  suppressCountdown?: boolean;
 }
 
 const cap = (value: string) => (value ? value[0].toUpperCase() + value.slice(1) : value);
@@ -61,6 +71,29 @@ function line(...parts: (string | null | undefined)[]): string {
 export function moneyUsd(value: number): string | null {
   if (!Number.isFinite(value) || value <= 0) return null;
   return `$${Math.round(value).toLocaleString("en-US")}`;
+}
+
+/**
+ * The Uzbek one-liner under the title.
+ *
+ * The reference post opens with `🇯🇵 MEXT (UR): Yaponiyada magistratura va PhD
+ * uchun to'liq grant` — a sentence *about* the award, not its official name.
+ * The official name is data and stays as stored; this line is built from the
+ * stored country/degrees/funding so the first thing a reader sees is Uzbek.
+ *
+ * Built only from fields the row actually holds: an unknown country or degree
+ * list shortens the sentence instead of being guessed.
+ */
+export function taglineFromFacts(facts: Facts, country: CountryDisplay | null): string | null {
+  // "to'liq grant" is the phrase the reference post uses; a partial award
+  // keeps its own label so the headline still says what is covered.
+  const funding = facts.fullyFunded ? "to'liq grant" : facts.coverage ? `${facts.coverage} grant` : "grant";
+  const where = country?.locative ? esc(country.locative) : null;
+  const degrees = facts.degrees ? esc(facts.degrees) : null;
+  if (where && degrees) return `${where} ${degrees} uchun ${funding}`;
+  if (where) return `${where} o'qish uchun ${funding}`;
+  if (degrees) return `${cap(degrees)} uchun ${funding}`;
+  return null;
 }
 
 /** The headline, in three styles. Without a tagline there is no dangling dash. */
@@ -158,21 +191,74 @@ export function benefitBullets(facts: Facts, content: ScholarshipContent | null)
   return out;
 }
 
-/** "Dastur haqida" — authored Uzbek prose only, one bullet per paragraph. */
-function aboutBullets(content: ScholarshipContent | null): string[] {
-  if (!content?.aboutUz) return [];
-  return content.aboutUz
-    .split(/\n{2,}|\r?\n/)
-    .map((part) => part.trim())
-    .filter(Boolean);
+/**
+ * "Dastur haqida".
+ *
+ * Order of authority:
+ *  1. the admin's own Uzbek copy (Admin → Kanal → Kontent), verbatim, one
+ *     bullet per paragraph;
+ *  2. a sentence composed from stored columns — where, which degree levels,
+ *     on what funding basis;
+ *  3. up to two sentences *read* out of the English `description` (taught in
+ *     English, N years, fully funded, open to international students).
+ *
+ * What is never here: the English description itself, and anything the row does
+ * not state. Without this the section simply did not exist on the 500+ awards
+ * nobody had typed copy for — which is why the published post was thinner than
+ * the reference format.
+ */
+export function aboutBullets(
+  facts: Facts,
+  content: ScholarshipContent | null,
+  country: CountryDisplay | null
+): string[] {
+  if (content?.aboutUz) {
+    return content.aboutUz
+      .split(/\n{2,}|\r?\n/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
+  const out: string[] = [];
+  /**
+   * Only the locative form is safe here: "Kanada bakalavr bosqichini" is broken
+   * Uzbek, and an unknown country has no locative at all. Without it the
+   * sentence simply does not name a place — it never writes the plain name into
+   * a position that needs `-da`.
+   */
+  const where = country?.locative ?? null;
+  const degrees = facts.degrees;
+  const funding = facts.fullyFunded ? "to'liq moliyalashtirish" : (facts.coverage ?? null);
+
+  if (where && degrees && funding) {
+    out.push(`Ushbu dastur ${where} ${degrees} bosqichini ${funding} asosida o'qish imkonini beradi.`);
+  } else if (where && degrees) {
+    out.push(`Ushbu dastur ${where} ${degrees} bosqichida o'qish imkonini beradi.`);
+  } else if (where && funding) {
+    out.push(`Ushbu dastur ${where} ${funding} asosida o'qish imkonini beradi.`);
+  } else if (degrees && funding) {
+    out.push(`Ushbu dastur ${degrees} bosqichini ${funding} asosida o'qish imkonini beradi.`);
+  } else if (degrees) {
+    out.push(`Ushbu dastur ${degrees} bosqichida o'qish imkonini beradi.`);
+  } else if (where) {
+    out.push(`Ushbu dastur ${where} o'qish uchun mo'ljallangan.`);
+  } else if (funding) {
+    out.push(`Ushbu dastur ${funding} asosida o'qishni qoplaydi.`);
+  }
+
+  for (const sentence of aboutSentences(facts.descriptionRaw, out)) {
+    if (out.length >= 2) break;
+    out.push(sentence);
+  }
+  return out;
 }
 
 /** `⏰️Oxirgi muddat: 12-noyabr, 2026 · 36 kun qoldi` */
-export function cardDeadlineLine(facts: Facts): string {
+export function cardDeadlineLine(facts: Facts, suppressCountdown = false): string {
   const { quality, date, daysLeft } = facts.deadline;
   const formatted = formatDateUz(date);
   if (quality === "exact" && formatted) {
-    const left = daysLeft !== null ? daysLeftUz(daysLeft) : null;
+    const left = !suppressCountdown && daysLeft !== null ? daysLeftUz(daysLeft) : null;
     return `⏰️<b>Oxirgi muddat:</b> ${formatted}${left ? ` · ${left}` : ""}`;
   }
   if (quality === "estimated") {
@@ -238,7 +324,8 @@ export function renderScholarshipCard(input: CardInput): Rendered | null {
   const content = input.content ?? null;
   if (!facts.title.trim()) return null;
 
-  const tagline = content?.taglineUz ? esc(content.taglineUz) : null;
+  const authoredTagline = content?.taglineUz ? esc(content.taglineUz) : null;
+  const tagline = authoredTagline ?? taglineFromFacts(facts, country);
   const sections: CardSections = {
     headline: headline(facts, tagline, country, chrome.variant),
     provider: facts.provider ? `🏛 ${facts.provider}` : null,
@@ -246,8 +333,8 @@ export function renderScholarshipCard(input: CardInput): Rendered | null {
     language: languageLabel(facts, content),
     eligibility: eligibilityBullets(facts, content),
     benefits: benefitBullets(facts, content),
-    about: aboutBullets(content),
-    deadline: cardDeadlineLine(facts),
+    about: aboutBullets(facts, content, country),
+    deadline: cardDeadlineLine(facts, input.suppressCountdown === true),
     source: facts.providerUrl ? `🏛 Rasmiy manba: <a href="${esc(facts.providerUrl)}">havola</a>` : null,
     detail: detailLine(facts, chrome),
     hashtags: hashtagLine(chrome.hashtags),

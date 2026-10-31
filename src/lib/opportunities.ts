@@ -16,6 +16,7 @@
 
 import { majorSimilarity } from "./chancing";
 import { subjectSimilarity } from "./subjectAffinity";
+import type { OpportunityNote, OpportunityNoteCode } from "./opportunityNotes";
 
 export type OpportunityType = "competition" | "research" | "internship" | "summer_school";
 export type OpportunityLevel = "high_school" | "undergrad" | "grad" | "phd" | "any";
@@ -40,8 +41,15 @@ export interface OpportunityProfile {
 
 export interface OpportunityMatch {
   match: number; // 0–100
+  /** English sentences — the API keeps these unchanged for existing consumers. */
   reasons: string[];
   flags: string[];
+  /**
+   * The same reasons and flags as code + parameters, so a UI can render them in
+   * the reader's language. `reasons` and `flags` are derived from this list, in
+   * order; nothing is emitted one way only.
+   */
+  notes: OpportunityNote[];
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -89,13 +97,23 @@ export function scoreOpportunity(
 ): OpportunityMatch {
   const reasons: string[] = [];
   const flags: string[] = [];
+  const notes: OpportunityNote[] = [];
+  /** Record one note: the English sentence (the API's contract) and its code. */
+  const reason = (text: string, code: OpportunityNoteCode, params?: Record<string, string>) => {
+    reasons.push(text);
+    notes.push({ kind: "reason", code, params });
+  };
+  const flag = (text: string, code: OpportunityNoteCode, params?: Record<string, string>) => {
+    flags.push(text);
+    notes.push({ kind: "flag", code, params });
+  };
   let match = 0;
 
   // 1. Field (0–40).
   const fields = parseFields(opp.fields).filter((f) => f.trim().toLowerCase() !== "all");
   if (!fields.length) {
     match += 25;
-    reasons.push("open to all fields");
+    reason("open to all fields", "field_all");
   } else if (profile.major?.trim()) {
     // Field relatedness uses the app-wide synonym-aware matcher; the plain
     // word-overlap value is kept as a floor so a genuine overlap is never
@@ -105,25 +123,27 @@ export function scoreOpportunity(
     );
     if (best >= 0.5) {
       match += Math.round(best * 40);
-      reasons.push(`field match: ${profile.major}`);
+      reason(`field match: ${profile.major}`, "field_match", { major: profile.major });
     } else {
-      flags.push(`listed fields: ${fields.join(", ")} — outside your major`);
+      flag(`listed fields: ${fields.join(", ")} — outside your major`, "field_outside", {
+        fields: fields.join(", "),
+      });
     }
   } else {
     match += 10;
-    flags.push("your major is not set in the profile");
+    flag("your major is not set in the profile", "field_unknown");
   }
 
   // 2. Country (0–20).
   const country = (opp.country ?? "").trim();
   if (!country) {
     match += 15;
-    reasons.push("international — open to all countries");
+    reason("international — open to all countries", "country_all");
   } else if (profile.country?.trim() && country.toLowerCase() === profile.country.trim().toLowerCase()) {
     match += 20;
-    reasons.push(`home country: ${country}`);
+    reason(`home country: ${country}`, "country_home", { country });
   } else {
-    flags.push(`limited to ${country}`);
+    flag(`limited to ${country}`, "country_limited", { country });
   }
 
   // 3. Level (0–20).
@@ -132,24 +152,36 @@ export function scoreOpportunity(
     match += 20;
   } else {
     match += 5;
-    flags.push(`aimed at ${TYPE_LABEL[level] ? level : level} level, you are ${profile.degreeLevel ?? "level unknown"}`);
+    flag(
+      `aimed at ${TYPE_LABEL[level] ? level : level} level, you are ${profile.degreeLevel ?? "level unknown"}`,
+      "level_mismatch",
+      { wanted: level, actual: profile.degreeLevel?.trim() ? profile.degreeLevel : "level unknown" }
+    );
   }
 
   // 4. Deadline (0–10). Unknown/recurring is a neutral 5, never a failure
   // and never a guessed date.
   if (!opp.deadlineDate) {
     match += 5;
-    flags.push("recurring or date not published — check the official page");
+    flag("recurring or date not published — check the official page", "deadline_recurring");
   } else {
     const d = new Date(`${opp.deadlineDate}T00:00:00Z`);
-    if (Number.isNaN(d.getTime())) {
+    const daysLeft = Number.isNaN(d.getTime())
+      ? null
+      : (Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) -
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) /
+        DAY_MS;
+    if (daysLeft === null) {
       match += 5;
-      flags.push("deadline date is not valid — check the official page");
-    } else if (d.getTime() < now.getTime() - DAY_MS) {
-      flags.push("deadline has passed");
+      flag("deadline date is not valid — check the official page", "deadline_invalid");
+    } else if (daysLeft < 0) {
+      // Phase V's rule: the closing day belongs to the applicant. A date-only
+      // value is midnight UTC, so `d < now` called an opportunity closed at
+      // 00:00:01 on the day it could still be entered.
+      flag("deadline has passed", "deadline_passed");
     } else {
       match += 10;
-      reasons.push(`deadline ${opp.deadlineDate}`);
+      reason(`deadline ${opp.deadlineDate}`, "deadline_set", { date: opp.deadlineDate });
     }
   }
 
@@ -157,6 +189,7 @@ export function scoreOpportunity(
     match: Math.min(100, Math.max(0, Math.round(match))),
     reasons,
     flags,
+    notes,
   };
 }
 

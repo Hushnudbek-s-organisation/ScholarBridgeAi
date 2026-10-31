@@ -36,7 +36,9 @@
     "scholarshipPeriodVariable": "variable",
     "universitiesLoadError": "Universities are temporarily unavailable. Please try again later.",
     "scholarshipsLoadError": "Scholarships are temporarily unavailable. Please try again later.",
-    "independentGuide": "ScholarBridgeAI is an independent guide and is not affiliated with any university or scholarship provider. Information is compiled from public sources and may be incomplete or out of date. Confirm requirements, costs, and deadlines with official sources before applying."
+    "independentGuide": "ScholarBridgeAI is an independent guide and is not affiliated with any university or scholarship provider. Information is compiled from public sources and may be incomplete or out of date. Confirm requirements, costs, and deadlines with official sources before applying.",
+    "deadlinePassed": "Deadline passed",
+    "deadlinePassedHint": "Check the official source for the next round."
   },
   "pagination": {
     "aria": "Pagination",
@@ -1354,7 +1356,8 @@
     "recurring": "Recurring program — check the official page for this year's date",
     "noResults": "No opportunities in this category yet.",
     "loading": "Loading opportunities…",
-    "searchPlaceholder": "Search opportunities, fields, providers…"
+    "searchPlaceholder": "Search opportunities, fields, providers…",
+    "deadlinePassed": "Deadline passed"
   },
   "navHints": {
     "dashboard": "Your path, next steps and progress at a glance",
@@ -3119,7 +3122,8 @@
     "wrongCredentials": "Incorrect email or password",
     "tooMany": "Too many attempts. Please wait a few minutes.",
     "failed": "Sign-in failed",
-    "showPassword": "Show password",
+"forgotPassword": "Forgot your password?",
+"showPassword": "Show password",
     "hidePassword": "Hide password",
     "noAccountHint": "Still not working? Check for a space at the end of the password, or create the account again below — an account made on another device or browser is not stored in this app.",
     "createWithThisEmail": "Create an account with this email"
@@ -3207,10 +3211,10 @@
       "on": "resume alerts",
       "unlink": "disconnect"
     },
-    "nudgeTitle": "Never miss a deadline",
-    "nudgeBody": "Connect Telegram — reminders and sign-in codes come straight to your phone.",
+    "nudgeTitle": "Connect the Telegram bot to use the site fully",
+    "nudgeBody": "Matching grants, deadline reminders and verified announcements arrive in the bot. Connecting takes 20 seconds — you can disconnect any time.",
     "nudgeCta": "Connect",
-    "dismiss": "Hide",
+    "dismiss": "Later",
     "types": {
       "deadline_approaching": "Deadline approaching",
       "deadline_changed": "Deadline changed",
@@ -3381,7 +3385,8 @@
         "deferred": "Deferred"
       },
       "rateLimited": "Too many requests. Please try again later."
-    }
+    },
+    "nudgeDaysLeft": "New-account reminder: shown for {days} more days."
   },
   "adminTelegram": {
     "loading": "Loading…",
@@ -3699,7 +3704,8 @@
     "backToList": "Back to list",
     "loadFailed": "Failed to load university",
     "notFound": "University not found",
-    "qsRanking": "QS World Ranking 2027",
+    "qsRanking": "QS World Ranking",
+    "sourceLanguageLabel": "Source language: English",
     "officialWebsite": "Official Website",
     "officialWebsiteLower": "Official website",
     "applyNow": "Apply Now",
@@ -6747,6 +6753,7 @@
     "backToCatalog": "Back to the catalogue",
     "overview": "Overview",
     "overviewNotPublished": "The catalogue has no published description of this institution yet.",
+    "sourceLanguageLabel": "Source language: English",
     "highlights": "Highlights",
     "costs": "Tuition and living costs",
     "admission": "Admission requirements",
@@ -6815,6 +6822,7 @@
     "noFee": "No fee stated",
     "providerLabel": "Provider",
     "sourceLabel": "Source",
+    "sourceLanguageLabel": "Source language: English",
     "verifiedNote": "Every figure on this page comes from the official source above and was last checked on {date}.",
     "notFoundTitle": "Scholarship not found",
     "notFoundBody": "This scholarship may have been retired. Browse the full catalogue instead.",
@@ -6837,7 +6845,8 @@
     "allMajors": "All fields",
     "allCountries": "All countries",
     "applicationFeeFree": "Free",
-    "applyOnOfficialPage": "Apply on the official page"
+    "applyOnOfficialPage": "Apply on the official page",
+    "deadlinePassedNote": "The application window for this award closed on {date}. The next round is announced on the official source."
   },
   "adminChannel": {
     "title": "Telegram channel",
@@ -6999,11 +7008,11 @@
       "priorityCountriesHint": "One per line. The nearest deadlines always go first; once they run out, programmes from these countries win."
     },
     "links": {
-      "footerTitle": "Footer and social links",
-      "footerMain": "Main footer",
-      "footerMainHint": "Shown at the end of ordinary posts; default is the Kanal and Bot usernames from above",
+      "footerTitle": "End-of-post line and social links",
+      "footerMain": "Line at the end of every post (socials)",
+      "footerMainHint": "Shown at the end of every post — e.g. Instagram | Telegram | YouTube. Left empty, the Kanal and Bot links above are used instead.",
       "footerSocial": "Social footer (weekly post)",
-      "footerSocialHint": "Only what you add here appears — nothing is invented",
+      "footerSocialHint": "Extra links for the weekly post. Only what you add here appears — nothing is invented.",
       "add": "Add link",
       "remove": "Remove",
       "labelPlaceholder": "Label",
@@ -7293,5 +7302,108 @@
     "failed": "Could not read diagnostics.",
     "detailTitle": "Exact reason from the database",
     "schemaArea": "Schema:"
+  },
+  "publicFeatures": {
+    "metaTitle": "Features — what the site does",
+    "metaDescription": "What the site gives you beyond the one grant you saw in the channel: fit scoring, admission chance, a deadline plan, documents, an AI assistant and a Telegram bot.",
+    "navLabel": "Features",
+    "heroEyebrow": "The next step after the channel",
+    "heroTitle": "You saw one grant. What does the site do next?",
+    "heroBody": "This is not just a list of announcements: the site picks grants that match your profile, estimates your admission chance, tracks deadlines and helps with the paperwork. Browsing needs no account.",
+    "heroPrimary": "Create a free account",
+    "heroSecondary": "Browse scholarships",
+    "heroBot": "Open the Telegram bot",
+    "freeNote": "Browsing is free and needs no account. An account is only for saving, deadline reminders and the AI assistant.",
+    "featuresTitle": "What is in one place",
+    "featuresBody": "Each part works on its own and together they become one plan.",
+    "stepOneTitle": "Profile",
+    "stepOneBody": "A form that takes minutes: level, field, country, GPA and language score.",
+    "stepTwoTitle": "Fit",
+    "stepTwoBody": "The site shows matching grants, universities and your admission chance.",
+    "stepThreeTitle": "Plan",
+    "stepThreeBody": "A plan across deadlines, documents and steps — with reminders.",
+    "stepsTitle": "How it works",
+    "promoTitle": "This page is only part of the site",
+    "promoBody": "Fit scoring, admission chance, a deadline plan, documents and an AI assistant in one place. Browsing works without an account.",
+    "promoCta": "See what it does",
+    "promoStart": "Start for free",
+    "backToCatalog": "Back to the catalogue",
+    "features": {
+      "match": {
+        "title": "Fit score",
+        "body": "Every grant and university is scored against your level, field, GPA and language score — with the reason it fits or does not."
+      },
+      "chancing": {
+        "title": "Admission chance",
+        "body": "Chance is estimated from requirements and past outcomes: strong, moderate or low."
+      },
+      "deadlines": {
+        "title": "Deadlines and plan",
+        "body": "Nearest deadlines in one place; every grant gets a step-by-step task plan."
+      },
+      "documents": {
+        "title": "Documents and essays",
+        "body": "A document checklist, essay review, CV templates and recommendation letters."
+      },
+      "ai": {
+        "title": "AI assistant",
+        "body": "Answers questions about your profile, motivation letter and interview preparation."
+      },
+      "visa": {
+        "title": "Visa and departure",
+        "body": "Visa requirements, apostille, insurance and the first steps after arrival."
+      },
+      "money": {
+        "title": "Cost plan",
+        "body": "Tuition, living and travel costs are calculated; fee-waiver options are shown."
+      },
+      "telegram": {
+        "title": "Telegram bot",
+        "body": "New matching grants, deadline reminders and verified announcements — in chat."
+      }
+    }
+  },
+  "passwordReset": {
+    "forgotMetaTitle": "Reset your password | ScholarBridge",
+    "forgotMetaDescription": "Request a password reset link by email and set a new password for your ScholarBridge account.",
+    "resetMetaTitle": "Set a new password | ScholarBridge",
+    "resetMetaDescription": "Choose a new password for your ScholarBridge account from an emailed reset link.",
+    "forgotEyebrow": "Account recovery",
+    "forgotTitle": "Forgot your password?",
+    "forgotBody": "Enter the email address you use for ScholarBridge. If an account exists for it, we will send a link that lets you set a new password.",
+    "resetEyebrow": "Account recovery",
+    "resetTitle": "Set a new password",
+    "resetBody": "Choose a new password for your account. Any device that is still signed in with the old password will be signed out.",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "you@example.com",
+    "sendLink": "Send reset link",
+    "sending": "Sending",
+    "sentTitle": "Check your inbox",
+    "sentBody": "If an account exists for this address, a reset link is on its way. The link works once and expires in 60 minutes.",
+    "sentSpamNote": "If nothing arrives within a few minutes, check the spam folder and then try again.",
+    "tryAnother": "Use another email",
+    "backToSignIn": "Back to sign in",
+    "invalidEmail": "Enter a valid email address.",
+    "requestFailed": "We could not send the email right now. Please try again shortly.",
+    "rateLimited": "Too many attempts. Wait a few minutes and try again.",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat the new password",
+    "passwordHint": "At least 8 characters. A short phrase is easier to remember than a single word.",
+    "updatePassword": "Update password",
+    "updating": "Updating",
+    "doneTitle": "Password updated",
+    "doneBody": "Your new password is active and other devices have been signed out. Sign in again with it.",
+    "doneAction": "Go to sign in",
+    "mismatch": "The two passwords do not match.",
+    "weak": "That password is too short or too easy to guess.",
+    "invalidLink": "This reset link is not valid. Request a new one.",
+    "expiredLink": "This reset link has expired. Request a new one.",
+    "usedLink": "This reset link has already been used. Request a new one.",
+    "resetFailed": "We could not update the password right now. Please try again shortly.",
+    "linkProblemTitle": "This link cannot be used",
+    "missingTokenTitle": "This link is incomplete",
+    "missingTokenBody": "The reset link is missing its token. Open the full link from the email, or request a new one.",
+    "requestNewLink": "Request a new link",
+    "privacyLink": "How we handle your data"
   }
 }

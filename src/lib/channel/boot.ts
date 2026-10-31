@@ -33,6 +33,7 @@ import { loadChannelSettings, writeChannelAudit } from "./repo";
 import { checkChannelConnection } from "./connect";
 import { runPlanForToday } from "./adminActions";
 import { recordTick } from "./whyStore";
+import { maintainPublisherTransport } from "./webhookStore";
 import { sendPlanRow, type SendOutcome } from "./send";
 import {
   AUTOPILOT_TEXTS,
@@ -231,11 +232,26 @@ export function startChannelAutopilot(): void {
       // parked in the panel, so the queue still has to be built.
       const panelOnly = runtime.mode === "approval" && runtime.blockedCode === "no_admin_chat";
       if (runtime.blockedReason && !panelOnly) return;
+      /**
+       * The approval buttons are only alive if the publisher bot has a working
+       * webhook — and on a host that sleeps, THIS loop is the only thing that
+       * ticks. Before 2026-10-29 the self-check lived only in
+       * `/api/cron/channel`, which nothing was calling, so a dead webhook stayed
+       * dead and every Approve press vanished without a trace.
+       */
+      const transport = await maintainPublisherTransport({
+        notifyChatId: runtime.adminChatId || null,
+      });
       const { runPostsNow } = await import("./adminActions");
       const summary = await runPostsNow(null);
       // The heartbeat is what makes "is the tick actually running?" answerable
       // from the panel instead of from the host's logs.
-      await recordTick("loop", { attempted: summary.attempted, sent: summary.sent, approval: summary.approval });
+      await recordTick("loop", {
+        attempted: summary.attempted,
+        sent: summary.sent,
+        approval: summary.approval,
+        webhook: `${transport.state}${transport.repaired ? ">repaired" : ""}`,
+      });
       if (summary.attempted > 0) {
         console.log(
           `[channel] tick: ${summary.sent} sent, ${summary.approval} awaiting approval, ${summary.skipped} skipped`
