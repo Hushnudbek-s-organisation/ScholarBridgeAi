@@ -148,6 +148,9 @@ const rankSources: RankSource[] = [
       name,
       country: benchmark.country,
       rank: benchmark.qsRank,
+      // A row that is IN the table with no position was checked against the
+      // edition and is not ranked — evidence, not a missing value.
+      unranked: benchmark.qsRank == null,
       source: "src/lib/qsTop200Benchmarks.ts",
     })),
   ),
@@ -196,7 +199,9 @@ for (const row of report) {
   const bits: string[] = [];
   if (row.rankConflict) {
     bits.push(
-      `rank CONFLICT: ${row.rankConflict.map((c) => `${c.value} (${c.source})`).join(" vs ")}`,
+      `rank CONFLICT: ${row.rankConflict
+        .map((c) => `${c.value ?? "not ranked"} (${c.source})`)
+        .join(" vs ")}`,
     );
   }
   if (row.rank) bits.push(`rank ${row.rank.value} ← ${row.rank.source}`);
@@ -240,14 +245,18 @@ check("every gap is classified — no row is silently dropped", () => {
 });
 
 check("two sources that disagree about a rank publish neither", () => {
-  // The campus export says KAIST is 37; the app's Top-200 table says 53. Picking
-  // one would silently endorse an edition, so the row is reported as a conflict.
+  // The campus export still says KAIST is 37; the app's verified QS 2026 table
+  // lists KAIST and says the edition does not rank it at all (Phase AC removed
+  // the false #53). A number from an older export must never overrule a table
+  // that actually checked the edition.
   const kaist = report.find((row) => row.name.startsWith("KAIST"));
   assert.ok(kaist, "KAIST must be in the audit");
-  assert.equal(kaist!.rank, null, "a conflicted rank must not be published");
-  const values = [...new Set((kaist!.rankConflict ?? []).map((c) => c.value))].sort((a, b) => a - b);
-  assert.deepEqual(values, [37, 53], `expected the 37 vs 53 conflict, got ${values.join("/")}`);
-  const sources = (kaist!.rankConflict ?? []).map((c) => c.source);
+  assert.equal(kaist!.rank, null, "a rank an older export claims must not be published");
+  const conflict = kaist!.rankConflict ?? [];
+  const values = conflict.map((c) => c.value);
+  assert.ok(values.includes(37), `expected the campus export's 37 to be reported, got ${values.join("/")}`);
+  assert.ok(values.includes(null), "the verified table's 'not ranked' must be part of the conflict");
+  const sources = conflict.map((c) => c.source);
   assert.ok(sources.includes("src/lib/qsTop200Benchmarks.ts"));
   assert.ok(sources.includes("data/universities_campus_images_and_full_data.csv"));
 });

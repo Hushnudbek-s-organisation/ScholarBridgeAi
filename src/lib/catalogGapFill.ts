@@ -41,6 +41,18 @@ export interface RankSource {
   country?: string | null;
   /** Integer rank only; a band such as "1201-1400" must arrive as `null`. */
   rank: number | null;
+  /**
+   * The source LISTS this institution and states that it holds no position in
+   * the edition the source covers.
+   *
+   * A null `rank` alone cannot say that: it also means "this table has no row
+   * for it" or "the rank was a band". The distinction matters because a table
+   * that checked the edition and found nothing is *evidence*, and evidence beats
+   * an older export that still claims a number — the campus CSV calls KAIST #37
+   * while the app's verified QS 2026 table says the edition does not rank it.
+   * Publishing 37 would invent a position.
+   */
+  unranked?: boolean;
   /** Human-readable file/table name, shown in the report and stored as the source. */
   source: string;
 }
@@ -93,7 +105,8 @@ function sameInstitution(a: string, b: string): boolean {
 }
 
 export interface RankCandidateMatch {
-  value: number;
+  /** `null` means the source says "not ranked in this edition". */
+  value: number | null;
   source: string;
 }
 
@@ -117,6 +130,26 @@ export function ranksFor(
 }
 
 /**
+ * Sources that LIST `row` and state it holds no position in their edition.
+ *
+ * A non-empty result is a veto, not a missing value: the edition was checked.
+ */
+export function unrankedFor(
+  row: Pick<UniversityGapRow, "name" | "country">,
+  sources: RankSource[],
+): RankCandidateMatch[] {
+  const matches: RankCandidateMatch[] = [];
+  for (const candidate of sources) {
+    if (!candidate.unranked) continue;
+    if (!sameInstitution(candidate.name, row.name)) continue;
+    if (candidate.country && row.country && !sameCountry(candidate.country, row.country)) continue;
+    if (matches.some((match) => match.source === candidate.source)) continue;
+    matches.push({ value: null, source: candidate.source });
+  }
+  return matches;
+}
+
+/**
  * The rank of `row` — but only when every source agrees.
  *
  * The catalogues we hold were compiled in different months (the 2026-10-23
@@ -130,11 +163,16 @@ export function resolveRank(
   row: Pick<UniversityGapRow, "name" | "country">,
   sources: RankSource[],
 ): Resolution<number> | null {
+  // A source that checked the edition and found the institution unranked
+  // outranks any number an older export still carries.
+  if (unrankedFor(row, sources).length) return null;
   const matches = ranksFor(row, sources);
   if (!matches.length) return null;
   const distinct = new Set(matches.map((match) => match.value));
   if (distinct.size > 1) return null;
-  return { value: matches[0].value, source: matches[0].source };
+  const value = matches[0].value;
+  if (value == null) return null;
+  return { value, source: matches[0].source };
 }
 
 /** Image URL of `row`, from a source that carries a real URL — never a file name. */
@@ -221,8 +259,13 @@ export function buildGapReport(
       (candidate, index) =>
         rankCandidates.findIndex((other) => other.value === candidate.value && other.source === candidate.source) === index,
     );
+    const unranked = unrankedFor(row, data.rankSources);
+    // A veto (or two different numbers) means the report names both sides and
+    // publishes neither — an administrator settles it against the edition.
     const rankConflict =
-      new Set(distinctCandidates.map((c) => c.value)).size > 1 ? distinctCandidates : null;
+      unranked.length > 0 || new Set(distinctCandidates.map((c) => c.value)).size > 1
+        ? [...distinctCandidates, ...unranked]
+        : null;
     const image = row.imageMissing ? resolveImageUrl(row, data.imageSources) : null;
     const programs = row.programsMissing
       ? resolvePrograms(row, data.programCountByUniversityId, data.programSource)
