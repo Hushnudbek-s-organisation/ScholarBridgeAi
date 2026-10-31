@@ -49,7 +49,14 @@ function rankNumber(raw: string): string {
   return raw.replace(/[^\d]/g, "");
 }
 
-const PREMIER = /^(.+?) is a premier global research university in (.+), (.+?) \(QS World Ranking #(\d+)\), renowned for academic excellence, cutting-edge laboratories, and international career outcomes\.$/;
+/**
+ * Shape 1 — the "premier global research university" sentence the catalogue
+ * generator emitted for 194 rows. The QS clause is **optional**: a university
+ * the edition does not rank (KAIST was excluded from QS 2026 by QS) keeps the
+ * sentence without the number, and the rank is never invented to fill it in.
+ */
+const PREMIER =
+  /^(.+?) is a premier global research university in (.+), (.+?)(?: \(QS World Ranking #(\d+)\))?, renowned for academic excellence, cutting-edge laboratories, and international career outcomes\.$/;
 
 /**
  * The second shape is assembled from sentences, and the live rows disagree on
@@ -315,12 +322,18 @@ export function localizeUniversityNarrative(text: string, locale: Locale): Narra
     const [, name, cityRaw, countryRaw, rank] = premier;
     const city = localizeCity(cityRaw, locale) || cityRaw;
     const country = localizeCountry(countryRaw, locale) || countryRaw;
-    const n = rankNumber(rank);
+    // No clause in the source → no rank in the sentence. The rest of the
+    // sentence is unchanged, so a university the edition does not rank still
+    // reads as itself instead of falling back to English.
+    const n = rank ? rankNumber(rank) : "";
     return {
-      text:
-        tl === "uz"
+      text: n
+        ? tl === "uz"
           ? `${name} — ${country}ning ${city} shahridagi jahon miqyosidagi yetakchi tadqiqot universiteti. QS jahon reytingida ${n}-o'rin; akademik mukammallik, zamonaviy laboratoriyalar va xalqaro karyera imkoniyatlari bilan tanilgan.`
-          : `${name} — ведущий исследовательский университет мирового уровня в городе ${city}, ${country}. В мировом рейтинге QS занимает ${n}-е место; известен академическим превосходством, современными лабораториями и международными карьерными возможностями.`,
+          : `${name} — ведущий исследовательский университет мирового уровня в городе ${city}, ${country}. В мировом рейтинге QS занимает ${n}-е место; известен академическим превосходством, современными лабораториями и международными карьерными возможностями.`
+        : tl === "uz"
+          ? `${name} — ${country}ning ${city} shahridagi jahon miqyosidagi yetakchi tadqiqot universiteti. Akademik mukammallik, zamonaviy laboratoriyalar va xalqaro karyera imkoniyatlari bilan tanilgan.`
+          : `${name} — ведущий исследовательский университет мирового уровня в городе ${city}, ${country}. Известен академическим превосходством, современными лабораториями и международными карьерными возможностями.`,
       verbatim: false,
     };
   }

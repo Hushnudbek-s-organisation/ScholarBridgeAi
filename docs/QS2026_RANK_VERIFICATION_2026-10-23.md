@@ -178,3 +178,30 @@ Foydalanuvchi so'rovi bilan uchta ish bajarildi:
    yopiq bo'lgani uchun uni sizning serveringizda ishga tushirish kerak.
 
 Yakuniy holat: 364 universitet, **356** reytingli (QS 2026), **293** rasmli, 4 tasida dastur yo'q.
+
+## Qo'shimcha tekshiruv — 2026-10-30 (Phase AE)
+
+Bu hisobdan keyin katalog yana ikki marta o'zgardi (PDF import + admin tahrirlari), shuning uchun
+**356 ta faol qatorning hammasi** `data/qs2026_top1500.csv` bilan qayta solishtirildi
+(`npm run audit:qs-ranks`, mantiq: `src/lib/qsRankAudit.ts`).
+
+| Topilma | Qatorlar |
+| --- | --- |
+| o'rin bir pog'ona past | Basel 157→**158**, Hanyang 158→**159**, Barcelona 159→**160**, Michigan State 160→**161**, Oulu 341→**342**, SUSTech 342→**343** |
+| nashrda umuman yo'q, lekin raqam turgan | **KAIST #53**, **École des Ponts #205** |
+| to'g'ri | 334 aniq + 14 band ichida |
+| to'g'ri `NULL` | 8 |
+
+Yuqoridagi "6 tasida ±1 (teng o'rinlar)" — aynan shu olti qator. Sabab bitta: **#157 bloki**.
+`data/qs_2026_top499.tsv` da Lancaster va Basel ikkalasi ham 157 (teng o'rin), keyin 158 Hanyang,
+159 Barcelona, 160 Michigan State va **161 bo'sh**. QS teng o'rindan keyin raqamni sakratadi, ya'ni
+157,157 dan keyin 159 kelishi kerak — bu faylda kelmaydi. To'liq `data/qs2026_top1500.csv` da esa
+157–161 uzluksiz, sakrash faqat 156 da (155 teng o'rini uchun) — ya'ni CSV qoidaga mos. Shu sababli
+baza CSV ga moslandi; agar QS sahifasida Basel "=157" bo'lsa, faqat `id 141` ni qaytarish kifoya.
+
+KAIST va École des Ponts 2026 nashrida yo'q — shu sababli ularning `world_ranking` i **NULL** ga
+qaytarildi (bu hisobdagi "8 tasi NULL" ro'yxati bilan bir xil), KAIST tavsifidagi
+`(QS World Ranking #37)` jumlasi ham olib tashlandi. `university_rankings` dagi 194 ta QS 2026 qatori
+1…200 ketma-ketligi bilan "verified" turgan edi — ular ham haqiqiy o'rinlarga moslandi.
+
+SQL: `supabase/qs_2026_rank_correction_pass2_2026-10-30.sql`. To'liq tavsif: `docs/CHANNEL.md` §11o.

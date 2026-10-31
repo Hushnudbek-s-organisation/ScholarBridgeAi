@@ -1926,20 +1926,13 @@ planner comparison list and the dashboard cards.
   end: a verified row with `world_ranking = 42` and `qs_rank_year = NULL` comes
   back with `worldRanking: null` and cannot satisfy `minRank=1`.
 
-### What did **not** change
+### What did **not** change (at the time)
 
-The catalogue rows themselves. `universities.id = 37` still stores 53 and id 298
-still stores 205 — recording the edition (or clearing the number) is a data
-decision, and the rule above is a read-path one. The admin editor already has
-the field: set `qsRankYear = 2026` on a row and its rank reappears everywhere;
-set it back to `NULL` and the rank disappears again. `university_rankings` still
-holds its pre-correction QS snapshot (unchanged, as noted in Phase AC).
-
-KAIST's stored description still contains the sentence *"(QS World Ranking
-#37)"*. Under the Phase X rule stored prose is shown as written (clean or
-verbatim) and is never machine-rewritten; it is no longer reconciled to the
-undated 53, so the page does not manufacture agreement with a number it refuses
-to publish. Correcting that sentence is a catalogue-content task for the owner.
+This phase was a read-path rule only: `universities.id = 37` still stored 53 and
+id 298 still stored 205, and KAIST's stored description still carried
+*"(QS World Ranking #37)"*. **Phase AE then fixed the data itself** — see §11o.
+The admin editor still has the field: set `qsRankYear = 2026` on a row and its
+rank reappears everywhere; set it back to `NULL` and the rank disappears again.
 
 ### Verified
 
@@ -1959,6 +1952,114 @@ fails 4 of the 14 and names the file.
 10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
 integration **353/0** (2 new) · security 90 · portability 57/0 · `check:i18n`
 passed · `tsc --noEmit` clean · `next build` OK.
+
+## 11o. The catalogue data itself: six ranks and two inventions corrected (2026-10-30)
+
+Phases Y–AD fixed what the screens *print*. None of them checked the numbers
+stored in `universities.world_ranking` — the column every screen repeats — against
+the edition. Phase AE did, over all 356 active rows, and then fixed the rows.
+
+### The audit
+
+`src/lib/qsRankAudit.ts` (pure, no database, no React) compares a catalogue row
+with the official table and returns a verdict: `match`, `band-match`, `mismatch`,
+`band-miss`, `not-filled`, `not-ranked`, `unverified-claim`, `undated`, `unknown`.
+Matching is **explicit** — an alias table of 40 hand-verified renames
+("Penn State University" ↔ "Pennsylvania State University", "TU Wien" ↔ "Vienna
+University of Technology", …) plus accent, apostrophe, leading-`The`,
+parenthetical and `X (Y)` ↔ `Y (X)` normalisation. A fuzzy matcher was rejected
+on purpose: attaching a rank to the wrong university is the exact failure this
+audit exists to catch.
+
+### What it found
+
+| finding | rows |
+| --- | --- |
+| rank one place low | **Basel** 157→158, **Hanyang** 158→159, **Barcelona** 159→160, **Michigan State** 160→161, **Oulu** 341→342, **SUSTech** 342→343 |
+| claimed a position the edition does not publish | **KAIST #53**, **École des Ponts ParisTech #205** |
+| correct | 334 exact + 14 inside a published range |
+| correctly unranked | 8 |
+
+All six wrong ranks sit in the single block that starts at #157, and the cause is
+a tie the two in-repo extracts render differently:
+
+| rank | `data/qs2026_top1500.csv` | `data/qs_2026_top499.tsv` |
+| ---: | --- | --- |
+| 155 | Exeter + Geneva (tie) | Exeter + Geneva (tie) |
+| 156 | (skipped) | (skipped) |
+| 157 | Lancaster | Lancaster + Basel (tie) |
+| 158 | Basel | Hanyang |
+| 159 | Hanyang | Barcelona |
+| 160 | Barcelona | Michigan State |
+| 161 | Michigan State | (skipped) |
+| 162 | Ghent | Ghent |
+
+QS numbers a tie once and then resumes **past** it, so a tie at 157 must be
+followed by 159. The top-499 extract breaks that rule (157, 157, 158 … and a gap
+at 161); the complete CSV holds it (157 … 161, no gap). The CSV is also the file
+Phases AB/AC and both ranking gates already read, so the database was aligned to
+it. If the owner's own QS page shows "=157" for Basel, `id 141` is the single
+value to revisit.
+
+KAIST is the exception QS made in this edition (excluded under the
+anti-canvassing rule), and the 2026-10-23 correction had already cleared it —
+a later import from the user-supplied *"Top 300 Universities dataset (user PDF,
+2026)"* put a number back. Neither KAIST nor École des Ponts appears anywhere in
+`data/qs2026_top1500.csv`.
+
+### What changed in the database
+
+`supabase/qs_2026_rank_correction_pass2_2026-10-30.sql` (run on the live project):
+
+* six ranks corrected, `qs_rank_year = 2026` stamped, `last_verified_at` touched;
+* `id 37` and `id 298` cleared to `world_ranking = NULL, qs_rank_year = NULL`;
+* **KAIST's stored sentence** lost its `(QS World Ranking #37)` clause, and the
+  highlight `"QS World University Ranking #37 globally"` was dropped. Nothing
+  else in the text was reworded — the clause was a false claim, not prose to
+  rewrite;
+* `university_rankings`: the 194 QS 2026 rows were a 1…200 **sequence** (Princeton
+  #13, Columbia #18, SNU #29) marked `verified`. They now carry the corrected
+  institutional positions; the two cleared universities get `rank = NULL` and
+  `verification_status = 'unverified'`. No runtime code reads that table — it was
+  a trap for whoever reads it next, not a live bug;
+* `university_rankings` THE and U.S. News rows were **left alone**: no official
+  table for either edition exists in this repository, and "cannot check" is not
+  "is wrong".
+
+Result: **348 ranked / 8 unranked**, every ranked row carrying `qs_rank_year = 2026`.
+
+### What changed in the code
+
+* **`src/lib/qsRankAudit.ts`** — the audit above.
+* **`scripts/check-qs-catalogue-ranks.ts`** (`test:qs-catalogue-ranks`) — replays
+  the audit over `scripts/fixtures/live-catalogue-ranks-2026-10-30.tsv`, a
+  committed snapshot of all 356 live rows.
+* **`scripts/audit-live-ranks.ts`** (`audit:qs-ranks`) — the same audit against
+  the real database (`DATABASE_URL`), with `-- --write-fixture` to refresh the
+  snapshot. Exits 1 on any disagreement.
+* **`src/lib/universityProse.ts`** — the "premier global research university"
+  shape now treats the `(QS World Ranking #N)` clause as optional, so a cleared
+  university still renders in uz/ru instead of falling back to English, and no
+  rank is invented to fill the gap.
+
+### Verified
+
+`npm run test:qs-catalogue-ranks` — **13/13** (new): the whole 356-row snapshot
+matches the edition, every row resolves to an official entry or to nothing, the
+eight unranked rows are pinned by name, Inha in Tashkent is proven not to take
+the Korean Inha's #643, and the audit is mutation-tested — restoring the six old
+ranks or KAIST's #53 fails it with the rows named.
+
+`test:university-prose` **19/0** (2 new: a rank-less sentence renders in uz/ru
+without inventing a position, and is never reconciled back into one) ·
+`test:university-rank-year` 14/0 · `test:university-rank` 17/0 ·
+`test:university-list` 15/0 · `test:university-hub` 11/0 ·
+`test:qs-benchmarks` 13/0 · `test:chancing` 28/0 · `test:landing-ranks` 10/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration 353/0 · security 90 · portability 57/0 · `check:i18n` passed ·
+`tsc --noEmit` clean · `next build` OK.
 
 ## 12. Short links
 

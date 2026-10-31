@@ -97,6 +97,30 @@ check("the premier shape localizes the city and the country", () => {
   assert.doesNotMatch(uz, /United States|MA,/, "English place names left in an Uzbek sentence");
 });
 
+check("a premier sentence with no rank still renders, in every language", () => {
+  // Phase AE cleared KAIST's rank (QS does not publish one for it in 2026) and
+  // removed the "(QS World Ranking #37)" clause from its stored sentence. The
+  // shape must still render as itself — not fall back to English, and above all
+  // not invent a rank to fill the gap.
+  const cleared =
+    "KAIST (Korea Advanced Institute of Science & Technology) is a premier global research university in Daejeon, South Korea, renowned for academic excellence, cutting-edge laboratories, and international career outcomes.";
+  for (const locale of ["uz", "ru"] as const) {
+    const state = universityDescriptionState(cleared, locale, null);
+    assert.equal(state.verbatim, false, `${locale}: the rank-less sentence fell back to verbatim`);
+    assert.match(state.text, /KAIST/, `${locale}: institution name lost`);
+    assert.doesNotMatch(state.text, /QS|\d+-o'rin|\d+-е место/, `${locale}: a QS position was invented`);
+    assert.doesNotMatch(state.text, ENGLISH_FRAMES, `${locale}: English frame survived`);
+  }
+  // English keeps the stored sentence byte-for-byte; nothing is rewritten.
+  assert.equal(universityDescriptionState(cleared, "en").text, cleared);
+});
+
+check("a rank-less sentence is never reconciled into one", () => {
+  const cleared =
+    "KAIST (Korea Advanced Institute of Science & Technology) is a premier global research university in Daejeon, South Korea, renowned for academic excellence, cutting-edge laboratories, and international career outcomes.";
+  assert.doesNotMatch(universityDescriptionState(cleared, "en", 53).text, /QS World Ranking #53/, "a cleared row was given a rank again");
+});
+
 check("the plain shape with a funding sentence renders", () => {
   for (const locale of ["uz", "ru"] as const) {
     const state = universityDescriptionState(PLAIN_KOC, locale);

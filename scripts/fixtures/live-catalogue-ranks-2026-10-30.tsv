@@ -1,0 +1,356 @@
+1	Massachusetts Institute of Technology (MIT)	1	2026
+2	Imperial College London	2	2026
+3	Stanford University	3	2026
+4	University of Oxford	4	2026
+5	Harvard University	5	2026
+6	University of Cambridge	6	2026
+7	ETH Zurich (Swiss Federal Institute of Technology)	7	2026
+8	National University of Singapore (NUS)	8	2026
+9	University College London (UCL)	9	2026
+10	California Institute of Technology (Caltech)	10	2026
+11	University of Pennsylvania (UPenn)	15	2026
+12	University of Chicago	13	2026
+13	Princeton University	25	2026
+14	Cornell University	16	2026
+15	The University of Melbourne	19	2026
+16	Nanyang Technological University (NTU Singapore)	12	2026
+17	Yale University	21	2026
+18	Columbia University	38	2026
+19	The University of Edinburgh	34	2026
+20	Tsinghua University	17	2026
+21	The University of Hong Kong (HKU)	11	2026
+22	Peking University	14	2026
+23	University of Toronto	29	2026
+24	EPFL (École Polytechnique Fédérale de Lausanne)	22	2026
+25	Technical University of Munich (TUM)	22	2026
+26	McGill University	27	2026
+27	Australian National University (ANU)	32	2026
+28	King's College London (KCL)	31	2026
+29	Seoul National University (SNU)	38	2026
+30	University of Michigan-Ann Arbor	45	2026
+31	Johns Hopkins University	24	2026
+32	University of California, Berkeley (UC Berkeley)	17	2026
+33	The Chinese University of Hong Kong (CUHK)	32	2026
+34	UNSW Sydney (University of New South Wales)	20	2026
+35	The University of Sydney	25	2026
+36	Zhejiang University	49	2026
+37	KAIST (Korea Advanced Institute of Science & Technology)	-	-
+38	Tokyo Institute of Technology (Institute of Science Tokyo)	85	2026
+39	The University of Tokyo	36	2026
+40	Fudan University	30	2026
+41	Shanghai Jiao Tong University (SJTU)	47	2026
+42	Monash University	36	2026
+43	Delft University of Technology (TU Delft)	47	2026
+44	Université PSL (Paris Sciences & Lettres)	28	2026
+45	Carnegie Mellon University	52	2026
+46	Universitat Politècnica de Catalunya (UPC BarcelonaTech)	392	2026
+47	Universitat Pompeu Fabra (UPF Barcelona)	265	2026
+48	KU Leuven	60	2026
+49	University of British Columbia (UBC)	40	2026
+50	New York University (NYU)	55	2026
+51	University of California, Los Angeles (UCLA)	46	2026
+52	University of Wisconsin-Madison	110	2026
+53	University of Amsterdam (UvA)	53	2026
+54	LMU Munich (Ludwig-Maximilians-Universität München)	58	2026
+55	The University of Manchester	35	2026
+56	The University of Queensland (UQ)	42	2026
+57	Sorbonne University	72	2026
+58	University of Bristol	51	2026
+59	University of Southern California (USC)	146	2026
+60	The University of Warwick	74	2026
+61	University of Glasgow	79	2026
+62	Duke University	62	2026
+63	City University of Hong Kong (CityU)	63	2026
+64	National Taiwan University (NTU)	63	2026
+65	University of Alberta	94	2026
+66	University of Waterloo	119	2026
+67	University of California, San Diego (UCSD)	66	2026
+68	University of Zurich (UZH)	100	2026
+69	King Fahd University of Petroleum & Minerals (KFUPM)	67	2026
+70	Brown University	69	2026
+71	Université Paris-Saclay	70	2026
+72	The Hong Kong Polytechnic University (PolyU)	54	2026
+73	Rice University	119	2026
+74	University of Illinois Urbana-Champaign (UIUC)	70	2026
+75	Georgia Institute of Technology (Georgia Tech)	123	2026
+76	London School of Economics and Political Science (LSE)	56	2026
+77	Universiti Malaya (UM)	58	2026
+78	University of Washington (UW)	81	2026
+79	The University of Texas at Austin (UT Austin)	68	2026
+80	Ruprecht-Karls-Universität Heidelberg	80	2026
+81	Trinity College Dublin (TCD)	75	2026
+82	Penn State University	82	2026
+83	Boston University (BU)	88	2026
+84	Lomonosov Moscow State University (MSU)	105	2026
+85	Purdue University	88	2026
+86	KTH Royal Institute of Technology	78	2026
+87	POSTECH (Pohang University of Science and Technology)	102	2026
+88	Yonsei University	50	2026
+89	Pontificia Universidad Católica de Chile (UC Chile)	116	2026
+90	Uppsala University	93	2026
+91	Universidad Nacional Autónoma de México (UNAM)	136	2026
+92	Politecnico di Milano	98	2026
+93	Freie Universität Berlin	88	2026
+94	Université de Montréal	168	2026
+95	Universiti Putra Malaysia (UPM)	134	2026
+96	Osaka University	91	2026
+97	Universiti Kebangsaan Malaysia (UKM)	126	2026
+98	Universiti Teknologi Malaysia (UTM)	153	2026
+99	Kyoto University	57	2026
+100	Korea University	61	2026
+101	Utrecht University	103	2026
+102	Qatar University	112	2026
+103	Aalto University	114	2026
+104	University of California, Davis (UC Davis)	114	2026
+105	Universiti Sains Malaysia (USM)	134	2026
+106	University College Dublin (UCD)	118	2026
+107	Leiden University	119	2026
+108	Indian Institute of Technology Delhi (IIT Delhi)	123	2026
+109	RMIT University	125	2026
+110	Chalmers University of Technology	165	2026
+111	Nanjing University	103	2026
+112	UCLouvain (Université catholique de Louvain)	191	2026
+113	University of Calgary	211	2026
+114	Technical University of Denmark (DTU)	107	2026
+115	University of Massachusetts Amherst (UMass Amherst)	247	2026
+116	University of Lausanne (UNIL)	212	2026
+117	University of Bologna (Alma Mater Studiorum)	138	2026
+118	Sapienza University of Rome	128	2026
+119	Macquarie University	138	2026
+120	Eindhoven University of Technology (TU/e)	140	2026
+121	University of Göttingen	243	2026
+122	Nagoya University	164	2026
+123	Tohoku University	109	2026
+124	Universität Hamburg	193	2026
+125	University of Vienna	152	2026
+126	University of Cologne	272	2026
+127	Kyushu University	170	2026
+128	Hokkaido University	170	2026
+129	RWTH Aachen University	105	2026
+130	University of Münster	350	2026
+131	University of Bern	184	2026
+132	Erasmus University Rotterdam	140	2026
+133	TU Wien (Vienna University of Technology)	197	2026
+134	Hanyang University	159	2026
+136	University of Gothenburg	202	2026
+137	Newcastle University	137	2026
+138	University of Aberdeen	262	2026
+139	University of Wollongong (UOW)	184	2026
+140	Stockholm University	147	2026
+141	University of Basel	158	2026
+142	Ghent University (UGent)	162	2026
+144	Cardiff University	181	2026
+145	McMaster University	173	2026
+146	University of Exeter	155	2026
+147	University of Bath	132	2026
+148	University of Twente	203	2026
+149	University of Otago	197	2026
+150	Keio University	215	2026
+151	University of York	169	2026
+152	University of Liverpool	147	2026
+153	Queen's University at Kingston	191	2026
+154	University of Reading	194	2026
+155	Universitat Autònoma de Barcelona (UAB)	172	2026
+156	Waseda University	196	2026
+157	University of Antwerp	280	2026
+158	University of Oslo	119	2026
+159	Universidad de los Andes (Uniandes)	212	2026
+160	Durham University	94	2026
+161	Lund University	72	2026
+162	University of Birmingham	76	2026
+163	Loughborough University	225	2026
+164	University of Nottingham	97	2026
+165	University of Southampton	87	2026
+166	The University of Sheffield	92	2026
+167	The University of Western Australia (UWA)	77	2026
+168	Universidad de Buenos Aires (UBA)	84	2026
+169	University of Technology Sydney (UTS)	96	2026
+171	University of Leeds	86	2026
+172	University of Groningen	147	2026
+173	The University of Auckland	65	2026
+175	University of Pittsburgh	281	2026
+177	University of Geneva	155	2026
+178	University of Ottawa	219	2026
+179	Indian Institute of Technology Bombay (IIT Bombay)	129	2026
+180	TU Dresden (Technische Universität Dresden)	218	2026
+181	Vrije Universiteit Amsterdam (VU Amsterdam)	194	2026
+182	Queen Mary University of London (QMUL)	110	2026
+183	Humboldt-Universität zu Berlin	130	2026
+184	University of St Andrews	113	2026
+185	Universidade de São Paulo (USP)	108	2026
+186	University of Science and Technology of China (USTC)	132	2026
+188	Khalifa University	177	2026
+189	Chulalongkorn University	221	2026
+190	Universidad Nacional de Colombia	259	2026
+191	The University of Adelaide	82	2026
+192	University of Cape Town (UCT)	150	2026
+193	University of Copenhagen	101	2026
+194	University of Helsinki	116	2026
+195	Aarhus University	131	2026
+196	University of Turku	366	2026
+197	University of Oulu	342	2026
+198	University of Iceland	582	2026
+199	University of Tartu	362	2026
+200	University of Latvia	801	2026
+201	Middle East Technical University (METU)	269	2026
+202	Koç University	323	2026
+203	Boğaziçi University	371	2026
+204	Sabancı University	404	2026
+205	Eötvös Loránd University (ELTE)	584	2026
+206	Budapest University of Technology and Economics (BME)	711	2026
+207	University of Debrecen	563	2026
+208	Nazarbayev University	-	-
+209	Al-Farabi Kazakh National University (KazNU)	166	2026
+210	University of Warsaw	271	2026
+211	Jagiellonian University	303	2026
+212	Charles University	265	2026
+213	Czech Technical University in Prague (CTU)	416	2026
+214	Westminster International University in Tashkent (WIUT)	-	-
+215	Inha University in Tashkent (IUT)	-	-
+216	New Uzbekistan University	-	-
+217	The Hong Kong University of Science and Technology	44	2026
+218	Technische Universität Berlin	145	2026
+219	Northwestern University	42	2026
+220	Karlsruhe Institute of Technology	98	2026
+221	Sungkyunkwan University (SKKU)	126	2026
+222	Lancaster University	157	2026
+223	University of North Carolina at Chapel Hill	140	2026
+224	Wageningen University & Research	153	2026
+225	Complutense University of Madrid	187	2026
+226	Tecnológico de Monterrey	187	2026
+227	Tongji University	177	2026
+228	Curtin University	183	2026
+229	Western University	151	2026
+230	Wuhan University	186	2026
+231	Emory University	182	2026
+232	Deakin University	207	2026
+233	Autonomous University of Madrid	206	2026
+234	American University of Sharjah	272	2026
+235	University of Minnesota Twin Cities	210	2026
+236	Universitas Indonesia	189	2026
+238	National Tsing Hua University	176	2026
+239	University of Freiburg	201	2026
+240	National Cheng Kung University	203	2026
+241	University of Florida	212	2026
+242	La Trobe University	233	2026
+243	University of Erlangen-Nürnberg	232	2026
+244	University of Bonn	207	2026
+245	Maastricht University	239	2026
+246	University of Campinas	233	2026
+247	University of Waikato	281	2026
+248	University of Padua	233	2026
+249	University of Rochester	236	2026
+250	Gadjah Mada University	224	2026
+251	Massey University	230	2026
+252	Dartmouth College	247	2026
+253	Victoria University of Wellington	240	2026
+254	University of Macau	285	2026
+255	University of Sussex	278	2026
+256	Griffith University	268	2026
+257	Bandung Institute of Technology	255	2026
+258	Heriot-Watt University	287	2026
+259	University of Lisbon	230	2026
+260	Canadian University Dubai	604	2026
+261	University of Canterbury	261	2026
+262	Norwegian University of Science and Technology	267	2026
+263	UCSI University	269	2026
+264	University of the Witwatersrand	291	2026
+265	Tianjin University	257	2026
+266	Beijing Normal University	247	2026
+267	Universidad Carlos III de Madrid	301	2026
+268	University of Leicester	326	2026
+269	University of Milan	276	2026
+270	University of Surrey	262	2026
+271	Swinburne University of Technology	294	2026
+272	University of Bergen	287	2026
+273	University of Maryland, College Park	207	2026
+274	National Yang Ming Chiao Tung University	199	2026
+275	University of Tübingen	215	2026
+276	Vanderbilt University	250	2026
+277	University of Navarra	262	2026
+278	American University of Beirut	237	2026
+279	Taylor’s University	253	2026
+280	Harbin Institute of Technology	256	2026
+281	Radboud University	279	2026
+282	University College Cork	246	2026
+283	University of Galway	284	2026
+284	Dalhousie University	283	2026
+285	University of Porto	237	2026
+286	Ulsan National Institute of Science and Technology	310	2026
+288	University of Strathclyde	251	2026
+289	The University of Arizona	287	2026
+290	University of Tasmania	314	2026
+291	Xi’an Jiaotong University	305	2026
+292	Stellenbosch University	302	2026
+293	University of Virginia	275	2026
+294	Swansea University	292	2026
+295	Huazhong University of Science and Technology	319	2026
+296	Hamad Bin Khalifa University	244	2026
+297	École Normale Supérieure de Lyon	205	2026
+298	École des Ponts ParisTech	-	-
+299	Case Western Reserve University	294	2026
+300	Vrije Universiteit Brussel	294	2026
+301	Southern University of Science and Technology	343	2026
+302	Institut Polytechnique de Paris	41	2026
+303	Universidad de Chile	173	2026
+304	King Abdulaziz University	163	2026
+305	Michigan State University	161	2026
+306	Texas A&M University	144	2026
+307	University of Barcelona	160	2026
+308	Washington University in St. Louis	167	2026
+309	University of California, Santa Barbara	179	2026
+310	University of Newcastle (Australia)	227	2026
+311	Arizona State University	173	2026
+312	King Saud University	143	2026
+313	Queen’s University Belfast	199	2026
+314	The Ohio State University	190	2026
+315	Indian Institute of Science	219	2026
+316	Indian Institute of Technology Kharagpur	215	2026
+317	Indian Institute of Technology Madras	180	2026
+318	Université libre de Bruxelles	227	2026
+319	Politecnico di Torino	242	2026
+320	Technical University of Darmstadt	253	2026
+321	Hong Kong Baptist University	244	2026
+322	Indian Institute of Technology Kanpur	222	2026
+323	Universiti Teknologi PETRONAS	251	2026
+324	Université Paris 1 Panthéon-Sorbonne	257	2026
+325	Bauman Moscow State Technical University	320	2026
+326	Queensland University of Technology	226	2026
+327	Kyung Hee University	331	2026
+328	Gwangju Institute of Science and Technology (GIST)	385	2026
+329	Istanbul Technical University (İTÜ)	298	2026
+330	Bilkent University	415	2026
+331	Hacettepe University	571	2026
+332	Istanbul University	628	2026
+333	Yıldız Technical University (YTÜ)	731	2026
+334	Ankara University	697	2026
+335	University of Naples Federico II	379	2026
+336	University of Pisa (UNIPI)	343	2026
+337	University of Florence (UNIFI)	404	2026
+338	University of Turin (UniTo)	408	2026
+339	University of Szeged (SZTE)	597	2026
+340	University of Pécs	741	2026
+341	Corvinus University of Budapest	-	-
+342	Semmelweis University	-	-
+343	Hungarian University of Agriculture and Life Sciences (MATE)	1001	2026
+344	Óbuda University	1001	2026
+345	Széchenyi István University	1001	2026
+346	RUDN University (Peoples' Friendship University)	367	2026
+347	Saint Petersburg State University (SPbU)	375	2026
+348	HSE University (Higher School of Economics)	440	2026
+349	Moscow Institute of Physics and Technology (MIPT / Phystech)	477	2026
+350	Novosibirsk State University (NSU)	461	2026
+351	Tomsk State University (TSU)	499	2026
+352	National Research Nuclear University MEPhI	591	2026
+353	Kazan Federal University (KFU)	450	2026
+354	Sunway University	410	2026
+355	International Islamic University Malaysia (IIUM)	613	2026
+356	Warsaw University of Technology (WUT)	487	2026
+357	AGH University of Krakow	801	2026
+358	Adam Mickiewicz University, Poznań	741	2026
+359	Gdańsk University of Technology (Gdańsk Tech)	801	2026
+360	Wrocław University of Science and Technology	851	2026
+361	University of Wrocław	801	2026
+362	Poznań University of Technology (PUT)	1001	2026
+363	Lodz University of Technology (TUL)	1001	2026
+364	United Arab Emirates University (UAEU)	229	2026
