@@ -189,8 +189,15 @@ export function rateLimitedResponse(retryAfterSec: number, message?: string) {
 export const LIMITS = {
   /** Email + password sign-in: 8 tries / 15 min per IP, 8 / 15 min per email. */
   signIn: { limit: 8, windowMs: 15 * 60_000 },
-  /** Account creation: 5 / hour per IP. */
-  signUp: { limit: 5, windowMs: 60 * 60_000 },
+  /**
+   * Account creation: 10 / hour per IP.
+   *
+   * The desktop app runs its engine locally, so every account created on that
+   * laptop arrives from 127.0.0.1: five was low enough that a family sharing a
+   * computer (or a student retrying after a typo) ran into the limit, and a
+   * whole university network can share one public address.
+   */
+  signUp: { limit: 10, windowMs: 60 * 60_000 },
   /** AI endpoints: 20 / minute per account (they cost real money). */
   ai: { limit: 20, windowMs: 60_000 },
   /** Anonymous AI/visa calls with no account: 6 / minute per IP. */

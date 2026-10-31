@@ -35,6 +35,14 @@ async function securityHeaders() {
 }
 
 const nextConfig: NextConfig = {
+  // The desktop app (desktop/) ships the compiled server *inside* the
+  // installer, so it needs Next's self-contained "standalone" output. The
+  // hosted deployment (Render) keeps `npm start` → `next start`, which the
+  // standalone mode does not support, so the flag is opt-in per build
+  // (`NEXT_OUTPUT_STANDALONE=1 npm run build`, see scripts/build-desktop.mjs).
+  ...(process.env.NEXT_OUTPUT_STANDALONE === "1"
+    ? { output: "standalone" as const, outputFileTracingRoot: process.cwd() }
+    : {}),
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "upload.wikimedia.org", pathname: "/wikipedia/commons/**" },

@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { seedDatabase } from "@/db/seed";
-import { hashPassword, passwordPolicyError, sanitizeProfile } from "@/lib/password";
+import { hashPassword, passwordPolicyProblem, sanitizeProfile } from "@/lib/password";
 import { awardPoints } from "@/lib/gamification";
 import { ensureReferralCode, applyReferralCodeToProfile } from "@/lib/referrals";
 import { recordVisit } from "@/lib/visits";
@@ -164,10 +164,12 @@ export async function POST(req: Request) {
     // yet; it can be set later from Edit Profile.
     const plainPassword = typeof body.password === "string" ? body.password.trim() : "";
     if (plainPassword) {
-      const policyError = passwordPolicyError(plainPassword);
-      if (policyError) {
+      const policyProblem = passwordPolicyProblem(plainPassword);
+      if (policyProblem) {
+        // `reason` lets the wizard say "choose a less common password" instead
+        // of the misleading length message it used to show for every refusal.
         return privateNoStoreJson(
-          { error: policyError, code: "weak_password" },
+          { error: policyProblem.message, code: "weak_password", reason: policyProblem.problem },
           { status: 400 }
         );
       }

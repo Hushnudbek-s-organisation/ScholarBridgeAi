@@ -1,0 +1,98 @@
+# Builds the ScholarBridge Android app (.apk) and uploads it as a downloadable
+# artifact. Pushing a tag like `v1.0.0` also attaches the APK to a GitHub
+# Release.
+#
+# The APK is an installed program on the phone: it opens full-screen, keeps its
+# own icon, and connects to a ScholarBridge server (the laptop desktop app or a
+# hosted deployment). It does not need the website open in a browser tab.
+name: Android APK
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  workflow_dispatch:
+    inputs:
+      server:
+        description: "Optional: default server address to bake in (e.g. https://app.example.com). Empty = ask on first launch."
+        required: false
+        default: ""
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # The ubuntu runner image ships the Android SDK (ANDROID_HOME is already
+      # set, with build-tools and platform 36). A third-party setup action is
+      # an extra failure point — one less moving part on a release build.
+      - name: Check the Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('mobile/android/**/*.gradle', 'mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: mobile
+
+      # Regenerates the icons from public/icon-512.png, syncs the app shell and
+      # compiles the APK with Gradle (scripts/build-mobile.mjs).
+      - name: Build the APK
+        run: node scripts/build-mobile.mjs
+        env:
+          SCHOLARBRIDGE_DEFAULT_SERVER: ${{ inputs.server }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+
+      # A stable file name means the link never changes:
+      #   .../releases/latest/download/ScholarBridge.apk
+      - name: Collect the APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          apk="$(find mobile/android/app/build/outputs/apk -name '*.apk' | head -1)"
+          test -n "$apk" || { echo "no APK was produced"; exit 1; }
+          cp "$apk" dist/ScholarBridge.apk
+          ls -la dist
+          echo "APK size: $(( $(stat -c%s dist/ScholarBridge.apk) / 1024 / 1024 )) MB ($(stat -c%s dist/ScholarBridge.apk) bytes)"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: scholarbridge-android-apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk

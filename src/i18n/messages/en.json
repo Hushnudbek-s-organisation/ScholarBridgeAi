@@ -3122,7 +3122,11 @@
     "wrongCredentials": "Incorrect email or password",
     "tooMany": "Too many attempts. Please wait a few minutes.",
     "failed": "Sign-in failed",
-    "forgotPassword": "Forgot your password?"
+"forgotPassword": "Forgot your password?",
+"showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "noAccountHint": "Still not working? Check for a space at the end of the password, or create the account again below — an account made on another device or browser is not stored in this app.",
+    "createWithThisEmail": "Create an account with this email"
   },
   "telegram": {
     "loginTitle": "Sign in with Telegram",
@@ -5414,7 +5418,16 @@
     "saving": "Saving…",
     "financialAidUnknown": "Not sure / not answered yet",
     "financialAidYes": "I may need financial aid",
-    "financialAidNo": "I do not expect to need financial aid"
+    "financialAidNo": "I do not expect to need financial aid",
+    "errorNameRequired": "Enter your full name.",
+    "errorEmailRequired": "Enter your email address.",
+    "errorEmailInvalid": "That email address is not complete — it needs an @ and a domain, e.g. ism@gmail.com.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "passwordLength": "{count} of {minimum} characters entered.",
+    "rateLimited": "{minutes} minute(s) until you can create another account from this device. A previously saved account can still be signed in to with your email and password.",
+    "passwordTooCommon": "This password is too easy to guess (such as 12345678 or qwerty123). Please choose another one — for example a phrase only you know.",
+    "passwordTooLong": "Your password is too long — the limit is 200 characters."
   },
   "taskRoadmap": {
     "title": "Tasks and timeline",

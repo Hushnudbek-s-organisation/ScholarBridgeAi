@@ -1,0 +1,468 @@
+# ScholarBridge apps — desktop (.exe / .dmg / AppImage) and Android (.apk)
+
+This document describes the two **installed programs** built from this
+repository. They are not websites opened in a tab, and they do not download a
+copy of the data:
+
+| App | What the user gets | Where the data lives |
+| --- | --- | --- |
+| **Desktop** (`desktop/`) | A double-clickable program with its own window and icon that opens the **hosted ScholarBridge site** over the internet — like Telegram Desktop opening Telegram. | In the **site's database**, always current, shared with the phone and the browser. Nothing is downloaded to the computer. |
+| **Android** (`mobile/`) | A real `.apk`: home-screen icon, full screen, no address bar. It opens the same site. | The same site database. |
+
+Both are built **from the same codebase and the same database schema** as the
+website, so accounts, saved lists, applications and AI quotas are one and the
+same everywhere. There is no second copy of anything, and no second
+implementation to keep in sync.
+
+```
+            ┌──────────────────────┐        ┌──────────────────────┐
+            │ Desktop app          │        │ Android app (.apk)   │
+            │ (installed program)  │        │                      │
+            └──────────┬───────────┘        └──────────┬───────────┘
+                       │   https, one account           │
+                       └───────────────┬────────────────┘
+                                       ▼
+                        ┌──────────────────────────────┐
+                        │ Hosted ScholarBridge site    │
+                        │ Next.js + its own PostgreSQL │
+                        │ (the data lives here)        │
+                        └──────────────────────────────┘
+```
+
+**Signing in is remembered.** The session cookie is stored by the app (a
+persistent Electron partition on the desktop, the WebView cookie store on the
+phone) and is valid for 7 days, so the password is asked once — not on every
+launch. Signing out in the app signs out there and nowhere else, because the
+session is per installation.
+
+### The offline copy (optional, desktop only)
+
+The installer still carries the compiled server and a private PostgreSQL, so
+the app opens even with no internet. It is **never used silently**: it appears
+only if the user chooses *Server → Use the offline copy*, and its data is a
+separate database — an account created against the site does not exist in it.
+*Server → Back to the online site* returns to the shared data.
+
+---
+
+## 1. Download and install
+
+Ready-made builds are attached to the repository's **Releases** page — no
+building required:
+
+**➡ https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi/releases/latest**
+
+| Your device | File | Size | Link (always the newest build) |
+| --- | --- | --- | --- |
+| **Android phone / tablet** | `ScholarBridge.apk` | **4 MB** | `…/releases/latest/download/ScholarBridge.apk` |
+| **Windows 10/11 — installer** | `ScholarBridge-Setup.exe` | **145 MB** | `…/releases/latest/download/ScholarBridge-Setup.exe` |
+| Windows — no installation | `ScholarBridge-Portable.exe` | 121 MB | `…/releases/latest/download/ScholarBridge-Portable.exe` |
+| macOS — Apple Silicon (M1–M4) | `ScholarBridge-arm64.dmg` | 158 MB | `…/releases/latest/download/ScholarBridge-arm64.dmg` |
+| macOS — Intel | `ScholarBridge-x64.dmg` | 161 MB | `…/releases/latest/download/ScholarBridge-x64.dmg` |
+| Linux — any distribution | `ScholarBridge.AppImage` | 120 MB | `…/releases/latest/download/ScholarBridge.AppImage` |
+| Linux — Debian/Ubuntu package | `ScholarBridge.deb` | 116 MB | `…/releases/latest/download/ScholarBridge.deb` |
+
+(Prefix every link with `https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi`;
+the sizes are the actual files of release `v1.0.7`.)
+
+### Why the Android app is 4 MB and the desktop app is 145 MB
+
+They do different jobs. The **APK is a client**: a thin installed shell that
+talks to a ScholarBridge server, so it carries no database and no web runtime —
+hence 4 MB. The **desktop app is the server**: the installer contains the
+compiled ScholarBridge server (~110 MB), a complete PostgreSQL (~60 MB
+compressed) and the Chromium runtime Electron needs (~120 MB), which is why it
+is the size of any Electron app such as Slack, Discord or VS Code.
+
+### Install — Windows
+
+1. Download `ScholarBridge-Setup.exe`.
+2. Windows SmartScreen shows *“Windows protected your PC”* (the build is not
+   code-signed — see §7): **More info → Run anyway**.
+3. Keep the default folder → **Install** → the app opens from the Start menu
+   and the desktop shortcut.
+4. First launch: 30–60 s (it creates its own database). Later launches: seconds.
+5. `ScholarBridge-Portable.exe` does the same without installing anything —
+   handy on a USB stick.
+6. **Upgrading from a broken build (1.0.3)**: uninstall it first (Settings →
+   Apps → ScholarBridge), then install this one. Your database and account stay
+   in `%APPDATA%\ScholarBridge` and are picked up again automatically.
+
+### Install — Android
+
+1. Download `ScholarBridge.apk` **on the phone** (or transfer it by USB/Drive).
+2. Open it. Android asks to allow installing from this source →
+   **Settings → Allow from this source** → back → **Install**.
+3. Open the app. It asks for a **server address** the first time:
+   * on the laptop open ScholarBridge → **Share → Show phone connection (QR)**,
+   * scan that QR with the phone (or type the address it shows), and press
+     **Connect**.
+4. The address is remembered — next time the app opens straight into your
+   account. The laptop app must be running and both devices on the same Wi-Fi
+   (or point the app at a hosted deployment, §5).
+
+### Install — macOS and Linux
+
+* **macOS:** open the `.dmg` → drag *ScholarBridge* into *Applications* →
+  first launch: right-click the app → **Open** (unsigned build).
+* **Linux AppImage:** `chmod +x ScholarBridge.AppImage && ./ScholarBridge.AppImage`
+  (install `libfuse2` if your distribution needs it).
+* **Linux .deb:** `sudo apt install ./ScholarBridge.deb`, then start
+  *ScholarBridge* from your applications menu.
+
+### Prefer to build it yourself?
+
+The same two workflows build these binaries on GitHub's machines; run them
+from **Actions → “Desktop app”** / **“Android APK”** and download the artifact.
+Building locally is described in §2 (desktop) and §4 (Android).
+
+## 2. Build the desktop app yourself
+
+Requirements: Node.js 20–22. No database is needed for the build (every route
+is dynamic and the connection pool is lazy, so `next build` never connects);
+the *installed* app creates and starts its own PostgreSQL.
+
+```bash
+npm ci                          # app dependencies
+cd desktop && npm ci && cd ..   # Electron + embedded PostgreSQL for the app
+
+# build the installer for this OS
+DATABASE_URL=postgresql://build:build@127.0.0.1:1/scholarbridge npm run desktop:dist
+
+# (the DATABASE_URL is only a placeholder for the build — see
+# scripts/build-desktop.mjs; you may also run `npm run db:dev:init` first if
+# you want a real database while developing)
+```
+
+Output: `desktop/release/` — `.exe` (+ portable `.exe`) on Windows, `.dmg` on
+macOS, `.AppImage`/`.deb` on Linux. Only the current platform is built; use the
+GitHub workflow for the other two.
+
+Useful variants:
+
+```bash
+npm run desktop:prepare   # only compile the bundled server (fast, no installer)
+npm run desktop           # run the app from source (Electron + dev build)
+npm run test:desktop-app  # end-to-end test of the boot path (see §8)
+```
+
+### What the installer contains
+
+`scripts/build-desktop.mjs` produces Next's *standalone* server
+(`NEXT_OUTPUT_STANDALONE=1 next build`), copies `public/` and
+`.next/static/` into it, and hands it to electron-builder, which bundles:
+
+```
+resources/app/                    ← the app itself (main.mjs, preload, splash, Electron's deps)
+resources/engine.tar              ← the compiled ScholarBridge server, as ONE archive (~106 MB tar)
+resources/node/                   ← the official Node.js runtime the server runs on
+resources/schema/full_schema.sql  ← the schema a new install applies
+```
+
+**The engine ships as a single archive.** It is unpacked by the app itself on
+first launch (into `<data folder>/engine`, about a second) and the folder is
+reused afterwards. Two reasons:
+
+* a per-file installer extraction can silently drop files on Windows
+  (antivirus quarantine, an interrupted write). The server then dies at
+  start-up with `MODULE_NOT_FOUND` even though the same package booted in CI —
+  the app now writes the tree itself, into a temporary folder that is renamed
+  into place only when complete, and an interrupted unpack repeats itself on
+  the next launch instead of leaving a half-engine;
+* one file instead of ~3600 also lets the installer's own LZMA pass compress it, so the download got smaller rather than bigger.
+
+The engine runs on the **bundled Node.js**, not on Electron's built-in Node.
+Electron can execute a script "as node", but that Node has a different module
+ABI than the official runtime, and the server bundle contains native modules
+(`sharp`): on Windows such a child process exits immediately with code 1 —
+which reached users as "the server stopped while starting". Shipping the real
+runtime removes that whole class of failure; `resources/node` is the binary
+the app starts, and the app falls back to Electron's Node only if it is
+missing. This is also why the installer is ~30 MB larger than a plain Electron
+app of the same content.
+
+The server bundle is staged first (`desktop/build-resources/server`): Next's
+standalone output contains one relative symlink (`pg-<hash> → ../../node_modules/pg`)
+that electron-builder cannot archive on Windows, so the build replaces every
+link with the real files before packaging.
+
+`app/` and `server/` are deliberately separate: Electron executes whatever is
+in `resources/app`, so bundling the server there as well merged two
+`package.json` files (the server's has no `main`) and the installed app died
+with `Cannot find module …\resources\app\index.js`. `scripts/build-desktop.mjs`
+now verifies the packed layout and refuses to produce an installer without
+`app/main.mjs`, `server/server.js` and `schema/full_schema.sql`.
+
+so the installed program needs neither Node.js, Docker nor this repository.
+
+### First launch and where data lives
+
+| OS | Data folder |
+| --- | --- |
+| Windows | `%APPDATA%\ScholarBridge` |
+| macOS | `~/Library/Application Support/ScholarBridge` |
+| Linux | `~/.config/ScholarBridge` |
+
+The first launch takes 30–60 seconds because the app initialises a PostgreSQL
+cluster and applies `supabase/full_schema.sql`; later launches take a couple of
+seconds. The catalogue (universities, programmes, scholarships) is filled in the
+background right after startup, so the first page that shows lists may take a
+bit longer than the ones after it. The folder holds:
+
+* `postgres/` — your database, always created as **UTF-8** (back this up: it
+  *is* your data),
+* `engine/` — the unpacked server, written on first launch of each version,
+* `db-password` — the password of that database (generated once; PostgreSQL
+  keeps its hash, so it must never change between launches),
+* `session-secret` — the key that signs your login cookie (per install),
+* `desktop-config.json` — settings such as "allow phone on this Wi-Fi",
+* `scholarbridge.log` — the app's log (open it from *File → Open error log*).
+
+Uninstalling the program keeps this folder, so reinstalling restores your data.
+Delete the folder to start from scratch. **Uninstall does not delete data on
+purpose** — that is the only copy of it.
+
+### The app's menu
+
+* **File** — open in browser, open data folder, open error log, restart engine.
+* **View** — reload, zoom, full screen.
+* **Share** — *Allow phone on this Wi-Fi* (starts sharing and shows a QR code),
+  *Show phone connection (QR)*, copy app address.
+* **Help** — About (engine address, data folder, versions).
+
+---
+
+## 3. Put it on your phone
+
+### 3a. The Android app (recommended)
+
+Build/obtain `app-debug.apk` (§1 or §4), copy it to the phone (USB, Google
+Drive, or any link) and open it. Android asks once for permission to install
+apps from this source (*Settings → Install unknown apps*).
+
+On first launch the app asks for the **server address** — type the address the
+desktop app shows, or open *Share → Show phone connection (QR)* on the laptop
+and scan it. The address is remembered, so the app opens straight onto your
+account next time.
+
+> **Same Wi-Fi required** for the "laptop as server" setup, and the laptop app
+> must be running. Guest Wi-Fi and some routers isolate devices from each other
+> — use your normal home network, or a hosted deployment (§5).
+
+### 3b. Nothing to install: the phone browser
+
+With *Allow phone on this Wi-Fi* on, the QR code also opens the full site in the
+phone's browser. It is already mobile-first, and *Add to Home screen* gives it an
+icon and a full-screen window (the app ships a web app manifest and icons).
+
+---
+
+## 4. Build the Android app yourself
+
+Quickest: **open `mobile/android` in Android Studio** (*Open project*) → let
+Gradle sync → *Run* on a device, or *Build → Build Bundle(s)/APK(s) → Build
+APK(s)*. The project is committed complete (Gradle wrapper, manifest, icons,
+splash screen) — nothing has to be generated first.
+
+Command line (needs JDK 21 + Android SDK, `ANDROID_HOME` set or
+`mobile/android/local.properties` with `sdk.dir=...`):
+
+```bash
+cd mobile && npm install && cd ..
+npm run mobile:apk           # debug APK  → mobile/android/app/build/outputs/apk/debug/
+npm run mobile:apk:release   # release APK (see signing below)
+```
+
+`npm run mobile:prepare` (icons + `capacitor sync` only) is handy after editing
+`mobile/www/`.
+
+**Bake in a server address** so the app never asks on first launch — useful when
+you distribute builds for a hosted deployment:
+
+```bash
+SCHOLARBRIDGE_DEFAULT_SERVER=https://app.your-domain.com npm run mobile:apk
+```
+
+**Release signing** (only needed for the Play Store or a stable upgrade path):
+create a keystore once and put it next to the project —
+
+```bash
+keytool -genkey -v -keystore mobile/android/sb-release.jks \
+  -alias scholarbridge -keyalg RSA -keysize 2048 -validity 10000
+cat > mobile/android/keystore.properties <<'EOF'
+storeFile=sb-release.jks
+storePassword=…
+keyAlias=scholarbridge
+keyPassword=…
+EOF
+```
+
+`keystore.properties`, `*.jks` and `*.keystore` are git-ignored. Without them the
+release build is signed with the local debug key, which installs fine for
+private distribution but cannot be published on Google Play.
+
+Icons and the launch screen are generated from the app's real logo —
+`mobile/scripts/generate-icons.mjs` (pure JavaScript, no `sharp`/native
+toolchain) rewrites every density of `ic_launcher`, the adaptive-icon
+foregrounds and the splash screens from `public/icon-512.png`.
+
+---
+
+## 5. Which site the apps open (and how to change it)
+
+The apps open the hosted site by default. The address is baked into a build, so
+an installed copy outside this repository never opens somebody else's site by
+accident:
+
+| Where | How it is set | How the user changes it |
+| --- | --- | --- |
+| Desktop | `desktop/server-default.mjs` → `DEFAULT_SERVER_URL` (`https://scholarbridgeai-9bmd.onrender.com`) | *Server → Open the online site…* (the address is saved in `desktop-config.json`), then restart-free |
+| Android | `mobile/www/config.js` → `SCHOLARBRIDGE_DEFAULT_SERVER` | the connect screen; the address is remembered on the phone |
+
+Ship a build for another deployment (a fork, a staging site):
+
+```bash
+SCHOLARBRIDGE_SERVER_URL=https://app.your-domain.com node scripts/build-desktop.mjs
+SCHOLARBRIDGE_DEFAULT_SERVER=https://app.your-domain.com npm run mobile:prepare
+```
+
+Both write the value into the files above, which are part of the repository, so
+the built installer and the APK carry the same address. A one-off run of the
+installed desktop app can also be pointed elsewhere with
+`SCHOLARBRIDGE_SERVER_URL=…`, which takes priority over everything except an
+explicit *Use the offline copy* choice.
+
+**Accounts do not sync with the offline copy.** The site's database and the
+bundled engine's database are separate: an account created online does not
+exist in the offline copy, and the app says so when you switch. Keep the site
+as the source of truth and use the offline copy only when the internet is gone.
+
+---
+
+## 6. Environment variables that only the apps use
+
+| Variable | Where | Meaning |
+| --- | --- | --- |
+| `APP_PLAIN_HTTP` | set by the desktop launcher (`=1`) | The app is served over plain `http://` on the user's machine or LAN: the session cookie is not marked `Secure` (the browser would drop it), and the CSP does not `upgrade-insecure-requests` (it would break the app's own assets). Never set this on a public deployment. |
+| `SCHOLARBRIDGE_SERVER_URL` | desktop (build or run) | The site the app opens. Sets the default for every user when building; for one launch it overrides the saved address. |
+| `SCHOLARBRIDGE_DEFAULT_SERVER` | mobile build | Default address baked into the APK; empty = ask on first launch. |
+| `SEED_ON_REQUEST` | set by the desktop launcher (`=on`) | A single-user self-hosted install may fill the catalogue on the first page load (see `src/lib/db/requestSeeding.ts`). |
+| `GOOGLE_API_KEY`, `GEMINI_API_KEY`, … | optional | AI features are off until a provider key is configured, in both apps; everything else works. Provider keys are **not** shipped in the installers. |
+
+A local install is a normal deployment, so the usual rules still apply: strong
+`SESSION_SECRET` (generated per install), no secrets in the renderer, and the
+database bound to loopback.
+
+---
+
+## 7. Security notes
+
+* **Unsigned builds.** No code-signing certificate is included. Windows shows
+  SmartScreen, macOS needs right-click → *Open*. Signing is a paid certificate;
+  when you have one, set `CSC_LINK`/`CSC_KEY_PASSWORD` (Windows/macOS) for
+  electron-builder.
+* **Phone access is opt-in and temporary.** Sharing starts only when you tick
+  *Allow phone on this Wi-Fi*, stops when you untick it or quit the app, and
+  binds the server to the LAN only while it is on. Treat any Wi-Fi you do not
+  control as hostile: turn sharing off on public networks. Server-side
+  protections (rate limits, CSRF origin checks, CSP, HttpOnly session cookies)
+  are unchanged — the same code that protects the hosted deployment runs here.
+* **The database is loopback-only** (`listen_addresses=127.0.0.1`) with a
+  random password generated per install. It is never reachable from the phone or
+  the network; only the web server is, and only when you enable sharing.
+* **The Android app is a WebView shell with no privileged API.** It exposes no
+  Node.js/Android bridge, opens external links in the real browser, and stores
+  one thing: the server address. `usesCleartextTraffic` is enabled because the
+  supported local setup is plain HTTP on your own Wi-Fi; with a hosted https
+  server everything travels over TLS.
+* **Keep the app updated** when the schema changes: a new build re-applies
+  `full_schema.sql` on launch (idempotent — it only adds what is missing).
+
+---
+
+## 8. Tests and CI
+
+| Command | What it proves |
+| --- | --- |
+| `npm run test:desktop-app` | Boots the *real* desktop engine end to end with a throwaway data folder: private PostgreSQL → `full_schema.sql` → standalone server → `/api/health` → the landing page renders with the plain-HTTP header policy, static assets and catalogue API work, and shutdown releases the port. Then launches it **again** on the same folder (the password must be stable), once more with the stored password corrupted, once against a cluster created as **WIN1251** (a non-UTF-8 Windows install), which must be rebuilt as UTF-8 automatically, and checks the engine archive (deep-path round-trip, a corrupt archive fails instead of producing a half-engine, unpack-once, repair of a half-unpacked folder), that a bundled `resources/node` runtime is preferred over Electron's Node, and that a broken engine's own output reaches the error message. 41 assertions. |
+| `npm run test:security` | Includes the `APP_PLAIN_HTTP` rules: no `Secure` cookie on `http://`, no `upgrade-insecure-requests`, no HSTS — and unchanged behaviour when the flag is off. |
+| `node scripts/check-desktop-engine.mjs <unpacked dir>` | Unpacks the engine from the built package, boots it with the packaged `resources/node`, and requires an HTTP answer (plus, with `SMOKE_WITH_DATABASE=1`, the private database, `/api/health` and a rendered landing page). Runs in CI on Windows, macOS and Linux after packaging, so a broken engine is caught before an installer is published — the gap that let the "server stopped while starting" build ship. |
+| `node scripts/build-desktop.mjs --verify-only` | Follows the app's own imports (`main.mjs` → `boot.mjs` → `tar.mjs` …) and fails if a referenced module is not in the package — the check for `ERR_MODULE_NOT_FOUND` at launch. Also inspects an already packed application (`desktop/release/*-unpacked` / `*.app`): the entry Electron runs is `app/main.mjs`, `server/server.js` and `schema/full_schema.sql` are present, and the server was not merged into `app/`. Runs automatically after every packaging, and the build fails instead of uploading a broken installer. |
+| `npm run test:remote` | 40 assertions on the "window onto the site" mode: which address a launch uses (environment → saved → baked-in, with an explicit *offline copy* choice winning), address normalisation (bare host → https, a laptop on the Wi-Fi → http, `ftp:` refused), the reachability probe (200 = ready, 503 = up but its database is not ready, closed port = unreachable, a slow cold-start answer still counts, a timeout is reported rather than thrown), that the window uses a persistent partition for the 7-day session cookie, that the bundled engine is **not** started in site mode, that an unreachable site explains itself and offers the offline copy, that the phone QR points at the site, and that `remote.mjs` + `server-default.mjs` are packaged and the APK carries the same address. |
+| `npm run test:auth` | 14 assertions on the credential code and its wiring: the value hashed at sign-up and the value compared at sign-in are normalised identically (a trailing space can no longer lock an account), an exactly-`MIN`-character password is accepted, `12345678` is reported as *too_common* rather than *too short*, the sign-in route clears the failure budget on success, and the wizard/sign-in form keep their per-field messages. |
+| `node desktop/auth-flow.mjs` | 41 assertions against the **packaged engine** over HTTP: sign-up with an 8-character password → sign-in → session; a password typed with surrounding spaces; an email typed with spaces and capitals; refusals that carry a specific reason; three cycles of *7 wrong passwords + 1 correct* (the correct one must still sign in, never 429); an unknown account answered with the same message as a wrong password. Needs `npm run desktop:prepare` first. |
+| `npm run typecheck`, `npm run lint` | The shared codebase still compiles and lints. |
+
+Prepare the build first (`npm run desktop:prepare`), then run
+`npm run test:desktop-app`. The workflow files
+`.github/workflows/desktop-app.yml` and `.github/workflows/android-apk.yml`
+build the real installers on GitHub's machines.
+
+---
+
+## 9. Troubleshooting
+
+| Symptom | Cause / fix |
+| --- | --- |
+| *“character with byte sequence 0xf0 0x9f 0x8c 0x90 in encoding \"UTF8\" has no equivalent in encoding \"WIN1251\"”* | The installed build is **older than 1.0.9**: on a non-English Windows `initdb` followed the system code page (WIN1251 on a Russian install), so the cluster could not store the catalogue's emoji and the schema never applied. 1.0.9 always creates a **UTF-8** cluster and rebuilds an empty non-UTF-8 one by itself — install it and start again, nothing to delete. |
+| *“password authentication failed for user \"scholarbridge\"”* right after the splash screen | The installed build is **older than 1.0.8**: it generated a new database password on every launch while PostgreSQL keeps the one from the first launch, so only the very first start could connect. Install 1.0.8 or newer — it keeps the password in `db-password` and, if an existing cluster's password was lost, resets it in a closed loopback-only window (`ALTER ROLE`) **without touching your data**. Nothing has to be deleted. |
+| Windows: *“A JavaScript error occurred in the main process — Cannot find module …\resources\app\index.js”* | The installed build predates 1.0.4, where the compiled server was bundled into `resources/app` and replaced the app's `package.json`. Install the current build (uninstall first is not needed — the installer overwrites the program, your data stays). |
+| Desktop: "could not start" on first launch | Look at *File → Open error log*. Most common: the port range 4310–4335 is busy (close the other copy — only one instance may run), or PostgreSQL cannot run as **root** on Linux (run the app as a normal user). |
+| *“A JavaScript error occurred in the main process — Cannot find module …\resources\app\tar.mjs”* | The installed build is **older than 1.0.15**: one of the app's own modules was missing from the installer's file list. 1.0.15 packages it and the build now verifies that **every module the app imports is installed**, so this cannot ship again. |
+| *“The ScholarBridge engine stopped while starting (code 1)”* with `MODULE_NOT_FOUND` | The installed build is **older than 1.0.12**: the engine was installed as ~3600 separate files, and on some Windows machines the installer left some of them behind (antivirus), so a module was missing at start-up. 1.0.12 ships the engine as one archive that the app unpacks itself and verifies — install it and start the app; the data folder is untouched. |
+| *“The ScholarBridge engine stopped while starting (code 1)”* | The installed build is **older than 1.0.10**: it ran the server on Electron's built-in Node, whose module ABI does not match the native modules in the server bundle, so the engine died instantly. 1.0.10 ships and uses the official Node.js runtime. The dialog now also shows the engine's own last lines — press **Copy details** and send them if anything still fails. |
+| Sign-in: *“Incorrect email or password”* although the password is certainly right | Three causes, all visible now. **(1)** In 1.0.16 and later the form can show the typed password (eye button) — a trailing space or a Cyrillic keyboard layout is the most common culprit, and both are stripped automatically now. **(2)** The account must exist **in this app**: the desktop build keeps its own database in `%APPDATA%\ScholarBridge`, so an account created on the website, or on another laptop/phone, is not there. The form offers *“Create an account with this email”* right under the error. **(3)** Eight attempts in 15 minutes from one address are throttled; a **successful** sign-in now clears that budget, so a correct password never inherits an earlier mistake. |
+| Sign-up: *“Your password must be at least 8 characters”* although the password **is** 8 characters | Fixed in **1.0.16**. That one message was printed for every refusal and for all three fields: a correct 8-character password was reported as too short when the **name** or **email** was the actual problem, and a blocked password such as `12345678` was also reported as a length problem. 1.0.16 reports each field separately (*“Enter your email address.”*, *“That email address is not complete…”*), tells a blocked password apart (*“too easy to guess”*), normalises spaces/capitals in the email, and shows a `n / 8 characters` counter with a show-password button. |
+| Sign-up: *“Could not create the account”* with no reason | Older than 1.0.16, where a duplicate email, a throttled address and a rejected password could all end in the same sentence. 1.0.16 says which one it is (and how many minutes the sign-up throttle has left). |
+| Desktop: *“Could not open scholarbridgeai-9bmd.onrender.com”* | The site could not be reached. No internet, or the **free Render plan was asleep** — the first open after a quiet period can take up to a minute; press **Try again**. The dialog also offers **Use the offline copy**, which works with no internet (separate database). |
+| Desktop: the app opens a site that is not yours | *Server → Open the online site…* and type your address (it is saved), or start it with `SCHOLARBRIDGE_SERVER_URL=…`. *Server* shows which address is in use. |
+| Desktop: signed in on the website, but the app asks to sign in | Expected — the website in a browser and the app are two separate cookie stores. Sign in once in the app; the session is kept for 7 days. |
+| Desktop: signed in online, but the *offline copy* says the account does not exist | Two databases. *Server → Back to the online site* returns to the shared one. |
+| Desktop: window shows a browser error | The bundled server died. *File → Restart engine*. If it repeats, the log names the failing step (database, schema, server). |
+| Desktop: works, but no AI answers | No AI provider key is configured in that install. Add one to the deployment env (or use a hosted deployment) — the rest of the app is unaffected. |
+| Phone: "Could not reach …" | Phone and laptop on different networks; sharing off; firewall blocking port 4310 (allow the app on *private* networks); guest Wi-Fi isolating devices; laptop asleep. |
+| Phone: app opens but shows the connect screen again | The address was unreachable, so it was not saved. Check the laptop's *Share → Show phone connection*. |
+| Android build: `SDK location not found` | Set `ANDROID_HOME`, or create `mobile/android/local.properties` with `sdk.dir=/path/to/Android/Sdk`. |
+| Android build: Gradle download fails | First build needs internet for Gradle + Android dependencies. In mainland networks configure a mirror, or build with the GitHub workflow. |
+| The app reports the wrong version (every build said **1.0.0** until 1.0.16) | Fixed in 1.0.16: `desktop/package.json` carries the release number, so *Help → About*, the `[app] starting …` line in `scholarbridge.log` and the title of the error dialog all name the build. The workflow **fails the build** when the tag (`v1.0.18`) and that number disagree. |
+| macOS: "app is damaged" | Unsigned build, quarantine attribute: `xattr -dr com.apple.quarantine /Applications/ScholarBridge.app`. |
+| Linux: `.AppImage` will not run | Make it executable: `chmod +x ScholarBridge-1.0.0.AppImage`, and install `libfuse2` if your distribution needs it. |
+
+---
+
+## 10. File map
+
+```
+desktop/
+  package.json          Electron app manifest (deps: electron, electron-builder, embedded-postgres, pg, qrcode)
+  main.mjs              Electron main process: window, menu, QR, lifecycle (thin — no business logic)
+  boot.mjs              Database + schema + server startup (testable under plain Node)
+  preload.cjs           Exposes only { isDesktopApp, platform, arch, chrome } to the page
+  splash.html           Branded startup screen with live status
+  electron-builder.mjs  Installer configuration for Windows/macOS/Linux
+  build/icon.png        App icon (generated from public/icon-512.png)
+mobile/
+  package.json          Capacitor app manifest
+  capacitor.config.json App id, name, web dir
+  www/                  The app shell: server address + connection screen
+  scripts/generate-icons.mjs   Launcher icons + splash screens from the real logo
+  android/              Complete Android Studio / Gradle project (committed)
+scripts/
+  build-desktop.mjs     Standalone server + installer build
+  build-mobile.mjs      Icons + Capacitor sync + Gradle APK build
+  check-desktop-app.mjs End-to-end boot test
+.github/workflows/
+  desktop-app.yml       Windows / macOS / Linux installers
+  android-apk.yml       Android APK
+```
+
+## 11. Not done (deliberately)
+
+* **iOS** — a Capacitor iOS target needs macOS + Xcode and an Apple developer
+  account; the same `mobile/www` shell applies, ask for it if you need it.
+* **Play Store / Microsoft Store publishing** — requires accounts, review and
+  signing; the builds here are for direct distribution.
+* **In-app purchases on mobile** — Premium checkout is a website flow; store
+  billing policies would forbid reusing it inside a store-distributed app.
+* **Offline AI** — AI calls go to a provider, so they need the internet in both
+  apps. Everything else in the catalogue works offline.

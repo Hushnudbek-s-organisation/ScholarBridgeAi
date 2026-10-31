@@ -1,0 +1,20 @@
+{
+  "appId": "ai.scholarbridge.app",
+  "appName": "ScholarBridge",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "allowNavigation": ["*"]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#1B2A4A"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#1B2A4A",
+      "showSpinner": false
+    }
+  }
+}

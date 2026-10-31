@@ -2,12 +2,12 @@ import { after, NextResponse } from "next/server";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { sql } from "drizzle-orm";
-import { sanitizeProfile, verifyPassword } from "@/lib/password";
+import { normalisePassword, sanitizeProfile, verifyPassword } from "@/lib/password";
 import { checkSessionRecord, sessionCookieFromToken, signSessionToken } from "@/lib/auth";
 import { ensureCoreSchema } from "@/lib/core/db";
 import { sendLoginAlert } from "@/lib/telegram/service";
 import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
-import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
+import { checkSharedRateLimit, clearSharedRateLimit } from "@/lib/rate-limit-shared";
 import { clampString, readJsonBody } from "@/lib/request";
 import { isDatabaseUnreachable } from "@/lib/dbError";
 
@@ -37,8 +37,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     }
 
-    const email = clampString(parsed.body.email, 320).toLowerCase();
-    const password = typeof parsed.body.password === "string" ? parsed.body.password : "";
+    const email = clampString(parsed.body.email, 320).trim().toLowerCase();
+    // Trimmed exactly like the value that was hashed at sign up.
+    const password = normalisePassword(parsed.body.password as string);
 
     if (!email || !password) {
       return NextResponse.json(
@@ -77,6 +78,14 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
+
+    // Correct password: clear the failure budget for this IP and account so a
+    // few earlier typos (and ordinary sign-out/sign-in cycles) cannot lock the
+    // student out with 429 on a password that is provably right.
+    await Promise.all([
+      clearSharedRateLimit(`signin:ip:${ip}`),
+      clearSharedRateLimit(`signin:email:${email}`),
+    ]);
 
     // Security alert to the owner's Telegram (if connected) — sent after the
     // response so a slow Telegram API never delays or fails the sign-in.

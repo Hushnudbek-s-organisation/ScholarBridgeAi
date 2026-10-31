@@ -257,6 +257,8 @@ export function Home({
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  // Email carried from the sign-in form into the sign-up wizard ("" = none).
+  const [wizardEmail, setWizardEmail] = useState("");
   const [pickerMessage, setPickerMessage] = useState("");
 
   const openProfileModal = useCallback((isNew = false) => {
@@ -716,7 +718,11 @@ export function Home({
     setActiveTab(p.isAdmin ? "admin" : "dashboard");
   };
 
-  const handleAddNewFromPicker = () => {
+  const handleAddNewFromPicker = (email?: string) => {
+    // Carry the address the person just typed in the sign-in form: after a
+    // failed sign-in the usual cause is that the account does not exist in this
+    // database, and retyping the email is a pointless extra step.
+    setWizardEmail(email ?? "");
     setIsPickerOpen(false);
     setView("wizard");
   };
@@ -1009,6 +1015,7 @@ export function Home({
         <div className="min-h-screen bg-slate-50 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:py-10">
           <OnboardingWizard
             profile={null}
+            initialEmail={wizardEmail}
             onCreated={handleWizardCreated}
             onComplete={handleWizardComplete}
           />

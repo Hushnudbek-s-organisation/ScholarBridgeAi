@@ -1,0 +1,150 @@
+# Builds the installable ScholarBridge desktop app for Windows, macOS and
+# Linux. Each run uploads the installers as downloadable artifacts; pushing a
+# tag like `v1.0.0` also attaches them to a GitHub Release.
+#
+# The app is self-contained: the compiled server (Next.js standalone output)
+# and the SQL schema are bundled as resources, and the app starts its own
+# PostgreSQL on the user's machine. That is why this job needs a database at
+# BUILD time only — `next build` reads it while collecting page data.
+name: Desktop app
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows (x64 .exe)
+            artifact: scholarbridge-windows
+            pattern: desktop/release/*.exe
+          - os: macos-latest
+            name: macOS (.dmg)
+            artifact: scholarbridge-macos
+            pattern: desktop/release/*.dmg
+          - os: ubuntu-latest
+            name: Linux (AppImage + .deb)
+            artifact: scholarbridge-linux
+            pattern: |
+              desktop/release/*.AppImage
+              desktop/release/*.deb
+
+    env:
+      # Placeholder only. `next build` never opens a connection (the pool is
+      # lazy and every route is dynamic), so no database is needed on the
+      # runner; the INSTALLED app starts its own PostgreSQL and passes the real
+      # DATABASE_URL to the bundled server. Verified: a build with an
+      # unreachable address succeeds.
+      DATABASE_URL: postgresql://build:build@127.0.0.1:1/scholarbridge
+      SESSION_SECRET: desktop-build-session-secret-not-used-at-runtime-000000
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Unsigned builds on purpose (no paid certificate in this project):
+      # stop electron-builder from hunting for an identity on macOS.
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # The tag IS the version the app reports (Help/About, the log line in the
+      # data folder, the title of the error dialog). When the two drift, a
+      # tester cannot tell which build they are looking at — refuse to ship.
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          app_version="$(node -p "require('./desktop/package.json').version")"
+          tag_version="${GITHUB_REF_NAME#v}"
+          echo "tag=${tag_version} desktop/package.json=${app_version}"
+          if [ "$app_version" != "$tag_version" ]; then
+            echo "::error title=Version mismatch::The tag v${tag_version} does not match desktop/package.json (${app_version}). Bump the version before tagging."
+            exit 1
+          fi
+
+      - name: Install app dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install desktop dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: desktop
+
+      - name: Check the site mode
+        shell: bash
+        # The app is a window onto the hosted site. This runs before packaging:
+        # the address it opens, the probe, the persistent session partition and
+        # the "offline copy is never entered silently" rule.
+        run: node scripts/check-remote-mode.mjs
+
+      # Compiles the standalone server, copies static assets, and packages the
+      # installer with electron-builder (scripts/build-desktop.mjs).
+      - name: Build the installer
+        shell: bash
+        # GitHub runs bash with -e, so a helper failing on an empty line would
+        # hide the real error. Print everything, then report the tail as
+        # annotations and in the job summary (log archives are not always
+        # downloadable).
+        run: |
+          set +e
+          node scripts/build-desktop.mjs > build.log 2>&1
+          status=$?
+          cat build.log
+          if [ "$status" -ne 0 ]; then
+            { echo "### Desktop build failed"; echo '```'; tail -n 60 build.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            grep -v '^[[:space:]]*$' build.log | tail -n 15 | sed 's/^/::error title=Desktop build::/' || true
+          fi
+          exit "$status"
+
+      # Boot the packaged engine on the OS that built it — the runtime and the
+      # server bundle from resources/, exactly as the installed app does. A
+      # Windows-only engine failure once reached a user because nothing ran the
+      # package before it was published.
+      - name: Smoke-test the packaged engine
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Windows) TARGET="desktop/release/win-unpacked" ;;
+            macOS)   TARGET="desktop/release/mac-arm64/ScholarBridge.app/Contents" ;;
+            *)       TARGET="desktop/release/linux-unpacked" ;;
+          esac
+          if [ ! -d "$TARGET/resources" ]; then
+            TARGET="$(ls -d desktop/release/*/Contents 2>/dev/null | head -1)"
+          fi
+          echo "checking $TARGET"
+          # Phase 2 boots the private PostgreSQL as well; on Windows only the
+          # spawn/HTTP phase runs (that is the failure mode this guards).
+          if [ "${{ runner.os }}" = "Windows" ]; then export SMOKE_WITH_DATABASE=0; else export SMOKE_WITH_DATABASE=1; fi
+          node scripts/check-desktop-engine.mjs "$TARGET" || {
+            echo "::error title=Packaged engine does not start::The packaged server failed to boot on this OS."
+            exit 1
+          }
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.pattern }}

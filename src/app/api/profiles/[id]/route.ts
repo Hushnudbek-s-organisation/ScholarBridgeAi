@@ -2,7 +2,7 @@ import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { hashPassword, passwordPolicyError, sanitizeProfile } from "@/lib/password";
+import { hashPassword, passwordPolicyProblem, sanitizeProfile } from "@/lib/password";
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
 import { requireAdmin, requireProfileAccess, sessionCookieHeader, invalidateAuthCacheForProfile } from "@/lib/auth";
 import { clampString, optionalNumber, optionalScore, readJsonBody } from "@/lib/request";
@@ -202,9 +202,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const newPasswordPlain =
       typeof body.password === "string" && body.password.trim() ? body.password.trim() : "";
     if (newPasswordPlain) {
-      const policyError = passwordPolicyError(newPasswordPlain);
-      if (policyError) {
-        return privateNoStoreJson({ error: policyError, code: "weak_password" }, { status: 400 });
+      const policyProblem = passwordPolicyProblem(newPasswordPlain);
+      if (policyProblem) {
+        return privateNoStoreJson(
+          { error: policyProblem.message, code: "weak_password", reason: policyProblem.problem },
+          { status: 400 }
+        );
       }
     }
     const newPasswordHash = newPasswordPlain ? hashPassword(newPasswordPlain) : undefined;

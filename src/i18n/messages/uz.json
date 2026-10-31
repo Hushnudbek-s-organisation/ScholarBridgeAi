@@ -3122,7 +3122,11 @@
     "wrongCredentials": "Email yoki parol noto'g'ri",
     "tooMany": "Juda ko'p urinish. Bir necha daqiqa kuting.",
     "failed": "Kirib bo'lmadi",
-    "forgotPassword": "Parolni unutdingizmi?"
+"forgotPassword": "Parolni unutdingizmi?",
+"showPassword": "Parolni ko‘rsatish",
+    "hidePassword": "Parolni yashirish",
+    "noAccountHint": "Hali ham kirmayaptimi? Parol oxirida bo‘sh joy (probel) yo‘qligini tekshiring yoki pastdan shu email bilan akkauntni qayta oching — boshqa qurilma yoki brauzerda ochilgan akkaunt bu ilovada saqlanmaydi.",
+    "createWithThisEmail": "Shu email bilan akkaunt ochish"
   },
   "telegram": {
     "loginTitle": "Telegram orqali kirish",
@@ -5414,7 +5418,16 @@
     "saving": "Saqlanmoqda…",
     "financialAidUnknown": "Hozircha noma’lum",
     "financialAidYes": "Moliyaviy yordam kerak bo‘lishi mumkin",
-    "financialAidNo": "Moliyaviy yordam kerak bo‘lmaydi"
+    "financialAidNo": "Moliyaviy yordam kerak bo‘lmaydi",
+    "errorNameRequired": "Ism va familiyani kiriting.",
+    "errorEmailRequired": "Email manzilni kiriting.",
+    "errorEmailInvalid": "Email manzil to‘liq emas — @ va domen kerak, masalan ism@gmail.com.",
+    "showPassword": "Parolni ko‘rsatish",
+    "hidePassword": "Parolni yashirish",
+    "passwordLength": "{minimum} belgidan {count} tasi kiritildi.",
+    "rateLimited": "Bu qurilmadan yangi akkaunt ochish uchun {minutes} daqiqa kuting. Avval ochilgan akkauntga email va parol bilan kirish mumkin.",
+    "passwordTooCommon": "Bu parolni topish juda oson (masalan 12345678 yoki qwerty123). Boshqa parol tanlang — masalan, faqat o‘zingiz biladigan ibora.",
+    "passwordTooLong": "Parol juda uzun — chegarasi 200 belgi."
   },
   "taskRoadmap": {
     "title": "Vazifalar va muddatlar",

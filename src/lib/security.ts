@@ -70,9 +70,39 @@ export function xFrameOptions(env: Record<string, string | undefined> = process.
   return isDevelopment(env) ? null : "DENY";
 }
 
+/**
+ * Plain-HTTP self-hosted mode (desktop app, phone on the same Wi-Fi).
+ *
+ * The production defaults assume the app sits behind TLS: the session cookie
+ * is `Secure`, HSTS is sent, and the CSP contains `upgrade-insecure-requests`.
+ * All three are actively harmful when the same build is served over
+ * `http://127.0.0.1:PORT` by the desktop app or over `http://192.168.x.x:PORT`
+ * to a phone: browsers drop `Secure` cookies on a non-trustworthy origin (so
+ * sign-in silently fails), and `upgrade-insecure-requests` rewrites the app's
+ * own `http://` asset requests to `https://`, so the page loads unstyled.
+ *
+ * `APP_PLAIN_HTTP=1` is set ONLY by the desktop launcher (`desktop/main.mjs`)
+ * and by `npm run app:serve` for a deliberate LAN deployment. It is never set
+ * by the hosted configuration, and every relaxation is keyed off a real
+ * request header where one exists — the flag can only make the app *serve*
+ * over HTTP, it never disables TLS verification or origin checks.
+ */
+export function plainHttpDeployment(env: Record<string, string | undefined> = process.env): boolean {
+  return env.APP_PLAIN_HTTP === "1";
+}
+
 /** HSTS is only meaningful over HTTPS and only shipped in production. */
-export function strictTransportSecurity(): string | null {
+export function strictTransportSecurity(env: Record<string, string | undefined> = process.env): string | null {
+  if (plainHttpDeployment(env)) return null;
   return IS_PRODUCTION ? "max-age=31536000; includeSubDomains; preload" : null;
+}
+
+/**
+ * Whether the response may tell browsers to upgrade every subresource to
+ * HTTPS. False only for the explicitly plain-HTTP app deployment.
+ */
+export function upgradesInsecureRequests(env: Record<string, string | undefined> = process.env): boolean {
+  return !plainHttpDeployment(env);
 }
 
 // ---------------------------------------------------------------------------

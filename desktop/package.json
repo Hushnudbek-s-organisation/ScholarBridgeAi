@@ -1,0 +1,28 @@
+{
+  "name": "scholarbridge-desktop",
+  "productName": "ScholarBridge",
+  "version": "1.0.18",
+  "private": true,
+  "description": "ScholarBridgeAI — the desktop app. A real installed program: the ScholarBridge server and a private PostgreSQL database run inside the app, so it works without a website tab and without Docker.",
+  "author": "ScholarBridgeAI",
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/Hushnudbek-s-organisation/ScholarBridgeAi",
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --config electron-builder.mjs --publish never",
+    "dist:win": "electron-builder --config electron-builder.mjs --win nsis portable --publish never",
+    "dist:mac": "electron-builder --config electron-builder.mjs --mac dmg --publish never",
+    "dist:linux": "electron-builder --config electron-builder.mjs --linux AppImage deb --publish never"
+  },
+  "dependencies": {
+    "embedded-postgres": "18.4.0-beta.17",
+    "pg": "8.20.0",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0"
+  }
+}

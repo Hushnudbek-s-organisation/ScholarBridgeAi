@@ -250,6 +250,30 @@ async function main() {
     assert.match(header, /Secure/);
   });
 
+  check("plain-HTTP app deployment does not mark the cookie Secure", () => {
+    // The desktop app and a phone on the same Wi-Fi are served over http://;
+    // a Secure cookie is silently dropped there and sign-in never sticks.
+    process.env.APP_PLAIN_HTTP = "1";
+    try {
+      const header = auth.sessionCookieHeader(profile, undefined);
+      assert.doesNotMatch(header, /Secure/);
+      // …but a request that really did arrive over HTTPS still gets it.
+      const httpsHeader = auth.sessionCookieHeader(profile, {
+        headers: new Headers({ "x-forwarded-proto": "https" }),
+      } as unknown as Request);
+      assert.match(httpsHeader, /Secure/);
+    } finally {
+      delete process.env.APP_PLAIN_HTTP;
+    }
+    // Default (hosted) behaviour is untouched: HTTPS still means Secure.
+    assert.match(
+      auth.sessionCookieHeader(profile, {
+        headers: new Headers({ "x-forwarded-proto": "https" }),
+      } as unknown as Request),
+      /Secure/
+    );
+  });
+
   check("clearSessionCookieHeader expires the cookie", () => {
     assert.match(auth.clearSessionCookieHeader(), /sb_session=;/);
     assert.match(auth.clearSessionCookieHeader(), /Max-Age=0/);
@@ -748,6 +772,24 @@ async function main() {
     assert.match(csp, /upgrade-insecure-requests/);
   });
 
+  check("plain-HTTP app deployment drops upgrade-insecure-requests + HSTS", () => {
+    process.env.APP_PLAIN_HTTP = "1";
+    try {
+      assert.doesNotMatch(contentSecurityPolicy("abc123"), /upgrade-insecure-requests/);
+      // over http:// that directive would rewrite the app's own asset URLs.
+      assert.match(contentSecurityPolicy("abc123"), /default-src 'self'/);
+    } finally {
+      delete process.env.APP_PLAIN_HTTP;
+    }
+    assert.match(contentSecurityPolicy("abc123"), /upgrade-insecure-requests/);
+    // HSTS is meaningless over http:// and must not be promised there.
+    assert.equal(sec.plainHttpDeployment({ APP_PLAIN_HTTP: "1" }), true);
+    assert.equal(sec.plainHttpDeployment({}), false);
+    assert.equal(sec.upgradesInsecureRequests({ APP_PLAIN_HTTP: "1" }), false);
+    assert.equal(sec.upgradesInsecureRequests({}), true);
+    assert.equal(sec.strictTransportSecurity({ APP_PLAIN_HTTP: "1" }), null);
+  });
+
   check("every request gets its own nonce", () => {
     assert.notEqual(contentSecurityPolicy("aaa"), contentSecurityPolicy("bbb"));
   });
@@ -1225,7 +1267,7 @@ async function main() {
     assert.doesNotMatch(src, /student@scholarbridge\.edu/, "no shared default sign-up address");
     assert.match(src, /invalid_email/, "a missing/invalid email is a 400");
     assert.match(src, /isUniqueViolation\(err\)/, "a racing duplicate resolves to 409, not 500");
-    assert.match(src, /passwordPolicyError\(plainPassword\)/, "the password policy is enforced server-side");
+    assert.match(src, /passwordPolicyProblem\(plainPassword\)/, "the password policy is enforced server-side");
   });
 
   check("community and beacon writes parse a size-capped body", () => {

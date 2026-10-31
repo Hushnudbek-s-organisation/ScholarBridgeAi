@@ -21,6 +21,8 @@ import { ShowMoreToggle } from "@/components/hubs/ui";import {
   CheckCircle2,
   Info,
   Sparkles,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
@@ -54,6 +56,12 @@ interface OnboardingWizardProps {
    * and every following step saves through PUT /api/profiles/:id.
    */
   profile: StudentProfile | null;
+  /**
+   * Email to start with — set when the sign-in form sends someone here after a
+   * failed sign-in ("create an account with this email"), so the address they
+   * already typed is not asked for again.
+   */
+  initialEmail?: string;
   onCreated?: (profile: StudentProfile) => void;
   onComplete: (updated: StudentProfile) => void;
 }
@@ -138,7 +146,7 @@ const inputCls =
   "sb-field min-h-11 w-full rounded-xl border px-4 py-3 text-sm text-slate-800 focus:outline-none motion-reduce:transition-none";
 const labelCls = "block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5";
 
-export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingWizardProps) {
+export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete }: OnboardingWizardProps) {
   const tCountry = useTranslations("countryNames");
   const tCommon = useTranslations("common");
   const tOnboarding = useTranslations("onboarding");
@@ -173,6 +181,9 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const [countrySearch, setCountrySearch] = useState("");
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [finished, setFinished] = useState(false);
+  // Reveal the password field: invisible typos (a stray space, a Cyrillic
+  // keyboard layout) otherwise only surface as "the password is too short".
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const pathButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const studyInterestsTouched = useRef(false);
@@ -181,7 +192,7 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
   const placeholderEmail = isTelegramPlaceholderEmail(profile?.email) ? profile!.email : "";
   const [form, setForm] = useState<FormState>({
     name: profile?.name || "",
-    email: placeholderEmail ? "" : profile?.email || "",
+    email: placeholderEmail ? "" : profile?.email || initialEmail?.trim().toLowerCase() || "",
     password: "",
     degreeLevel: profile?.degreeLevel || "",
     targetMajor: profile?.targetMajor || "",
@@ -324,6 +335,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...payload,
+            name: form.name.trim(),
+            email: form.email.trim().toLowerCase(),
             password: form.password,
             referralCode: storedReferralCode(),
           }),
@@ -335,8 +348,23 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
               ? tOnboarding("emailTaken")
               : data.code === "invalid_email"
                 ? tOnboarding("invalidEmail")
+                : res.status === 429 || data.code === "rate_limited"
+                  // Account creation is throttled per address. Without this
+                  // branch the visitor saw "could not create the account" and
+                  // assumed their password or email was rejected.
+                  ? tOnboarding("rateLimited", {
+                      minutes: Math.max(1, Math.ceil(Number(data.retryAfter || 60) / 60)),
+                    })
                 : data.code === "weak_password"
-                  ? tOnboarding("weakPassword", { minimum: MIN_PASSWORD_LENGTH })
+                  // The server distinguishes "too short" from "too common".
+                  // Showing the length sentence for a blocked password like
+                  // 12345678 is what made an 8-character password look
+                  // rejected for its length.
+                  ? data.reason === "too_common"
+                    ? tOnboarding("passwordTooCommon")
+                    : data.reason === "too_long"
+                      ? tOnboarding("passwordTooLong")
+                      : tOnboarding("weakPassword", { minimum: MIN_PASSWORD_LENGTH })
                   : data.code === "study_interests_invalid"
                     ? tOnboarding("selectStudyInterest")
                     : tOnboarding("createError");
@@ -382,21 +410,47 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
 
   /** Step 1 requirements for a BRAND-NEW account (password = sign-in key). */
   const isNewAccount = createdId == null;
-  const step0Invalid =
-    !form.name.trim() ||
-    (!form.email.trim() && !placeholderEmail) ||
-    // Must match MIN_PASSWORD_LENGTH in src/lib/password.ts (server rejects
-    // anything shorter, so a 6-char pass here would only fail later).
-    (isNewAccount && form.password.trim().length < MIN_PASSWORD_LENGTH);
+
+  /**
+   * Name the field that is actually wrong.
+   *
+   * The old check produced ONE sentence for three fields ("enter name, email
+   * and a password of at least 8 characters"), so a visitor who had filled the
+   * password but left the name empty was told their password was too short —
+   * they retyped it and the form still refused. Each requirement now reports
+   * itself, and the email is checked for shape here as well (the server
+   * rejects it later with `invalid_email`, which used to look like a save
+   * failure).
+   */
+  const emailTrimmed = form.email.trim();
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailTrimmed);
+  const nameError = !form.name.trim();
+  const emailError = placeholderEmail && !emailTrimmed ? false : !emailTrimmed || !emailLooksValid;
+  const passwordError = isNewAccount && form.password.trim().length < MIN_PASSWORD_LENGTH;
+  const step0Problems: string[] = [];
+  if (nameError) step0Problems.push(tOnboarding("errorNameRequired"));
+  if (emailError) {
+    step0Problems.push(
+      !emailTrimmed ? tOnboarding("errorEmailRequired") : tOnboarding("errorEmailInvalid")
+    );
+  }
+  if (passwordError) step0Problems.push(tOnboarding("weakPassword", { minimum: MIN_PASSWORD_LENGTH }));
+  const step0Invalid = step0Problems.length > 0;
   const step2Invalid = !isStudyInterestSelectionValid(form.studyInterests);
+
+  /** Bring the first invalid field into view — the form scrolls on phones. */
+  const focusFirstProblem = () => {
+    const id = nameError ? "ob-name" : emailError ? "ob-email" : passwordError ? "ob-password" : null;
+    if (!id) return;
+    const element = document.getElementById(id);
+    element?.scrollIntoView({ block: "center", behavior: "smooth" });
+    element?.focus({ preventScroll: true });
+  };
 
   const handleNext = async () => {
     if (step === 0 && step0Invalid) {
-      setError(
-        isNewAccount
-          ? tOnboarding("identityPasswordRequired", { minimum: MIN_PASSWORD_LENGTH })
-          : tOnboarding("identityRequired")
-      );
+      setError(step0Problems.join(" · "));
+      focusFirstProblem();
       return;
     }
     if (step === 2 && step2Invalid) return;
@@ -529,9 +583,8 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
         )}
         {!error && step === 0 && step0Invalid && (
           <p className="mb-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            {isNewAccount
-              ? tOnboarding("identityPasswordRequired", { minimum: MIN_PASSWORD_LENGTH })
-              : tOnboarding("identityRequired")}
+            {/* Only pre-existing accounts (no password step) get the short note. */}
+            {isNewAccount ? step0Problems.join(" · ") : tOnboarding("identityRequired")}
           </p>
         )}
 
@@ -552,6 +605,11 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 value={form.name}
                 onChange={(e) => set("name", e.target.value)}
               />
+              {nameError && (
+                <p className="mt-1.5 text-xs font-semibold text-red-600 dark:text-red-300">
+                  {tOnboarding("errorNameRequired")}
+                </p>
+              )}
             </div>
             <div>
               <label className={labelCls} htmlFor="ob-email">
@@ -570,7 +628,15 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
                 placeholder={tOnboarding("emailPlaceholder")}
                 value={form.email}
                 onChange={(e) => set("email", e.target.value)}
+                // Spaces and capitals are the two most common reasons a
+                // correct-looking address fails: normalise on blur.
+                onBlur={() => set("email", form.email.trim().toLowerCase())}
               />
+              {emailError && (
+                <p className="mt-1.5 text-xs font-semibold text-red-600 dark:text-red-300">
+                  {!emailTrimmed ? tOnboarding("errorEmailRequired") : tOnboarding("errorEmailInvalid")}
+                </p>
+              )}
               {placeholderEmail && (
                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                   {tOnboarding("telegramEmailHint")}
@@ -580,23 +646,50 @@ export function OnboardingWizard({ profile, onCreated, onComplete }: OnboardingW
             {isNewAccount && (
               <div>
                 <label className={labelCls} htmlFor="ob-password">{tOnboarding("passwordLabel")}</label>
-                <input
-                  id="ob-password"
-                  name="new-password"
-                  type="password"
-                  required
-                  aria-required="true"
-                  aria-invalid={step0Invalid && form.password.trim().length < MIN_PASSWORD_LENGTH ? true : undefined}
-                  aria-describedby="ob-password-help"
-                  className={inputCls}
-                  placeholder={tOnboarding("passwordPlaceholder", { minimum: MIN_PASSWORD_LENGTH })}
-                  value={form.password}
-                  onChange={(e) => set("password", e.target.value)}
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <input
+                    id="ob-password"
+                    name="new-password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    aria-required="true"
+                    aria-invalid={passwordError ? true : undefined}
+                    aria-describedby="ob-password-help"
+                    className={`${inputCls} pr-12`}
+                    placeholder={tOnboarding("passwordPlaceholder", { minimum: MIN_PASSWORD_LENGTH })}
+                    value={form.password}
+                    onChange={(e) => set("password", e.target.value)}
+                    autoComplete="new-password"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  {/* Reveal the field: a stray space, a wrong keyboard layout or
+                      an autofilled placeholder is invisible otherwise, and the
+                      visitor only sees "the password is too short". */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? tOnboarding("hidePassword") : tOnboarding("showPassword")}
+                    aria-pressed={showPassword}
+                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-slate-200"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+                  </button>
+                </div>
                 <p id="ob-password-help" className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  {tOnboarding("passwordHelp")}
+                  {passwordError
+                    ? tOnboarding("weakPassword", { minimum: MIN_PASSWORD_LENGTH })
+                    : tOnboarding("passwordHelp")}
                 </p>
+                {form.password.length > 0 && (
+                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                    {tOnboarding("passwordLength", {
+                      count: form.password.trim().length,
+                      minimum: MIN_PASSWORD_LENGTH,
+                    })}
+                  </p>
+                )}
               </div>
             )}
             <p className="text-xs text-slate-500 dark:text-slate-400">
