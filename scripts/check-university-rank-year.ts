@@ -105,9 +105,11 @@ check("the rule is a pure module — no database, no React, no environment", () 
 check("the catalogue list drops an undated rank before it is published", () => {
   const text = source("src/app/api/universities/route.ts");
   assert.match(text, /import \{ verifiedQsRank \} from "@\/lib\/universityRank";/);
+  // Phase AF wrapped the row in `withResolvedUsdCosts` first, so the guard now
+  // reads the published copy; the rule itself is unchanged.
   assert.match(
     text,
-    /if \(uni\.worldRanking != null && verifiedQsRank\(uni\) == null\) \{\s*return \{ \.\.\.uni, worldRanking: null \};/,
+    /if \(resolved\.worldRanking != null && verifiedQsRank\(resolved\) == null\) \{\s*return \{ \.\.\.resolved, worldRanking: null \};/,
     "the list endpoint publishes an undated rank again"
   );
 });

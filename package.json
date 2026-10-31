@@ -39,6 +39,7 @@
     "test:landing-ranks": "tsx scripts/check-landing-ranks.ts",
     "test:qs-benchmarks": "tsx scripts/check-qs-benchmarks.ts",
     "test:university-rank-year": "tsx scripts/check-university-rank-year.ts",
+    "test:university-costs": "tsx scripts/check-university-costs.ts",
     "test:qs-catalogue-ranks": "tsx scripts/check-qs-catalogue-ranks.ts",
     "audit:qs-ranks": "tsx scripts/audit-live-ranks.ts",
     "test:country-facts": "tsx scripts/check-country-facts.ts",

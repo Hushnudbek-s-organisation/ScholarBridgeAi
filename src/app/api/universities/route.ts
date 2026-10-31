@@ -16,6 +16,7 @@ import { matchesUniversityType } from "@/lib/universityType";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { verifiedQsRank } from "@/lib/universityRank";
+import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
 
 /**
@@ -57,10 +58,14 @@ export async function GET(req: Request) {
       if (uni.verificationStatus === "verified") {
         // Phase AD: a rank whose edition was never recorded is not a QS
         // position, so it is not published, filtered or sorted on either.
-        if (uni.worldRanking != null && verifiedQsRank(uni) == null) {
-          return { ...uni, worldRanking: null };
+        // Phase AF: publish one figure per cost — the resolved USD value, not
+        // the raw legacy mirror that disagreed with the canonical amount on 160
+        // rows. The card and the profile page must not quote two prices.
+        const resolved = withResolvedUsdCosts(uni);
+        if (resolved.worldRanking != null && verifiedQsRank(resolved) == null) {
+          return { ...resolved, worldRanking: null };
         }
-        return { ...uni };
+        return resolved;
       }
       return {
         ...uni,

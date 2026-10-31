@@ -19,6 +19,7 @@ import { toMatchProfileWithActivities, chancingProfileWithActivities, toUniversi
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { verifiedQsRankNumber } from "@/lib/universityRank";
+import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { countriesMatch } from "@/lib/countries";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import {
@@ -297,7 +298,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // A row with no verified position is left verbatim instead of being
     // corrected to a number the edition does not publish.
     uni = {
-      ...uni,
+      ...withResolvedUsdCosts(uni),
       worldRanking: qsRank,
       description: localizeUniversityDescription(uni.description, "en", qsRank),
       highlights: localizeHighlights(uni.highlights, "en", qsRank),

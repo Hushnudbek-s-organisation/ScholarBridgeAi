@@ -590,6 +590,56 @@ async function main() {
       `status ${undatedFiltered.status}; rows ${JSON.stringify(undatedFiltered.rows.map((row) => row.id))}`
     );
     await db.update(schema.universities).set({ worldRanking: uniA.worldRanking, qsRankYear: uniA.qsRankYear }).where(eq(schema.universities.id, uniA.id));
+
+    // Phase AF: the two cost columns describe the same quantity, and the live
+    // catalogue had them disagreeing on 160 rows. The API must publish the
+    // canonical amount, never the legacy mirror.
+    await db.update(schema.universities).set({
+      verificationStatus: "verified",
+      worldRanking: 50,
+      qsRankYear: 2026,
+      annualTuition: 5000,
+      tuitionCurrency: "USD",
+      tuitionPeriod: "year",
+      annualTuitionUsd: 9999,
+      annualLivingEst: 4000,
+      livingCostCurrency: "USD",
+      livingCostPeriod: "year",
+      annualLivingEstUsd: 7777,
+    }).where(eq(schema.universities.id, uniA.id));
+    const costRows = await catalogue();
+    const costRow = costRows.rows.find((row) => row.id === uniA.id);
+    check(
+      "universities: the API publishes the canonical tuition, not the legacy USD mirror",
+      costRows.status === 200 && costRow?.annualTuitionUsd === 5000 && costRow?.annualLivingEstUsd === 4000,
+      `status ${costRows.status}; tuition ${costRow?.annualTuitionUsd}; living ${costRow?.annualLivingEstUsd}`
+    );
+    const costFiltered = await catalogue("maxTuition=6000");
+    check(
+      "universities: the tuition filter uses the same published figure",
+      costFiltered.status === 200 && costFiltered.rows.some((row) => row.id === uniA.id),
+      `status ${costFiltered.status}; rows ${JSON.stringify(costFiltered.rows.map((row) => row.id))}`
+    );
+
+    const { GET: getUniversityDetail } = await import("../src/app/api/universities/[id]/route");
+    const detailResponse = await getUniversityDetail(
+      new Request(`http://localhost/api/universities/${uniA.id}`),
+      { params: Promise.resolve({ id: String(uniA.id) }) }
+    );
+    const detailBody = (await detailResponse.json()) as { money?: { annualTuition?: number } };
+    check(
+      "universities: the profile payload states the same tuition as the card",
+      detailResponse.status === 200 && detailBody.money?.annualTuition === 5000,
+      `status ${detailResponse.status}; money ${JSON.stringify(detailBody.money)}`
+    );
+    await db.update(schema.universities).set({
+      annualTuition: uniA.annualTuition,
+      tuitionCurrency: uniA.tuitionCurrency,
+      tuitionPeriod: uniA.tuitionPeriod,
+      annualLivingEst: uniA.annualLivingEst,
+      livingCostCurrency: uniA.livingCostCurrency,
+      livingCostPeriod: uniA.livingCostPeriod,
+    }).where(eq(schema.universities.id, uniA.id));
   } finally {
     for (const uni of [uniA, uniB]) {
       await db.update(schema.universities).set({ degreeLevel: uni.degreeLevel, annualTuitionUsd: uni.annualTuitionUsd, worldRanking: uni.worldRanking, qsRankYear: uni.qsRankYear, annualLivingEstUsd: uni.annualLivingEstUsd, minIelts: uni.minIelts, postStudyWorkVisaYears: uni.postStudyWorkVisaYears, verificationStatus: uni.verificationStatus }).where(eq(schema.universities.id, uni.id));

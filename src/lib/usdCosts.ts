@@ -96,6 +96,33 @@ export function resolvedUsdUniversityCosts(row: UniversityCostFields): ResolvedU
 }
 
 /**
+ * Publish resolved USD costs on a catalogue row.
+ *
+ * Every cost column exists twice: the canonical amount + currency + period
+ * (`annual_tuition`, `tuition_currency`, `tuition_period`) and a legacy USD
+ * mirror (`annual_tuition_usd`). Measured 2026-10-30 in the live catalogue, the
+ * two disagreed on 160 tuition rows, 162 living-cost rows and 176 accommodation
+ * rows — the same quantity, in the same currency, twice, with two values.
+ *
+ * The API used to ship the raw pair, so the explorer card (which reads the
+ * mirror) and the profile page (which reads the canonical amount) showed two
+ * different prices for the same university — $65,500 vs $64,310 for MIT. Every
+ * public payload now ships the *resolved* figure in the mirror column, so all
+ * surfaces state one number, and the resolver's precedence is the single rule:
+ * canonical wins when it is in USD, the mirror is only a fallback, and a
+ * non-USD canonical value stays incomparable instead of borrowing the mirror.
+ */
+export function withResolvedUsdCosts<T extends UniversityCostFields>(row: T): T {
+  const resolved = resolvedUsdUniversityCosts(row);
+  return {
+    ...row,
+    annualTuitionUsd: resolved.annualTuitionUsd,
+    annualLivingEstUsd: resolved.annualLivingEstUsd,
+    accommodationCostUsd: resolved.accommodationCostUsd,
+  };
+}
+
+/**
  * Resolve a scholarship's displayed/fixed award amount to USD. This does not
  * infer an annual value from awardPeriod; callers making annual comparisons
  * must inspect that separate catalogue field.

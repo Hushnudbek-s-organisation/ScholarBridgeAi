@@ -16,6 +16,7 @@ import { db } from "@/db";
 import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import { verifiedQsRank } from "@/lib/universityRank";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { localizeCity, localizeCountry, localizeMajorOrField, localizeUniversityType } from "@/lib/catalogLocalizer";
 
@@ -94,7 +95,7 @@ export default async function UniversitiesPage({
           country: university.country,
           city: university.city,
           flag_emoji: university.flagEmoji,
-          world_ranking: verified ? university.worldRanking : null,
+          world_ranking: verifiedQsRank(university)?.rank ?? null,
           program_major: university.programMajor,
           university_type: university.universityType,
           annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
@@ -165,7 +166,7 @@ export default async function UniversitiesPage({
           country: university.country,
           city: university.city,
           flag_emoji: university.flagEmoji,
-          world_ranking: verified ? university.worldRanking : null,
+          world_ranking: verifiedQsRank(university)?.rank ?? null,
           program_major: university.programMajor,
           university_type: university.universityType,
           annual_tuition_usd: verified ? costs.annualTuitionUsd : null,

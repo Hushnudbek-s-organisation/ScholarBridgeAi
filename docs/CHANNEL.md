@@ -2061,6 +2061,88 @@ without inventing a position, and is never reconciled back into one) ·
 integration 353/0 · security 90 · portability 57/0 · `check:i18n` passed ·
 `tsc --noEmit` clean · `next build` OK.
 
+## 11p. One figure per cost: the tuition on the card and on the page (2026-10-30)
+
+Every university cost is stored twice — the canonical amount with its currency
+and period (`annual_tuition` + `tuition_currency` + `tuition_period`) and a
+legacy USD mirror (`annual_tuition_usd`), with the same pair for living costs
+and accommodation. All 356 active rows are USD / year on all three families, so
+the two columns describe the **same quantity in the same unit**.
+
+Measured 2026-10-30, they disagreed on:
+
+| family | rows where canonical ≠ mirror |
+| --- | ---: |
+| tuition | **160** |
+| living costs | **162** |
+| accommodation | **176** |
+
+The gaps were not rounding: MIT 64,310 vs 65,500 · Oxford 59,650 vs 48,500 ·
+ETH Zurich 4,900 vs 1,650 · TUM 5,500 vs 3,000 · KAIST 18,000 vs 6,000 ·
+UCL 45,000 vs 47,000.
+
+**What the user saw.** The explorer card prints `annualTuitionUsd` (the mirror);
+the profile page prints the canonical amount; the server-rendered catalogue
+resolves through `resolvedUsdUniversityCosts()` (canonical). So MIT's card read
+**$65,500 on first paint and $64,310 after any filter change**, while the
+profile page agreed with the second figure. Two prices for the same university,
+decided by which screen the student happened to be on.
+
+### The rule
+
+`annualUsdAmount()` in `src/lib/usdCosts.ts` already encoded it: the canonical
+amount is authoritative **when its currency is USD**, the mirror is only a
+fallback for rows with no canonical amount, an explicitly non-USD canonical
+value is never replaced by a USD mirror, and a monthly amount is annualised
+rather than copied. The gap was that two endpoints shipped the raw pair.
+
+### What changed
+
+* **`withResolvedUsdCosts(row)`** (new, in `usdCosts.ts`) publishes the resolved
+  figure in the mirror slot — one call, one rule.
+* **`GET /api/universities`** and **`GET /api/universities/[id]`** now ship
+  `withResolvedUsdCosts(row)`, so the card, the table, the filter (`maxTuition`),
+  the tuition sort and the profile page all read one number. Every other cost
+  consumer (dashboard, planner, deadlines, scholarships, autopilot, country
+  compare, the SSR catalogue) already resolved through the helper — the gate now
+  pins that too.
+* **The SSR catalogue was missing the Phase AD rank rule**: both of its branches
+  published `verified ? university.worldRanking : null`, so a verified row with
+  no recorded edition could still print a `QS #N` badge on the first paint while
+  the API and the profile page refused it. Both branches now use
+  `verifiedQsRank(university)?.rank ?? null`.
+* **The database mirrors were aligned** to the canonical amounts
+  (`supabase/university_cost_mirror_alignment_2026-10-30.sql`), so admin screens,
+  exports and any older reader see the same figure too. The canonical columns
+  were not touched — this is a copy, never a re-derivation, and no exchange rate
+  was invented. Verified after the run: 0 / 0 / 0 remaining gaps.
+
+### Verified
+
+`npm run test:university-costs` — **12/12** (new): the canonical amount wins over
+a disagreeing mirror on all 17 real pre-alignment pairs, a mirror-only row still
+resolves, a GBP canonical amount is never published as USD, a monthly amount is
+annualised, a genuine zero survives as zero, all three families follow the same
+rule, both endpoints publish the resolved figure, every other cost consumer
+resolves through the helper, the cards read the published value, the SSR
+catalogue applies the rank rule, and the migration keeps its non-USD guard.
+Reverting the list endpoint to the raw row fails it by name.
+
+**Integration (+3):** a row written with `annual_tuition = 5000` and the mirror
+`9999` comes back from `/api/universities` as **5000**, satisfies
+`maxTuition=6000`, and `/api/universities/[id]` reports the same **5000** in
+`money.annualTuition` — card and profile can no longer disagree.
+
+`test:university-rank-year` 14/0 · `test:university-rank` 17/0 ·
+`test:university-list` 15/0 · `test:university-hub` 11/0 ·
+`test:qs-catalogue-ranks` 13/0 · `test:qs-benchmarks` 13/0 · `test:chancing`
+28/0 · `test:landing-ranks` 10/0 · `test:university-prose` 19/0 ·
+`test:catalogue-language` 19/0 · `test:render` 354/0 · `test:localization` 16/0 ·
+`test:catalogue-order` 12/0 · `test:deadline-day` 13/0 · `test:opportunity-notes`
+10/0 · `test:opportunities` 27/0 · `test:channel` 196/0 · `test:dataset` 50/0 ·
+integration **356/0** · security 90 · portability 57/0 · `check:i18n` passed ·
+`tsc --noEmit` clean · `next build` OK.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from
