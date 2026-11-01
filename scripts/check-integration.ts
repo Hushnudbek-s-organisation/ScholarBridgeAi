@@ -3503,6 +3503,23 @@ async function main() {
       listed?.liveSessions >= 1,
       `liveSessions=${listed?.liveSessions}`
     );
+    // The confirmation field asks for THIS account's password, so the payload
+    // must name it — and say whether it can be checked at all.
+    check(
+      "the list names the signed-in admin and their password state",
+      list.status === 200 &&
+        list.body?.viewer?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() &&
+        list.body?.viewer?.hasPassword === true &&
+        list.body?.viewer?.passwordFormat === "verifiable" &&
+        typeof list.body?.viewer?.passwordChangedAt === "string",
+      `viewer=${JSON.stringify(list.body?.viewer)?.slice(0, 220)}`
+    );
+    check(
+      "the viewer payload carries no hash either",
+      !JSON.stringify(list.body?.viewer ?? {}).toLowerCase().includes("hash") &&
+        !JSON.stringify(list.body?.viewer ?? {}).includes("scrypt"),
+      `viewer=${JSON.stringify(list.body?.viewer)?.slice(0, 220)}`
+    );
 
     // --- a non-admin cannot see it
     const studentList = await callFrom(`sb_session=${studentToken}`, "/api/admin/accounts");

@@ -2405,6 +2405,79 @@ alternate port such as Brevo 2525 or Resend 2587, or an HTTPS mail API), the
 administrator's reset link is the working recovery path — and it is the one that
 teaches nobody a password.
 
+## 11s. "Incorrect password." was a dead end (2026-11-01)
+
+The first real use of §11r ended at a red line: the operator searched the
+student, filled the "your password" field, pressed **Create link**, and got
+**Incorrect password.** Nothing else. No link, no hint, no next step — and no way
+to work out whether the problem was the typing, the account, or the build.
+
+That is a bug in the *answer*, not in the check. Re-authentication is correct and
+stays. What was wrong: three different situations all produced one sentence.
+
+| situation | what the old code said | what it has to say |
+| --- | --- | --- |
+| the admin typed the student's password, or a guess | Incorrect password. | **which** account's password is wanted, and when that password was last set |
+| the admin's account has no password at all (Telegram-created) | Incorrect password. — impossible to satisfy | "no password yet — set one in Edit Profile" |
+| the stored hash is in a format this build cannot verify | Incorrect password. — forever | "this hash cannot be checked; set a new one" |
+
+`verifyPassword()` returns `false` for a malformed hash exactly as it does for a
+wrong one, so the last two were indistinguishable from a typo **by construction**.
+`passwordHashFormat()` (pure, in `adminAccountRules.ts`) now classifies a stored
+hash as `none` / `verifiable` / `legacy` *before* any comparison, and the refusal
+carries a distinct code:
+
+* `password_not_set` (400) — no password on the admin's own account;
+* `password_format_legacy` (409) — a hash this build cannot check;
+* `invalid_password` (403) — a genuine mismatch.
+
+### The panel now says whose password it wants
+
+`GET /api/admin/accounts` returns `viewer`: the signed-in administrator's id,
+name, email, `hasPassword`, `passwordChangedAt` and `passwordFormat` — never a
+hash. The field is labelled with that address and the date its password was last
+set, so "which password?" is answered before the first attempt instead of after
+the third.
+
+Every server code is now translated in en / uz / ru (`errInvalidPassword`,
+`errPasswordNotSet`, `errPasswordFormatLegacy`, `errRateLimited`,
+`errAppUrlMissing`, `errSelfTarget`, `errWeakPassword`, `errAmbiguousRequest`,
+`errNotFound`). The panel no longer prints a raw English string at an operator
+reading Uzbek.
+
+### And it always offers the way out
+
+An administrator who cannot reproduce their own password is not stuck: a
+**signed-in** account may set a new password in Edit Profile without the old one
+(that is what a session is for), and the panel now grows an **Open Edit Profile**
+button in exactly the three situations above. It is the same password policy as
+everywhere else, and the change stamps `password_changed_at` — which the panel
+then shows back. No new privilege is created: the operator already holds the
+session; the panel just stops pretending the email reset can save them.
+
+### Verified
+
+`test:admin-accounts` **22 → 26**: `passwordHashFormat` reads `scrypt:…` as
+verifiable and five malformed shapes as legacy; the classifier runs BEFORE
+`verifyPassword`; all three codes exist and are ordered; `AdminViewerRow` carries
+no hash field; the list route asks `adminViewer()` for the acting admin; the panel
+names `viewer.email`, offers `openProfile`, and translates all nine codes in all
+three languages.
+
+integration **397 → 399**: the list payload carries `viewer` with the admin's own
+email, `hasPassword: true`, `passwordFormat: "verifiable"` and a
+`passwordChangedAt` timestamp — and the viewer object contains neither `hash` nor
+`scrypt`.
+
+`test:security` **104 → 106**: an unverifiable hash can never stand in for a
+password (format decided first, and neither `none` nor `legacy` falls through to
+`ok: true`), the refusals never echo the submitted password, the panel names the
+account, offers the way out, and writes nothing to `localStorage`,
+`sessionStorage` or `document.cookie`.
+
+Also green: `check:i18n` (3 979 call sites), `lint:baseline`, `tsc --noEmit`,
+`next build`.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

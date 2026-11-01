@@ -1301,7 +1301,9 @@ export function Home({
             />
           )}
 
-          {activeTab === "admin" && <AdminPanel activeProfile={activeProfile} />}
+          {activeTab === "admin" && (
+            <AdminPanel activeProfile={activeProfile} onOpenProfileEditor={() => openProfileModal(false)} />
+          )}
 
           {/* One-line "what is this page?" help for newcomers (admin-editable).
               Module 2: it sits at the BOTTOM of every section now — the main

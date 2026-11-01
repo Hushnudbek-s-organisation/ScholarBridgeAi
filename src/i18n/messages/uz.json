@@ -7631,6 +7631,23 @@
     "copy": "Nusxalash",
     "copied": "Nusxalandi",
     "copyFailed": "Nusxalab bo'lmadi. Matnni belgilab, qo'lda nusxalang.",
-    "whyNoPassword": "Hech bir sahifa hisob parolini ko'rsata olmaydi: u bir tomonlama scrypt hash sifatida saqlanadi, bazada ham kodlab bo'ladigan narsa yo'q. Admin qila oladigan ish — shu sahifadagi ikkitasi: parolni yangisiga almashtirish yoki talaba o'zi yangi parol qo'yadigan havola berish. Ikkalasi ham audit jurnalida admin ismi bilan qayd etiladi."
+    "whyNoPassword": "Hech bir sahifa hisob parolini ko'rsata olmaydi: u bir tomonlama scrypt hash sifatida saqlanadi, bazada ham kodlab bo'ladigan narsa yo'q. Admin qila oladigan ish — shu sahifadagi ikkitasi: parolni yangisiga almashtirish yoki talaba o'zi yangi parol qo'yadigan havola berish. Ikkalasi ham audit jurnalida admin ismi bilan qayd etiladi.",
+    "yourPasswordWhose": "Bu — {email} akkauntining paroli (oxirgi marta: {when}). Sizning parolingiz, talabaning emas.",
+    "viewerNoPasswordTitle": "Sizning admin akkauntingizda hali parol yo'q",
+    "viewerNoPasswordBody": "Telegram orqali yaratilgan akkauntda parol umuman bo'lmasligi mumkin — tasdiqlash uchun hech narsa yo'q. «Profilni tahrirlash» ni ochib parol qo'ying, keyin shu yerga yozing.",
+    "viewerLegacyTitle": "Bu parolni joriy versiya tekshira olmaydi",
+    "viewerLegacyBody": "Bazadagi qiymat eski formatda saqlangan, shuning uchun har qanday urinish «parol xato» bo'lib ko'rinadi. «Profilni tahrirlash»da yangi parol qo'ying, keyin shuni yozing.",
+    "reauthMismatchTitle": "Bu shu admin akkauntning paroli emas",
+    "reauthMismatchBody": "Maydon {email} bilan kirishda ishlatadigan parolni kutadi — talabaning parolini emas, eski parolni ham emas. Esingizda bo'lmasa, «Profilni tahrirlash»da yangisini qo'ying va shuni yozing.",
+    "openProfile": "Profilni tahrirlash",
+    "errInvalidPassword": "Bu {email} uchun parol emas. Bu maydon SIZNING parolingizni kutadi — talabaning emas.",
+    "errPasswordNotSet": "Sizning admin akkauntingizda parol yo'q. Avval «Profilni tahrirlash»da parol qo'ying, keyin qayting.",
+    "errPasswordFormatLegacy": "Akkauntingizdagi parol eski formatda va uni tekshirib bo'lmaydi. «Profilni tahrirlash»da yangi parol qo'ying va qayta urinib ko'ring.",
+    "errRateLimited": "Juda ko'p urinish bo'ldi. Bir necha daqiqadan keyin qayta urinib ko'ring.",
+    "errAppUrlMissing": "Serverda APP_URL sozlanmagan, shuning uchun to'liq havola yasab bo'lmaydi. Deploy sozlamalarida APP_URL qo'shing va qayta urinib ko'ring.",
+    "errSelfTarget": "O'zingizning parolingizni bu yerdan tiklab bo'lmaydi — «Profilni tahrirlash»dan foydalaning.",
+    "errWeakPassword": "Parol talabga javob bermaydi: kamida 8 belgi va oson topiladigan parol bo'lmasligi kerak.",
+    "errAmbiguousRequest": "So'rovda bir vaqtda ikkita parol kelgan. Yozilgan parol YOKI «yaratish» — ikkalasi emas.",
+    "errNotFound": "Bunday akkaunt topilmadi."
   }
 }

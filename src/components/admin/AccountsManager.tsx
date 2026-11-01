@@ -17,7 +17,11 @@
  * letting an administrator hunt for a button that cannot exist.
  *
  * Both actions require the administrator to re-enter their own password — a
- * stolen admin cookie alone cannot take over a student account.
+ * stolen admin cookie alone cannot take over a student account. That field asks
+ * for the password of the account that is SIGNED IN, so the panel names it, says
+ * when that password was last set, and never answers a failure with a bare
+ * "incorrect password": a missing password, an unverifiable old hash, a rate
+ * limit and a genuine typo need four different next steps.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -33,6 +37,15 @@ import {
   Smartphone,
   UserRound,
 } from "lucide-react";
+
+interface Viewer {
+  id: number;
+  name: string;
+  email: string;
+  hasPassword: boolean;
+  passwordChangedAt: string | null;
+  passwordFormat: "none" | "verifiable" | "legacy";
+}
 
 interface Account {
   id: number;
@@ -60,10 +73,27 @@ type Result =
   | { kind: "password"; password: string | null; email: string }
   | null;
 
-export function AccountsManager() {
+/** Keeps the server's machine-readable code attached to the failure. */
+class ApiError extends Error {
+  code: string;
+  constructor(message: string, code?: unknown) {
+    super(message);
+    this.code = typeof code === "string" ? code : "";
+  }
+}
+
+interface AccountsManagerProps {
+  /** Opens the profile editor, where a signed-in account sets a new password. */
+  onOpenProfileEditor?: () => void;
+}
+
+export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = {}) {
   const t = useTranslations("adminAccounts");
   const [q, setQ] = useState("");
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [viewer, setViewer] = useState<Viewer | null>(null);
+  /** The failure code, so the panel can say what to DO rather than echo a server string. */
+  const [errorCode, setErrorCode] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Account | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
@@ -78,11 +108,14 @@ export function AccountsManager() {
     try {
       const res = await fetch(`/api/admin/accounts?q=${encodeURIComponent(needle)}`, { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      if (!res.ok) throw new ApiError(json.error || `HTTP ${res.status}`, json.code);
       setAccounts(Array.isArray(json.accounts) ? (json.accounts as Account[]) : []);
+      if (json.viewer && typeof json.viewer === "object") setViewer(json.viewer as Viewer);
       setError("");
+      setErrorCode("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("loadFailed"));
+      setError(t("loadFailed"));
+      setErrorCode("");
     } finally {
       setLoading(false);
     }
@@ -92,6 +125,17 @@ export function AccountsManager() {
   useEffect(() => {
     const id = setTimeout(() => void load(q.trim()), 250);
     return () => clearTimeout(id);
+  }, [q, load]);
+
+  /**
+   * Coming back from the profile editor is the one moment the panel's idea of
+   * the signed-in account is out of date: the operator may have just set the
+   * password this screen keeps asking for. Refresh on focus, not on a timer.
+   */
+  useEffect(() => {
+    const onFocus = () => void load(q.trim());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [q, load]);
 
   const when = useMemo(
@@ -106,14 +150,52 @@ export function AccountsManager() {
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    if (!res.ok) throw new ApiError(json.error || `HTTP ${res.status}`, json.code);
     return json as Record<string, unknown>;
   };
+
+  /**
+   * Turn a failure code into the next step, in the operator's language.
+   *
+   * "Incorrect password." is only true for ONE of these. A bare server string for
+   * all of them is how an operator ends up retyping the same wrong password
+   * forever while the real problem is that the account has no password at all.
+   */
+  const messageFor = useCallback(
+    (err: unknown) => {
+      const code = err instanceof ApiError ? err.code : "";
+      const who = viewer?.email ?? "";
+      switch (code) {
+        case "invalid_password":
+          return t("errInvalidPassword", { email: who });
+        case "password_not_set":
+          return t("errPasswordNotSet");
+        case "password_format_legacy":
+          return t("errPasswordFormatLegacy");
+        case "rate_limited":
+          return t("errRateLimited");
+        case "app_url_missing":
+          return t("errAppUrlMissing");
+        case "self_target":
+          return t("errSelfTarget");
+        case "weak_password":
+          return t("errWeakPassword");
+        case "ambiguous_request":
+          return t("errAmbiguousRequest");
+        case "not_found":
+          return t("errNotFound");
+        default:
+          return err instanceof Error && err.message ? err.message : t("failed");
+      }
+    },
+    [t, viewer]
+  );
 
   const createLink = async () => {
     if (!selected) return;
     setBusy("link");
     setError("");
+    setErrorCode("");
     setResult(null);
     try {
       const json = await post(`/api/admin/accounts/${selected.id}/reset-link`, { adminPassword });
@@ -121,7 +203,8 @@ export function AccountsManager() {
       setAdminPassword("");
       await load(q.trim());
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("failed"));
+      setErrorCode(err instanceof ApiError ? err.code : "");
+      setError(messageFor(err));
     } finally {
       setBusy(null);
     }
@@ -131,6 +214,7 @@ export function AccountsManager() {
     if (!selected) return;
     setBusy(generate ? "generate" : "set");
     setError("");
+    setErrorCode("");
     setResult(null);
     try {
       const json = await post(`/api/admin/accounts/${selected.id}/password`, {
@@ -146,7 +230,8 @@ export function AccountsManager() {
       setTypedPassword("");
       await load(q.trim());
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("failed"));
+      setErrorCode(err instanceof ApiError ? err.code : "");
+      setError(messageFor(err));
     } finally {
       setBusy(null);
     }
@@ -161,6 +246,23 @@ export function AccountsManager() {
       setError(t("copyFailed"));
     }
   };
+
+  /**
+   * Why the confirmation field cannot be satisfied right now — or "" when it can.
+   * Each case needs a different sentence AND the same way out (set a new password).
+   */
+  const ownPasswordProblem =
+    viewer?.passwordFormat === "legacy"
+      ? "legacy"
+      : viewer?.passwordFormat === "none"
+        ? "none"
+        : errorCode === "invalid_password"
+          ? "mismatch"
+          : "";
+
+  // A wrong password is explained directly under the field it belongs to; the
+  // red banner at the top would be the same sentence twice, twice as far away.
+  const showErrorBanner = Boolean(error) && !(errorCode === "invalid_password" && viewer);
 
   return (
     <div className="space-y-4">
@@ -182,7 +284,7 @@ export function AccountsManager() {
             className={`${inputCls} pl-9`}
           />
         </div>
-        {error && (
+        {showErrorBanner && (
           <div role="alert" className="mt-2 flex items-start gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>{error}</span>
@@ -206,6 +308,7 @@ export function AccountsManager() {
                     setSelected(a);
                     setResult(null);
                     setError("");
+                    setErrorCode("");
                     setAdminPassword("");
                     setTypedPassword("");
                   }}
@@ -279,6 +382,36 @@ export function AccountsManager() {
               placeholder={t("yourPasswordHint")}
               className={inputCls}
             />
+            {/* WHOSE password this is. The field is useless until it says so. */}
+            <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+              {viewer
+                ? t("yourPasswordWhose", { email: viewer.email, when: when(viewer.passwordChangedAt) })
+                : t("yourPasswordHint")}
+            </p>
+            {ownPasswordProblem && (
+              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+                <p className="font-bold">
+                  {ownPasswordProblem === "legacy"
+                    ? t("viewerLegacyTitle")
+                    : ownPasswordProblem === "none"
+                      ? t("viewerNoPasswordTitle")
+                      : t("reauthMismatchTitle")}
+                </p>
+                <p className="mt-0.5">
+                  {ownPasswordProblem === "legacy"
+                    ? t("viewerLegacyBody")
+                    : ownPasswordProblem === "none"
+                      ? t("viewerNoPasswordBody")
+                      : t("reauthMismatchBody", { email: viewer?.email ?? "" })}
+                </p>
+                {onOpenProfileEditor && (
+                  <button type="button" onClick={onOpenProfileEditor} className={`${btnLight} mt-2`}>
+                    <UserRound className="h-3.5 w-3.5" />
+                    {t("openProfile")}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 1. reset link — the path that works with email down */}
