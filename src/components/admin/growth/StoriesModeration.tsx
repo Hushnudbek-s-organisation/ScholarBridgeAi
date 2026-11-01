@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { BadgeCheck, Check, ChevronDown, Loader2, RefreshCw, Star, Trash2, X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface AdminStory {
   id: number;
@@ -104,119 +105,119 @@ export function StoriesModeration() {
 
   return (
     <div className="space-y-3">
-      <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">{t("storiesIntro")}</p>
+      <p className="rounded-surface border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{t("storiesIntro")}</p>
       <div className="flex flex-wrap items-center gap-1.5">
         {(["pending", "approved", "rejected", "all"] as Filter[]).map((f) => (
-          <button
+          <Button variant="unstyled"
             key={f}
             onClick={() => setFilter(f)}
-            className={`rounded-xl px-3 py-1.5 text-xs font-bold ${filter === f ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+            className={`rounded-surface px-3 py-1.5 text-xs font-bold ${filter === f ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
           >
             {t(`st.${f}`)}
             {f !== "all" && <span className="ml-1 opacity-70">{counts[f] ?? 0}</span>}
-          </button>
+          </Button>
         ))}
-        <button onClick={() => void load()} className="ml-auto inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
+        <Button variant="unstyled" onClick={() => void load()} className="ml-auto inline-flex items-center gap-1 rounded-surface border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
           <RefreshCw className="h-3.5 w-3.5" /> {t("refresh")}
-        </button>
+        </Button>
       </div>
 
-      {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p>}
+      {error && <p className="rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{error}</p>}
       {!items && (
-        <p className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-6 text-xs text-slate-500">
+        <p className="flex items-center gap-2 rounded-surface border border-slate-200 bg-white p-6 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
         </p>
       )}
-      {items && items.length === 0 && <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">{t("noStories")}</p>}
+      {items && items.length === 0 && <p className="rounded-surface border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">{t("noStories")}</p>}
 
       <ul className="space-y-2">
         {items?.map((s) => {
           const isOpen = open === s.id;
           return (
-            <li key={s.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-              <button onClick={() => setOpen(isOpen ? null : s.id)} className="flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left" aria-expanded={isOpen}>
+            <li key={s.id} className="overflow-hidden rounded-overlay border border-slate-200 bg-white">
+              <Button variant="unstyled" onClick={() => setOpen(isOpen ? null : s.id)} className="flex w-full flex-wrap items-center gap-2 px-4 py-3 text-left" aria-expanded={isOpen}>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1 text-sm font-bold text-slate-900">
                     {s.admittedUniversity}
                     {s.isVerified && <BadgeCheck className="h-4 w-4 text-sky-500" />}
                     {s.isFeatured && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
                   </span>
-                  <span className="block truncate text-[11px] text-slate-500">
+                  <span className="block truncate text-xs text-slate-500">
                     {[s.degreeLevel, s.major, s.admittedCountry].filter(Boolean).join(" · ")} — {s.authorName || s.displayName}
                     {s.authorEmail ? ` (${s.authorEmail})` : ""}
                   </span>
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusChip(s.status)}`}>{t(`st.${s.status}`)}</span>
-                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-              </button>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${statusChip(s.status)}`}>{t(`st.${s.status}`)}</span>
+                <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              </Button>
               {isOpen && (
                 <div className="space-y-3 border-t border-slate-100 px-4 pb-4 pt-3 text-xs text-slate-700">
                   <div className="flex flex-wrap gap-1.5">
-                    {s.gpa != null && <span className="rounded bg-slate-100 px-2 py-0.5 font-bold">GPA {s.gpa}{s.gpaScale ? `/${s.gpaScale}` : ""}</span>}
-                    {s.ielts != null && <span className="rounded bg-slate-100 px-2 py-0.5 font-bold">IELTS {s.ielts}</span>}
-                    {s.toefl != null && <span className="rounded bg-slate-100 px-2 py-0.5 font-bold">TOEFL {s.toefl}</span>}
-                    {s.sat != null && <span className="rounded bg-slate-100 px-2 py-0.5 font-bold">SAT {s.sat}</span>}
-                    {s.intakeYear && <span className="rounded bg-slate-100 px-2 py-0.5 font-bold">{s.intakeYear}</span>}
+                    {s.gpa != null && <span className="rounded-control bg-slate-100 px-2 py-0.5 font-bold">GPA {s.gpa}{s.gpaScale ? `/${s.gpaScale}` : ""}</span>}
+                    {s.ielts != null && <span className="rounded-control bg-slate-100 px-2 py-0.5 font-bold">IELTS {s.ielts}</span>}
+                    {s.toefl != null && <span className="rounded-control bg-slate-100 px-2 py-0.5 font-bold">TOEFL {s.toefl}</span>}
+                    {s.sat != null && <span className="rounded-control bg-slate-100 px-2 py-0.5 font-bold">SAT {s.sat}</span>}
+                    {s.intakeYear && <span className="rounded-control bg-slate-100 px-2 py-0.5 font-bold">{s.intakeYear}</span>}
                   </div>
                   {s.advice && <p className="whitespace-pre-line"><b>{t("advice")}:</b> {s.advice}</p>}
                   {s.activities.length > 0 && <p><b>{t("activities")}:</b> {s.activities.join("; ")}</p>}
                   {s.awards.length > 0 && <p><b>{t("awards")}:</b> {s.awards.join("; ")}</p>}
                   {s.scholarshipName && <p><b>{t("scholarship")}:</b> {s.scholarshipName}</p>}
                   {s.essayExcerpt && (
-                    <div className="max-h-48 overflow-y-auto rounded-xl bg-slate-50 p-3">
+                    <div className="max-h-48 overflow-y-auto rounded-surface bg-slate-50 p-3">
                       <p className="font-bold">{s.essayTitle || t("essay")}</p>
                       <p className="mt-1 whitespace-pre-line">{s.essayExcerpt}</p>
                     </div>
                   )}
                   <label className="block">
-                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("privateNote")}</span>
+                    <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">{t("privateNote")}</span>
                     <input
                       value={notes[s.id] ?? s.adminNote ?? ""}
                       onChange={(e) => setNotes((n) => ({ ...n, [s.id]: e.target.value }))}
                       maxLength={500}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs"
+                      className="w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm"
                     />
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {s.status !== "approved" && (
-                      <button
+                      <Button variant="unstyled"
                         disabled={busy === s.id}
                         onClick={() => void patch(s, { status: "approved", adminNote: notes[s.id] ?? s.adminNote ?? "" })}
-                        className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-surface bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
                       >
                         <Check className="h-3.5 w-3.5" /> {t("approve")}
-                      </button>
+                      </Button>
                     )}
                     {s.status !== "rejected" && (
-                      <button
+                      <Button variant="unstyled"
                         disabled={busy === s.id}
                         onClick={() => void patch(s, { status: "rejected", adminNote: notes[s.id] ?? s.adminNote ?? "" })}
-                        className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
                       >
                         <X className="h-3.5 w-3.5" /> {t("reject")}
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button variant="unstyled"
                       disabled={busy === s.id}
                       onClick={() => void patch(s, { isVerified: !s.isVerified })}
-                      className="inline-flex items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-surface border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
                     >
                       <BadgeCheck className="h-3.5 w-3.5" /> {s.isVerified ? t("unverify") : t("verify")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="unstyled"
                       disabled={busy === s.id}
                       onClick={() => void patch(s, { isFeatured: !s.isFeatured })}
-                      className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
                     >
                       <Star className="h-3.5 w-3.5" /> {s.isFeatured ? t("unfeature") : t("feature")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="unstyled"
                       disabled={busy === s.id}
                       onClick={() => void remove(s)}
-                      className="ml-auto inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                      className="ml-auto inline-flex items-center gap-1 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
                     >
                       <Trash2 className="h-3.5 w-3.5" /> {t("delete")}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

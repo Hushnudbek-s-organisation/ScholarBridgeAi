@@ -50,6 +50,8 @@ import {
   formatNumber,
   type ChartPoint,
 } from "./analytics/charts";
+import { Button } from "@/components/ui/Button";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 interface AnalyticsDashboardProps {
   adminProfileId: number;
@@ -251,53 +253,53 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
   return (
     <div className="space-y-4">
       {/* ---------------------------------------------------------------- Header */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50">
+          <div className="flex h-9 w-9 items-center justify-center rounded-surface bg-indigo-50">
             <BarChart3 className="h-5 w-5 text-indigo-600" />
           </div>
           <div className="min-w-0">
             <h2 className="text-sm font-extrabold text-slate-800">Platform Statistics</h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
               Tashriflar, foydalanuvchilar, to&apos;lovlar va kontent — hammasi bir joyda
             </p>
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+            <div className="flex rounded-surface border border-slate-200 bg-slate-50 p-0.5">
               {RANGES.map((range) => (
-                <button
+                <Button variant="unstyled"
                   key={range.days}
                   onClick={() => setDays(range.days)}
-                  className={`rounded-lg px-3 py-1.5 text-[11px] font-bold transition-colors ${
+                  className={`rounded-control px-3 py-1.5 text-xs font-bold transition-colors ${
                     days === range.days ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   {range.label}
-                </button>
+                </Button>
               ))}
             </div>
-            <button
+            <Button variant="unstyled"
               onClick={exportCsv}
               disabled={!data}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
               title="CSV fayl sifatida yuklab olish"
             >
               <Download className="h-3.5 w-3.5" />
               CSV
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               onClick={() => void load(true)}
               disabled={loading}
-              className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-surface bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-60"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               Yangilash
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-3 text-[11px] font-semibold text-slate-400">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-3 text-xs font-semibold text-slate-500">
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3 w-3" />
             {data ? `Davrlar: ${rangeLabel}` : "—"}
@@ -319,14 +321,14 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
 
       {/* -------------------------------------------------------------- Warnings */}
       {error ? (
-        <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+        <div className="flex items-center gap-2 rounded-overlay border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
       ) : null}
 
       {!t?.trackingAvailable && !loading ? (
-        <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+        <div className="flex items-start gap-2 rounded-overlay border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             Tashriflar jadvali (<code className="font-mono">site_visits</code>) hali yaratilmagan — shu sababli visitor
@@ -337,11 +339,11 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
       ) : null}
 
       {data?.warnings?.length ? (
-        <details className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] text-slate-500">
+        <details className="rounded-overlay border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
           <summary className="cursor-pointer font-bold text-slate-600">
             {data.warnings.length} ta metrika yuklanmadi (batafsil)
           </summary>
-          <ul className="mt-2 list-disc space-y-1 pl-5 font-mono text-[10px]">
+          <ul className="mt-2 list-disc space-y-1 pl-5 font-mono text-sm">
             {data.warnings.map((w) => (
               <li key={w}>{w}</li>
             ))}
@@ -437,7 +439,7 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
       </div>
 
       {loading && !data ? (
-        <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-10 text-xs font-semibold text-slate-500">
+        <div className="flex items-center justify-center gap-2 rounded-overlay border border-slate-200 bg-white p-10 text-xs font-semibold text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" /> Statistika yuklanmoqda…
         </div>
       ) : null}
@@ -447,7 +449,7 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
         title={`Traffic — oxirgi ${days} kun`}
         subtitle="Ustunlar: ko'rishlar · Chiziq: noyob tashriflar (har bir ustun ustiga sichqoncha olib borsangiz sana ko'rinadi)"
         action={
-          <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500">
+          <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
             <span className="inline-flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-indigo-500" /> Views
             </span>
@@ -491,17 +493,17 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
                 const share = t?.views ? Math.round((d.views / t.views) * 100) : 0;
                 return (
                   <li key={d.device}>
-                    <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-slate-700">
+                    <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-700">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="text-slate-400">{meta.icon}</span>
+                        <span className="text-slate-500">{meta.icon}</span>
                         {meta.label}
                       </span>
                       <span className="text-slate-900">{share}%</span>
                     </div>
                     <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max(2, share)}%` }} />
+                      <ProgressFill value={Math.max(2, share)} className="h-full rounded-full bg-indigo-500" />
                     </div>
-                    <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                    <p className="mt-1 text-sm font-semibold text-slate-500">
                       {formatNumber(d.views)} views · {formatNumber(d.visitors)} visitors
                     </p>
                   </li>
@@ -565,10 +567,10 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
           </div>
           {u?.byLocale.length ? (
             <div className="mt-3 border-t border-slate-100 pt-3">
-              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Til bo&apos;yicha</p>
+              <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">Til bo&apos;yicha</p>
               <div className="flex flex-wrap gap-2">
                 {u.byLocale.map((l) => (
-                  <span key={l.locale} className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600">
+                  <span key={l.locale} className="rounded-control bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
                     {l.locale.toUpperCase()} · {formatNumber(l.count)}
                   </span>
                 ))}
@@ -603,10 +605,10 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
           {r?.byProvider.length || r?.byCurrency.length ? (
             <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
               <div>
-                <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Provider</p>
+                <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">Provider</p>
                 <ul className="space-y-1">
                   {(r?.byProvider ?? []).map((p) => (
-                    <li key={p.provider} className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                    <li key={p.provider} className="flex items-center justify-between text-sm font-bold text-slate-600">
                       <span className="capitalize">{p.provider}</span>
                       <span>{formatMoney(p.total, mainCurrency)}</span>
                     </li>
@@ -614,10 +616,10 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
                 </ul>
               </div>
               <div>
-                <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Valyuta</p>
+                <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">Valyuta</p>
                 <ul className="space-y-1">
                   {(r?.byCurrency ?? []).map((cur) => (
-                    <li key={cur.currency} className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                    <li key={cur.currency} className="flex items-center justify-between text-sm font-bold text-slate-600">
                       <span>{cur.currency}</span>
                       <span>
                         {formatNumber(cur.count)} · {compactNumber(cur.total)}
@@ -647,7 +649,7 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
           </div>
           {c?.topCountries.length ? (
             <div className="mt-3 border-t border-slate-100 pt-3">
-              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Top davlatlar (universitetlar)</p>
+              <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">Top davlatlar (universitetlar)</p>
               <HBarList
                 items={c.topCountries.map((tc) => ({ label: tc.country, value: tc.count }))}
                 color="bg-sky-500"
@@ -682,23 +684,23 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
           </div>
           <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2">
             <div>
-              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">AI vazifalari</p>
+              <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">AI vazifalari</p>
               {e?.aiByTask.length ? (
                 <ul className="space-y-1">
                   {e.aiByTask.map((task) => (
-                    <li key={task.taskType} className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                    <li key={task.taskType} className="flex items-center justify-between text-sm font-bold text-slate-600">
                       <span className="truncate">{task.taskType}</span>
                       <span className="ml-2 shrink-0">{formatNumber(task.count)}</span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-[11px] text-slate-400">AI so&apos;rovlari hali qayd etilmagan</p>
+                <p className="text-sm text-slate-500">AI so&apos;rovlari hali qayd etilmagan</p>
               )}
             </div>
             <div>
-              <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Tizim holati</p>
-              <ul className="space-y-1.5 text-[11px] font-semibold text-slate-600">
+              <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">Tizim holati</p>
+              <ul className="space-y-1.5 text-sm font-semibold text-slate-600">
                 <li className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5">
                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Refresh jobs
@@ -713,7 +715,7 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
                 </li>
                 <li className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-slate-400" /> Oxirgi refresh
+                    <Clock className="h-3.5 w-3.5 text-slate-500" /> Oxirgi refresh
                   </span>
                   <span>{e?.lastRefreshAt ? timeAgo(e.lastRefreshAt) : "—"}</span>
                 </li>
@@ -725,7 +727,7 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
                 </li>
                 <li className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-slate-400" /> Tekshirilmagan ma&apos;lumot
+                    <Target className="h-3.5 w-3.5 text-slate-500" /> Tekshirilmagan ma&apos;lumot
                   </span>
                   <span>{formatNumber((c?.unverifiedUniversities ?? 0) + (c?.unverifiedScholarships ?? 0))}</span>
                 </li>
@@ -742,19 +744,19 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
             <ul className="divide-y divide-slate-100">
               {data.recentSignups.map((s) => (
                 <li key={s.id} className="flex items-center gap-3 py-2">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-[11px] font-extrabold text-emerald-600">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-surface bg-emerald-50 text-xs font-extrabold text-emerald-600">
                     {s.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-slate-800">
+                    <p className="truncate text-sm font-bold text-slate-800">
                       {s.name}
                       {s.isPremium ? <Crown className="ml-1 inline h-3 w-3 text-amber-500" /> : null}
                     </p>
-                    <p className="truncate text-[11px] text-slate-400">{s.email}</p>
+                    <p className="truncate text-sm text-slate-500">{s.email}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-[10px] font-bold uppercase text-slate-400">{s.locale}</p>
-                    <p className="text-[10px] font-semibold text-slate-400">{timeAgo(s.createdAt)}</p>
+                    <p className="text-sm font-bold uppercase text-slate-500">{s.locale}</p>
+                    <p className="text-sm font-semibold text-slate-500">{timeAgo(s.createdAt)}</p>
                   </div>
                 </li>
               ))}
@@ -769,19 +771,19 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
             <ul className="divide-y divide-slate-100">
               {data.recentVisits.map((v) => (
                 <li key={v.id} className="flex items-center gap-3 py-2">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-surface bg-indigo-50 text-indigo-600">
                     {DEVICE_META[v.device]?.icon ?? <Eye className="h-3.5 w-3.5" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-slate-800">
+                    <p className="truncate text-sm font-bold text-slate-800">
                       {v.screen ? screenLabel(v.screen) : v.path}
-                      {v.profileId ? <span className="ml-1 text-[10px] font-bold text-emerald-600">· profil #{v.profileId}</span> : null}
+                      {v.profileId ? <span className="ml-1 text-xs font-bold text-emerald-600">· profil #{v.profileId}</span> : null}
                     </p>
-                    <p className="truncate text-[11px] text-slate-400">
+                    <p className="truncate text-sm text-slate-500">
                       {v.path} · {v.referrer === "direct" ? "direct" : v.referrer ?? "—"} · <span className="font-mono">{v.visitorId}</span>
                     </p>
                   </div>
-                  <span className="shrink-0 text-[10px] font-semibold text-slate-400">{timeAgo(v.createdAt)}</span>
+                  <span className="shrink-0 text-xs font-semibold text-slate-500">{timeAgo(v.createdAt)}</span>
                 </li>
               ))}
             </ul>
@@ -801,11 +803,11 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
             { label: "Ro'yxatdan o'tgan", value: u?.newInWindow ?? 0, icon: <UserPlus className="h-4 w-4" />, tone: "text-emerald-600 bg-emerald-50" },
             { label: "Premium / to'lagan", value: (u?.premium ?? 0) + (r?.paidInWindow ?? 0), icon: <Crown className="h-4 w-4" />, tone: "text-amber-600 bg-amber-50" },
           ].map((step, idx, arr) => (
-            <div key={step.label} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-              <div className={`mb-2 flex h-7 w-7 items-center justify-center rounded-lg ${step.tone}`}>{step.icon}</div>
+            <div key={step.label} className="rounded-surface border border-slate-200 bg-slate-50/60 p-3">
+              <div className={`mb-2 flex h-7 w-7 items-center justify-center rounded-control ${step.tone}`}>{step.icon}</div>
               <p className="text-xl font-extrabold leading-none text-slate-900">{formatNumber(step.value)}</p>
-              <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">{step.label}</p>
-              <p className="mt-1 text-[10px] font-semibold text-slate-400">
+              <p className="mt-1.5 text-sm font-bold uppercase tracking-wide text-slate-500">{step.label}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
                 {idx === 0
                   ? "100%"
                   : `${arr[0].value ? Math.round((step.value / arr[0].value) * 100) : 0}% konversiya`}
@@ -816,7 +818,7 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
       </Panel>
 
       {/* ---------------------------------------------------------- Icon legend */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-slate-400">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs font-semibold text-slate-500">
         <span className="inline-flex items-center gap-1">
           <Building2 className="h-3 w-3" /> Universitetlar: {formatNumber(c?.universities ?? 0)}
         </span>

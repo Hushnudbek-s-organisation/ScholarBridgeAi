@@ -16,7 +16,7 @@ const UniversityDetail = dynamic(
   () => import("./UniversityDetail").then((m) => m.UniversityDetail),
   {
     loading: () => (
-      <div className="h-96 animate-pulse rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-[#111a2e]" />
+      <div className="h-96 animate-pulse rounded-overlay border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-surface" />
     ),
   },
 );
@@ -32,7 +32,7 @@ import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { fitBadgeClass } from "@/lib/fitBadge";
-import { ScrollRegion } from "@/components/hubs/ui";
+import { ScrollRegion } from "@/components/ui/hubs";
 import { AppNote } from "./AppNote";
 import {
   Search,
@@ -59,6 +59,8 @@ import {
   Zap,
   Loader2
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 
 export interface University {
   id: number;
@@ -166,6 +168,7 @@ export function UniversityExplorer({
   onOpenProfileModal,
 }: UniversityExplorerProps) {
   const t = useTranslations("university");
+  const tCommon = useTranslations("common");
   const tDegrees = useTranslations("degrees");
   const tCountry = useTranslations("countryNames");
   const { locale } = useLocaleContext();
@@ -223,8 +226,8 @@ export function UniversityExplorer({
   const [sortBy, setSortBy] = useState("rank");
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
-  // `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`, so 8 / 16 / 24 cards.
-  const perPage = useResponsivePerPage({ base: 1, md: 2, lg: 3 });
+  // `grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3`, so 8 / 16 / 24 cards.
+  const perPage = useResponsivePerPage({ base: 1, lg: 2, "2xl": 3 });
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -602,105 +605,16 @@ export function UniversityExplorer({
   const lockedLevel = normalizeDegreeLevel(activeProfile?.degreeLevel) ?? activeProfile?.degreeLevel;
   const activeLevel = activeProfile?.degreeLevel || (selectedLevel !== "All" ? selectedLevel : null);
 
-  if (selectedUniId != null) {
+  function renderUniversityFilters(idPrefix: string) {
     return (
-      <UniversityDetail
-        universityId={selectedUniId}
-        activeProfile={activeProfile}
-        onBack={() => setSelectedUniId(null)}
-        onNavigate={onNavigate}
-        onApplicationStarted={onApplicationStarted}
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Search & Filter toolbar — ONE compact card. The hub header above
-          already owns this screen's <h1> + intro paragraph, so the explorer
-          no longer repeats them as a giant title block: the localized
-          section name lives inline in the toolbar (still an <h2> for the
-          outline, still rendered for SSR and screen readers). */}
-      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-slate-100">
-            <Search className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
-            <span className="min-w-0 break-words">{t("exTitle")}</span>
-          </h2>
-          {activeProfile ? (
-            <span className="hidden min-w-0 break-words text-[11px] text-slate-500 lg:inline">
-              {t("exFilteredBy", { profile: activeProfile.name || t("exProfileFallback") })}
-            </span>
-          ) : null}
-          {refreshing && (
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              {t("exRefreshing")}
-            </span>
-          )}
-          {compareIds.length > 0 && (
-            <button
-              onClick={openCompareModal}
-              className="ml-auto flex min-h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:shadow-indigo-200"
-            >
-              <Columns className="h-4 w-4" />
-              {t("exCompareSelected", { count: compareIds.length })}
-            </button>
-          )}
-        </div>
-
-        {/* Filter Controls Grid
-            3 tiers: on a phone the five secondary controls collapse behind one
-            button (the search box and the quick chips stay visible); from
-            `sm` up the wrapper becomes `display: contents`, so all six
-            controls are direct cells of the outer grid — 3 columns × 2 rows on
-            a tablet, a single 6-column row on a laptop. */}
-        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          {/* Text Search — always visible, on every screen size. */}
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder={t("exSearchPlaceholder")}
-              aria-label={t("exSearchPlaceholder")}
-              value={search}
-              onChange={(e) => onSearchInput(e.target.value)}
-              className="min-h-11 w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
-            />
-          </div>
-
-          {/* Phone-only toggle: how many filters are currently narrowing the list. */}
-          <button
-            type="button"
-            onClick={() => setMobileFiltersOpen((open) => !open)}
-            aria-expanded={mobileFiltersOpen}
-            aria-controls="university-filters"
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-700 sm:hidden"
-          >
-            <Filter className="h-4 w-4" />
-            <span className="break-words text-center">{t("exFiltersAndSort")}</span>
-            {activeFilterCount > 0 && (
-              <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                {activeFilterCount}
-              </span>
-            )}
-            <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} />
-          </button>
-
-          {/* Secondary controls — collapsed on a phone, always visible from `sm`.
-              The elements stay MOUNTED (only the layout changes), so the
-              filters keep their values, their labels and their test ids. */}
-          <div
-            id="university-filters"
-            className={`${mobileFiltersOpen ? "grid" : "hidden"} grid-cols-1 gap-3 sm:contents`}
-          >
-          {/* Country Filter */}
+      <>
+{/* Country Filter */}
           <div>
             <select
               value={selectedCountry}
               onChange={(e) => setSelectedCountry(e.target.value)}
               aria-label={t("exCountryAll")}
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+              className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="All">{t("exCountryAll")}</option>
               {UNIVERSITY_FILTER_COUNTRIES.map((country) => {
@@ -721,7 +635,7 @@ export function UniversityExplorer({
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
               aria-label={t("uniType")}
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+              className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="All">{t("exTypeAll")}</option>
               <option value="Public">{t("exTypePublic")}</option>
@@ -736,7 +650,7 @@ export function UniversityExplorer({
               onChange={(e) => setSelectedLevel(e.target.value)}
               disabled={Boolean(lockedLevel)}
               aria-label={t("exLevelAria")}
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600 sm:text-sm"
+              className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600 sm:text-sm"
             >
               {(!lockedLevel || lockedLevel === "All") && <option value="All">{t("exLevelAll")}</option>}
               <option value="Bachelor">🎓 <DegreeLevelLabel value="Bachelor" /></option>
@@ -755,7 +669,7 @@ export function UniversityExplorer({
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               aria-label={t("exSortRank")}
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+              className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="rank">{t("exSortRank")}</option>
               <option value="tuition_asc">{t("exSortTuitionAsc")}</option>
@@ -768,13 +682,13 @@ export function UniversityExplorer({
           </div>
 
           {/* Max Tuition Slider */}
-          <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 flex flex-col justify-center">
-            <div className="flex justify-between items-center text-[11px] font-semibold text-slate-700">
-              <label htmlFor="university-max-tuition">{t("exMaxTuition")}</label>
+          <div className="bg-slate-50 px-3 py-1.5 rounded-surface border border-slate-200 flex flex-col justify-center">
+            <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
+              <label htmlFor={`${idPrefix}-max-tuition`}>{t("exMaxTuition")}</label>
               <span className="text-indigo-600 font-bold">${formatNumber(maxTuition, { placeholder: "0", suffix: "/yr" })}</span>
             </div>
             <input
-              id="university-max-tuition"
+              id={`${idPrefix}-max-tuition`}
               type="range"
               min="5000"
               max="70000"
@@ -789,64 +703,173 @@ export function UniversityExplorer({
               className="w-full accent-indigo-600 cursor-pointer h-1.5 mt-1"
             />
           </div>
+      </>
+    );
+  }
+
+  if (selectedUniId != null) {
+    return (
+      <UniversityDetail
+        universityId={selectedUniId}
+        activeProfile={activeProfile}
+        onBack={() => setSelectedUniId(null)}
+        onNavigate={onNavigate}
+        onApplicationStarted={onApplicationStarted}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Search & Filter toolbar — ONE compact card. The hub header above
+          already owns this screen's <h1> + intro paragraph, so the explorer
+          no longer repeats them as a giant title block: the localized
+          section name lives inline in the toolbar (still an <h2> for the
+          outline, still rendered for SSR and screen readers). */}
+      <div className="space-y-3 rounded-overlay border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-slate-100">
+            <Search className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+            <span className="min-w-0 break-words">{t("exTitle")}</span>
+          </h2>
+          {activeProfile ? (
+            <span className="hidden min-w-0 break-words text-xs text-slate-500 lg:inline">
+              {t("exFilteredBy", { profile: activeProfile.name || t("exProfileFallback") })}
+            </span>
+          ) : null}
+          {refreshing && (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              {t("exRefreshing")}
+            </span>
+          )}
+          {compareIds.length > 0 && (
+            <Button variant="unstyled"
+              onClick={openCompareModal}
+              className="ml-auto flex min-h-11 items-center gap-2 rounded-surface bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:shadow-indigo-200"
+            >
+              <Columns className="h-4 w-4" />
+              {t("exCompareSelected", { count: compareIds.length })}
+            </Button>
+          )}
+        </div>
+
+        {/* Filter Controls Grid
+            3 tiers: on a phone the five secondary controls collapse behind one
+            button (the search box and the quick chips stay visible); from
+            `sm` up the wrapper becomes `display: contents`, so all six
+            controls are direct cells of the outer grid — 3 columns × 2 rows on
+            a tablet, a single 6-column row on a laptop. */}
+        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          {/* Text Search — always visible, on every screen size. */}
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder={t("exSearchPlaceholder")}
+              aria-label={t("exSearchPlaceholder")}
+              value={search}
+              onChange={(e) => onSearchInput(e.target.value)}
+              className="min-h-11 w-full rounded-surface border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+
+          {/* Phone-only toggle: how many filters are currently narrowing the list. */}
+          <Button variant="unstyled"
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            aria-expanded={mobileFiltersOpen}
+            aria-controls="university-filter-sheet"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-surface border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-700 sm:hidden"
+          >
+            <Filter className="h-4 w-4" />
+            <span className="break-words text-center">{t("exFiltersAndSort")}</span>
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-xs font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+
+          {/* Desktop filters stay in their original compact grid. Phone
+              controls are rendered in the sheet below from the same state. */}
+          <div id="university-filters" className="hidden sm:contents">
+            {renderUniversityFilters("university")}
           </div>
         </div>
 
+        <BottomSheet
+          id="university-filter-sheet"
+          open={mobileFiltersOpen}
+          onClose={() => setMobileFiltersOpen(false)}
+          title={t("exFiltersAndSort")}
+          footer={(
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={resetFilters}>{t("exResetFilters")}</Button>
+              <Button onClick={() => setMobileFiltersOpen(false)}>
+                {tCommon("showResults")} ({formatNumber(totalCount)})
+              </Button>
+            </div>
+          )}
+        >
+          <div className="grid grid-cols-1 gap-4">{renderUniversityFilters("mobile-university")}</div>
+        </BottomSheet>
+
         {/* One-click quick filters + reset */}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => {
               setMaxRank((prev) => (prev === 50 ? null : 50));
               setIeltsMax(null);
             }}
             aria-pressed={maxRank === 50}
-            className={`min-h-9 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+            className={`min-h-9 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
               maxRank === 50
                 ? "border-indigo-500 bg-indigo-600 text-white"
                 : "border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:text-indigo-700"
             }`}
           >
             🏆 {t("exQuickTop50")}
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             onClick={() => {
               setLowTuition();
             }}
             aria-pressed={committedMaxTuition === 5000}
-            className={`min-h-9 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+            className={`min-h-9 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
               committedMaxTuition === 5000
-                ? "border-emerald-500 bg-emerald-600 text-white"
+                ? "border-emerald-500 bg-emerald-700 text-white"
                 : "border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:text-emerald-700"
             }`}
           >
             💰 {t("exQuickLowTuition")}
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             onClick={() => {
               setIeltsMax((prev) => (prev === 6.5 ? null : 6.5));
               setMaxRank(null);
             }}
             aria-pressed={ieltsMax === 6.5}
-            className={`min-h-9 rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+            className={`min-h-9 rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
               ieltsMax === 6.5
-                ? "border-sky-500 bg-sky-600 text-white"
+                ? "border-sky-500 bg-sky-700 text-white"
                 : "border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-300 hover:text-sky-700"
             }`}
           >
             🗣️ {t("exQuickIelts")}
-          </button>
+          </Button>
           {quickFiltersActive && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={resetFilters}
-              className="flex min-h-9 items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-bold text-red-700 transition-colors hover:bg-red-100"
+              className="flex min-h-9 items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-100"
             >
               <X className="h-3.5 w-3.5" />
               {t("exResetFilters")}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -855,20 +878,20 @@ export function UniversityExplorer({
         {notice && (
           <div
             role="status"
-            className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-semibold text-amber-800"
+            className="flex items-start justify-between gap-3 rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"
           >
             <span className="flex items-start gap-1.5">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {notice}
             </span>
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setNotice("")}
               aria-label={t("exDismiss")}
-              className="rounded-lg p-1 text-amber-700 hover:bg-amber-100"
+              className="rounded-control p-1 text-amber-700 hover:bg-amber-100"
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         )}
 
@@ -877,20 +900,20 @@ export function UniversityExplorer({
         {startError && (
           <div
             role="alert"
-            className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+            className="flex items-start justify-between gap-3 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
           >
             <span className="flex min-w-0 items-start gap-1.5">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span className="min-w-0 break-words whitespace-normal">{startError}</span>
             </span>
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setStartError("")}
               aria-label={t("exDismiss")}
-              className="rounded-lg p-1 text-rose-700 hover:bg-rose-100"
+              className="rounded-control p-1 text-rose-700 hover:bg-rose-100"
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -898,32 +921,32 @@ export function UniversityExplorer({
       {/* Pillar 3.2 — the shortlist is never a dead end: once universities
           are saved, the next logical steps are one click away right here. */}
       {savedUniIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-200/80 bg-indigo-50/60 px-3 py-2.5 dark:border-indigo-400/30 dark:bg-indigo-500/10">
-          <p className="min-w-0 flex-1 break-words text-xs font-extrabold text-indigo-800 dark:text-indigo-200">
+        <div className="flex flex-wrap items-center gap-2 rounded-overlay border border-indigo-200/80 bg-indigo-50/60 px-3 py-2.5 dark:border-indigo-400/30 dark:bg-indigo-500/10">
+          <p className="min-w-0 flex-1 break-words text-sm font-extrabold text-indigo-800 dark:text-indigo-200">
             {t("exShortlistBanner", { count: savedUniIds.size })}
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => onNavigate?.("universities/outlook")}
-              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+              className="inline-flex min-h-11 items-center rounded-surface border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
             >
               <span className="min-w-0 break-words">{t("exCompareOutlook")}</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => onNavigate?.("scholarships/browse")}
-              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+              className="inline-flex min-h-11 items-center rounded-surface border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
             >
               <span className="min-w-0 break-words">{t("exFindScholarships")}</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => onNavigate?.("applications/tracker")}
-              className="inline-flex min-h-11 items-center rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
+              className="inline-flex min-h-11 items-center rounded-surface border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-indigo-400/40 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-slate-800"
             >
               <span className="min-w-0 break-words">{t("exManageApplications")}</span>
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -945,43 +968,43 @@ export function UniversityExplorer({
       {loading ? (
         // First load: a skeleton grid that matches the real card footprint, so
         // the page never jumps when the data lands.
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true">
+        <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2 2xl:grid-cols-3" aria-busy="true">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="h-[420px] animate-pulse rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#111a2e]"
+              className="h-[420px] animate-pulse rounded-overlay border border-slate-200 bg-white dark:border-slate-700 dark:bg-surface"
             >
               <div className="h-40 w-full rounded-t-2xl bg-slate-200 dark:bg-slate-700" />
               <div className="space-y-3 p-4">
-                <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
-                <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
-                <div className="h-20 w-full rounded-xl bg-slate-100 dark:bg-slate-800" />
-                <div className="h-3 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-4 w-3/4 rounded-control bg-slate-200 dark:bg-slate-700" />
+                <div className="h-3 w-1/2 rounded-control bg-slate-200 dark:bg-slate-700" />
+                <div className="h-20 w-full rounded-surface bg-slate-100 dark:bg-slate-800" />
+                <div className="h-3 w-2/3 rounded-control bg-slate-200 dark:bg-slate-700" />
               </div>
             </div>
           ))}
           <span className="sr-only">{t("exLoading")}</span>
         </div>
       ) : fetchError ? (
-        <div className="p-8 text-center bg-white rounded-2xl border border-red-200">
-          <p className="text-xs font-bold text-red-700 mb-2">{t("exLoadFailed")}</p>
-          <p className="text-[11px] text-slate-600 break-all">{fetchError}</p>
-          <button
+        <div className="p-8 text-center bg-white rounded-overlay border border-rose-200">
+          <p className="text-sm font-bold text-rose-700 mb-2">{t("exLoadFailed")}</p>
+          <p className="text-sm text-slate-600 break-all">{fetchError}</p>
+          <Button variant="unstyled"
             onClick={() => void fetchUniversities()}
-            className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
+            className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
           >
             {t("exTryAgain")}
-          </button>
+          </Button>
         </div>
       ) : filteredUniversities.length === 0 ? (
-        <div className="p-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
+        <div className="p-12 text-center text-slate-500 bg-white rounded-overlay border border-slate-200">
           {t("exEmpty")}
         </div>
       ) : (
         // Refreshing keeps the current cards mounted (dimmed + inert) instead
         // of collapsing the page into a placeholder box.
         <div
-          className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-150 ${
+          className={`grid auto-rows-fr grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2 2xl:grid-cols-3 transition-opacity duration-150 ${
             refreshing ? "pointer-events-none opacity-60" : ""
           }`}
           aria-busy={refreshing}
@@ -1011,7 +1034,7 @@ export function UniversityExplorer({
             return (
               <div
                 key={uni.id}
-                className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs transition-all hover:border-indigo-300 hover:shadow-lg dark:border-slate-700 dark:bg-[#111a2e] dark:hover:border-indigo-500/50"
+                className="group flex h-full flex-col justify-between overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-xs transition-all hover:border-indigo-300 hover:shadow-lg dark:border-slate-700 dark:bg-surface dark:hover:border-indigo-500/50"
               >
                 {/* Top Image Banner — a taller banner on a phone, where the
                     card is the only thing on the row. */}
@@ -1052,7 +1075,7 @@ export function UniversityExplorer({
                         API actually computed one. */}
                     {typeof uni.chanceScore === "number" && (
                       <span
-                        className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1 text-xs font-bold text-white shadow-sm"
+                        className="inline-flex items-center gap-1 rounded-control bg-violet-700 px-2.5 py-1 text-xs font-bold text-white shadow-sm"
                         title={uni.selectivityCategory ?? undefined}
                       >
                         🎯 {t("chanceBadgeLabel", { score: uni.chanceScore })}
@@ -1064,7 +1087,7 @@ export function UniversityExplorer({
                       (Phase AD: a rank with no recorded edition is dropped
                       upstream, so the card shows no badge at all). */}
                   {uni.worldRanking != null && (
-                    <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
+                    <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-xs font-bold px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
                       <Star className="h-3 w-3 fill-amber-300" />
                       {t("exWorldRank", { rank: formatNumber(uni.worldRanking, { placeholder: "—" }) })}
                     </div>
@@ -1076,13 +1099,13 @@ export function UniversityExplorer({
                       <CountryFlag country={uni.country} flagEmoji={uni.flagEmoji} size="xs" />
                       <span>{localizeCity(uni.city, locale)}, {localizeCountry(uni.country, locale)}</span>
                     </div>
-                    <h3 className="line-clamp-2 break-words font-bold text-base leading-tight drop-shadow-xs">{uni.name}</h3>
+                    <h3 className="line-clamp-2 min-h-10 break-words font-bold text-base leading-tight drop-shadow-xs">{uni.name}</h3>
                   </div>
                 </div>
 
                 {/* Card Content Body */}
-                <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-                  <div>
+                <div className="flex flex-1 flex-col space-y-3 p-4">
+                  <div className="flex flex-1 flex-col">
                     {/* Card discipline — three chips at most, then "+N".
                         The card used to stack a major chip, an institution
                         type, a degree line and a Top-300 signal on top of the
@@ -1095,7 +1118,7 @@ export function UniversityExplorer({
                           key: "major",
                           label: `${visibleMajorFields}${remainingMajorFields > 0 ? ` +${remainingMajorFields}` : ""}`,
                           node: (
-                            <span className="inline-block max-w-full break-words whitespace-normal rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">
+                            <span className="inline-block max-w-full break-words whitespace-normal rounded-control border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200">
                               {visibleMajorFields}
                               {remainingMajorFields > 0 && <span> +{remainingMajorFields}</span>}
                             </span>
@@ -1107,7 +1130,7 @@ export function UniversityExplorer({
                           key: "type",
                           label: uni.universityType,
                           node: (
-                            <span className="inline-flex max-w-full break-words rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-700 dark:border-[#46536b] dark:bg-[#202b42] dark:text-[#e2e8f0]">
+                            <span className="inline-flex max-w-full break-words rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 dark:border-border-strong dark:bg-control dark:text-ink-body">
                               {uni.universityType}
                             </span>
                           ),
@@ -1119,7 +1142,7 @@ export function UniversityExplorer({
                           key: "degree",
                           label: degreeLabel,
                           node: (
-                            <span className="inline-flex max-w-full break-words rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            <span className="inline-flex max-w-full break-words rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                               {degreeLabel}
                             </span>
                           ),
@@ -1135,7 +1158,7 @@ export function UniversityExplorer({
                           key: "top300",
                           label: top300Label,
                           node: (
-                            <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200">
+                            <span className="inline-flex max-w-full items-center gap-1.5 rounded-control border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200">
                               <CountryFlag country="Uzbekistan" size="xs" />
                               <span className="min-w-0 break-words">{top300Label}</span>
                             </span>
@@ -1154,7 +1177,7 @@ export function UniversityExplorer({
                           ))}
                           {hiddenChips.length > 0 && (
                             <span
-                              className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                              className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                               title={hiddenChips.map((chip) => chip.label).join(" · ")}
                             >
                               +{hiddenChips.length}
@@ -1180,16 +1203,16 @@ export function UniversityExplorer({
                         return (
                           <div className="mb-2 flex flex-wrap items-center gap-1.5">
                             {missingData && onOpenProfileModal && (
-                              <button
+                              <Button variant="unstyled"
                                 type="button"
                                 onClick={onOpenProfileModal}
-                                className="inline-flex min-h-11 max-w-full items-center rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-[10px] font-bold leading-snug text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                                className="inline-flex min-h-11 max-w-full items-center rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-xs font-bold leading-snug text-indigo-700 transition-colors hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
                               >
                                 <span className="min-w-0 break-words">{t("exScoreBoosterHint")}</span>
-                              </button>
+                              </Button>
                             )}
                             {penalties > 0 && (
-                              <p className="inline-flex max-w-full items-center rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold leading-snug text-amber-800 ring-1 ring-inset ring-amber-200">
+                              <p className="inline-flex max-w-full items-center rounded-full bg-amber-50 px-2.5 py-1 text-sm font-bold leading-snug text-amber-800 ring-1 ring-inset ring-amber-200">
                                 <span className="min-w-0 break-words">
                                   {t("exBoosterGain", { points: penalties.toFixed(1) })}
                                 </span>
@@ -1212,7 +1235,7 @@ export function UniversityExplorer({
                         The card shows the four numbers that decide "can I
                         afford / qualify" and nothing else; every secondary
                         diagnostic lives in the details drawer below. */}
-                    <div className="my-3 grid grid-cols-2 gap-2 rounded-xl border border-slate-200/80 bg-slate-50 p-3 text-[11px] dark:border-slate-700/80 dark:bg-slate-800/60">
+                    <div className="mb-3 mt-auto grid grid-cols-2 gap-2 rounded-surface border border-slate-200/80 bg-slate-50 p-3 text-xs dark:border-slate-700/80 dark:bg-slate-800/60">
                       <div>
                         <span className="block text-slate-500 dark:text-slate-400">{t("exAnnualTuition")}</span>
                         <strong className="font-bold text-slate-900 dark:text-white">{formatMoney(uni.annualTuitionUsd, "USD")}</strong>
@@ -1236,21 +1259,21 @@ export function UniversityExplorer({
                         children stay in the static SSR markup that the render
                         checks assert, while the browser shows only the summary
                         row until the student asks for the arithmetic. */}
-                    <details className="group mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/60">
-                      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-xs font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-200 [&::-webkit-details-marker]:hidden">
+                    <details className="group mt-0 rounded-surface border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/60">
+                      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-control text-xs font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-200 [&::-webkit-details-marker]:hidden">
                         <span className="min-w-0 break-words">{t("exCardDetails")}</span>
-                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
                       </summary>
                       <div className="mt-2 space-y-2 border-t border-slate-200/70 pt-2 text-slate-600 dark:border-slate-800/60">
                         {uni.description && uni.descriptionSourceLanguage === "en" && (
-                          <p className="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
+                          <p className="inline-flex items-center gap-1 rounded-control bg-slate-200/70 px-1.5 py-0.5 text-sm font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
                             <Languages className="h-3 w-3 shrink-0" aria-hidden />
                             <span>{t("sourceLanguageLabel")}</span>
                           </p>
                         )}
                         {uni.description && (
                           <p
-                            className="break-words text-xs leading-relaxed text-slate-600"
+                            className="break-words text-sm leading-relaxed text-slate-600"
                             lang={uni.descriptionSourceLanguage === "en" ? "en" : undefined}
                           >
                             {uni.description}
@@ -1260,14 +1283,14 @@ export function UniversityExplorer({
                         {highlightsList.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {highlightsList.map((hl, i) => (
-                              <span key={`highlight-${i}`} className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-md">
+                              <span key={`highlight-${i}`} className="text-xs bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded-control">
                                 ✓ {hl}
                               </span>
                             ))}
                           </div>
                         )}
                         {highlightsList.length > 0 && uni.highlightsSourceLanguage === "en" && (
-                          <p className="inline-flex items-center gap-1 rounded-md bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
+                          <p className="inline-flex items-center gap-1 rounded-control bg-slate-200/70 px-1.5 py-0.5 text-sm font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
                             <Languages className="h-3 w-3 shrink-0" aria-hidden />
                             <span>{t("sourceLanguageLabel")}</span>
                           </p>
@@ -1277,13 +1300,13 @@ export function UniversityExplorer({
                         {(uni.matchReasons?.length || uni.matchIssues?.length) && (
                           <div className="space-y-1">
                             {uni.matchReasons?.map((r, i) => (
-                              <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
+                              <p key={`r${i}`} className="text-sm text-emerald-700 flex items-start gap-1">
                                 <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
                                 <span><b>{t("exWhyMatch")}</b> {r}</span>
                               </p>
                             ))}
                             {uni.matchIssues?.map((r, i) => (
-                              <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
+                              <p key={`p${i}`} className="text-sm text-amber-700 flex items-start gap-1">
                                 <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
                                 <span><b>{t("exWhyLower")}</b> {r}</span>
                               </p>
@@ -1292,11 +1315,11 @@ export function UniversityExplorer({
                         )}
 
                         {/* Exact arithmetic: every scoring dimension with the
-                            points it contributed. Nothing here is rounded into
+                            points it contributed. Nothing here is rounded-control into
                             vagueness — the components add up to the score on
                             the card header. */}
                         {typeof uni.effectiveAcceptRatePct === "number" && (
-                          <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
                             {t("chanceAdmitRate", { rate: uni.effectiveAcceptRatePct })}
                           </p>
                         )}
@@ -1320,7 +1343,7 @@ export function UniversityExplorer({
                         </div>
 
                         {/* Source credibility footnote */}
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-200/70 pt-2 dark:border-slate-800/60">
+                        <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-200/70 pt-2 dark:border-slate-800/60">
                           {uni.sourceUrl ? (
                             <a
                               href={uni.sourceUrl}
@@ -1331,14 +1354,14 @@ export function UniversityExplorer({
                               <ExternalLink className="h-3 w-3" /> {t("sourceLink")}
                             </a>
                           ) : (
-                            <span className="text-slate-400">{t("exSourcePending")}</span>
+                            <span className="text-slate-500">{t("exSourcePending")}</span>
                           )}
                           {uni.sourceLastVerifiedAt ? (
-                            <span className="text-slate-400">
+                            <span className="text-slate-500">
                               {t("lastVerifiedDate")}: {new Date(uni.sourceLastVerifiedAt).toLocaleDateString(locale)}
                             </span>
                           ) : uni.sourceUrl ? (
-                            <span className="text-slate-400">{t("lastVerifiedDate")}: —</span>
+                            <span className="text-slate-500">{t("lastVerifiedDate")}: —</span>
                           ) : null}
                         </div>
 
@@ -1346,7 +1369,7 @@ export function UniversityExplorer({
                             the decision data it follows: read the breakdown,
                             then start. Same one-click POST, no extra row in
                             the card footer. */}
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() => void startApplication(uni)}
                           disabled={startingUniId != null}
@@ -1355,7 +1378,7 @@ export function UniversityExplorer({
                               ? t("startAppHint", { name: uni.name })
                               : t("startAppNeedsProfile")
                           }
-                          className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {startingUniId === uni.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -1363,7 +1386,7 @@ export function UniversityExplorer({
                             <Zap className="h-3.5 w-3.5" aria-hidden />
                           )}
                           {t("startApp")}
-                        </button>
+                        </Button>
                       </div>
                     </details>
                   </div>
@@ -1371,38 +1394,38 @@ export function UniversityExplorer({
                   {/* Footer — ONE row, one primary CTA. Shortlist, compare and
                       the official site are compact icon/pill actions; nothing
                       wraps into a second line of competing buttons. */}
-                  <div className="flex items-center gap-1.5 pt-3 border-t border-slate-200/80 dark:border-slate-700/80">
-                    <button
+                  <div className="flex shrink-0 items-center gap-1.5 border-t border-slate-200/80 pt-3 dark:border-slate-700/80">
+                    <Button variant="unstyled"
                       onClick={() => setSelectedUniId(uni.id)}
-                      className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-500"
+                      className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700"
                     >
                       <Eye className="h-3.5 w-3.5" />
                       {t("exViewUniversity")}
-                    </button>
+                    </Button>
 
                     {isSaved ? (
-                      <button
+                      <Button variant="unstyled"
                         onClick={() => onUnsaveUniversity(uni.id)}
                         title={t("exSaved")}
-                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-surface border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-800 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
                       >
                         <Check className="h-3.5 w-3.5" />
                         <span className="max-sm:hidden">{t("exSaved")}</span>
-                      </button>
+                      </Button>
                     ) : (
-                      <button
+                      <Button variant="unstyled"
                         onClick={() => onSaveUniversity(uni.id)}
                         title={t("exShortlist")}
-                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40"
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-surface border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         <span className="max-sm:hidden">{t("exShortlist")}</span>
-                      </button>
+                      </Button>
                     )}
 
                     <label
                       title={t("exCompare")}
-                      className={`flex min-h-11 min-w-11 cursor-pointer select-none items-center justify-center gap-1.5 rounded-xl border px-2.5 text-xs transition-colors ${
+                      className={`flex min-h-11 min-w-11 cursor-pointer select-none items-center justify-center gap-1.5 rounded-surface border px-2.5 text-sm transition-colors ${
                         isCompared
                           ? "border-indigo-300 bg-indigo-50 font-bold text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/20 dark:text-indigo-200"
                           : "border-slate-200 bg-slate-50 font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
@@ -1412,7 +1435,7 @@ export function UniversityExplorer({
                         type="checkbox"
                         checked={isCompared}
                         onChange={() => toggleCompare(uni.id)}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded-control border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       />
                       <span className="max-sm:hidden">{t("exCompare")}</span>
                     </label>
@@ -1421,7 +1444,7 @@ export function UniversityExplorer({
                       href={uni.websiteUrl ?? undefined}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-300"
+                      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-surface border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-300"
                       title={t("exVisitPortal")}
                       aria-label={t("exVisitPortal")}
                     >
@@ -1458,23 +1481,23 @@ export function UniversityExplorer({
           their label. Tablet and up: the centred dialog of before. */}
       {showCompareModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-end justify-center sm:items-center sm:p-4">
-          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-t-3xl bg-white shadow-2xl overflow-hidden border border-slate-200 sm:rounded-2xl">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-t-3xl bg-white shadow-2xl overflow-hidden border border-slate-200 sm:rounded-overlay">
             <div className="bg-gradient-to-r from-indigo-700 to-blue-700 text-white px-6 py-4 flex items-center justify-between">
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <Columns className="h-5 w-5" />
                 {t("exCompareTitle")}
               </h3>
-              <button
+              <Button variant="unstyled"
                 onClick={() => setShowCompareModal(false)}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white hover:bg-white/10"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-control text-white hover:bg-white/10"
               >
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
 
             <ScrollRegion label={t("exCompare")} className="p-4 sm:p-6 overflow-x-auto">
               {compareLoading ? (
-                <p className="py-8 text-center text-xs font-medium text-slate-500">
+                <p className="py-8 text-center text-sm font-medium text-slate-500">
                   {t("exCompareLoading")}
                 </p>
               ) : (

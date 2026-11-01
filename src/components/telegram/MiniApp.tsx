@@ -36,6 +36,9 @@ import {
   Unplug,
   X,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { cn } from "@/components/ui/cn";
+import { TELEGRAM_NATIVE_COLORS } from "@/components/ui/tokens";
 
 // ---------------------------------------------------------------------------
 // Telegram WebApp (subset we use)
@@ -160,17 +163,6 @@ function fmtDate(d: string | null | undefined): string {
   return `${String(date.getUTCDate()).padStart(2, "0")}.${String(date.getUTCMonth() + 1).padStart(2, "0")}.${date.getUTCFullYear()}`;
 }
 
-// Telegram injects its theme as CSS variables; fall back to the site palette.
-const C = {
-  bg: "var(--tg-theme-bg-color, #ffffff)",
-  text: "var(--tg-theme-text-color, #0f172a)",
-  hint: "var(--tg-theme-hint-color, #64748b)",
-  card: "var(--tg-theme-secondary-bg-color, #f1f5f9)",
-  button: "var(--tg-theme-button-color, #4f46e5)",
-  buttonText: "var(--tg-theme-button-text-color, #ffffff)",
-  link: "var(--tg-theme-link-color, #4f46e5)",
-};
-
 class ApiError extends Error {
   constructor(public status: number, public code: string | null) {
     super(`HTTP ${status}`);
@@ -252,22 +244,22 @@ function daysUntilDate(d: string | null | undefined): number | null {
   return Math.round((ms - Date.now()) / 86_400_000);
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  not_started: "#64748b",
-  preparing: "#f59e0b",
-  essay: "#3b82f6",
-  documents: "#3b82f6",
-  recommendations: "#3b82f6",
-  fee_paid: "#0ea5e9",
-  submitted: "#4f46e5",
-  interview: "#8b5cf6",
-  decision: "#14b8a6",
-  in_progress: "#f59e0b",
-  accepted: "#10b981",
-  rejected: "#f43f5e",
-  waitlisted: "#f97316",
-  deferred: "#64748b",
-  withdrawn: "#94a3b8",
+const STATUS_CLASSES: Record<string, string> = {
+  not_started: "tg-status-neutral",
+  preparing: "tg-status-warning",
+  essay: "tg-status-info",
+  documents: "tg-status-info",
+  recommendations: "tg-status-info",
+  fee_paid: "tg-status-info",
+  submitted: "tg-status-primary",
+  interview: "tg-status-violet",
+  decision: "tg-status-teal",
+  in_progress: "tg-status-warning",
+  accepted: "tg-status-success",
+  rejected: "tg-status-danger",
+  waitlisted: "tg-status-orange",
+  deferred: "tg-status-neutral",
+  withdrawn: "tg-status-neutral",
 };
 
 /** Only these statuses are accepted by PATCH /api/applications. */
@@ -382,8 +374,8 @@ export function MiniApp() {
       // Blend the chrome with the app palette (cosmetic; invalid values are
       // ignored by the client).
       try {
-        tg.setHeaderColor?.("#4f46e5");
-        tg.setBackgroundColor?.(tg.colorScheme === "dark" ? "#0f172a" : "#ffffff");
+        tg.setHeaderColor?.(TELEGRAM_NATIVE_COLORS.primary);
+        tg.setBackgroundColor?.(tg.colorScheme === "dark" ? TELEGRAM_NATIVE_COLORS.darkCanvas : TELEGRAM_NATIVE_COLORS.lightCanvas);
       } catch {
         /* older clients */
       }
@@ -529,7 +521,7 @@ export function MiniApp() {
 
   // ------------------------------------------------------------ states
   const shell = (children: React.ReactNode) => (
-    <div className="min-h-screen" style={{ background: C.bg, color: C.text }}>
+    <div className={cn("min-h-screen", "tg-bg tg-text")}>
       {children}
     </div>
   );
@@ -537,8 +529,8 @@ export function MiniApp() {
   if (phase.k === "loading") {
     return shell(
       <div className="flex min-h-screen flex-col items-center justify-center gap-3" role="status" aria-live="polite">
-        <Loader2 className="h-7 w-7 animate-spin" style={{ color: C.button }} />
-        <p className="text-sm" style={{ color: C.hint }}>{t.loading}</p>
+        <Loader2 className={cn("h-7 w-7 animate-spin", "tg-button-text")} />
+        <p className={cn("text-sm", "tg-hint")}>{t.loading}</p>
       </div>
     );
   }
@@ -547,11 +539,11 @@ export function MiniApp() {
     const body = phase.k === "outside" ? t.outsideBody : phase.k === "error" ? t.errorBody : t.unlinkedBody;
     return shell(
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: C.card }}>
-          <GraduationCap className="h-7 w-7" style={{ color: C.button }} />
+        <div className={cn("flex h-14 w-14 items-center justify-center rounded-overlay", "tg-card")}>
+          <GraduationCap className={cn("h-7 w-7", "tg-button-text")} />
         </div>
         <h1 className="text-lg font-bold">{title}</h1>
-        <p className="text-sm leading-relaxed" style={{ color: C.hint }}>{body}</p>
+        <p className={cn("text-sm leading-relaxed", "tg-hint")}>{body}</p>
         {phase.k === "error" && phase.retry && (
           <PrimaryButton onClick={() => { setPhase({ k: "loading" }); exchange().catch(() => setPhase({ k: "error", retry: true })); }}>{t.retry}</PrimaryButton>
         )}
@@ -578,42 +570,42 @@ export function MiniApp() {
     <div className="mx-auto flex min-h-screen max-w-xl flex-col">
       {/* ---- Top Mini App bar: brand · student/plan pill · language pills ---- */}
       <header
-        className="sticky top-0 z-30 border-b px-3 py-2"
-        style={{ background: C.bg, borderColor: C.card }}
+        className={cn("sticky top-0 z-30 border-b px-3 py-2", "tg-bg tg-border-card")}
+
       >
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => goToScreen("home")}
-            className="flex min-h-11 min-w-11 items-center gap-2 rounded-xl px-1.5 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="flex min-h-11 min-w-11 items-center gap-2 rounded-surface px-1.5 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           >
             <span
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
-              style={{ background: C.button, color: C.buttonText }}
+              className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-surface", "tg-button")}
+
             >
               <GraduationCap className="h-4.5 w-4.5" />
             </span>
             <span className="text-sm font-extrabold tracking-tight">ScholarBridge</span>
-          </button>
+          </Button>
           {profile && (
             <span
-              className="flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-              style={{ background: C.card, color: C.text }}
+              className={cn("flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", "tg-card tg-text")}
+
             >
               <span className="min-w-0 break-words">{profile.name}</span>
-              <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.button, color: C.buttonText }}>
+              <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-xs font-bold", "tg-button")}>
                 {planLabel}
               </span>
             </span>
           )}
           <div
-            className="ml-auto flex items-center gap-0.5 rounded-full p-0.5"
-            style={{ background: C.card }}
+            className={cn("ml-auto flex items-center gap-0.5 rounded-full p-0.5", "tg-card")}
+
             role="group"
             aria-label={t.langLabel}
           >
             {(["uz", "ru", "en"] as Lang[]).map((code) => (
-              <button
+              <Button variant="unstyled"
                 key={code}
                 type="button"
                 onClick={() => {
@@ -621,11 +613,11 @@ export function MiniApp() {
                   setLang(code);
                 }}
                 aria-pressed={lang === code}
-                className="min-h-11 min-w-11 rounded-full px-2 text-xs font-black uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                style={lang === code ? { background: C.button, color: C.buttonText } : { color: C.hint }}
+                className={cn("min-h-11 min-w-11 rounded-full px-2 text-xs font-black uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", (lang === code ? "tg-button" : "tg-hint"))}
+
               >
                 {code}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -700,23 +692,23 @@ export function MiniApp() {
       )}
 
       <nav
-        className="fixed inset-x-0 bottom-0 border-t"
-        style={{ background: C.bg, borderColor: C.card, paddingBottom: "env(safe-area-inset-bottom)" }}
+        className={cn("fixed inset-x-0 bottom-0 border-t", "tg-bg tg-border-card tg-safe-bottom")}
+
         aria-label={t.navigationLabel}
       >
         <div className="mx-auto grid max-w-xl grid-cols-5">
           {tabs.map(({ id, icon: Icon }) => (
-            <button
+            <Button variant="unstyled"
               key={id}
               type="button"
               onClick={() => goToScreen(id)}
               aria-current={screen === id ? "page" : undefined}
-              className="flex min-h-11 min-w-11 flex-col items-center gap-0.5 rounded-lg py-2 text-[10px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-              style={{ color: screen === id ? C.button : C.hint }}
+              className={cn("flex min-h-11 min-w-11 flex-col items-center gap-0.5 rounded-control py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", (screen === id ? "tg-button-text" : "tg-hint"))}
+
             >
               <Icon className="h-5 w-5" />
               {t.tabs[id]}
-            </button>
+            </Button>
           ))}
         </div>
       </nav>
@@ -733,38 +725,38 @@ type Api = <R>(path: string, init?: RequestInit) => Promise<{ data: R; fallback:
 
 function PrimaryButton({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
-    <button
+    <Button variant="unstyled"
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
-      style={{ background: C.button, color: C.buttonText }}
+      className={cn("inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-surface px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60", "tg-button")}
+
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
 function Card({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
   const inner = (
-    <div className="rounded-2xl p-3.5" style={{ background: C.card }}>
+    <div className={cn("rounded-overlay p-3.5", "tg-card")}>
       {children}
     </div>
   );
   if (!onClick) return inner;
   return (
-    <button
+    <Button variant="unstyled"
       type="button"
       onClick={onClick}
-      className="w-full rounded-2xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+      className="w-full rounded-overlay text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
     >
       {inner}
-    </button>
+    </Button>
   );
 }
 
 function Notice({ text }: { text: string }) {
-  return <p className="py-6 text-center text-sm" style={{ color: C.hint }}>{text}</p>;
+  return <p className={cn("py-6 text-center text-sm", "tg-hint")}>{text}</p>;
 }
 
 function errorText(t: T, err: unknown): string {
@@ -794,7 +786,7 @@ function useLoad<R>(loader: () => Promise<R>, deps: React.DependencyList) {
 function Spinner() {
   return (
     <div className="flex justify-center py-8" role="status">
-      <Loader2 className="h-6 w-6 animate-spin" style={{ color: C.button }} />
+      <Loader2 className={cn("h-6 w-6 animate-spin", "tg-button-text")} />
     </div>
   );
 }
@@ -804,7 +796,7 @@ function DeadlineBadge({ days, urgency, t }: { days: number | null | undefined; 
   const icon = urgency === "critical" ? "🔴" : urgency === "soon" ? "🟠" : "🟢";
   if (days == null) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: C.bg, color: C.text }}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold", "tg-bg tg-text")}>
       <span aria-hidden>{icon}</span>
       {days === 0 ? t.todayLabel : formatMessage(t.daysLeft, { n: days })}
     </span>
@@ -816,7 +808,7 @@ function ItemThumb({ item, kind, size = "h-16 w-16" }: { item: Item; kind: Kind;
   const raw = item.imageUrl ?? null;
   const thumb = !broken && raw ? viaImageProxy(toWikimediaThumb(raw, 320)) : !raw ? null : raw;
   return (
-    <div className={`${size} shrink-0 overflow-hidden rounded-xl`} style={{ background: C.bg }}>
+    <div className={cn(`${size} shrink-0 overflow-hidden rounded-surface`, "tg-bg")}>
       {thumb ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -893,7 +885,7 @@ function HomeScreen({
     };
   }, [profile.id]);
 
-  const dot: Record<string, string> = { critical: "#ef4444", high: "#f97316", medium: "#eab308", low: "#22c55e" };
+  const dot: Record<string, string> = { critical: "tg-status-danger", high: "tg-status-orange", medium: "tg-status-warning", low: "tg-status-success" };
   const english = profile.ieltsScore != null
     ? formatMessage(t.ieltsScore, { score: profile.ieltsScore })
     : profile.toeflScore != null
@@ -923,77 +915,77 @@ function HomeScreen({
       {/* Profile readiness summary */}
       <Card>
         <div className="flex items-center gap-2">
-          <Target className="h-4 w-4 shrink-0" style={{ color: C.button }} />
+          <Target className={cn("h-4 w-4 shrink-0", "tg-button-text")} />
           <p className="text-sm font-bold">{t.tabs.profile}</p>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {pills.map((p, i) =>
             p ? (
-              <span key={i} className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: C.bg, color: C.text }}>
+              <span key={i} className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", "tg-bg tg-text")}>
                 {p}
               </span>
             ) : (
-              <span key={i} className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: C.bg, color: C.hint }}>
+              <span key={i} className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", "tg-bg tg-hint")}>
                 {t.notSet}
               </span>
             )
           )}
         </div>
         {profileIncomplete && (
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => go("profile")}
-            className="mt-2.5 inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            style={{ background: C.button, color: C.buttonText }}
+            className={cn("mt-2.5 inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-surface px-3 py-2 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", "tg-button")}
+
           >
             {t.completeProfile}
-          </button>
+          </Button>
         )}
       </Card>
 
       {/* Interactive stat tiles */}
       <div className="grid grid-cols-3 gap-2">
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={() => {
             haptic.tap();
             onSavedTile("u");
             go("universities");
           }}
-          className="rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="rounded-surface text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
         >
           <Card>
             <p className="text-2xl font-bold">{state.data?.unis ?? "—"}</p>
-            <p className="text-xs leading-tight" style={{ color: C.hint }}>{t.savedUnis}</p>
+            <p className={cn("text-sm leading-tight", "tg-hint")}>{t.savedUnis}</p>
           </Card>
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           type="button"
           onClick={() => {
             haptic.tap();
             onSavedTile("s");
             go("scholarships");
           }}
-          className="rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="rounded-surface text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
         >
           <Card>
             <p className="text-2xl font-bold">{state.data?.schs ?? "—"}</p>
-            <p className="text-xs leading-tight" style={{ color: C.hint }}>{t.savedSch}</p>
+            <p className={cn("text-sm leading-tight", "tg-hint")}>{t.savedSch}</p>
           </Card>
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           type="button"
           onClick={() => {
             haptic.tap();
             go("applications");
           }}
-          className="rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="rounded-surface text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
         >
           <Card>
             <p className="text-2xl font-bold">{state.data?.apps ?? "—"}</p>
-            <p className="text-xs leading-tight" style={{ color: C.hint }}>{t.activeApps}</p>
+            <p className={cn("text-sm leading-tight", "tg-hint")}>{t.activeApps}</p>
           </Card>
-        </button>
+        </Button>
       </div>
 
       {state.loading && <Spinner />}
@@ -1004,22 +996,22 @@ function HomeScreen({
           {/* Upcoming deadlines strip */}
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: C.hint }}>{t.upcomingDeadlines}</h2>
-              <button
+              <h2 className={cn("text-sm font-bold uppercase tracking-wide", "tg-hint")}>{t.upcomingDeadlines}</h2>
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => {
                   haptic.tap();
                   go("applications", "deadlines");
                 }}
-                className="min-h-11 min-w-11 rounded-lg px-2 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                style={{ color: C.link }}
+                className={cn("min-h-11 min-w-11 rounded-control px-2 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", "tg-link")}
+
               >
                 {t.viewAllDeadlines}
-              </button>
+              </Button>
             </div>
             {state.data.deadlines.length === 0 ? (
               <Card>
-                <p className="text-xs" style={{ color: C.hint }}>{t.noDeadlines}</p>
+                <p className={cn("text-sm", "tg-hint")}>{t.noDeadlines}</p>
               </Card>
             ) : (
               state.data.deadlines.map((d, i) => (
@@ -1035,7 +1027,7 @@ function HomeScreen({
 
           {/* Interactive next steps */}
           <section className="space-y-2">
-            <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: C.hint }}>{t.nextSteps}</h2>
+            <h2 className={cn("text-sm font-bold uppercase tracking-wide", "tg-hint")}>{t.nextSteps}</h2>
             {state.data.next.headline && <p className="text-sm">{state.data.next.headline}</p>}
             {(state.data.next.actions ?? []).length === 0 && <Notice text={t.nothingUrgent} />}
             {(state.data.next.actions ?? []).map((a) => (
@@ -1048,10 +1040,10 @@ function HomeScreen({
                 }}
               >
                 <div className="flex items-start gap-2">
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: dot[a.urgency] ?? C.hint }} />
+                  <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", (dot[a.urgency] ?? "tg-status-neutral"))} />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold break-words">{a.title}</p>
-                    <p className="mt-0.5 text-xs leading-relaxed break-words" style={{ color: C.hint }}>{a.why}</p>
+                    <p className={cn("mt-0.5 text-sm leading-relaxed break-words", "tg-hint")}>{a.why}</p>
                   </div>
                 </div>
               </Card>
@@ -1099,7 +1091,7 @@ function AskAiBox({ t, api, profile }: { t: T; api: Api; profile: MiniProfile })
 
   return (
     <Card>
-      <button
+      <Button variant="unstyled"
         type="button"
         onClick={() => {
           haptic.tap();
@@ -1108,28 +1100,28 @@ function AskAiBox({ t, api, profile }: { t: T; api: Api; profile: MiniProfile })
         aria-expanded={open}
         className="flex min-h-11 w-full items-center gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
       >
-        <Bot className="h-4 w-4 shrink-0" style={{ color: C.button }} />
+        <Bot className={cn("h-4 w-4 shrink-0", "tg-button-text")} />
         <span className="min-w-0 flex-1 text-sm font-bold break-words">{t.askAiTitle}</span>
-        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} style={{ color: C.hint }} />
-      </button>
+        <ChevronDown className={cn(`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`, "tg-hint")} />
+      </Button>
       {open && (
         <div className="mt-2 space-y-2">
-          <p className="text-xs leading-relaxed" style={{ color: C.hint }}>{t.askAiHint}</p>
+          <p className={cn("text-sm leading-relaxed", "tg-hint")}>{t.askAiHint}</p>
           <div className="flex flex-wrap gap-1.5">
             {[t.starter1, t.starter2, t.starter3].map((s) => (
-              <button
+              <Button variant="unstyled"
                 key={s}
                 type="button"
                 onClick={() => {
                   setQuestion(s);
                   void ask(s);
                 }}
-                className="min-h-11 rounded-full px-3 py-2 text-[11px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                style={{ background: C.bg, color: C.text }}
+                className={cn("min-h-11 rounded-full px-3 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", "tg-bg tg-text")}
+
               >
-                <Sparkles className="mr-1 inline h-3 w-3" style={{ color: C.button }} />
+                <Sparkles className={cn("mr-1 inline h-3 w-3", "tg-button-text")} />
                 {s}
-              </button>
+              </Button>
             ))}
           </div>
           <textarea
@@ -1139,8 +1131,8 @@ function AskAiBox({ t, api, profile }: { t: T; api: Api; profile: MiniProfile })
             rows={2}
             maxLength={2000}
             aria-label={t.askAiPlaceholder}
-            className="w-full rounded-xl px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            style={{ background: C.bg, color: C.text }}
+            className={cn("w-full rounded-surface px-3 py-2 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", "tg-bg tg-text")}
+
           />
           <PrimaryButton onClick={() => void ask(question)} disabled={busy || !question.trim()}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
@@ -1148,8 +1140,8 @@ function AskAiBox({ t, api, profile }: { t: T; api: Api; profile: MiniProfile })
           </PrimaryButton>
           {failed && <Notice text={failed} />}
           {answer && (
-            <div className="rounded-xl p-3" style={{ background: C.bg }} role="status" aria-live="polite">
-              {answer.offline && <p className="mb-2 text-[11px] font-semibold" style={{ color: C.hint }}>{t.aiOffline}</p>}
+            <div className={cn("rounded-surface p-3", "tg-bg")}  role="status" aria-live="polite">
+              {answer.offline && <p className={cn("mb-2 text-sm font-semibold", "tg-hint")}>{t.aiOffline}</p>}
               <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{answer.text}</p>
             </div>
           )}
@@ -1342,19 +1334,19 @@ function SearchScreen({
           submitNow();
         }}
       >
-        <div className="flex flex-1 items-center gap-2 rounded-xl px-3" style={{ background: C.card }}>
-          <Search className="h-4 w-4 shrink-0" style={{ color: C.hint }} />
+        <div className={cn("flex flex-1 items-center gap-2 rounded-surface px-3", "tg-card")}>
+          <Search className={cn("h-4 w-4 shrink-0", "tg-hint")} />
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={kind === "u" ? t.searchUni : t.searchSch}
-            className="w-full bg-transparent py-2.5 text-sm outline-none"
-            style={{ color: C.text }}
+            className={cn("w-full bg-transparent py-2.5 text-sm outline-none", "tg-text")}
+
             maxLength={80}
             aria-label={t.search}
           />
           {input.length > 0 && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => {
                 haptic.tap();
@@ -1363,11 +1355,11 @@ function SearchScreen({
                 setPage(1);
               }}
               aria-label={t.clearSearch}
-              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-              style={{ color: C.hint }}
+              className={cn("flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", "tg-hint")}
+
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
         <PrimaryButton onClick={submitNow}>{t.search}</PrimaryButton>
@@ -1382,7 +1374,7 @@ function SearchScreen({
         {chips.map((chip) => {
           const active = filter === chip.id;
           return (
-            <button
+            <Button variant="unstyled"
               key={chip.id}
               type="button"
               onClick={() => {
@@ -1391,11 +1383,11 @@ function SearchScreen({
                 setPage(1);
               }}
               aria-pressed={active}
-              className="min-h-11 min-w-11 shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-              style={active ? { background: C.button, color: C.buttonText } : { background: C.card, color: C.text }}
+              className={cn("min-h-11 min-w-11 shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", (active ? "tg-button" : "tg-card tg-text"))}
+
             >
               {chip.label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -1453,7 +1445,7 @@ function ResultCard({
   return (
     <Card>
       <div className="flex items-start gap-3">
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={onOpen}
           className="flex min-w-0 flex-1 items-start gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
@@ -1463,62 +1455,62 @@ function ResultCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               {kind === "u" && it.worldRanking ? (
-                <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.button, color: C.buttonText }}>
+                <span className={cn("rounded-control px-1.5 py-0.5 text-xs font-bold", "tg-button")}>
                   #{it.worldRanking}
                 </span>
               ) : null}
               {typeof it.matchScore === "number" && (
-                <span className="rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: C.bg, color: C.text }}>
+                <span className={cn("rounded-control px-1.5 py-0.5 text-xs font-bold", "tg-bg tg-text")}>
                   🎯 {Math.round(it.matchScore)}% {t.match}
                 </span>
               )}
               {kind === "s" && it.coverageType && (
-                <span className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: C.bg, color: C.hint }}>
+                <span className={cn("rounded-control px-1.5 py-0.5 text-xs font-semibold", "tg-bg tg-hint")}>
                   {it.coverageType}
                 </span>
               )}
             </div>
             <p className="mt-1 text-sm font-semibold leading-snug break-words">{name}</p>
-            <p className="mt-0.5 text-xs break-words" style={{ color: C.hint }}>
+            <p className={cn("mt-0.5 text-sm break-words", "tg-hint")}>
               {kind === "u"
                 ? [it.city, it.country].filter(Boolean).join(", ")
                 : [it.provider, it.country].filter(Boolean).join(" · ")}
             </p>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {amount && (
-                <span className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold" style={{ background: C.bg, color: C.text }}>
+                <span className={cn("rounded-control px-1.5 py-0.5 text-xs font-semibold", "tg-bg tg-text")}>
                   {amount}{kind === "u" ? t.perYear : ""}
                 </span>
               )}
               {kind === "u" && typeof it.minIelts === "number" && (
-                <span className="rounded-md px-1.5 py-0.5 text-[11px]" style={{ background: C.bg, color: C.hint }}>
+                <span className={cn("rounded-control px-1.5 py-0.5 text-xs", "tg-bg tg-hint")}>
                   IELTS ≥ {it.minIelts}
                 </span>
               )}
               {kind === "u" && typeof it.minGpa === "number" && (
-                <span className="rounded-md px-1.5 py-0.5 text-[11px]" style={{ background: C.bg, color: C.hint }}>
+                <span className={cn("rounded-control px-1.5 py-0.5 text-xs", "tg-bg tg-hint")}>
                   GPA ≥ {it.minGpa}
                 </span>
               )}
               {kind === "s" && it.deadlineDate && (
-                <span className="rounded-md px-1.5 py-0.5 text-[11px]" style={{ background: C.bg, color: C.hint }}>
+                <span className={cn("rounded-control px-1.5 py-0.5 text-xs", "tg-bg tg-hint")}>
                   {t.deadline}: {fmtDate(it.deadlineDate)}
                 </span>
               )}
             </div>
           </div>
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           type="button"
           onClick={onToggleSave}
           disabled={busy}
-          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
-          style={isSaved ? { background: C.bg, color: C.text } : { background: C.button, color: C.buttonText }}
+          className={cn("flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-control px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60", (isSaved ? "tg-bg tg-text" : "tg-button"))}
+
           aria-label={isSaved ? t.saved : t.save}
         >
           {isSaved ? <BookmarkCheck className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
           {isSaved ? t.saved : t.save}
-        </button>
+        </Button>
       </div>
     </Card>
   );
@@ -1637,25 +1629,25 @@ function DetailSheet({
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={t.detailsTitle}>
       <div
-        className="absolute inset-0"
-        style={{ background: "rgba(15,23,42,0.45)", animation: "sbFadeIn 0.18s ease-out" }}
+        className={cn("absolute inset-0", "tg-scrim")}
+
         onClick={onClose}
       />
       <div
-        className="sb-sheet relative flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl"
-        style={{ background: C.bg, color: C.text }}
+        className={cn("sb-sheet relative flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl", "tg-bg tg-text")}
+
       >
-        <div className="flex items-center justify-between gap-2 border-b px-4 py-2.5" style={{ borderColor: C.card }}>
+        <div className={cn("flex items-center justify-between gap-2 border-b px-4 py-2.5", "tg-border-card")}>
           <p className="min-w-0 text-sm font-bold break-words">{t.detailsTitle}</p>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onClose}
             aria-label={t.close}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            style={{ color: C.hint }}
+            className={cn("flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", "tg-hint")}
+
           >
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-6 pt-3">
@@ -1672,19 +1664,19 @@ function DetailSheet({
                 const img = e.currentTarget;
                 if (item.imageUrl && img.src !== item.imageUrl) img.src = item.imageUrl;
               }}
-              className="mb-3 h-40 w-full rounded-xl object-cover"
+              className="mb-3 h-40 w-full rounded-surface object-cover"
             />
           )}
 
           <div className="flex flex-wrap items-center gap-1.5">
             {item.flagEmoji && <span className="text-xl" aria-hidden>{item.flagEmoji}</span>}
             {kind === "u" && item.worldRanking ? (
-              <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold" style={{ background: C.button, color: C.buttonText }}>
+              <span className={cn("rounded-control px-1.5 py-0.5 text-xs font-bold", "tg-button")}>
                 #{item.worldRanking}
               </span>
             ) : null}
             {typeof item.matchScore === "number" && (
-              <span className="rounded-md px-1.5 py-0.5 text-[11px] font-bold" style={{ background: C.card, color: C.text }}>
+              <span className={cn("rounded-control px-1.5 py-0.5 text-xs font-bold", "tg-card tg-text")}>
                 🎯 {Math.round(item.matchScore)}% {t.match}
               </span>
             )}
@@ -1692,7 +1684,7 @@ function DetailSheet({
           <h2 className="mt-1.5 text-lg font-extrabold leading-tight break-words">
             {kind === "u" ? item.name : item.title}
           </h2>
-          <p className="mt-1 text-xs break-words" style={{ color: C.hint }}>
+          <p className={cn("mt-1 text-sm break-words", "tg-hint")}>
             {kind === "u"
               ? [item.city, item.country].filter(Boolean).join(", ")
               : [item.provider, item.country].filter(Boolean).join(" · ")}
@@ -1702,17 +1694,17 @@ function DetailSheet({
             <div className="mt-3 space-y-1.5">
               {!!item.matchReasons?.length && (
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: C.hint }}>{t.whyMatch}</p>
+                  <p className={cn("text-sm font-bold uppercase tracking-wide", "tg-hint")}>{t.whyMatch}</p>
                   {item.matchReasons.slice(0, 3).map((r, i) => (
-                    <p key={i} className="text-xs leading-relaxed break-words">✓ {r}</p>
+                    <p key={i} className="text-sm leading-relaxed break-words">✓ {r}</p>
                   ))}
                 </div>
               )}
               {!!item.matchIssues?.length && (
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: C.hint }}>{t.watchOut}</p>
+                  <p className={cn("text-sm font-bold uppercase tracking-wide", "tg-hint")}>{t.watchOut}</p>
                   {item.matchIssues.slice(0, 3).map((r, i) => (
-                    <p key={i} className="text-xs leading-relaxed break-words">! {r}</p>
+                    <p key={i} className="text-sm leading-relaxed break-words">! {r}</p>
                   ))}
                 </div>
               )}
@@ -1721,7 +1713,7 @@ function DetailSheet({
 
           {kind === "u" ? (
             <>
-              <p className="mt-4 text-[11px] font-bold uppercase tracking-wide" style={{ color: C.hint }}>{t.requirementsTitle}</p>
+              <p className={cn("mt-4 text-sm font-bold uppercase tracking-wide", "tg-hint")}>{t.requirementsTitle}</p>
               <dl className="mt-2 grid grid-cols-2 gap-2">
                 <Fact label={t.annualTuition} value={money(item.annualTuitionUsd) ?? "—"} />
                 <Fact label={t.livingCost} value={money(item.annualLivingEstUsd) ?? "—"} />
@@ -1731,17 +1723,17 @@ function DetailSheet({
                 <Fact label={t.workVisaYears} value={item.postStudyWorkVisaYears != null ? `${item.postStudyWorkVisaYears}` : "—"} />
               </dl>
 
-              <p className="mt-4 text-[11px] font-bold uppercase tracking-wide" style={{ color: C.hint }}>{t.programsTitle}</p>
+              <p className={cn("mt-4 text-sm font-bold uppercase tracking-wide", "tg-hint")}>{t.programsTitle}</p>
               {programs == null ? (
-                <p className="mt-2 text-xs" style={{ color: C.hint }}>{t.programsLoading}</p>
+                <p className={cn("mt-2 text-sm", "tg-hint")}>{t.programsLoading}</p>
               ) : programs.length === 0 ? (
-                <p className="mt-2 text-xs" style={{ color: C.hint }}>{t.programsEmpty}</p>
+                <p className={cn("mt-2 text-sm", "tg-hint")}>{t.programsEmpty}</p>
               ) : (
                 <ul className="mt-2 space-y-1.5">
                   {programs.slice(0, 8).map((p) => (
-                    <li key={p.id} className="rounded-lg px-2.5 py-2 text-xs break-words" style={{ background: C.card }}>
+                    <li key={p.id} className={cn("rounded-control px-2.5 py-2 text-sm break-words", "tg-card")}>
                       <span className="font-semibold">{p.name}</span>
-                      {p.degree ? <span style={{ color: C.hint }}> · {p.degree}</span> : null}
+                      {p.degree ? <span className="tg-hint"> · {p.degree}</span> : null}
                     </li>
                   ))}
                 </ul>
@@ -1759,16 +1751,16 @@ function DetailSheet({
                   {daysLeft != null && <DeadlineBadge days={daysLeft} urgency={daysLeft <= 14 ? "critical" : daysLeft <= 45 ? "soon" : null} t={t} />}
                 </div>
               )}
-              <p className="mt-3 text-[11px] font-bold uppercase tracking-wide" style={{ color: C.hint }}>{t.eligibility}</p>
-              <p className="mt-1 text-xs leading-relaxed break-words">{item.requirements || item.description || "—"}</p>
+              <p className={cn("mt-3 text-sm font-bold uppercase tracking-wide", "tg-hint")}>{t.eligibility}</p>
+              <p className="mt-1 text-sm leading-relaxed break-words">{item.requirements || item.description || "—"}</p>
             </>
           )}
 
-          {action && <p className="mt-3 text-xs font-semibold" style={{ color: C.link }}>{action}</p>}
+          {action && <p className={cn("mt-3 text-sm font-semibold", "tg-link")}>{action}</p>}
         </div>
 
         {/* Action bar */}
-        <div className="border-t px-4 py-3" style={{ borderColor: C.card }}>
+        <div className={cn("border-t px-4 py-3", "tg-border-card")}>
           <div className="flex flex-wrap gap-2">
             {kind === "u" ? (
               <PrimaryButton onClick={() => void startApplication()} disabled={busy}>
@@ -1779,26 +1771,26 @@ function DetailSheet({
                 {t.addFunding}
               </PrimaryButton>
             )}
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => onToggleSave(item)}
               disabled={busySave === item.id}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
-              style={isSaved ? { background: C.card, color: C.text } : { background: C.button, color: C.buttonText }}
+              className={cn("inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-surface px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60", (isSaved ? "tg-card tg-text" : "tg-button"))}
+
             >
               {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
               {isSaved ? t.saved : t.save}
-            </button>
+            </Button>
             {item.websiteUrl && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => openLinkExternal(item.websiteUrl!, openSite)}
-                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                style={{ background: C.card, color: C.text }}
+                className={cn("inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-surface px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", "tg-card tg-text")}
+
               >
                 <ExternalLink className="h-4 w-4" />
                 {t.officialWebsite}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -1809,8 +1801,8 @@ function DetailSheet({
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg px-2.5 py-2" style={{ background: C.card }}>
-      <dt className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: C.hint }}>{label}</dt>
+    <div className={cn("rounded-control px-2.5 py-2", "tg-card")}>
+      <dt className={cn("text-xs font-semibold uppercase tracking-wide", "tg-hint")}>{label}</dt>
       <dd className="mt-0.5 text-xs font-bold break-words">{value}</dd>
     </div>
   );
@@ -1908,8 +1900,8 @@ function ApplicationsScreen({
 
       {/* Segmented toggle: Applications | Deadlines */}
       <div
-        className="grid grid-cols-2 gap-1 rounded-xl p-1"
-        style={{ background: C.card }}
+        className={cn("grid grid-cols-2 gap-1 rounded-surface p-1", "tg-card")}
+
         role="tablist"
         aria-label={t.apps}
       >
@@ -1917,7 +1909,7 @@ function ApplicationsScreen({
           { id: "apps", label: t.segApplications },
           { id: "deadlines", label: t.segDeadlines },
         ] as const).map((seg) => (
-          <button
+          <Button variant="unstyled"
             key={seg.id}
             type="button"
             role="tab"
@@ -1926,46 +1918,46 @@ function ApplicationsScreen({
               haptic.tap();
               setView(seg.id);
             }}
-            className="min-h-11 min-w-11 rounded-lg px-2 py-2 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            style={view === seg.id ? { background: C.button, color: C.buttonText } : { color: C.hint }}
+            className={cn("min-h-11 min-w-11 rounded-control px-2 py-2 text-xs font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", (view === seg.id ? "tg-button" : "tg-hint"))}
+
           >
             {seg.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       {error && <Notice text={error} />}
-      {flash && <p className="text-xs font-semibold" style={{ color: C.link }}>{flash}</p>}
+      {flash && <p className={cn("text-sm font-semibold", "tg-link")}>{flash}</p>}
 
       {view === "apps" ? (
         <>
           {rows == null && !error && <Spinner />}
           {rows != null && rows.length === 0 && <Notice text={t.appsEmpty} />}
           {(rows ?? []).map((a) => {
-            const color = STATUS_COLORS[a.status] ?? "#64748b";
+            const color = STATUS_CLASSES[a.status] ?? "tg-status-neutral";
             return (
               <Card key={a.id}>
                 <p className="text-sm font-semibold break-words">{a.universityName}</p>
-                {a.programName && <p className="text-xs break-words" style={{ color: C.hint }}>{a.programName}</p>}
+                {a.programName && <p className={cn("text-sm break-words", "tg-hint")}>{a.programName}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-md px-2 py-1 text-[11px] font-bold text-white" style={{ background: color }}>
+                  <span className={cn("rounded-control px-2 py-1 text-xs font-bold text-white", color)}>
                     {statusLabel(a.status)}
                   </span>
                   {a.deadline && (
-                    <span className="text-xs" style={{ color: C.hint }}>
+                    <span className={cn("text-xs", "tg-hint")}>
                       {t.deadline}: {fmtDate(a.deadline)}
                     </span>
                   )}
                 </div>
-                <label className="mt-2 flex items-center gap-2 text-xs" style={{ color: C.hint }}>
+                <label className={cn("mt-2 flex items-center gap-2 text-sm", "tg-hint")}>
                   <span className="shrink-0">{t.statusLabel}</span>
                   <select
                     value={SETTABLE_STATUSES.includes(a.status) ? a.status : "not_started"}
                     onChange={(e) => void updateStatus(a, e.target.value)}
                     disabled={busyId === a.id}
                     aria-label={t.statusLabel}
-                    className="min-h-11 min-w-11 flex-1 rounded-lg px-2 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
-                    style={{ background: C.bg, color: C.text }}
+                    className={cn("min-h-11 min-w-11 flex-1 rounded-control px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60", "tg-bg tg-text")}
+
                   >
                     {!SETTABLE_STATUSES.includes(a.status) && (
                       <option value="not_started">{statusLabel(a.status)}</option>
@@ -1990,7 +1982,7 @@ function ApplicationsScreen({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold break-words">{d.title}</p>
-                  <p className="mt-0.5 text-xs" style={{ color: C.hint }}>
+                  <p className={cn("mt-0.5 text-sm", "tg-hint")}>
                     {fmtDate(d.date)}
                     {d.type ? ` · ${d.type}` : ""}
                   </p>
@@ -2091,21 +2083,21 @@ function ProfileScreen({
     <div className="space-y-4">
       <Card>
         <p className="text-base font-bold">{profile.name}</p>
-        <p className="text-xs" style={{ color: C.hint }}>
+        <p className={cn("text-sm", "tg-hint")}>
           {t.plan}: <b>{planLabel}</b>
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-          <dt style={{ color: C.hint }}>{t.level}</dt>
+          <dt className="tg-hint">{t.level}</dt>
           <dd>{profile.degreeLevel || t.notSet}</dd>
-          <dt style={{ color: C.hint }}>{t.major}</dt>
+          <dt className="tg-hint">{t.major}</dt>
           <dd>{profile.targetMajor || t.notSet}</dd>
-          <dt style={{ color: C.hint }}>{t.gpa}</dt>
+          <dt className="tg-hint">{t.gpa}</dt>
           <dd>{profile.gpa != null ? `${profile.gpa}${profile.gpaScale ? ` / ${profile.gpaScale}` : ""}` : t.notSet}</dd>
-          <dt style={{ color: C.hint }}>{t.english}</dt>
+          <dt className="tg-hint">{t.english}</dt>
           <dd>{english}</dd>
-          <dt style={{ color: C.hint }}>{t.countries}</dt>
+          <dt className="tg-hint">{t.countries}</dt>
           <dd>{countries}</dd>
-          <dt style={{ color: C.hint }}>{t.budget}</dt>
+          <dt className="tg-hint">{t.budget}</dt>
           <dd>{money(profile.budgetAnnualUsd) ?? t.notSet}</dd>
         </dl>
       </Card>
@@ -2116,19 +2108,19 @@ function ProfileScreen({
             <span className="flex items-center gap-2"><Bell className="h-4 w-4" /> {t.notifications}</span>
             <input type="checkbox" checked={link.notifyEnabled} onChange={(e) => update({ notifyEnabled: e.target.checked })} className="h-5 w-5 min-h-11 min-w-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600" />
           </label>
-          <p className="mt-3 text-xs" style={{ color: C.hint }}>{t.reminders}</p>
+          <p className={cn("mt-3 text-sm", "tg-hint")}>{t.reminders}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {PRESETS.map((p) => (
-              <button
+              <Button variant="unstyled"
                 key={p.id}
                 type="button"
                 onClick={() => update({ reminderDays: p.days })}
-                className="min-h-11 min-w-11 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                style={activePreset === p.id ? { background: C.button, color: C.buttonText } : { background: C.bg, color: C.text }}
+                className={cn("min-h-11 min-w-11 rounded-control px-2.5 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", (activePreset === p.id ? "tg-button" : "tg-bg tg-text"))}
+
                 aria-pressed={activePreset === p.id}
               >
                 {p.days.length ? p.days.join(" · ") : t.remindersOff}
-              </button>
+              </Button>
             ))}
           </div>
         </Card>
@@ -2139,9 +2131,9 @@ function ProfileScreen({
         <PrimaryButton onClick={() => openSite("/")}>
           <ExternalLink className="h-4 w-4" /> {t.fullSite}
         </PrimaryButton>
-        <button type="button" onClick={disconnect} className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600" style={{ background: C.card }}>
+        <Button variant="unstyled" type="button" onClick={disconnect} className={cn("inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-surface px-4 py-2.5 text-sm font-semibold text-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600", "tg-card")}>
           <Unplug className="h-4 w-4" /> {t.disconnect}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -31,6 +31,7 @@ import { CatalogManager, type FieldDef } from "./admin/growth/CatalogManager";
 import { CHECKLIST_PHASES, GOAL_LEVELS, GOAL_PILLARS, PROMPT_CATEGORIES } from "@/lib/growth/defaults";
 import { NAV_SECTIONS, navLabelKey } from "@/lib/navSections";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Research Agent is lazy-loaded so that any issue in its client bundle can
@@ -42,7 +43,7 @@ const ResearchAgent = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs font-semibold text-slate-400">
+      <div className="rounded-overlay border border-slate-200 bg-white p-8 text-center text-xs font-semibold text-slate-500">
         Loading Research Agent…
       </div>
     ),
@@ -300,14 +301,14 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-4 sm:p-6 shadow-xl">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-overlay p-4 sm:p-6 shadow-xl">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 shrink-0 rounded-xl bg-white/10 flex items-center justify-center">
+          <div className="h-10 w-10 shrink-0 rounded-surface bg-white/10 flex items-center justify-center">
             <ShieldCheck className="h-6 w-6 text-amber-300" />
           </div>
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-extrabold">{t("title")}</h1>
-            <p className="text-xs text-slate-300 mt-0.5">{t("subtitle")}</p>
+            <p className="text-sm text-slate-300 mt-0.5">{t("subtitle")}</p>
           </div>
         </div>
       </div>
@@ -315,15 +316,15 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
       <div className="xl:grid xl:grid-cols-[240px_minmax(0,1fr)] xl:gap-5">
         {/* Section menu — grouped list on wide screens */}
         <aside className="hidden xl:block">
-          <div className="sticky top-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="sticky top-4 space-y-3 rounded-overlay border border-slate-200 bg-white p-3">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder={t("search")}
                 aria-label={t("search")}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-2 text-xs text-slate-800 focus:border-indigo-300 focus:outline-none"
+                className="w-full rounded-surface border border-slate-200 bg-slate-50 py-2 pl-8 pr-2 text-sm text-slate-800 focus:border-indigo-300 focus:outline-none"
               />
             </div>
             <nav aria-label={t("title")} className="space-y-3">
@@ -332,23 +333,23 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
                 if (!items.length) return null;
                 return (
                   <div key={g}>
-                    <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t(`group.${g}`)}</p>
+                    <p className="px-2 pb-1 text-sm font-bold uppercase tracking-wider text-slate-500">{t(`group.${g}`)}</p>
                     <ul className="space-y-0.5">
                       {items.map((s) => {
                         const Icon = s.icon;
                         const active = s.id === tab;
                         return (
                           <li key={s.id}>
-                            <button
+                            <Button variant="unstyled"
                               onClick={() => setTab(s.id)}
                               aria-current={active ? "page" : undefined}
-                              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold transition-colors ${
+                              className={`flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-xs font-semibold transition-colors ${
                                 active ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
                               }`}
                             >
                               <Icon className="h-3.5 w-3.5 shrink-0" />
                               <span className="min-w-0 flex-1 truncate">{t(`tab.${s.id}`)}</span>
-                            </button>
+                            </Button>
                           </li>
                         );
                       })}
@@ -356,7 +357,7 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
                   </div>
                 );
               })}
-              {visibleSections.length === 0 && <p className="px-2 text-[11px] text-slate-400">{t("noMatch")}</p>}
+              {visibleSections.length === 0 && <p className="px-2 text-sm text-slate-500">{t("noMatch")}</p>}
             </nav>
           </div>
         </aside>
@@ -368,7 +369,7 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
             <select
               value={tab}
               onChange={(e) => setTab(e.target.value as AdminTab)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-800 shadow-xs"
+              className="w-full rounded-surface border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-800 shadow-xs"
             >
               {GROUPS.map((g) => (
                 <optgroup key={g} label={t(`group.${g}`)}>
@@ -383,12 +384,12 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
           </label>
 
           <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-amber-300">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-surface bg-slate-900 text-amber-300">
               <CurrentIcon className="h-4 w-4" />
             </span>
             <div className="min-w-0">
               <h2 className="text-base font-extrabold text-slate-900 sm:text-lg">{t(`tab.${current.id}`)}</h2>
-              <p className="text-xs text-slate-500">{t(`desc.${current.id}`)}</p>
+              <p className="text-sm text-slate-500">{t(`desc.${current.id}`)}</p>
             </div>
           </div>
 
@@ -397,8 +398,8 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
           <ErrorBoundary
             key={tab}
             fallback={
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
-                <p className="text-xs font-bold text-amber-800">{t("sectionFailed")}</p>
+              <div className="rounded-overlay border border-amber-200 bg-amber-50 p-6 text-center">
+                <p className="text-sm font-bold text-amber-800">{t("sectionFailed")}</p>
               </div>
             }
           >

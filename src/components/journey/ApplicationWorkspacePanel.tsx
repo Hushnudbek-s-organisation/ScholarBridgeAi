@@ -12,7 +12,9 @@ import { useTranslations } from "next-intl";
 import { ArrowLeft, Check, ExternalLink, Lock, RefreshCw } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { SectionTransition } from "@/components/motion";
-import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, daysLabel, toneForDays } from "./ui";
+import { Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, daysLabel, toneForDays } from "@/components/ui/journey";
+import { Button } from "@/components/ui/Button";
+import { MotionButton } from "@/components/ui/MotionButton";
 
 interface WorkspaceData {
   tabs: { id: string; label: string; icon: string }[];
@@ -244,10 +246,10 @@ export function ApplicationWorkspacePanel({
           <ul className="grid gap-2 sm:grid-cols-2">
             {data.workspaces.map((w) => (
               <li key={w.id}>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => onSelect(w.id)}
-                  className="w-full rounded-xl border border-slate-200 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 dark:border-slate-700 dark:hover:border-indigo-700"
+                  className="w-full rounded-surface border border-slate-200 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 dark:border-slate-700 dark:hover:border-indigo-700"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="min-w-0 break-words text-sm font-semibold text-slate-900 dark:text-white">
@@ -259,14 +261,14 @@ export function ApplicationWorkspacePanel({
                       <Pill tone={toneForDays(daysTo(w.deadline))}>{daysTo(w.deadline)}d</Pill>
                     ) : null}
                   </div>
-                  {w.programName && <p className="break-words text-[11px] text-slate-500">{w.programName}</p>}
+                  {w.programName && <p className="break-words text-sm text-slate-500">{w.programName}</p>}
                   <div className="mt-2">
                     <ProgressBar pct={w.progressPct} size="sm" tone={w.progressPct >= 100 ? "good" : "brand"} />
                   </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
+                  <p className="mt-1 text-sm text-slate-500">
                     {w.submittedAt ? t("recStatusSubmitted") : t("awReqsDone", { done: w.done, total: w.total })}
                   </p>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -296,29 +298,29 @@ export function ApplicationWorkspacePanel({
       <JourneyCard>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => onSelect(0)}
-              className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+              className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
             >
-              <ArrowLeft className="h-3 w-3" />{t("awAllWorkspaces")}</button>
+              <ArrowLeft className="h-3 w-3" />{t("awAllWorkspaces")}</Button>
             <h2 className="break-words text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">{app.universityName}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {[app.programName, app.applicationRound, app.intakeTerm].filter(Boolean).join(" · ")}
             </p>
             {app.deadline && (
-              <p className="mt-1 break-words text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <p className="mt-1 break-words text-sm font-semibold text-slate-600 dark:text-slate-300">
                 {t("awDeadlineLabel")} {app.deadline} · {daysLabel(daysTo(app.deadline))}
               </p>
             )}
           </div>
           <div className="min-w-0 flex-1 sm:min-w-[180px] sm:max-w-xs">
             <div className="flex items-baseline justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("awProgressLabel")}</span>
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("awProgressLabel")}</span>
               <span className="text-lg font-extrabold text-slate-900 dark:text-white">{data.progress.pct}%</span>
             </div>
             <ProgressBar pct={data.progress.pct} size="lg" tone={data.progress.pct >= 100 ? "good" : "brand"} />
-            <p className="mt-1 text-[11px] text-slate-500">
+            <p className="mt-1 text-sm text-slate-500">
               {t("awReqsComplete", { done: data.progress.done, total: data.progress.total })}
             </p>
           </div>
@@ -329,14 +331,14 @@ export function ApplicationWorkspacePanel({
             const sectionProgress = data.progress.sections.find((s) => s.key === t.id);
             const isActive = tab === t.id;
             return (
-              <motion.button
+              <MotionButton variant="unstyled"
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
                 aria-current={isActive ? "true" : undefined}
                 whileHover={reduceMotion ? undefined : { y: -1 }}
                 whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-                className={`relative rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                className={`relative rounded-control border px-2.5 py-1.5 text-xs font-semibold transition ${
                   isActive
                     ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
                     : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -345,7 +347,7 @@ export function ApplicationWorkspacePanel({
                 {isActive && (
                   <motion.span
                     layoutId="workspace-tab-pill"
-                    className="absolute inset-0 rounded-lg bg-indigo-600"
+                    className="absolute inset-0 rounded-control bg-indigo-600"
                     transition={{ type: "spring", stiffness: 420, damping: 34 }}
                   />
                 )}
@@ -357,14 +359,14 @@ export function ApplicationWorkspacePanel({
                     </span>
                   )}
                 </span>
-              </motion.button>
+              </MotionButton>
             );
           })}
         </nav>
       </JourneyCard>
 
-      {message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{message}</p>}
-      {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
+      {message && <p className="rounded-control bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{message}</p>}
+      {error && <p className="rounded-control bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
 
       {/* Every tab body fades in place (no vertical travel) so the header and
           the tab strip never jump while switching. */}
@@ -442,16 +444,16 @@ export function ApplicationWorkspacePanel({
                   {s.items.map((r) => (
                     <li
                       key={r.id}
-                      className="flex flex-wrap items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700"
+                      className="flex flex-wrap items-start gap-3 rounded-control border border-slate-200 px-3 py-2 dark:border-slate-700"
                     >
-                      <button
+                      <Button variant="unstyled"
                         type="button"
                         disabled={busy}
                         onClick={() => patchRequirement(r.id, r.status === "done" ? "todo" : "done")}
                         aria-label={r.status === "done" ? `Mark ${r.title} as not done` : `Mark ${r.title} as done`}
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-control border ${
                           r.status === "done"
-                            ? "border-emerald-500 bg-emerald-500 text-white sb-ink-on-bright"
+                            ? "border-emerald-500 bg-emerald-700 text-white sb-ink-on-bright"
                             : r.status === "not_required"
                               ? "border-slate-300 bg-slate-100 dark:bg-slate-700"
                               : "border-slate-300 dark:border-slate-600"
@@ -459,17 +461,17 @@ export function ApplicationWorkspacePanel({
                       >
                         {r.status === "done" && <Check className="h-3 w-3" />}
                         {r.status === "not_required" && <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />}
-                      </button>
+                      </Button>
                       <div className="min-w-0 flex-1">
                         <p
                           className={`text-sm font-medium ${
-                            r.status === "done" ? "text-slate-400 line-through" : "text-slate-800 dark:text-slate-100"
+                            r.status === "done" ? "text-slate-500 line-through" : "text-slate-800 dark:text-slate-100"
                           }`}
                         >
                           {r.title}
-                          {!r.isRequired && <span className="ml-1 text-[10px] font-normal uppercase text-slate-400">{t("awOptional")}</span>}
+                          {!r.isRequired && <span className="ml-1 text-xs font-normal uppercase text-slate-500">{t("awOptional")}</span>}
                         </p>
-                        {r.instructions && <p className="text-xs text-slate-500 dark:text-slate-400">{r.instructions}</p>}
+                        {r.instructions && <p className="text-sm text-slate-500 dark:text-slate-400">{r.instructions}</p>}
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <SourceTag
                             url={r.sourceUrl}
@@ -517,14 +519,14 @@ export function ApplicationWorkspacePanel({
                   <li className="flex items-center gap-2 py-2 text-sm">
                     <Pill tone={toneForDays(daysTo(app.deadline))}>{daysLabel(daysTo(app.deadline))}</Pill>
                     <span className="flex-1 text-slate-700 dark:text-slate-200">{t("awAppDeadline")}</span>
-                    <span className="text-xs text-slate-400">{app.deadline}</span>
+                    <span className="text-xs text-slate-500">{app.deadline}</span>
                   </li>
                 )}
                 {data.deadlines.map((d) => (
                   <li key={d.id} className="flex items-center gap-2 py-2 text-sm">
                     <Pill tone={toneForDays(daysTo(d.dueDate))}>{daysLabel(daysTo(d.dueDate))}</Pill>
                     <span className="flex-1 text-slate-700 dark:text-slate-200">{d.title}</span>
-                    <span className="text-xs text-slate-400">{d.dueDate}</span>
+                    <span className="text-xs text-slate-500">{d.dueDate}</span>
                   </li>
                 ))}
               </ul>
@@ -536,7 +538,7 @@ export function ApplicationWorkspacePanel({
             ) : (
               <ul className="space-y-2">
                 {data.reversePlan.map((step) => (
-                  <li key={step.key} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-start">
+                  <li key={step.key} className="flex min-w-0 flex-col gap-2 rounded-control border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-start">
                     <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">
                       {t(`awReverseStep.${step.key}` as never)}
                     </span>
@@ -559,8 +561,8 @@ export function ApplicationWorkspacePanel({
             {data.submissionChecklist.map((c) => (
               <li key={c.key} className="flex items-center gap-2 text-sm">
                 <span
-                  className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                    c.ok ? "bg-emerald-500 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
+                  className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${
+                    c.ok ? "bg-emerald-700 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
                   }`}
                 >
                   {c.ok ? "✓" : ""}
@@ -573,12 +575,12 @@ export function ApplicationWorkspacePanel({
           </ul>
 
           {app.submittedAt ? (
-            <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/40">
+            <div className="rounded-surface border border-emerald-300 bg-emerald-50 px-3 py-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/40">
               <p className="font-bold text-emerald-700 dark:text-emerald-300">
                 Submitted {new Date(app.submittedAt).toLocaleDateString()}
               </p>
-              <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">{t("awConfirmationNote")}</p>
-              <p className="mt-2 text-xs leading-relaxed text-emerald-900 dark:text-emerald-100">{t("awPostSubmitPortal")}</p>
+              <p className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-300/80">{t("awConfirmationNote")}</p>
+              <p className="mt-2 text-sm leading-relaxed text-emerald-900 dark:text-emerald-100">{t("awPostSubmitPortal")}</p>
             </div>
           ) : (
             <>
@@ -590,7 +592,7 @@ export function ApplicationWorkspacePanel({
               >
                 <Lock className="h-3.5 w-3.5" />{t("awMarkSubmittedBtn")}</Button>
               {!data.readyToSubmit && (
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-sm text-slate-500">
                   Still open: {data.progress.blockers.slice(0, 4).join(", ")}
                   {data.progress.blockers.length > 4 && ` and ${data.progress.blockers.length - 4} more`}
                 </p>
@@ -614,15 +616,15 @@ export function ApplicationWorkspacePanel({
       {tab === "decision" && (
         <JourneyCard title={t("tabDecision")} subtitle={t("awDecisionSubtitle")}>
           {data.offer ? <div className="mb-3 space-y-2"><Pill tone={data.offer.status === "accepted" ? "good" : data.offer.status === "pending" ? "warn" : "slate"}>{t(`opStatus_${data.offer.status}` as never)}</Pill>{data.offer.status === "accepted" && <p className="text-sm text-slate-600 dark:text-slate-300">{t("awAcceptedNote")}</p>}<Button variant="outline" onClick={() => onNavigateTab("offers")}>{t("awOpenOffers")}</Button></div> : <Empty title={t("awNoDecision")} hint={t("awNoDecisionHint")} />}
-          <details open={!data.offer} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+          <details open={!data.offer} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
             <summary className="cursor-pointer text-sm font-bold text-indigo-700 dark:text-indigo-300">{data.offer ? t("awEditDecision") : t("awRecordDecision")}</summary>
             <form onSubmit={saveOffer} className="mt-3 grid gap-2 sm:grid-cols-2">
-              <label className="text-xs font-semibold">{t("opStatus")}<select name="status" defaultValue={data.offer?.status ?? "pending"} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">{["pending", "accepted", "waitlisted", "deferred", "rejected"].map((s) => <option key={s} value={s}>{t(`opStatus_${s}` as never)}</option>)}</select></label>
-              <label className="text-xs font-semibold">{t("opRespondBy")}<input name="responseDeadline" type="date" defaultValue={data.offer?.responseDeadline ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
-              <label className="text-xs font-semibold">{t("opDecidedOn")}<input name="decidedAt" type="date" defaultValue={data.offer?.decidedAt ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
-              <label className="text-xs font-semibold">{t("opDepositAmount")}<input name="depositAmount" type="number" min="0" step="1" defaultValue={data.offer?.depositAmount ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
-              <label className="text-xs font-semibold">{t("opDepositDue")}<input name="depositDueDate" type="date" defaultValue={data.offer?.depositDueDate ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
-              <label className="text-xs font-semibold">{t("opTuitionCommitment")}<input name="tuitionCommitment" type="number" min="0" step="1" defaultValue={data.offer?.tuitionCommitment ?? ""} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-sm font-semibold">{t("opStatus")}<select name="status" defaultValue={data.offer?.status ?? "pending"} className="mt-1 min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">{["pending", "accepted", "waitlisted", "deferred", "rejected"].map((s) => <option key={s} value={s}>{t(`opStatus_${s}` as never)}</option>)}</select></label>
+              <label className="text-sm font-semibold">{t("opRespondBy")}<input name="responseDeadline" type="date" defaultValue={data.offer?.responseDeadline ?? ""} className="mt-1 min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-sm font-semibold">{t("opDecidedOn")}<input name="decidedAt" type="date" defaultValue={data.offer?.decidedAt ?? ""} className="mt-1 min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-sm font-semibold">{t("opDepositAmount")}<input name="depositAmount" type="number" min="0" step="1" defaultValue={data.offer?.depositAmount ?? ""} className="mt-1 min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-sm font-semibold">{t("opDepositDue")}<input name="depositDueDate" type="date" defaultValue={data.offer?.depositDueDate ?? ""} className="mt-1 min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
+              <label className="text-sm font-semibold">{t("opTuitionCommitment")}<input name="tuitionCommitment" type="number" min="0" step="1" defaultValue={data.offer?.tuitionCommitment ?? ""} className="mt-1 min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" /></label>
               <Button type="submit" disabled={busy} className="sm:col-span-2">{t("opSaveOffer")}</Button>
             </form>
           </details>
@@ -635,9 +637,9 @@ export function ApplicationWorkspacePanel({
 
 function WorkspaceList({ title, empty, rows, onOpen, action }: { title: string; empty: string; rows: string[]; onOpen: () => void; action: string }) {
   return (
-    <div className="mt-4 rounded-xl border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-900">
+    <div className="mt-4 rounded-surface border border-slate-200 p-3 dark:border-slate-700 dark:bg-slate-900">
       <h3 className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{title}</h3>
-      {rows.length ? <ul className="mt-2 space-y-1">{rows.map((row, i) => <li key={`${row}-${i}`} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">{row}</li>)}</ul> : <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{empty}</p>}
+      {rows.length ? <ul className="mt-2 space-y-1">{rows.map((row, i) => <li key={`${row}-${i}`} className="rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">{row}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{empty}</p>}
       <Button size="sm" variant="outline" className="mt-3" onClick={onOpen}>{action}</Button>
     </div>
   );

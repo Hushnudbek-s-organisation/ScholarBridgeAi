@@ -14,7 +14,7 @@ export default function TermsPage() {
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center overflow-hidden shadow-sm border border-slate-200">
+            <div className="h-8 w-8 rounded-control bg-white flex items-center justify-center overflow-hidden shadow-sm border border-slate-200">
               <BrandingImage alt="ScholarBridgeAI Logo" className="h-8 w-8 object-cover" />
             </div>
             <span className="font-extrabold text-slate-900 tracking-tight">ScholarBridgeAI</span>
@@ -26,9 +26,9 @@ export default function TermsPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10">
+        <div className="bg-white rounded-overlay border border-slate-200 shadow-sm p-6 sm:p-10">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Terms of Service</h1>
-          <p className="mt-2 text-xs text-slate-500">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • Effective for all users of ScholarBridgeAI</p>
+          <p className="mt-2 text-sm text-slate-500">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • Effective for all users of ScholarBridgeAI</p>
 
           <div className="mt-8 space-y-8 text-sm text-slate-700 leading-relaxed">
             <section>
@@ -140,7 +140,7 @@ export default function TermsPage() {
             </section>
 
             <section className="pt-6 border-t border-slate-200">
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-slate-500">
                 By continuing to use ScholarBridgeAI, creating a profile, or clicking &quot;Start for free&quot;, you agree to these Terms and our Privacy Policy. If you do not agree, please do not use the service.
               </p>
             </section>

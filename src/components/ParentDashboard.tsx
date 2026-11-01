@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Copy, Eye, EyeOff, Info, Loader2, Lock, ShieldCheck, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
+import { Button } from "@/components/ui/Button";
 
 interface ParentShareSettings {
   enabled: boolean;
@@ -177,7 +178,7 @@ export function ParentDashboard({ activeProfile }: { activeProfile: StudentProfi
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 dark:border-slate-700 dark:bg-slate-900">
+      <section className="rounded-overlay border border-slate-200 bg-white p-4 sm:p-6 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-start gap-3">
           <Users aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
           <div className="min-w-0">
@@ -196,25 +197,25 @@ export function ParentDashboard({ activeProfile }: { activeProfile: StudentProfi
               </p>
             )}
             {loadError && (
-              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200" role="alert">
+              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-control bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200" role="alert">
                 <span>{t("loadError")}</span>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => void loadSettings()}
-                  className="min-h-11 rounded-lg px-3 font-semibold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  className="min-h-11 rounded-control px-3 font-semibold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   {t("share.retry")}
-                </button>
+                </Button>
               </div>
             )}
 
             {linkUnavailable && (
-              <p role="status" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+              <p role="status" className="mt-4 rounded-control border border-amber-200 bg-amber-50 p-3 text-sm leading-5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                 {t("linkUnavailable")}
               </p>
             )}
 
-            <div className="mt-4 rounded-xl border border-slate-200 p-3 sm:p-4 dark:border-slate-700">
+            <div className="mt-4 rounded-surface border border-slate-200 p-3 sm:p-4 dark:border-slate-700">
               <label className="flex min-h-11 items-start gap-3 py-2">
                 <input
                   type="checkbox"
@@ -244,45 +245,45 @@ export function ParentDashboard({ activeProfile }: { activeProfile: StudentProfi
                         }}
                         placeholder={t("emailPlaceholder")}
                         autoComplete="email"
-                        className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                        className="min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                       />
                     </label>
-                    <button
+                    <Button variant="unstyled"
                       type="submit"
                       disabled={savingEmail || busy || email === savedEmail}
-                      className="min-h-11 rounded-lg bg-indigo-700 px-4 text-sm font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700"
+                      className="min-h-11 rounded-control bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700"
                     >
                       {savingEmail ? t("savingEmail") : t("saveEmail")}
-                    </button>
+                    </Button>
                     {emailSaved && <span role="status" aria-live="polite" className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{t("emailSaved")}</span>}
                   </form>
 
                   {link && (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 sm:p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+                    <div className="rounded-control border border-emerald-200 bg-emerald-50/70 p-3 sm:p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
                       <p className="flex items-start gap-2 text-sm font-medium leading-5 text-emerald-950 dark:text-emerald-100">
                         <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
                         <span>{t("shareLinkIntro")}</span>
                       </p>
                       <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-                        <code className="min-w-0 max-w-full break-all rounded bg-white px-2 py-1.5 text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+                        <code className="min-w-0 max-w-full break-all rounded-control bg-white px-2 py-1.5 text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-100">
                           {reveal ? link : `${link.slice(0, 34)}${"•".repeat(18)}`}
                         </code>
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() => setReveal((current) => !current)}
                           aria-label={reveal ? t("hideLink") : t("showLink")}
-                          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-control border border-slate-300 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                         >
                           {reveal ? <EyeOff aria-hidden="true" className="h-4 w-4" /> : <Eye aria-hidden="true" className="h-4 w-4" />}
                           <span>{reveal ? t("hideLink") : t("showLink")}</span>
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() => void copy()}
-                          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-sm font-medium text-white hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-control bg-emerald-700 px-3 text-sm font-medium text-white hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
                         >
                           <Copy aria-hidden="true" className="h-4 w-4" /> {copied ? t("copied") : t("copyLink")}
-                        </button>
+                        </Button>
                       </div>
                       <p className="mt-3 text-sm leading-5 text-emerald-950/90 dark:text-emerald-100">{t("linkPrivacyNotice")}</p>
                     </div>
@@ -290,11 +291,11 @@ export function ParentDashboard({ activeProfile }: { activeProfile: StudentProfi
                 </div>
               )}
 
-              {error && <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">{t("updateError")}</p>}
+              {error && <p role="alert" className="mt-3 rounded-control bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">{t("updateError")}</p>}
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="rounded-surface border border-slate-200 p-4 dark:border-slate-700">
                 <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
                   <ShieldCheck aria-hidden="true" className="h-4 w-4" /> {t("whatTheySee")}
                 </h3>
@@ -304,7 +305,7 @@ export function ParentDashboard({ activeProfile }: { activeProfile: StudentProfi
                   <li>{t("visibleReportedOutcomes")}</li>
                 </ul>
               </div>
-              <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="rounded-surface border border-slate-200 p-4 dark:border-slate-700">
                 <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-rose-800 dark:text-rose-300">
                   <Lock aria-hidden="true" className="h-4 w-4" /> {t("whatTheyDoNotSee")}
                 </h3>
@@ -318,7 +319,7 @@ export function ParentDashboard({ activeProfile }: { activeProfile: StudentProfi
               </div>
             </div>
 
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50/70 p-4 text-sm leading-5 text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
+            <div className="mt-4 flex items-start gap-2 rounded-surface border border-sky-200 bg-sky-50/70 p-4 text-sm leading-5 text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
               <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" />
               <p>{t("scopeNote")}</p>
             </div>

@@ -5,6 +5,7 @@ import { AlertCircle, Loader2, Printer, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import type { ParentSummary } from "@/lib/parentSummary";
+import { Button } from "@/components/ui/Button";
 
 function isParentSummary(value: unknown): value is ParentSummary {
   if (!value || typeof value !== "object") return false;
@@ -42,7 +43,7 @@ async function readSharedSummary(token: string, signal: AbortSignal): Promise<Pa
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+    <div className="min-w-0 rounded-surface border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
       <dt className="text-sm leading-5 text-slate-600 dark:text-slate-300">{label}</dt>
       <dd className="mt-2 break-words text-2xl font-semibold tabular-nums text-slate-950 dark:text-white">{value}</dd>
     </div>
@@ -103,52 +104,52 @@ export function ParentShareView({ token }: { token: string }) {
   return (
     <main className="min-h-screen bg-slate-50 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto w-full max-w-3xl space-y-5">
-        <header className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-900">
+        <header className="rounded-overlay border border-slate-200 bg-white p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-900">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
               <ShieldCheck aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">ScholarBridgeAI</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">ScholarBridgeAI</p>
                 <h1 className="mt-1 break-words text-2xl font-bold tracking-tight sm:text-3xl">{t("pageTitle")}</h1>
                 <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{t("pageIntro")}</p>
                 {summary && <p className="mt-2 break-words text-sm font-medium text-slate-800 dark:text-slate-200">{t("sharedFor", { name: summary.studentFirstName ?? t("studentNameFallback") })}</p>}
               </div>
             </div>
             {summary && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => window.print()}
                 aria-label={t("printSummaryHint")}
-                className="print:hidden inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="print:hidden inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Printer aria-hidden="true" className="h-4 w-4" />
                 {t("printSummary")}
-              </button>
+              </Button>
             )}
           </div>
         </header>
 
         {loading && (
-          <section role="status" aria-live="polite" aria-busy="true" className="flex min-h-24 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          <section role="status" aria-live="polite" aria-busy="true" className="flex min-h-24 items-center gap-3 rounded-overlay border border-slate-200 bg-white p-5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
             <Loader2 aria-hidden="true" className="h-5 w-5 shrink-0 animate-spin text-indigo-600 dark:text-indigo-400" />
             <span>{t("loading")}</span>
           </section>
         )}
 
         {unavailable && !loading && (
-          <section role="alert" className="rounded-2xl border border-rose-200 bg-white p-5 sm:p-7 dark:border-rose-900 dark:bg-slate-900">
+          <section role="alert" className="rounded-overlay border border-rose-200 bg-white p-5 sm:p-7 dark:border-rose-900 dark:bg-slate-900">
             <div className="flex items-start gap-3">
               <AlertCircle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-rose-700 dark:text-rose-300" />
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{t("loadErrorTitle")}</h2>
                 <p className="mt-2 break-words text-sm leading-6 text-slate-700 dark:text-slate-300">{t("invalidLink")}</p>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => void load()}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-indigo-700 px-4 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700"
+                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-control bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700"
                 >
                   {t("retry")}
-                </button>
+                </Button>
               </div>
             </div>
           </section>
@@ -156,7 +157,7 @@ export function ParentShareView({ token }: { token: string }) {
 
         {summary && records && (
           <>
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-900">
+            <section className="rounded-overlay border border-slate-200 bg-white p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-900">
               <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{t("profileHeading")}</h2>
               {hasProfileContext ? (
                 <dl className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -169,7 +170,7 @@ export function ParentShareView({ token }: { token: string }) {
               )}
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-900">
+            <section className="rounded-overlay border border-slate-200 bg-white p-5 sm:p-7 dark:border-slate-700 dark:bg-slate-900">
               <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{t("applicationsHeading")}</h2>
               <dl className="mt-4 grid gap-3 sm:grid-cols-3">
                 <Metric label={t("totalRecordsLabel")} value={numberFormat.format(records.total)} />
@@ -181,13 +182,13 @@ export function ParentShareView({ token }: { token: string }) {
               {records.studentReportedAcceptedOutcomes > 0 && <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{t("outcomeNote")}</p>}
             </section>
 
-            <section className="rounded-2xl border border-sky-200 bg-sky-50/70 p-5 sm:p-6 dark:border-sky-900 dark:bg-sky-950/30">
+            <section className="rounded-overlay border border-sky-200 bg-sky-50/70 p-5 sm:p-6 dark:border-sky-900 dark:bg-sky-950/30">
               <h2 className="text-sm font-semibold text-sky-950 dark:text-sky-100">{t("privacyHeading")}</h2>
               <p className="mt-2 text-sm leading-6 text-sky-950/90 dark:text-sky-100">{t("privacyBody")}</p>
               <p className="mt-3 text-sm font-medium leading-6 text-sky-950 dark:text-sky-100">{t("notAssessment")}</p>
             </section>
 
-            <p className="px-1 text-center text-xs leading-5 text-slate-600 dark:text-slate-400">{t("footer")}</p>
+            <p className="px-1 text-center text-sm leading-5 text-slate-600 dark:text-slate-400">{t("footer")}</p>
           </>
         )}
       </div>

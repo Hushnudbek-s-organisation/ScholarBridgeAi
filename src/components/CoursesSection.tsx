@@ -39,13 +39,13 @@ export function CoursesSection({ activeProfile }: CoursesSectionProps) {
     <div className="space-y-6">
       {/* Section toolbar, not a second hero: the Community destination
           (HubPage) already owns this screen's hero and <h1>. */}
-      <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 shadow-xs dark:border-slate-700">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 ring-1 ring-indigo-100 dark:ring-indigo-500/25">
+      <div className="flex items-center gap-3 rounded-overlay border border-slate-200 bg-white px-4 py-3.5 shadow-xs dark:border-slate-700">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface bg-indigo-50 ring-1 ring-indigo-100 dark:ring-indigo-500/25">
           <GraduationCap className="h-5 w-5 text-indigo-600" />
         </div>
         <div className="min-w-0">
           <h2 className="text-base font-bold tracking-tight text-slate-900 sm:text-lg">{t("title")}</h2>
-          <p className="mt-0.5 text-xs text-slate-500">{t("subtitle")}</p>
+          <p className="mt-0.5 text-sm text-slate-500">{t("subtitle")}</p>
         </div>
       </div>
 
@@ -62,7 +62,7 @@ export function CoursesSection({ activeProfile }: CoursesSectionProps) {
           }}
         />
       ) : loading ? (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-10 text-center">
+        <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-10 text-center">
           <p className="text-sm text-slate-500">{t("loading")}</p>
         </div>
       ) : (

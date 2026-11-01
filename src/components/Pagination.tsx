@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface PaginationProps {
   /** 1-based active page (from `?page=`). */
@@ -53,7 +54,7 @@ function getPageItems(
 
 const numberButtonClass = (isActive: boolean) =>
   [
-    "inline-flex h-11 min-w-11 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors",
+    "inline-flex h-11 min-w-11 items-center justify-center rounded-control border px-3 text-sm font-medium transition-colors",
     isActive
       ? "border-blue-600 bg-blue-600 text-white shadow-xs"
       : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
@@ -84,7 +85,7 @@ function PageControl({
 }: PageControlProps) {
   if (onSelect) {
     return (
-      <button
+      <Button variant="unstyled"
         type="button"
         onClick={() => onSelect(page)}
         className={`${className} cursor-pointer`}
@@ -92,7 +93,7 @@ function PageControl({
         aria-current={ariaCurrent}
       >
         {children}
-      </button>
+      </Button>
     );
   }
   return (
@@ -136,7 +137,7 @@ function PaginationInner({
 
   const arrowClass = (enabled: boolean) =>
     [
-      "inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors",
+      "inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-control border px-3 text-sm font-medium transition-colors",
       enabled
         ? "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
         : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300",
@@ -170,7 +171,7 @@ function PaginationInner({
           <span
             key={item}
             aria-hidden="true"
-            className="inline-flex h-11 min-w-11 items-center justify-center px-1 text-sm text-slate-400"
+            className="inline-flex h-11 min-w-11 items-center justify-center px-1 text-sm text-slate-500"
           >
             …
           </span>
@@ -237,7 +238,7 @@ export function Pagination(props: PaginationProps) {
           {Array.from({ length: 5 }, (_, i) => (
             <div
               key={i}
-              className="h-11 w-11 animate-pulse rounded-lg bg-slate-100"
+              className="h-11 w-11 animate-pulse rounded-control bg-slate-100"
             />
           ))}
         </div>

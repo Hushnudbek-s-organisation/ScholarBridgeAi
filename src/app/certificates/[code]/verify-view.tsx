@@ -63,17 +63,17 @@ export function CertificateVerifyView({ code }: { code: string }) {
   return (
     <main aria-busy={status === "loading"}>
       <header className="mb-6 flex flex-col items-center text-center">
-        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg">
+        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-overlay bg-indigo-600 text-white shadow-lg">
           <Award className="h-7 w-7" aria-hidden="true" />
         </div>
         <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">{t("title")}</h1>
         <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">{t("description")}</p>
       </header>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+      <div className="rounded-overlay border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
           {t("codeLabel")}
-          <code className="ml-2 break-all rounded bg-slate-100 px-2 py-1 font-mono text-xs text-slate-800 dark:bg-slate-800 dark:text-slate-200">{displayCode || "—"}</code>
+          <code className="ml-2 break-all rounded-control bg-slate-100 px-2 py-1 font-mono text-xs text-slate-800 dark:bg-slate-800 dark:text-slate-200">{displayCode || "—"}</code>
         </p>
 
         {status === "loading" && (
@@ -84,7 +84,7 @@ export function CertificateVerifyView({ code }: { code: string }) {
         )}
 
         {status === "valid" && (
-          <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-800 dark:bg-emerald-950">
+          <div role="status" className="rounded-surface border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-800 dark:bg-emerald-950">
             <p className="flex items-center gap-2 text-base font-bold text-emerald-800 dark:text-emerald-300">
               <BadgeCheck className="h-6 w-6" aria-hidden="true" />
               {t("valid")}
@@ -112,13 +112,13 @@ export function CertificateVerifyView({ code }: { code: string }) {
                 </div>
               </dl>
             ) : (
-              <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-400">{t("validGeneric")}</p>
+              <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">{t("validGeneric")}</p>
             )}
           </div>
         )}
 
         {status === "invalid" && (
-          <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-800 dark:bg-rose-950">
+          <div role="alert" className="rounded-surface border border-rose-200 bg-rose-50 p-5 dark:border-rose-800 dark:bg-rose-950">
             <p className="flex items-center gap-2 text-base font-bold text-rose-800 dark:text-rose-300">
               <BadgeX className="h-6 w-6" aria-hidden="true" />
               {t("invalid")}
@@ -130,7 +130,7 @@ export function CertificateVerifyView({ code }: { code: string }) {
 
       {/* What "valid" means — the check confirms this platform issued the
           certificate, not that any university or employer recognises it. */}
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+      <div className="mt-6 rounded-overlay border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
         <AppNote kind="certificate" />
       </div>
 

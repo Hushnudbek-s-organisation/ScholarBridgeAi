@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { Gift, Settings2, Loader2, RefreshCw, Save, Upload, Download, Image as ImageIcon } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface ConfigManagerProps {
   adminProfileId: number;
@@ -89,36 +90,36 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-slate-900 flex items-center justify-center">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-slate-900 flex items-center justify-center">
           <Settings2 className="h-5 w-5 text-amber-300" />
         </div>
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Settings (App Config)</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             No hardcoded business values — prices, limits and schedules live here.
           </p>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={load}
-          className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="ml-auto flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </button>
+        </Button>
       </div>
 
-      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+      <div className="rounded-overlay border border-indigo-100 bg-indigo-50/60 p-4">
         <div className="flex items-start gap-3 mb-4">
           <ImageIcon className="h-5 w-5 text-indigo-600 mt-0.5" />
           <div>
             <h3 className="text-sm font-extrabold text-slate-800">Site images</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Replace the logo and browser tab favicon across the platform. PNG, JPG, WEBP or ICO, up to 5 MB.</p>
+            <p className="text-sm text-slate-500 mt-0.5">Replace the logo and browser tab favicon across the platform. PNG, JPG, WEBP or ICO, up to 5 MB.</p>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {(["logo", "favicon"] as const).map((kind) => (
-            <div key={kind} className="flex items-center gap-3 rounded-xl border border-white bg-white p-3 shadow-xs dark:border-slate-700">
-              <div className="sb-logo-well h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+            <div key={kind} className="flex items-center gap-3 rounded-surface border border-white bg-white p-3 shadow-xs dark:border-slate-700">
+              <div className="sb-logo-well h-12 w-12 shrink-0 rounded-control border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
                 {branding[kind] ? (
                   <Image
                     src={branding[kind]}
@@ -133,9 +134,9 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-extrabold text-slate-700">{kind === "logo" ? "Site logo" : "Favicon"}</p>
-                <p className="truncate text-[10px] text-slate-400">{branding[kind] ? "Custom image active" : "Default image active"}</p>
-                <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 has-[:disabled]:opacity-60">
+                <p className="text-sm font-extrabold text-slate-700">{kind === "logo" ? "Site logo" : "Favicon"}</p>
+                <p className="truncate text-sm text-slate-500">{branding[kind] ? "Custom image active" : "Default image active"}</p>
+                <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-control bg-indigo-600 px-2.5 py-1.5 text-sm font-bold text-white hover:bg-indigo-700 has-[:disabled]:opacity-60">
                   {uploading === kind ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
                   Upload and replace
                   <input type="file" accept="image/png,image/jpeg,image/webp,image/x-icon" className="sr-only" disabled={uploading !== ""} onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadBranding(kind, file); e.currentTarget.value = ""; }} />
@@ -151,12 +152,12 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
       <ConfigTransferCard onApplied={load} />
 
       {message && (
-        <div className={`rounded-xl px-4 py-3 text-xs font-semibold ${message.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+        <div className={`rounded-surface px-4 py-3 text-xs font-semibold ${message.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"}`}>
           {message.text}
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+      <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center gap-2 p-8 text-xs font-semibold text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
@@ -165,7 +166,7 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-4 py-3 font-bold">Key</th>
                   <th className="px-4 py-3 font-bold">Value</th>
                   <th className="px-4 py-3 font-bold">Description</th>
@@ -180,22 +181,22 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
                       <input
                         key={r.key + r.value}
                         defaultValue={r.value}
-                        className="w-full max-w-[180px] rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full max-w-[180px] rounded-control border border-slate-200 px-2.5 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </td>
                     <td className="px-4 py-2.5 text-slate-500">{r.description || "—"}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <button
+                      <Button variant="unstyled"
                         onClick={(e) => {
                           const input = (e.currentTarget.closest("tr") as HTMLElement)?.querySelector("input");
                           if (input) save(r.key, input.value);
                         }}
                         disabled={savingKey === r.key}
-                        className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+                        className="inline-flex items-center gap-1 rounded-control bg-indigo-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
                       >
                         {savingKey === r.key ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                         Save
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -247,12 +248,12 @@ function ReferralRewardsCard({
   const preview = REFERRAL_FIELDS.every((f, i) => Number.isFinite(numbers[i]) && numbers[i] >= f.min && numbers[i] <= f.max);
 
   return (
-    <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4">
+    <div className="rounded-overlay border border-violet-200 bg-violet-50/60 p-4">
       <div className="flex items-start gap-3 mb-4">
         <Gift className="h-5 w-5 text-violet-600 mt-0.5" />
         <div>
           <h3 className="text-sm font-extrabold text-slate-800">{t("refTitle")}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">{t("refSubtitle")}</p>
+          <p className="text-sm text-slate-500 mt-0.5">{t("refSubtitle")}</p>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -262,30 +263,30 @@ function ReferralRewardsCard({
           const dirty = current !== stored;
           const valid = /^\d{1,12}$/.test(current) && Number(current) >= field.min && Number(current) <= field.max;
           return (
-            <div key={field.key} className="rounded-xl border border-white bg-white p-3 shadow-xs dark:border-slate-700">
-              <label className="text-xs font-extrabold text-slate-700" htmlFor={`cfg-${field.key}`}>
+            <div key={field.key} className="rounded-surface border border-white bg-white p-3 shadow-xs dark:border-slate-700">
+              <label className="text-sm font-extrabold text-slate-700" htmlFor={`cfg-${field.key}`}>
                 {t(field.labelKey)}
               </label>
-              <p className="mt-0.5 text-[10px] text-slate-400">{t(field.hintKey)}</p>
+              <p className="mt-0.5 text-sm text-slate-500">{t(field.hintKey)}</p>
               <div className="mt-2 flex items-center gap-2">
                 <input
                   id={`cfg-${field.key}`}
                   inputMode="numeric"
                   value={current}
                   onChange={(e) => setDraft((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                  className="w-24 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-24 rounded-control border border-slate-200 px-2.5 py-1.5 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
-                <button
+                <Button variant="unstyled"
                   onClick={() => dirty && valid && onSave(field.key, current)}
                   disabled={!dirty || !valid || savingKey === field.key}
-                  className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-control bg-violet-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"
                 >
                   {savingKey === field.key ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                   {t("save")}
-                </button>
+                </Button>
               </div>
               {!valid && (
-                <p className="mt-1 text-[10px] font-semibold text-red-600">
+                <p className="mt-1 text-sm font-semibold text-rose-600">
                   {t("refNumberRange", { min: field.min, max: field.max })}
                 </p>
               )}
@@ -294,7 +295,7 @@ function ReferralRewardsCard({
         })}
       </div>
       {preview && (
-        <p className="mt-3 rounded-xl border border-violet-200 bg-white px-3 py-2 text-[11px] font-semibold text-violet-800">
+        <p className="mt-3 rounded-surface border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-violet-800">
           {t("refPreview", {
             multiple: multiple || 1,
             days: days || 1,
@@ -364,25 +365,25 @@ function ConfigTransferCard({ onApplied }: { onApplied: () => void }) {
   const pending = plan ? plan.changes.length + plan.modelChanges.length : 0;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+    <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs space-y-3">
       <div>
         <h3 className="text-sm font-extrabold text-slate-800">Export / import settings</h3>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <p className="text-sm text-slate-500 mt-0.5">
           Copies prices, limits, AI provider choices and models, navigation and guide texts to another deployment.
           Secrets (API keys, bot token, passwords) are never exported — set them on the new host.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <a href="/api/admin/config/export" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">
+        <a href="/api/admin/config/export" className="inline-flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">
           <Download className="h-3.5 w-3.5" /> Export (JSON)
         </a>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Import…
           <input type="file" accept="application/json,.json" className="sr-only" disabled={busy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void onFile(file); e.currentTarget.value = ""; }} />
         </label>
       </div>
       {plan && (
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[11px] text-slate-600 space-y-1" aria-live="polite">
+        <div className="rounded-surface border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600 space-y-1" aria-live="polite">
           <p className="font-bold text-slate-700">
             {pending} change(s) · {plan.unchanged.length} unchanged · {plan.rejected.length} rejected
           </p>
@@ -393,16 +394,16 @@ function ConfigTransferCard({ onApplied }: { onApplied: () => void }) {
             <p key={m.provider} className="font-mono">model {m.provider}: {m.from ?? "(default)"} → {m.to}</p>
           ))}
           {plan.rejected.map((r) => (
-            <p key={r.key} className="font-mono text-red-600">✗ {r.key}: {r.reason}</p>
+            <p key={r.key} className="font-mono text-rose-600">✗ {r.key}: {r.reason}</p>
           ))}
           {payload !== null && pending > 0 && (
-            <button onClick={() => void post(false, payload)} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
+            <Button variant="unstyled" onClick={() => void post(false, payload)} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 rounded-control bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
               <Save className="h-3 w-3" /> Apply {pending} change(s)
-            </button>
+            </Button>
           )}
         </div>
       )}
-      {msg && <p className={`text-[11px] font-semibold ${msg.ok ? "text-emerald-600" : "text-red-600"}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm font-semibold ${msg.ok ? "text-emerald-600" : "text-rose-600"}`}>{msg.text}</p>}
     </div>
   );
 }

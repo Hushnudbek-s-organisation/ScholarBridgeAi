@@ -391,6 +391,13 @@ export async function GET(req: Request) {
       nextSteps,
       deadlines,
       applications: appProgress,
+      // Full-profile activity counts power the three starter tasks. The
+      // recommendation arrays are intentionally short and cannot answer this.
+      activity: {
+        savedUniversities: Number(row?.savedUniversities ?? 0),
+        savedScholarships: Number(row?.savedScholarships ?? 0),
+        applications: Number(row?.applications ?? appRows.length),
+      },
       readiness,
       phases,
       testGaps: gaps,

@@ -35,7 +35,7 @@ export function MatchEvidenceBadge({
     <span
       title={t("exEvidenceDisclaimer")}
       aria-label={`${t("exEvidenceCoverage", { percent, compared: comparedDimensions, total: totalDimensions })}. ${t(`exEvidenceLevel.${level}` as never)}`}
-      className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-tight tabular-nums ${levelStyle} ${className}`}
+      className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold leading-tight tabular-nums ${levelStyle} ${className}`}
     >
       <span>{t("exEvidenceCoverage", { percent, compared: comparedDimensions, total: totalDimensions })}</span>
       <span aria-hidden="true">·</span>

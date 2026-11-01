@@ -110,6 +110,10 @@ import {
   MIC_RESTART_DELAY_MS,
   speakWatchdogMs,
 } from "@/lib/visa-mic";
+import { Button } from "@/components/ui/Button";
+import { LoadingStages } from "@/components/ui/LoadingStages";
+import { UI_COLORS } from "@/components/ui/tokens";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 const MAX_SILENCE_RECOVERY_ATTEMPTS = 5;
 
@@ -523,7 +527,7 @@ function Steps({ current }: { current: 0 | 1 | 2 }) {
           {i > 0 && <div className="h-px w-5 bg-white/25 sm:w-8" />}
           <div className="flex items-center gap-1.5">
             <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                 i === current
                   ? "bg-white text-blue-700"
                   : i < current
@@ -551,7 +555,7 @@ function ScoreRing({
   value,
   label,
   size = 120,
-  color = "#2563eb",
+  color = UI_COLORS.info,
 }: {
   value: number;
   label: string;
@@ -577,7 +581,7 @@ function ScoreRing({
             cy={size / 2}
             r={r}
             fill="none"
-            stroke="#e2e8f0"
+            stroke={UI_COLORS.border}
             strokeWidth={stroke}
           />
           <circle
@@ -590,14 +594,14 @@ function ScoreRing({
             strokeLinecap="round"
             strokeDasharray={c}
             strokeDashoffset={c - (c * animated) / 100}
+            className="sb-ring-transition"
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            style={{ transition: "stroke-dashoffset 1.2s ease-out" }}
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-2xl font-extrabold text-slate-900">
             {animated}
-            <span className="text-sm font-bold text-slate-400">%</span>
+            <span className="text-sm font-bold text-slate-500">%</span>
           </span>
         </div>
       </div>
@@ -2559,10 +2563,10 @@ export function VisaSpeakingAssistant({
       {/* Theme-adaptive hero: alabaster-indigo in light mode, obsidian-indigo
           in dark. The old hardcoded slate-950 banner stayed black in Light
           Mode, which read as a rendering fault. */}
-      <div className="sb-journey-hero overflow-hidden rounded-3xl border border-slate-200 p-5 shadow-sm sm:p-6 dark:border-slate-700/80">
+      <div className="sb-journey-hero overflow-hidden rounded-overlay border border-slate-200 p-5 shadow-sm sm:p-6 dark:border-slate-700/80">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-300/50 bg-indigo-100/70 px-3 py-1 text-[11px] font-black tracking-[0.2em] text-indigo-700 uppercase dark:border-indigo-400/30 dark:bg-indigo-400/15 dark:text-indigo-200">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-300/50 bg-indigo-100/70 px-3 py-1 text-xs font-black tracking-[0.2em] text-indigo-700 uppercase dark:border-indigo-400/30 dark:bg-indigo-400/15 dark:text-indigo-200">
               <Radio className="h-3.5 w-3.5" />
               {t("aiSimulatorBadge")}
             </div>
@@ -2571,11 +2575,11 @@ export function VisaSpeakingAssistant({
             <h2 className="mt-3 text-xl font-extrabold tracking-tight sm:text-2xl">
               🎙️ {t("title")}
             </h2>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600 sm:text-sm dark:text-slate-300">
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-sm dark:text-slate-300">
               {t("subtitle")}
             </p>
           </div>
-          <div className="rounded-2xl bg-white/60 px-3 py-2 backdrop-blur-sm dark:bg-white/10">
+          <div className="rounded-overlay bg-white/60 px-3 py-2 backdrop-blur-sm dark:bg-white/10">
             <Steps current={screen === "setup" ? 0 : screen === "result" ? 2 : 1} />
           </div>
         </div>
@@ -2583,13 +2587,13 @@ export function VisaSpeakingAssistant({
 
       {screen === "setup" && (
         <div className="space-y-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700">
+          <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                   {t("countryTitle")}
                 </h2>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t("countryHint")}</p>
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t("countryHint")}</p>
               </div>
               <input
                 type="search"
@@ -2597,19 +2601,19 @@ export function VisaSpeakingAssistant({
                 onChange={(e) => setCountrySearch(e.target.value)}
                 placeholder={t("searchCountryPlaceholder")}
                 aria-label={t("searchCountryPlaceholder")}
-                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-56 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-56 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {visibleVisaCountries.map((c) => {
                 const selected = countryCode === c.code;
                 return (
-                  <button
+                  <Button variant="unstyled"
                     key={c.code}
                     type="button"
                     onClick={() => setCountryCode(c.code)}
                     aria-pressed={selected}
-                    className={`relative rounded-xl border-2 p-3 text-left transition-all ${
+                    className={`relative rounded-surface border-2 p-3 text-left transition-all ${
                       selected
                         ? "border-blue-600 bg-blue-50 shadow-md"
                         : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm"
@@ -2627,7 +2631,7 @@ export function VisaSpeakingAssistant({
                       {localizedCountryName(c.name)}
                     </div>
                     <div
-                      className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
                         selected
                           ? "bg-blue-600 text-white"
                           : "bg-slate-100 text-slate-500"
@@ -2636,22 +2640,22 @@ export function VisaSpeakingAssistant({
                       <Globe className="h-2.5 w-2.5" />
                       {languageLabel(c.language)}
                     </div>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
             {visibleVisaCountries.length === 0 && (
-              <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-3 text-center text-sm text-slate-500 dark:text-slate-400">
                 {t("countryNoMatches")}
               </p>
             )}
             {!countryPickerSearching && VISA_COUNTRIES.length > visibleVisaCountries.length && (
               <div className="mt-3 flex justify-center">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => setShowAllCountries((v) => !v)}
                   aria-expanded={showAllCountries}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   {showAllCountries
                     ? t("showFewer")
@@ -2659,17 +2663,17 @@ export function VisaSpeakingAssistant({
                         total: VISA_COUNTRIES.length,
                         hidden: VISA_COUNTRIES.length - visibleVisaCountries.length,
                       })}
-                </button>
+                </Button>
               </div>
             )}
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
               <h2 className="text-base font-bold text-slate-900">
                 {t("genderTitle")}
               </h2>
-              <p className="mt-0.5 text-xs text-slate-500">{t("genderHint")}</p>
+              <p className="mt-0.5 text-sm text-slate-500">{t("genderHint")}</p>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {(
                   [
@@ -2679,7 +2683,7 @@ export function VisaSpeakingAssistant({
                 ).map((g) => {
                   const selected = gender === g.id;
                   return (
-                    <button
+                    <Button variant="unstyled"
                       key={g.id}
                       type="button"
                       onClick={() => {
@@ -2687,7 +2691,7 @@ export function VisaSpeakingAssistant({
                         setVoice(normalizeVisaLiveVoice(voice, g.id));
                       }}
                       aria-pressed={selected}
-                      className={`relative flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                      className={`relative flex items-center gap-3 rounded-surface border-2 p-4 text-left transition-all ${
                         selected
                           ? "border-blue-600 bg-blue-50 shadow-md"
                           : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm"
@@ -2711,29 +2715,29 @@ export function VisaSpeakingAssistant({
                           {g.desc}
                         </span>
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
               <h2 className="text-base font-bold text-slate-900">
                 {t("liveVoiceTitle")}
               </h2>
-              <p className="mt-0.5 text-xs text-slate-500">{t("liveVoiceHint")}</p>
+              <p className="mt-0.5 text-sm text-slate-500">{t("liveVoiceHint")}</p>
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {VISA_LIVE_VOICES.map((v) => {
                   const selected = voice === v;
                   return (
-                    <button
+                    <Button variant="unstyled"
                       key={v}
                       type="button"
                       onClick={() => {
                         setVoice(v);
                         setLiveVoiceSelected(true);
                       }}
-                      className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
+                      className={`rounded-surface border px-3 py-2.5 text-left transition-all ${
                         selected
                           ? "border-cyan-400 bg-slate-950 text-white shadow-md"
                           : "border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50"
@@ -2743,31 +2747,31 @@ export function VisaSpeakingAssistant({
                         <Waves className="h-3.5 w-3.5" />
                         {v}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
             </div>
           </div>
 
-          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+          <div className="mb-3 rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
             {t("openRouterInterviewDisclosure")}
           </div>
           <div className="flex flex-col items-center gap-2">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => engineRef.current?.startInterview()}
               disabled={!countryCode || !gender}
-              className={`w-full rounded-xl px-6 py-3.5 text-sm font-bold shadow-md transition-all sm:w-auto sm:min-w-72 ${
+              className={`w-full rounded-surface px-6 py-3.5 text-sm font-bold shadow-md transition-all sm:w-auto sm:min-w-72 ${
                 countryCode && gender
                   ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "cursor-not-allowed bg-slate-200 text-slate-400"
+                  : "cursor-not-allowed bg-slate-200 text-slate-500"
               }`}
             >
               🎙️ {t("start")}
-            </button>
+            </Button>
             {(!countryCode || !gender) && (
-              <p className="text-xs text-slate-400">{t("pickCountryFirst")}</p>
+              <p className="text-sm text-slate-500">{t("pickCountryFirst")}</p>
             )}
           </div>
         </div>
@@ -2775,19 +2779,19 @@ export function VisaSpeakingAssistant({
 
       {screen === "interview" && country && (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
+          <div className="flex flex-wrap items-center gap-3 rounded-overlay border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
             <CountryFlag country={country.name} flagEmoji={country.flag} size="lg" />
             <div className="min-w-0">
               <div className="break-words text-sm font-bold text-slate-900 dark:text-slate-100">
                 {localizedCountryName(country.name)}
               </div>
-              <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                 <Globe className="h-3 w-3" />
                 {languageLabel(country.language)}
               </div>
             </div>
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-inset ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ring-inset ${
                 engineMode === "gemini-live"
                   ? "bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-200 dark:ring-indigo-800"
                   : "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
@@ -2799,25 +2803,25 @@ export function VisaSpeakingAssistant({
               </span>
               {engineMode === "gemini-live" ? t("aiLiveVoice") : t("aiStandardVoice")}
             </span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
               {t("answers", { count: userTurns })}
             </span>
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => engineRef.current?.endInterview()}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-red-700"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-surface bg-rose-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-rose-700"
             >
               <PhoneOff className="h-4 w-4" />
               {t("end")}
-            </button>
+            </Button>
           </div>
 
           {/* Theme-adaptive studio: light alabaster-indigo by day, deep
               obsidian-indigo at night. Replaces the old slab of `bg-slate-950`,
               which was black in both themes. */}
-          <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-gradient-to-br from-slate-50 via-indigo-50/35 to-sky-50/25 text-slate-900 shadow-lg dark:border-slate-700/80 dark:from-[#0b1325] dark:via-[#111c35] dark:to-[#0d1528] dark:text-slate-100">
+          <div className="overflow-hidden rounded-overlay border border-slate-200/90 bg-gradient-to-br from-slate-50 via-indigo-50/35 to-sky-50/25 text-slate-900 shadow-lg dark:border-slate-700/80 dark:from-canvas dark:via-surface dark:to-well dark:text-slate-100">
             <div className="grid gap-4 p-4 lg:grid-cols-[1fr_420px] lg:p-6">
-              <div className="relative flex min-h-[430px] flex-col items-center justify-center rounded-3xl border border-slate-200/80 bg-white/85 p-6 shadow-xs backdrop-blur-md dark:border-slate-700/70 dark:bg-[#131f38]/85">
+              <div className="relative flex min-h-[430px] flex-col items-center justify-center rounded-overlay border border-slate-200/80 bg-white/85 p-6 shadow-xs backdrop-blur-md dark:border-slate-700/70 dark:bg-surface/85">
                 <AiOrbFaceAvatar
                   state={reactorStatus}
                   level={reactorLevel}
@@ -2834,23 +2838,23 @@ export function VisaSpeakingAssistant({
                   }
                   roleLabel={t("avOfficerRole")}
                 />
-                <div className="mt-4 grid w-full max-w-xl grid-cols-3 gap-2 text-center text-[10px] font-black tracking-wide text-slate-500 uppercase sm:text-xs dark:text-slate-300">
-                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
+                <div className="mt-4 grid w-full max-w-xl grid-cols-3 gap-2 text-center text-xs font-black tracking-wide text-slate-500 uppercase sm:text-xs dark:text-slate-300">
+                  <div className="rounded-overlay border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
                     {liveConnected || engineMode === "fallback" ? t("connected") : t("connecting")}
                   </div>
-                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
+                  <div className="rounded-overlay border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
                     {muted ? t("soundOff") : t("soundOn")}
                   </div>
-                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
+                  <div className="rounded-overlay border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
                     {country.language}
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col gap-4">
-                <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-700/70 dark:bg-[#15223c]">
+                <div className="rounded-overlay border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-700/70 dark:bg-surface">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-3xl ring-1 ring-slate-200 dark:bg-indigo-950/60 dark:ring-indigo-800/50">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-overlay bg-slate-100 text-3xl ring-1 ring-slate-200 dark:bg-indigo-950/60 dark:ring-indigo-800/50">
                       {gender === "female" ? "👩‍💼" : "👨‍💼"}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -2868,7 +2872,7 @@ export function VisaSpeakingAssistant({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-4 min-h-24 rounded-2xl border border-slate-200/80 bg-slate-50 p-4 dark:border-indigo-800/50 dark:bg-indigo-950/40">
+                  <div className="mt-4 min-h-24 rounded-overlay border border-slate-200/80 bg-slate-50 p-4 dark:border-indigo-800/50 dark:bg-indigo-950/40">
                     {officerState === "thinking" && !lastOfficer && !liveOutputPartial ? (
                       <span className="inline-flex items-center gap-2 text-sm text-indigo-700 dark:text-indigo-200">
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -2885,24 +2889,24 @@ export function VisaSpeakingAssistant({
                     ) : null}
                   </div>
                   {engineMode === "fallback" && !ttsSupported && (
-                    <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-500">
                       {t("voiceUnavailable")}
                     </p>
                   )}
                   {audioNeedsGesture && !muted && !listening && lastOfficer && (
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       onClick={() => engineRef.current?.replayOfficerVoice()}
                       aria-live="polite"
-                      className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                      className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-surface border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
                     >
                       <Volume2 className="h-4 w-4" />
                       {t("tapToPlayOfficer")}
-                    </button>
+                    </Button>
                   )}
                 </div>
 
-                <div className="min-h-0 flex-1 rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-700/70 dark:bg-[#15223c]">
+                <div className="min-h-0 flex-1 rounded-overlay border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-700/70 dark:bg-surface">
                   <h3 className="text-xs font-black tracking-[0.2em] text-slate-500 uppercase dark:text-slate-400">
                     {t("transcriptTitle")}
                   </h3>
@@ -2911,7 +2915,7 @@ export function VisaSpeakingAssistant({
                     className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1"
                   >
                     {messages.length === 0 && !interim && !liveOutputPartial && (
-                      <p className="py-8 text-center text-xs text-slate-400 dark:text-slate-500">
+                      <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-500">
                         {t("emptyTranscript")}
                       </p>
                     )}
@@ -2919,9 +2923,9 @@ export function VisaSpeakingAssistant({
                       m.role === "officer" ? (
                         <div
                           key={i}
-                          className="mr-6 rounded-2xl rounded-tl-sm border border-slate-200/80 bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-800 sm:text-sm dark:border-indigo-800/50 dark:bg-indigo-950/60 dark:text-slate-100"
+                          className="mr-6 rounded-overlay rounded-tl-sm border border-slate-200/80 bg-slate-100 px-3 py-2 text-xs leading-relaxed text-slate-800 sm:text-sm dark:border-indigo-800/50 dark:bg-indigo-950/60 dark:text-slate-100"
                         >
-                          <span className="mb-0.5 block text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                          <span className="mb-0.5 block text-xs font-bold text-indigo-700 dark:text-indigo-300">
                             {t("officer")}
                           </span>
                           {m.text}
@@ -2929,9 +2933,9 @@ export function VisaSpeakingAssistant({
                       ) : (
                         <div
                           key={i}
-                          className="ml-6 rounded-2xl rounded-tr-sm bg-indigo-600 px-3 py-2 text-xs leading-relaxed text-white shadow-xs sm:text-sm"
+                          className="ml-6 rounded-overlay rounded-tr-sm bg-indigo-600 px-3 py-2 text-xs leading-relaxed text-white shadow-xs sm:text-sm"
                         >
-                          <span className="mb-0.5 block text-[10px] font-bold text-indigo-200">
+                          <span className="mb-0.5 block text-xs font-bold text-indigo-200">
                             {t("you")}
                           </span>
                           {m.text}
@@ -2939,16 +2943,16 @@ export function VisaSpeakingAssistant({
                       ),
                     )}
                     {liveOutputPartial && (
-                      <div className="mr-6 rounded-2xl rounded-tl-sm border border-dashed border-indigo-300/50 bg-indigo-50 px-3 py-2 text-xs text-slate-600 italic sm:text-sm dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200">
-                        <span className="mb-0.5 block text-[10px] font-bold text-cyan-300">
+                      <div className="mr-6 rounded-overlay rounded-tl-sm border border-dashed border-indigo-300/50 bg-indigo-50 px-3 py-2 text-xs text-slate-600 italic sm:text-sm dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+                        <span className="mb-0.5 block text-xs font-bold text-cyan-300">
                           {t("officer")}
                         </span>
                         {liveOutputPartial}…
                       </div>
                     )}
                     {interim && (
-                      <div className="ml-6 rounded-2xl rounded-tr-sm border border-dashed border-indigo-300/50 bg-indigo-50 px-3 py-2 text-xs text-slate-600 italic sm:text-sm dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200">
-                        <span className="mb-0.5 block text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
+                      <div className="ml-6 rounded-overlay rounded-tr-sm border border-dashed border-indigo-300/50 bg-indigo-50 px-3 py-2 text-xs text-slate-600 italic sm:text-sm dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+                        <span className="mb-0.5 block text-xs font-bold text-indigo-600 dark:text-indigo-300">
                           {t("you")}
                         </span>
                         {interim}…
@@ -2960,20 +2964,20 @@ export function VisaSpeakingAssistant({
             </div>
 
             <div className="border-t border-white/10 bg-white/[0.03] p-4">
-              <p className="text-center text-xs font-bold text-cyan-100">
+              <p className="text-center text-sm font-bold text-cyan-100">
                 {t("answerIn", { language: country.language })}
               </p>
               <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => engineRef.current?.onMicClick()}
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-xs font-black shadow-sm transition-all ${
+                  className={`inline-flex items-center gap-2 rounded-overlay px-4 py-3 text-xs font-black shadow-sm transition-all ${
                     engineMode === "gemini-live"
                       ? liveConnected
                         ? "cursor-not-allowed bg-white/10 text-white/45"
                         : "bg-emerald-500 text-slate-950 sb-ink-on-bright hover:bg-emerald-400"
                       : listening
-                        ? "bg-red-600 text-white hover:bg-red-700"
+                        ? "bg-rose-600 text-white hover:bg-rose-700"
                         : officerState !== "idle"
                           ? "cursor-not-allowed bg-white/10 text-white/45"
                           : "bg-emerald-500 text-slate-950 sb-ink-on-bright hover:bg-emerald-400"
@@ -2987,21 +2991,21 @@ export function VisaSpeakingAssistant({
                     <Mic className="h-4 w-4" />
                   )}
                   {engineMode === "fallback" && listening ? t("micStop") : t("startShort")}
-                </button>
+                </Button>
 
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => engineRef.current?.interruptAssistant()}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-xs font-black text-white shadow-sm transition-colors hover:bg-red-700"
+                  className="inline-flex items-center gap-2 rounded-overlay bg-rose-600 px-4 py-3 text-xs font-black text-white shadow-sm transition-colors hover:bg-rose-700"
                 >
                   <Square className="h-4 w-4 fill-current" />
                   {t("stop")}
-                </button>
+                </Button>
 
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => engineRef.current?.toggleMute()}
-                  className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black transition-colors ${
+                  className={`inline-flex items-center gap-2 rounded-overlay border px-4 py-3 text-xs font-black transition-colors ${
                     muted
                       ? "border-white/10 bg-white/10 text-white/60"
                       : "border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/15"
@@ -3009,10 +3013,10 @@ export function VisaSpeakingAssistant({
                 >
                   {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                   {muted ? t("soundOff") : t("soundOn")}
-                </button>
+                </Button>
               </div>
 
-              <p className="mt-3 text-center text-xs text-slate-400">
+              <p className="mt-3 text-center text-sm text-slate-500">
                 {reactorStatus === "LISTENING"
                   ? t("micListening")
                   : reactorStatus === "THINKING"
@@ -3026,23 +3030,23 @@ export function VisaSpeakingAssistant({
                   works, typing when it does not. It used to appear only after a
                   mic failure, so a desktop or mobile student who simply
                   preferred typing had no way in. */}
-              <div className="mx-auto mt-4 max-w-2xl space-y-2 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700/60 dark:bg-white/5">
+              <div className="mx-auto mt-4 max-w-2xl space-y-2 rounded-overlay border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700/60 dark:bg-white/5">
                 {showTextFallback && (
                   <>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       {!sttSupported ? t("sttUnsupported") : t("micBlocked")}
                     </p>
                     {sttSupported && (
                       <div className="space-y-1.5">
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() => engineRef.current?.onMicClick()}
-                          className="sb-ink-on-bright inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 transition-colors hover:bg-emerald-400"
+                          className="sb-ink-on-bright inline-flex items-center gap-1.5 rounded-surface bg-emerald-500 px-3 py-2 text-xs font-black text-slate-950 transition-colors hover:bg-emerald-400"
                         >
                           <Mic className="h-3.5 w-3.5" />
                           {t("micRetry")}
-                        </button>
-                        <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                        </Button>
+                        <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">
                           {t("micInlineHint")}
                         </p>
                         {embedded && (
@@ -3050,7 +3054,7 @@ export function VisaSpeakingAssistant({
                             href={typeof window === "undefined" ? "/" : window.location.href}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-300/50 bg-indigo-50 px-3 py-2 text-[11px] font-black text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200"
+                            className="inline-flex items-center gap-1.5 rounded-surface border border-indigo-300/50 bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200"
                           >
                             <Mic className="h-3.5 w-3.5" />
                             {t("micOpenTab")}
@@ -3070,17 +3074,17 @@ export function VisaSpeakingAssistant({
                       }
                     }}
                     placeholder={t("typePlaceholder")}
-                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-400 dark:border-slate-700/70 dark:bg-[#0f1a30] dark:text-slate-100 dark:placeholder:text-slate-500"
+                    className="min-w-0 flex-1 rounded-surface border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus:border-indigo-400 dark:border-slate-700/70 dark:bg-field dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     onClick={() => engineRef.current?.submitAnswer(textAnswer)}
                     disabled={!textAnswer.trim()}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Send className="h-4 w-4" />
                     {t("send")}
-                  </button>
+                  </Button>
                 </div>
 
                 {/* 1-click model answer: fills the box with the authored
@@ -3088,11 +3092,11 @@ export function VisaSpeakingAssistant({
                     of detail expected, then edit it into their own words. */}
                 {hasModelAnswer && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       onClick={() => void loadModelAnswer()}
                       disabled={loadingModelAnswer || officerState !== "idle"}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-[11px] font-black text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+                      className="inline-flex items-center gap-1.5 rounded-surface border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
                     >
                       {loadingModelAnswer ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -3100,8 +3104,8 @@ export function VisaSpeakingAssistant({
                         <span aria-hidden>🎯</span>
                       )}
                       {t("loadModelAnswer")}
-                    </button>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    </Button>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
                       {loadedModelAnswer ? t("modelAnswerTip") : t("modelAnswerHint")}
                     </span>
                   </div>
@@ -3111,55 +3115,54 @@ export function VisaSpeakingAssistant({
           </div>
 
           {error && (
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-800">
+            <div className="flex flex-wrap items-center gap-2 rounded-overlay border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-800">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span className="flex-1">{error}</span>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => engineRef.current?.retryReply()}
-                className="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700"
+                className="rounded-control bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700"
               >
                 {t("tryAgain")}
-              </button>
+              </Button>
             </div>
           )}
           {notice && !error && (
-            <p className="text-center text-xs text-slate-500">{notice}</p>
+            <p className="text-center text-sm text-slate-500">{notice}</p>
           )}
         </div>
       )}
 
       {screen === "analyzing" && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-xs">
+        <div className="rounded-overlay border border-slate-200 bg-white p-10 text-center shadow-xs">
           {analyzeError ? (
             <div className="mx-auto max-w-md space-y-3">
-              <AlertCircle className="mx-auto h-10 w-10 text-red-400" />
-              <p className="text-sm font-medium text-red-700">{analyzeError}</p>
+              <AlertCircle className="mx-auto h-10 w-10 text-rose-400" />
+              <p className="text-sm font-medium text-rose-700">{analyzeError}</p>
               <div className="flex justify-center gap-2">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => engineRef.current?.runAnalysis()}
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  className="min-h-11 rounded-surface bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
                 >
                   {t("tryAgain")}
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => engineRef.current?.backToInterview()}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  className="rounded-surface border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                 >
                   {t("backToInterview")}
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <div className="mx-auto max-w-md space-y-3">
-              <Loader2 className="mx-auto h-10 w-10 animate-spin text-blue-600" />
-              <p className="text-base font-bold text-slate-900">
-                {t("analyzing")}
-              </p>
-              <p className="text-xs text-slate-500">{t("analyzingHint")}</p>
-            </div>
+            <LoadingStages
+              className="mx-auto max-w-xl text-left"
+              title={t("analyzing")}
+              description={t("analyzingHint")}
+              stages={[t("analysisStage1"), t("analysisStage2"), t("analysisStage3")]}
+            />
           )}
         </div>
       )}
@@ -3169,9 +3172,9 @@ export function VisaSpeakingAssistant({
           {/* #9 — the rubric is computed from what was actually said, so it
               renders even when no AI provider is configured. */}
           {analysis.rubric && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+            <div className="rounded-overlay border border-slate-200 bg-white p-6 shadow-xs">
               <h3 className="text-sm font-extrabold text-slate-900">{t("answerRubric")}</h3>
-              <p className="mt-0.5 text-xs text-slate-500">{t("rubricComputed")}</p>
+              <p className="mt-0.5 text-sm text-slate-500">{t("rubricComputed")}</p>
 
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {(
@@ -3185,25 +3188,22 @@ export function VisaSpeakingAssistant({
                   ] as const
                 ).map(([key, label]) => (
                   <div key={key}>
-                    <div className="flex justify-between text-[11px] font-semibold text-slate-600">
+                    <div className="flex justify-between text-xs font-semibold text-slate-600">
                       <span>{label}</span>
                       <span>{analysis.rubric!.scores[key]}</span>
                     </div>
                     <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-blue-600"
-                        style={{ width: `${analysis.rubric!.scores[key]}%` }}
-                      />
+                      <ProgressFill value={analysis.rubric!.scores[key]} className="h-full rounded-full bg-blue-600" />
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+              <div className="mt-3 flex items-center justify-between rounded-surface bg-slate-50 px-3 py-2">
                 <span className="text-xs font-bold text-slate-600">{t("rubricOverallReadiness")}</span>
                 <span className="text-lg font-extrabold text-slate-900">
                   {analysis.rubric.scores.total}
-                  <span className="text-xs font-bold text-slate-400">/100</span>
+                  <span className="text-xs font-bold text-slate-500">/100</span>
                 </span>
               </div>
 
@@ -3212,9 +3212,9 @@ export function VisaSpeakingAssistant({
                   {analysis.rubric.risks.map((risk, i) => (
                     <li key={`${risk.code}-${i}`} className="flex flex-wrap items-start gap-2">
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${
+                        className={`rounded-full border px-2 py-0.5 text-xs font-bold ${
                           risk.severity === "high"
-                            ? "border-red-200 bg-red-50 text-red-700"
+                            ? "border-rose-200 bg-rose-50 text-rose-700"
                             : risk.severity === "medium"
                               ? "border-amber-200 bg-amber-50 text-amber-700"
                               : "border-slate-200 bg-slate-100 text-slate-600"
@@ -3233,7 +3233,7 @@ export function VisaSpeakingAssistant({
               )}
 
               {analysis.rubric.unanswered.length > 0 && (
-                <p className="mt-3 text-[11px] text-slate-500">
+                <p className="mt-3 text-sm text-slate-500">
                   {t("unansweredPrefix")} {analysis.rubric.unanswered.join(" / ").slice(0, 200)}
                 </p>
               )}
@@ -3241,40 +3241,40 @@ export function VisaSpeakingAssistant({
               {analysis.rubric.turnFeedback.length > 0 && (
                 <section className="mt-4 border-t border-slate-100 pt-4">
                   <h4 className="text-xs font-extrabold text-slate-800">{t("turnFeedbackTitle")}</h4>
-                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t("turnFeedbackIntro")}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-500">{t("turnFeedbackIntro")}</p>
                   <div className="mt-2 space-y-2">
                     {analysis.rubric.turnFeedback.map((turn) => (
-                      <article key={turn.turnNumber} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <article key={turn.turnNumber} className="rounded-surface border border-slate-200 bg-slate-50 p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h5 className="text-[11px] font-bold text-slate-800">{t("turnNumber", { number: turn.turnNumber })}</h5>
-                          <span className="text-[10px] font-semibold tabular-nums text-slate-500">{t("turnWordCount", { count: turn.answerWordCount })}</span>
+                          <h5 className="text-xs font-bold text-slate-800">{t("turnNumber", { number: turn.turnNumber })}</h5>
+                          <span className="text-xs font-semibold tabular-nums text-slate-500">{t("turnWordCount", { count: turn.answerWordCount })}</span>
                         </div>
                         {turn.question && (
-                          <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                          <p className="mt-1 text-sm leading-relaxed text-slate-600">
                             <span className="font-semibold">{t("turnQuestion")}:</span> {turn.question}
                           </p>
                         )}
-                        <blockquote className="mt-1 rounded-lg border-l-2 border-indigo-300 bg-white px-2 py-1 text-[11px] leading-relaxed text-slate-700">
+                        <blockquote className="mt-1 rounded-control border-l-2 border-indigo-300 bg-white px-2 py-1 text-sm leading-relaxed text-slate-700">
                           <span className="font-semibold">{t("turnAnswer")}:</span> “{turn.answerExcerpt}”
                         </blockquote>
                         {turn.evidence.length > 0 && (
                           <div className="mt-2">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("turnEvidenceTitle")}</p>
+                            <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("turnEvidenceTitle")}</p>
                             <ul className="mt-1 flex flex-wrap gap-1">
                               {turn.evidence.map((kind) => (
-                                <li key={kind} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">{t(`turnEvidence.${kind}` as never)}</li>
+                                <li key={kind} className="rounded-full bg-emerald-100 px-2 py-0.5 text-sm font-semibold text-emerald-800">{t(`turnEvidence.${kind}` as never)}</li>
                               ))}
                             </ul>
                           </div>
                         )}
                         <div className="mt-2">
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("turnConcernTitle")}</p>
+                          <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("turnConcernTitle")}</p>
                           {turn.concerns.length > 0 ? (
-                            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[11px] leading-relaxed text-amber-800">
+                            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm leading-relaxed text-amber-800">
                               {turn.concerns.map((code) => <li key={code}>{t(`turnConcerns.${code}` as never)}</li>)}
                             </ul>
                           ) : (
-                            <p className="mt-1 text-[11px] text-slate-500">{t("turnNoConcerns")}</p>
+                            <p className="mt-1 text-sm text-slate-500">{t("turnNoConcerns")}</p>
                           )}
                         </div>
                       </article>
@@ -3286,29 +3286,29 @@ export function VisaSpeakingAssistant({
           )}
 
           {analysis.openRouterReview && (analysis.openRouterReview.mercury || analysis.openRouterReview.respan) && (
-            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5">
+            <div className="rounded-overlay border border-indigo-200 bg-indigo-50/60 p-5">
               <h3 className="text-sm font-extrabold text-slate-900">{t("openRouterReviewTitle")}</h3>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600">{t("openRouterReviewNotice")}</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">{t("openRouterReviewNotice")}</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {([
                   ["mercury", analysis.openRouterReview.mercury, t("mercuryReviewLabel")],
                   ["respan", analysis.openRouterReview.respan, t("respanReviewLabel")],
                 ] as const).map(([provider, review, label]) => review && (
-                  <section key={provider} className="rounded-xl border border-indigo-100 bg-white p-3">
+                  <section key={provider} className="rounded-surface border border-indigo-100 bg-white p-3">
                     <h4 className="text-xs font-bold text-indigo-900">{label}</h4>
                     {!review.available ? (
-                      <p className="mt-2 text-[11px] text-slate-500">{t("specialistReviewUnavailable")}</p>
+                      <p className="mt-2 text-sm text-slate-500">{t("specialistReviewUnavailable")}</p>
                     ) : (
                       <dl className="mt-2 space-y-2">
                         {Object.entries(review.signals).map(([name, signal]) => (
-                          <div key={name} className="rounded-lg bg-slate-50 px-2.5 py-2">
-                            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                          <div key={name} className="rounded-control bg-slate-50 px-2.5 py-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                               <dt className="font-semibold text-slate-700">{t(`review_${name}`)}</dt>
                               <dd className="font-bold text-indigo-800">
                                 {signal.probabilityPercent !== null ? `${signal.probabilityPercent}%` : signal.score !== undefined && signal.score !== null ? `${signal.score}/100` : t("reviewNotScored")}
                               </dd>
                             </div>
-                            {provider === "respan" && <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{t(`reviewTip_${name}`)}</p>}
+                            {provider === "respan" && <p className="mt-1 text-sm leading-relaxed text-slate-500">{t(`reviewTip_${name}`)}</p>}
                           </div>
                         ))}
                       </dl>
@@ -3330,12 +3330,12 @@ export function VisaSpeakingAssistant({
           {/* Practice history (spec §13) — session-by-session progress. The
               last entry is the session that was just analysed. */}
           {practiceHistory && practiceHistory.count > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+            <div className="rounded-overlay border border-slate-200 bg-white p-6 shadow-xs">
               <h3 className="text-sm font-extrabold text-slate-900">
                 {t("practiceHistory")}
               </h3>
               {practiceHistory.sessions.length >= 2 && (
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-sm text-slate-500">
                   {(() => {
                     const first = practiceHistory.sessions[0].total;
                     const last = practiceHistory.sessions[practiceHistory.sessions.length - 1].total;
@@ -3354,7 +3354,7 @@ export function VisaSpeakingAssistant({
                   return (
                     <li
                       key={s.id}
-                      className={`flex items-center justify-between rounded-xl px-3 py-2 ${
+                      className={`flex items-center justify-between rounded-surface px-3 py-2 ${
                         isCurrent ? "bg-emerald-50" : "bg-slate-50"
                       }`}
                     >
@@ -3362,7 +3362,7 @@ export function VisaSpeakingAssistant({
                         {t("session")} {i + 1}
                         {s.country ? ` · ${localizedCountryName(s.country)}` : ""}
                         {isCurrent && (
-                          <span className="ml-2 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                          <span className="ml-2 rounded-full bg-emerald-700 px-1.5 py-0.5 text-xs font-bold text-white">
                             now
                           </span>
                         )}
@@ -3370,8 +3370,8 @@ export function VisaSpeakingAssistant({
                       <span className="flex items-baseline gap-1.5">
                         {delta != null && delta !== 0 && (
                           <span
-                            className={`text-[10px] font-bold ${
-                              delta > 0 ? "text-emerald-600" : "text-red-600"
+                            className={`text-xs font-bold ${
+                              delta > 0 ? "text-emerald-600" : "text-rose-600"
                             }`}
                           >
                             {delta > 0 ? `+${delta}` : delta}
@@ -3387,18 +3387,18 @@ export function VisaSpeakingAssistant({
           )}
 
           {analysis.chanceDisclaimer && (
-            <p className="rounded-xl bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-800">
+            <p className="rounded-surface bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800">
               {analysis.chanceDisclaimer}
             </p>
           )}
 
           {analysis.aiError && (
-            <p role="status" className="rounded-xl bg-slate-100 px-4 py-3 text-[11px] leading-relaxed text-slate-600">
+            <p role="status" className="rounded-surface bg-slate-100 px-4 py-3 text-sm leading-relaxed text-slate-600">
               {analysis.aiError}
             </p>
           )}
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xs">
+          <div className="rounded-overlay border border-slate-200 bg-white p-6 text-center shadow-xs">
             <CountryFlag country={country.name} flagEmoji={country.flag} size="lg" className="mx-auto" />
             <h2 className="mt-2 text-lg font-extrabold text-slate-900 dark:text-slate-100">
               {localizedCountryName(country.name)} · {t("visaChance")}
@@ -3408,7 +3408,7 @@ export function VisaSpeakingAssistant({
                 value={analysis.estimated_visa_chance}
                 label=""
                 size={150}
-                color="#059669"
+                color={UI_COLORS.success}
               />
             </div>
             <div className="mx-auto mt-6 grid max-w-xl grid-cols-3 gap-3">
@@ -3416,24 +3416,24 @@ export function VisaSpeakingAssistant({
                 value={analysis.confidence}
                 label={t("confidence")}
                 size={104}
-                color="#2563eb"
+                color={UI_COLORS.info}
               />
               <ScoreRing
                 value={analysis.persuasiveness}
                 label={t("persuasiveness")}
                 size={104}
-                color="#7c3aed"
+                color={UI_COLORS.violet}
               />
               <ScoreRing
                 value={analysis.language_level}
                 label={t("languageLevel")}
                 size={104}
-                color="#d97706"
+                color={UI_COLORS.warning}
               />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-5">
+          <div className="rounded-overlay border border-blue-100 bg-blue-50/60 p-5">
             <h3 className="text-sm font-bold text-blue-900">
               ✨ {t("recommendations")}
             </h3>
@@ -3443,21 +3443,21 @@ export function VisaSpeakingAssistant({
           </div>
 
           <div className="flex flex-col justify-center gap-2 sm:flex-row">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => engineRef.current?.restartInterview()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-700"
+              className="inline-flex items-center justify-center gap-2 rounded-surface bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-700"
             >
               <RotateCcw className="h-4 w-4" />
               {t("retry")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => engineRef.current?.backToSetup()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center justify-center gap-2 rounded-surface border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
             >
               {t("changeSetup")}
-            </button>
+            </Button>
           </div>
         </div>
       )}

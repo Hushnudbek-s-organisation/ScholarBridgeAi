@@ -287,7 +287,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           body.dataShareConsent === true && !body.dataShareConsentAt ? new Date() : undefined,
         // Onboarding wizard persistence (resume support)
         onboardingStep:
-          optionalNumber(body.onboardingStep, { min: 0, max: 50, integer: true }) ?? undefined,
+          optionalNumber(body.onboardingStep, { min: 0, max: 3, integer: true }) ?? undefined,
         onboardingCompleted: body.onboardingCompleted !== undefined ? !!body.onboardingCompleted : undefined,
         updatedAt: new Date(),
       })

@@ -39,11 +39,11 @@ export function StatCard({
         : formatNumber(value);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-sm">
+    <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-sm">
       <div className="flex items-start gap-3">
-        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${accent}`}>{icon}</div>
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-surface ${accent}`}>{icon}</div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[10px] font-extrabold uppercase tracking-wide text-slate-400" title={uz ?? label}>
+          <p className="truncate text-sm font-extrabold uppercase tracking-wide text-slate-500" title={uz ?? label}>
             {label}
           </p>
           <p className="mt-0.5 truncate text-2xl font-extrabold leading-tight text-slate-900" title={String(display)}>
@@ -52,8 +52,8 @@ export function StatCard({
         </div>
         {delta !== undefined ? <DeltaBadge value={delta} /> : null}
       </div>
-      {uz ? <p className="mt-2 truncate text-[10px] font-semibold text-slate-400">{uz}</p> : null}
-      {hint ? <p className="mt-1 truncate text-[11px] font-semibold text-slate-500">{hint}</p> : null}
+      {uz ? <p className="mt-2 truncate text-sm font-semibold text-slate-500">{uz}</p> : null}
+      {hint ? <p className="mt-1 truncate text-sm font-semibold text-slate-500">{hint}</p> : null}
     </div>
   );
 }

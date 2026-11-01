@@ -41,7 +41,8 @@ import {
 } from "@/lib/careerDiscovery";
 import { CAREER_PATHS, careerI18nSuffix, getCareerPath } from "@/lib/journey/careers";
 import { getJson, sendJson, useResource } from "./useResource";
-import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar } from "./ui";
+import { Empty, JourneyCard, Loading, Pill, ProgressBar } from "@/components/ui/journey";
+import { Button } from "@/components/ui/Button";
 
 type View = "intro" | "questions" | "results";
 
@@ -242,7 +243,7 @@ export function CareerDiscoveryFlow({
         tone="hero"
       >
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          <div className="rounded-surface border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             <p className="font-semibold text-slate-800 mb-1">{t("notDiagnosticTitle")}</p>
             <p>{t("notDiagnosticBody")}</p>
           </div>
@@ -258,7 +259,7 @@ export function CareerDiscoveryFlow({
             </li>
           </ul>
           {saved.data.result && (
-            <p className="text-xs text-slate-500">{t("savedRunHint")}</p>
+            <p className="text-sm text-slate-500">{t("savedRunHint")}</p>
           )}
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => setView("questions")}>
@@ -295,7 +296,7 @@ export function CareerDiscoveryFlow({
           <ProgressBar pct={Math.round((step / total) * 100)} label={t("progress", { done: step + 1, total })} />
           <div>
             <h3 className="text-base font-bold text-slate-900">{t(`q.${question.id}`)}</h3>
-            <p className="text-xs text-slate-500 mt-1">{t(`qHelp.${question.id}`)}</p>
+            <p className="text-sm text-slate-500 mt-1">{t(`qHelp.${question.id}`)}</p>
           </div>
           <div
             className={`grid gap-2 ${compact ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}
@@ -305,27 +306,27 @@ export function CareerDiscoveryFlow({
             {question.options.map((opt) => {
               const active = selected.includes(opt.id);
               return (
-                <button
+                <Button variant="unstyled"
                   key={opt.id}
                   type="button"
                   aria-pressed={active}
                   onClick={() => toggleOption(question.id, opt.id, question.kind)}
-                  className={`rounded-xl border-2 px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  className={`rounded-surface border-2 px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                     active
                       ? "border-indigo-600 bg-indigo-50 text-indigo-800"
                       : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300"
                   }`}
                 >
                   {t(`opt.${question.id}.${opt.id}`)}
-                </button>
+                </Button>
               );
             })}
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             {question.kind === "multi" ? t("multiHint") : t("singleHint")} · {t("answered", { count: answeredCount })}
           </p>
           {error && (
-            <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+            <p role="alert" className="rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
               {error}
             </p>
           )}
@@ -459,11 +460,11 @@ function DiscoveryResults({
   return (
     <div className="space-y-4">
       <JourneyCard title={t("resultsTitle")} subtitle={t("resultsSubtitle")}>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <div className="rounded-surface border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
           {t("disclaimer")}
         </div>
         {error && (
-          <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+          <p role="alert" className="mt-3 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
             {error}
           </p>
         )}
@@ -496,7 +497,7 @@ function DiscoveryResults({
 
               {rec.reasons.length > 0 && (
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("whyLabel")}</p>
+                  <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("whyLabel")}</p>
                   <ul className="mt-1 space-y-1 text-sm text-slate-700">
                     {rec.reasons.slice(0, 5).map((r, i) => (
                       <li key={`${r.questionId}/${r.optionId}/${i}`} className="flex items-start gap-2">
@@ -514,7 +515,7 @@ function DiscoveryResults({
 
               {/* What the work actually looks like — real daily tasks, not slogans. */}
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("dailyLabel")}</p>
+                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("dailyLabel")}</p>
                 <ul className="mt-1 space-y-1 text-sm text-slate-700 list-disc list-inside">
                   <li>{tCareers(`${career.id}.task1`)}</li>
                   <li>{tCareers(`${career.id}.task2`)}</li>
@@ -524,7 +525,7 @@ function DiscoveryResults({
 
               {(rec.matchedInterests.length > 0 || rec.matchedSkills.length > 0) && (
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("fitLabel")}</p>
+                  <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("fitLabel")}</p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {[...rec.matchedInterests, ...rec.matchedSkills].slice(0, 8).map((tag) => (
                       <Pill key={tag} tone="brand">{t(`tags.${tag.replace(":", "_")}`)}</Pill>
@@ -534,7 +535,7 @@ function DiscoveryResults({
               )}
 
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("majorsLabel")}</p>
+                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("majorsLabel")}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {rec.relatedMajors.map((m) => (
                     <Pill key={m} tone="slate">{m}</Pill>
@@ -543,14 +544,14 @@ function DiscoveryResults({
               </div>
 
               {rec.unknowns.length > 0 && (
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-slate-500">
                   <span className="font-semibold">{t("unknownsLabel")} </span>
                   {rec.unknowns.map((q) => t(`q.${q}`)).join(" · ")}
                 </p>
               )}
 
               {rec.alternatives.length > 0 && (
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-slate-500">
                   <span className="font-semibold">{t("alternativesLabel")} </span>
                   {rec.alternatives
                     .map((id) => {
@@ -562,14 +563,14 @@ function DiscoveryResults({
               )}
 
               {/* ---- mini practice trial ---- */}
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-indigo-700">{t("trialLabel")}</p>
+              <div className="rounded-surface border border-indigo-100 bg-indigo-50/60 p-3">
+                <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">{t("trialLabel")}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{tCareers(`${career.id}.trialTitle`)}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-slate-500">
                   {t("trialTime", { minutes: career.trialMinutes ?? 45 })} · {tCareers(`${career.id}.trialPrereq`)}
                 </p>
                 <p className="mt-2 text-sm text-slate-700">{tCareers(`${career.id}.trialGoal`)}</p>
-                <ol className="mt-2 space-y-1 text-xs text-slate-600 list-decimal list-inside">
+                <ol className="mt-2 space-y-1 text-sm text-slate-600 list-decimal list-inside">
                   <li>{tCareers(`${career.id}.trialStep1`)}</li>
                   <li>{tCareers(`${career.id}.trialStep2`)}</li>
                   <li>{tCareers(`${career.id}.trialStep3`)}</li>
@@ -596,7 +597,7 @@ function DiscoveryResults({
                   >
                     {t("trialExploreMore")}
                   </Button>
-                  <span className="text-[11px] text-slate-500">{t("trialSkipNote")}</span>
+                  <span className="text-xs text-slate-500">{t("trialSkipNote")}</span>
                 </div>
               </div>
 

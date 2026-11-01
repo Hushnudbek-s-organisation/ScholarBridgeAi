@@ -7,8 +7,9 @@ import { BookOpen, Briefcase, Check, Clock, Flag, Plus, Sparkles, Trash2, Trophy
 import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
 import { useSeedText } from "./useSeedText";
-import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, Toast, useToast } from "./ui";
+import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, Toast, useToast } from "@/components/ui/growth";
 import { AppNote } from "@/components/AppNote";
+import { Button } from "@/components/ui/Button";
 
 type Pillar = "academic" | "activities" | "skills" | "career";
 
@@ -143,15 +144,15 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97 }}
-        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs"
+        className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs"
       >
         <div className="flex items-start gap-3">
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${st.chip}`}>
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-surface ${st.chip}`}>
             <Icon className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-slate-900">{tr(g.title)}</p>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-sm text-slate-500">
               {pillarLabel(g.pillar)} · {t("stepsDone", { done: g.steps.filter((s) => s.done).length, total: g.steps.length })}
             </p>
           </div>
@@ -163,40 +164,40 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
         <ul className="mt-3 space-y-1">
           {g.steps.map((s, i) => (
             <li key={i}>
-              <button onClick={() => toggleStep(g, i)} className="flex w-full items-start gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-slate-50">
+              <Button variant="unstyled" onClick={() => toggleStep(g, i)} className="flex w-full items-start gap-2 rounded-control px-1.5 py-1 text-left hover:bg-slate-50">
                 <span
-                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded ${s.done ? "bg-emerald-500 text-white sb-ink-on-bright" : "border-2 border-slate-300"}`}
+                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-control ${s.done ? "bg-emerald-700 text-white sb-ink-on-bright" : "border-2 border-slate-300"}`}
                 >
                   {s.done && <Check className="h-3 w-3" />}
                 </span>
-                <span className={`text-xs leading-snug ${s.done ? "text-slate-400 line-through" : "text-slate-700"}`}>{tr(s.text)}</span>
-              </button>
+                <span className={`text-xs leading-snug ${s.done ? "text-slate-500 line-through" : "text-slate-700"}`}>{tr(s.text)}</span>
+              </Button>
             </li>
           ))}
         </ul>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-          <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <label className="flex items-center gap-1.5 text-sm text-slate-500">
             <Clock className="h-3.5 w-3.5" /> {t("targetDate")}
             <input
               type="date"
               value={g.targetDate ?? ""}
               onChange={(e) => void update(g, { targetDate: e.target.value || null })}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700"
+              className="rounded-control border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700"
             />
           </label>
           <div className="flex gap-1.5">
             {g.status === "done" ? (
-              <button onClick={() => void update(g, { status: "active" })} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
+              <Button variant="unstyled" onClick={() => void update(g, { status: "active" })} className="rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
                 {t("reopen")}
-              </button>
+              </Button>
             ) : (
-              <button onClick={() => void update(g, { status: "done" })} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100">
+              <Button variant="unstyled" onClick={() => void update(g, { status: "done" })} className="rounded-control border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
                 {t("markDone")}
-              </button>
+              </Button>
             )}
-            <button onClick={() => void remove(g)} className="rounded-lg border border-slate-200 p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label={t("remove")}>
+            <Button variant="unstyled" onClick={() => void remove(g)} className="rounded-control border border-slate-200 p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600" aria-label={t("remove")}>
               <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         </div>
       </motion.li>
@@ -206,15 +207,15 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
   return (
     <div className="space-y-4">
       <PageHeader icon={Flag} title={t("title")} subtitle={t("subtitle")} accent="amber">
-        <button
+        <Button variant="unstyled"
           onClick={() => {
             setCustom(true);
             setView("library");
           }}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
+          className="inline-flex items-center gap-1.5 rounded-surface bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
         >
           <Plus className="h-3.5 w-3.5" /> {t("customGoal")}
-        </button>
+        </Button>
       </PageHeader>
 
       {error && <ErrorNote message={error} />}
@@ -228,12 +229,12 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
               const Icon = st.icon;
               const n = active.filter((g) => g.pillar === p).length;
               return (
-                <div key={p} className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3">
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${st.chip}`}>
+                <div key={p} className="flex items-center gap-2.5 rounded-overlay border border-slate-200 bg-white p-3">
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-control ${st.chip}`}>
                     <Icon className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="break-words text-[11px] font-bold text-slate-500">{pillarLabel(p)}</p>
+                    <p className="break-words text-sm font-bold text-slate-500">{pillarLabel(p)}</p>
                     <p className="text-lg font-black leading-none text-slate-900">{n}</p>
                   </div>
                 </div>
@@ -241,7 +242,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
             })}
           </div>
 
-          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             {t("focusRule", { max: maxActive, active: active.length })}
           </p>
 
@@ -262,9 +263,9 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                 title={t("emptyActive")}
                 body={t("emptyActiveBody")}
                 action={
-                  <button onClick={() => setView("library")} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600">
+                  <Button variant="unstyled" onClick={() => setView("library")} className="rounded-surface bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600">
                     {t("browseLibrary")}
-                  </button>
+                  </Button>
                 }
               />
             ) : (
@@ -294,13 +295,13 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                       e.preventDefault();
                       void add({ title: form.title, pillar: form.pillar, steps: form.steps.split("\n").map((s) => s.trim()).filter(Boolean) });
                     }}
-                    className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4"
+                    className="overflow-hidden rounded-overlay border border-slate-200 bg-white p-4"
                   >
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-bold text-slate-900">{t("customGoal")}</p>
-                      <button type="button" onClick={() => setCustom(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label={t("cancel")}>
+                      <Button variant="unstyled" type="button" onClick={() => setCustom(false)} className="rounded-control p-1 text-slate-500 hover:bg-slate-100" aria-label={t("cancel")}>
                         <X className="h-4 w-4" />
-                      </button>
+                      </Button>
                     </div>
                     <div className="mt-3 grid gap-3 sm:grid-cols-3">
                       <div className="sm:col-span-2">
@@ -324,9 +325,9 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                       </div>
                     </div>
                     <div className="mt-3 flex justify-end">
-                      <button disabled={busy || active.length >= maxActive} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600 disabled:opacity-50">
+                      <Button variant="unstyled" disabled={busy || active.length >= maxActive} className="rounded-surface bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600 disabled:opacity-50">
                         {t("addGoal")}
-                      </button>
+                      </Button>
                     </div>
                   </motion.form>
                 )}
@@ -334,15 +335,15 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
 
               <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
                 {(["all", "academic", "activities", "skills", "career"] as const).map((p) => (
-                  <button
+                  <Button variant="unstyled"
                     key={p}
                     onClick={() => setPillar(p)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold ${
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${
                       pillar === p ? "border-amber-300 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     {p === "all" ? t("all") : pillarLabel(p)}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -352,36 +353,36 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                   const Icon = st.icon;
                   const adopted = adoptedIds.has(tp.id);
                   return (
-                    <li key={tp.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                    <li key={tp.id} className="flex flex-col rounded-overlay border border-slate-200 bg-white p-4">
                       <div className="flex items-start gap-3">
-                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${st.chip}`}>
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-surface ${st.chip}`}>
                           <Icon className="h-4 w-4" />
                         </span>
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-900">{tr(tp.title)}</p>
-                          <p className="text-[11px] text-slate-500">
+                          <p className="text-sm text-slate-500">
                             {pillarLabel(tp.pillar)}
                             {tp.estWeeks ? ` · ${t("weeks", { n: tp.estWeeks })}` : ""} · {t("stepsCount", { n: tp.steps.length })}
                           </p>
                         </div>
                       </div>
-                      {tp.description && <p className="mt-2 text-xs leading-relaxed text-slate-600">{tr(tp.description)}</p>}
-                      <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-[11px] text-slate-500">
+                      {tp.description && <p className="mt-2 text-sm leading-relaxed text-slate-600">{tr(tp.description)}</p>}
+                      <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-sm text-slate-500">
                         {tp.steps.slice(0, 3).map((s, i) => (
                           <li key={i}>{tr(s)}</li>
                         ))}
-                        {tp.steps.length > 3 && <li className="list-none text-slate-400">{t("more", { n: tp.steps.length - 3 })}</li>}
+                        {tp.steps.length > 3 && <li className="list-none text-slate-500">{t("more", { n: tp.steps.length - 3 })}</li>}
                       </ol>
                       <div className="mt-auto pt-3">
-                        <button
+                        <Button variant="unstyled"
                           disabled={busy || adopted || active.length >= maxActive}
                           onClick={() => void add({ templateId: tp.id })}
-                          className={`w-full rounded-xl px-3 py-2 text-xs font-bold ${
+                          className={`w-full rounded-surface px-3 py-2 text-xs font-bold ${
                             adopted ? "bg-emerald-50 text-emerald-700" : "bg-amber-500 text-white sb-ink-on-warm hover:bg-amber-600"
                           } disabled:cursor-not-allowed disabled:opacity-70`}
                         >
                           {adopted ? t("onList") : active.length >= maxActive ? t("limitReached") : t("addGoal")}
-                        </button>
+                        </Button>
                       </div>
                     </li>
                   );

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { ShieldCheck, Loader2, RefreshCw, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface VerificationManagerProps {
   adminProfileId: number;
@@ -70,8 +71,8 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
       <li key={`${entityType}-${r.id}`} className="border-b border-slate-100 last:border-0 px-4 py-3">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold text-slate-800">{r.title}</p>
-            <p className="text-[11px] text-slate-500">
+            <p className="truncate text-sm font-bold text-slate-800">{r.title}</p>
+            <p className="text-sm text-slate-500">
               {r.provider || r.country || ""} · #{r.id}
             </p>
             {source && (
@@ -79,16 +80,16 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
                 href={source}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[10px] text-indigo-600 hover:underline mt-0.5"
+                className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline mt-0.5"
               >
                 <ExternalLink className="h-2.5 w-2.5" /> {source.slice(0, 60)}…
               </a>
             )}
           </div>
-          <button
+          <Button variant="unstyled"
             onClick={() => verify(entityType, r.id, source || "")}
             disabled={busyId === `${entityType}-${r.id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-control bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-60"
           >
             {busyId === `${entityType}-${r.id}` ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -96,7 +97,7 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
               <CheckCircle2 className="h-3 w-3" />
             )}
             Mark verified
-          </button>
+          </Button>
         </div>
       </li>
     );
@@ -106,13 +107,13 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-slate-900 flex items-center justify-center">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-slate-900 flex items-center justify-center">
           <ShieldCheck className="h-5 w-5 text-amber-300" />
         </div>
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Source Verification</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             Review unverified records and mark them verified with their official source. Never present unverified data as verified.
           </p>
         </div>
@@ -120,29 +121,29 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+            className="rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600"
           >
             <option value="unverified">Unverified ({total})</option>
             <option value="needs_verification">Needs verification</option>
             <option value="verified">Verified</option>
             <option value="recently_verified">Recently verified</option>
           </select>
-          <button
+          <Button variant="unstyled"
             onClick={load}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
+        <div className="rounded-overlay border border-slate-200 bg-white p-8 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…
         </div>
       ) : total === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-          <p className="text-xs font-semibold text-slate-500">
+        <div className="rounded-overlay border border-slate-200 bg-white p-8 text-center">
+          <p className="text-sm font-semibold text-slate-500">
             {status === "unverified"
               ? "No unverified records — everything has been reviewed."
               : `No records with status "${status}".`}
@@ -151,16 +152,16 @@ export function VerificationManager({ adminProfileId }: VerificationManagerProps
       ) : (
         <>
           {universities.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-500">
                 Universities ({universities.length})
               </div>
               <ul>{universities.map((r) => renderRow(r, "university"))}</ul>
             </div>
           )}
           {scholarships.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-500">
                 Scholarships ({scholarships.length})
               </div>
               <ul>{scholarships.map((r) => renderRow(r, "scholarship"))}</ul>

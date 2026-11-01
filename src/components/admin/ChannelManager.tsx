@@ -49,9 +49,11 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, StatCard, Toast, useToast } from "../growth/ui";
+import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, StatCard, Toast, useToast } from "@/components/ui/growth";
 import { normalizeChannelIdentifier } from "@/lib/channel/config";
 import { SystemDiagnostics } from "./SystemDiagnostics";
+import { Button } from "@/components/ui/Button";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 type Tab =
   | "connect"
@@ -349,11 +351,11 @@ const TABS: Tab[] = [
 ];
 
 const btn =
-  "inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-surface px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50";
 const btnPrimary = `${btn} bg-indigo-600 text-white hover:bg-indigo-700`;
 const btnGhost = `${btn} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800`;
-const card = "rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900";
-const chip = "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide";
+const card = "rounded-overlay border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900";
+const chip = "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide";
 
 export function ChannelManager() {
   const t = useTranslations("adminChannel");
@@ -458,14 +460,14 @@ export function ChannelManager() {
               {t("pausedUntil", { date: runtime.pausedUntil ?? "" })}
             </span>
           )}
-          <button className={btnGhost} onClick={() => void load(true)} disabled={busy}>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void load(true)} disabled={busy}>
             <RefreshCw className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} /> {t("refresh")}
-          </button>
+          </Button>
         </div>
       </PageHeader>
 
       {runtime.blockedReason && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+        <div className="flex items-start gap-2 rounded-surface border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{runtime.blockedReason}</span>
         </div>
@@ -625,13 +627,13 @@ function DictionaryCard({
           <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
             <BookOpen className="h-4 w-4 text-indigo-500" /> {t("dictionary.title")}
           </h3>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge}`}>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${badge}`}>
               {t(`dictionary.state.${status.state}` as never)}
             </span>
             <span>{t(`dictionary.advice.${status.advice}` as never)}</span>
           </p>
-          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {t("dictionary.facts", {
               rows: status.rows,
               terms: status.bundledTerms,
@@ -641,10 +643,10 @@ function DictionaryCard({
           </p>
         </div>
         {!status.ready && (
-          <button className={btnGhost} onClick={() => void runImport()} disabled={busy || importing}>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void runImport()} disabled={busy || importing}>
             {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}{" "}
             {t("dictionary.importNow")}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -708,29 +710,29 @@ function WebhookCard({
           <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
             <Link2 className="h-4 w-4 text-indigo-500" /> {t("webhook.title")}
           </h3>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge}`}>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${badge}`}>
               {t(`webhook.state.${webhook.state}` as never)}
             </span>
             <span>{t(`webhook.advice.${webhook.advice}` as never)}</span>
           </p>
-          <p className="mt-1 break-all text-[11px] text-slate-500 dark:text-slate-400">
+          <p className="mt-1 break-all text-sm text-slate-500 dark:text-slate-400">
             {webhook.registeredUrl ?? t("webhook.none")}
             {webhook.pending > 0 ? ` · ${t("webhook.pending", { count: webhook.pending })}` : ""}
           </p>
           {webhook.lastError && (
-            <p className="mt-1 break-words text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+            <p className="mt-1 break-words text-sm font-semibold text-rose-700 dark:text-rose-300">
               {t("webhook.lastError", { message: webhook.lastError })}
             </p>
           )}
           {webhook.dedicated && (
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t("webhook.dedicated")}</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("webhook.dedicated")}</p>
           )}
         </div>
-        <button className={btnGhost} onClick={() => void repair()} disabled={busy || fixing}>
+        <Button variant="unstyled" className={btnGhost} onClick={() => void repair()} disabled={busy || fixing}>
           {fixing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}{" "}
           {t("webhook.fix")}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -778,15 +780,15 @@ function ApprovalInbox({
           <Clock className="h-4 w-4 text-amber-500" />
           {t("approval.title", { count: rows.length })}
         </h3>
-        <span className="text-[11px] text-slate-500 dark:text-slate-400">{t("approval.ttl", { hours: ttlHours })}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">{t("approval.ttl", { hours: ttlHours })}</span>
       </div>
       <ul className="space-y-3">
         {rows.map((row) => {
           const parts = (row.html ?? "").split("\n\n———\n\n").filter(Boolean);
           const editing = editingId === row.postId;
           return (
-            <li key={row.postId} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            <li key={row.postId} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 <span className={`${chip} bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300`}>{row.kind}</span>
                 {row.slot != null && <span>slot {row.slot}</span>}
                 {row.status === "editing" && (
@@ -798,41 +800,41 @@ function ApprovalInbox({
               {editing ? (
                 <div className="mt-2 space-y-2">
                   <textarea
-                    className={`${inputCls} min-h-40 font-mono text-[11px]`}
+                    className={`${inputCls} min-h-40 font-mono text-sm`}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     maxLength={4000}
                   />
                   <div className="flex flex-wrap gap-2">
-                    <button
+                    <Button variant="unstyled"
                       className={btnPrimary}
                       disabled={busy || !draft.trim()}
                       onClick={() => void run("edit", row.postId, { text: draft })}
                     >
                       <Save className="h-3.5 w-3.5" /> {t("approval.saveEdit")}
-                    </button>
-                    <button className={btnGhost} onClick={() => setEditingId(null)}>
+                    </Button>
+                    <Button variant="unstyled" className={btnGhost} onClick={() => setEditingId(null)}>
                       {t("cancel")}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <>
-                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-control bg-slate-50 p-2 text-xs leading-relaxed text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
                     {parts.join("\n\n———\n\n") || t("approval.empty")}
                   </pre>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button className={btnPrimary} disabled={busy} onClick={() => void run("approve", row.postId)}>
+                    <Button variant="unstyled" className={btnPrimary} disabled={busy} onClick={() => void run("approve", row.postId)}>
                       <Check className="h-3.5 w-3.5" /> {t("approval.approve")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="unstyled"
                       className={btnGhost}
                       disabled={busy}
                       onClick={() => void run("reject", row.postId)}
                     >
                       <XCircle className="h-3.5 w-3.5" /> {t("approval.reject")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="unstyled"
                       className={btnGhost}
                       disabled={busy}
                       onClick={() => {
@@ -841,7 +843,7 @@ function ApprovalInbox({
                       }}
                     >
                       <Pencil className="h-3.5 w-3.5" /> {t("approval.edit")}
-                    </button>
+                    </Button>
                   </div>
                 </>
               )}
@@ -1127,8 +1129,8 @@ function ConnectTab({
         <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
           <Zap className="h-4 w-4 text-indigo-500" /> {t("connect.quick.title")}
         </h3>
-        <p className="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{t("connect.quick.hint")}</p>
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200" htmlFor="channel-quick-address">
+        <p className="mb-3 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t("connect.quick.hint")}</p>
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200" htmlFor="channel-quick-address">
           {t("connect.quick.label")}
         </label>
         <div className="mt-1 flex flex-col gap-2 sm:flex-row">
@@ -1141,36 +1143,36 @@ function ConnectTab({
             autoComplete="off"
             spellCheck={false}
           />
-          <button
+          <Button variant="unstyled"
             className={`${btnPrimary} justify-center sm:w-auto`}
             onClick={() => void quickConnect()}
             disabled={!quickParsed.ok || saving || busy}
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{" "}
             {saving ? t("connect.quick.connecting") : t("connect.quick.connect")}
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             className={`${btnGhost} justify-center sm:w-auto`}
             onClick={() => act("test").then(() => showToast(t("connect.testSent")))}
             disabled={busy || !conn.channelId}
           >
             <Wand2 className="h-3.5 w-3.5" /> {t("connect.quick.test")}
-          </button>
+          </Button>
         </div>
 
         {/* What the pasted value will become — before anything is saved. */}
         {quickTrimmed &&
           (quickParsed.ok ? (
-            <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-              <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+            <div className="mt-2 rounded-surface border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
                 {t("connect.quick.previewOk", { value: quickParsed.value })}
               </p>
-              <p className="mt-0.5 text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
+              <p className="mt-0.5 text-sm text-emerald-800/80 dark:text-emerald-300/80">
                 {quickParsed.kind === "username" ? t("connect.quick.previewUsername") : t("connect.quick.previewId")}
               </p>
               {quickUsername && (
                 <a
-                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                  className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
                   href={`https://t.me/${quickUsername}`}
                   target="_blank"
                   rel="noreferrer noopener"
@@ -1180,29 +1182,29 @@ function ConnectTab({
               )}
             </div>
           ) : (
-            <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+            <p className="mt-2 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
               {quickError}
             </p>
           ))}
 
         {/* The verdict, in red, with the fix in the operator's language. */}
         {failing.length > 0 ? (
-          <div className="mt-2 rounded-xl border border-rose-300 bg-rose-50 p-3 dark:border-rose-500/40 dark:bg-rose-500/10">
-            <p className="text-xs font-bold text-rose-800 dark:text-rose-300">{t("connect.quick.fixTitle")}</p>
-            <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+          <div className="mt-2 rounded-surface border border-rose-300 bg-rose-50 p-3 dark:border-rose-500/40 dark:bg-rose-500/10">
+            <p className="text-sm font-bold text-rose-800 dark:text-rose-300">{t("connect.quick.fixTitle")}</p>
+            <ul className="mt-1 list-disc space-y-1 pl-4 text-sm font-semibold text-rose-700 dark:text-rose-300">
               {failing.map((step, index) => (
                 <li key={`${step.id}-${index}`}>{step.message}</li>
               ))}
             </ul>
           </div>
         ) : allGood ? (
-          <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+          <p className="mt-2 rounded-surface border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
             {t("connect.quick.ready")}
           </p>
         ) : null}
 
         {conn.mode === "approval" && (
-          <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{t("connect.quick.modeApprovalNote")}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("connect.quick.modeApprovalNote")}</p>
         )}
       </div>
 
@@ -1219,7 +1221,7 @@ function ConnectTab({
             <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
               <Activity className="h-4 w-4 text-indigo-500" /> {t("why.title")}
             </h3>
-            <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
               {!why
                 ? whyBusy
                   ? t("why.checking")
@@ -1231,7 +1233,7 @@ function ConnectTab({
                     : t("why.readyNoNext")}
             </p>
             {why && (
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {t("why.catalogueLine", {
                   publishable: why.why.catalogue.publishable,
                   total: why.why.catalogue.total,
@@ -1241,37 +1243,37 @@ function ConnectTab({
               </p>
             )}
           </div>
-          <button className={btnGhost} onClick={() => void checkWhy()} disabled={whyBusy}>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void checkWhy()} disabled={whyBusy}>
             {whyBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} {t("why.recheck")}
-          </button>
+          </Button>
         </div>
 
         {/* The two blocks with an obvious one-press fix get the button, so the
             answer to "why" is also the way to start it. */}
         {why?.why.blocked?.id === "mode_off" && (
-          <button
+          <Button variant="unstyled"
             className={`${btnPrimary} mt-3`}
             disabled={saving || busy}
             onClick={() => void startPublishing()}
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} {t("why.startNow")}
-          </button>
+          </Button>
         )}
         {why?.why.blocked?.id === "plan_empty" && (
-          <button
+          <Button variant="unstyled"
             className={`${btnPrimary} mt-3`}
             disabled={saving || busy}
             onClick={() => void buildToday()}
           >
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarClock className="h-3.5 w-3.5" />} {t("why.buildNow")}
-          </button>
+          </Button>
         )}
 
         {why && (
           <>
             <ul className="mt-3 space-y-1.5">
               {why.why.steps.map((step, index) => (
-                <li key={`${step.id}-${index}`} className="flex items-start gap-2 text-[11px]">
+                <li key={`${step.id}-${index}`} className="flex items-start gap-2 text-sm">
                   {step.level === "ok" ? (
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                   ) : step.level === "warn" ? (
@@ -1297,10 +1299,10 @@ function ConnectTab({
             {/* The tick. On a sleeping host this is the reason, and the fix is a
                 monitor URL, so it is spelled out instead of hinted at. */}
             {why.why.tick.lastTickMinutes === null || why.why.tick.lastTickMinutes > Math.max(15, why.why.tick.intervalMinutes * 3) ? (
-              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] dark:border-amber-500/30 dark:bg-amber-500/10">
+              <div className="mt-2 rounded-surface border border-amber-200 bg-amber-50 p-2.5 text-xs dark:border-amber-500/30 dark:bg-amber-500/10">
                 <p className="font-bold text-amber-900 dark:text-amber-200">{t("why.cronTitle")}</p>
                 <p className="mt-0.5 text-amber-800 dark:text-amber-300">{t("why.cronBody")}</p>
-                <code className="mt-1 block break-all rounded bg-white/70 px-2 py-1 font-mono text-[10px] text-amber-900 dark:bg-slate-900/60 dark:text-amber-200">
+                <code className="mt-1 block break-all rounded-control bg-white/70 px-2 py-1 font-mono text-xs text-amber-900 dark:bg-slate-900/60 dark:text-amber-200">
                   {why.cron.url}
                 </code>
                 {!why.cron.secretConfigured && (
@@ -1310,7 +1312,7 @@ function ConnectTab({
             ) : null}
 
             {why.unpublished.length > 0 && (
-              <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[11px] dark:border-slate-700 dark:bg-slate-800/60">
+              <div className="mt-2 rounded-surface border border-slate-200 bg-slate-50 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-800/60">
                 <p className="font-bold text-slate-700 dark:text-slate-200">{t("why.unpublishedTitle")}</p>
                 <ul className="mt-1 space-y-0.5">
                   {why.unpublished.map((row) => (
@@ -1322,7 +1324,7 @@ function ConnectTab({
               </div>
             )}
             {why.why.catalogueThin && (
-              <p className="mt-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300">{t("why.thin")}</p>
+              <p className="mt-2 text-sm font-semibold text-amber-700 dark:text-amber-300">{t("why.thin")}</p>
             )}
           </>
         )}
@@ -1348,19 +1350,19 @@ function ConnectTab({
            * that Telegram never displays.
            */}
           {discovered && conn.channelId !== discovered.id && (
-            <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
-              <p className="text-xs font-bold text-indigo-900 dark:text-indigo-200">{t("connect.discoveredTitle")}</p>
-              <p className="mt-0.5 text-[11px] text-indigo-800 dark:text-indigo-300">
+            <div className="mb-3 rounded-surface border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+              <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">{t("connect.discoveredTitle")}</p>
+              <p className="mt-0.5 text-sm text-indigo-800 dark:text-indigo-300">
                 {discovered.title ?? t("connect.discoveredNoTitle")}
                 {discovered.username ? ` · @${discovered.username}` : ""} · <code>{discovered.id}</code>
               </p>
-              <button
+              <Button variant="unstyled"
                 className={`${btnPrimary} mt-2`}
                 disabled={saving || busy}
                 onClick={() => void adoptDiscovered()}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" /> {t("connect.discoveredConnect")}
-              </button>
+              </Button>
             </div>
           )}
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
@@ -1368,20 +1370,20 @@ function ConnectTab({
           </h3>
           <ol className="space-y-2">
             {steps.map((step, index) => (
-              <li key={`${step.id}-${index}`} className="flex items-start gap-2 text-xs">
+              <li key={`${step.id}-${index}`} className="flex items-start gap-2 text-sm">
                 {step.ok ? (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                 ) : (
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-300 text-[10px] font-bold text-slate-500 dark:border-slate-600 dark:text-slate-400">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-300 text-xs font-bold text-slate-500 dark:border-slate-600 dark:text-slate-400">
                     {index + 1}
                   </span>
                 )}
                 <span className={step.ok ? "text-slate-600 dark:text-slate-300" : "font-semibold text-slate-800 dark:text-slate-100"}>
                   {step.label}
-                  {step.hint && <span className="mt-0.5 block truncate text-[11px] font-normal text-slate-400">{step.hint}</span>}
+                  {step.hint && <span className="mt-0.5 block truncate text-xs font-normal text-slate-500">{step.hint}</span>}
                   {/* The actionable sentence: red, because this is the thing to fix. */}
                   {step.message && (
-                    <span className="mt-0.5 block text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                    <span className="mt-0.5 block text-xs font-semibold text-rose-600 dark:text-rose-400">
                       {step.message}
                     </span>
                   )}
@@ -1393,12 +1395,12 @@ function ConnectTab({
               the only one with no step is the deploy-level kill switch, which the
               form shows separately below. */}
           <div className="mt-3 flex flex-wrap gap-2">
-            <button className={btnPrimary} onClick={() => act("verify").then(() => showToast(t("verified")))} disabled={busy}>
+            <Button variant="unstyled" className={btnPrimary} onClick={() => act("verify").then(() => showToast(t("verified")))} disabled={busy}>
               <ShieldCheck className="h-3.5 w-3.5" /> {t("connect.verify")}
-            </button>
-            <button className={btnGhost} onClick={() => act("test").then(() => showToast(t("connect.testSent")))} disabled={busy}>
+            </Button>
+            <Button variant="unstyled" className={btnGhost} onClick={() => act("test").then(() => showToast(t("connect.testSent")))} disabled={busy}>
               <Wand2 className="h-3.5 w-3.5" /> {t("connect.test")}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1424,7 +1426,7 @@ function ConnectTab({
                   placeholder="123456789"
                 />
               </Field>
-              <div className="mt-1.5 rounded-xl border border-dashed border-slate-200 p-2.5 text-[11px] leading-relaxed text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              <div className="mt-1.5 rounded-surface border border-dashed border-slate-200 p-2.5 text-xs leading-relaxed text-slate-600 dark:border-slate-700 dark:text-slate-300">
                 <p className="font-bold text-slate-700 dark:text-slate-200">{t("connect.chatIdHowTitle")}</p>
                 <ol className="mt-1 list-decimal space-y-0.5 pl-4">
                   <li>{t("connect.chatIdHow1")}</li>
@@ -1490,7 +1492,7 @@ function ConnectTab({
             </div>
             {/* The deploy-level kill switch is invisible in the panel otherwise:
                 an operator flips the mode to Live and nothing happens. */}
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               <span className="font-bold">{t("env.envLabel")}:</span>{" "}
               {runtime.envAutopost === null
                 ? t("env.envUnset")
@@ -1501,30 +1503,30 @@ function ConnectTab({
                     : t("env.envOn")}
             </p>
             {conn.mode === "approval" && (
-              <p className="rounded-xl bg-sky-50 px-3 py-2 text-[11px] font-semibold text-sky-800 dark:bg-sky-500/10 dark:text-sky-300">
+              <p className="rounded-surface bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 dark:bg-sky-500/10 dark:text-sky-300">
                 {t("connect.approvalHint")}
               </p>
             )}
             {conn.mode === "on" && (
-              <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+              <p className="rounded-surface bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
                 {t("connect.liveWarning")}
               </p>
             )}
             {/* The single most common support question: "I connected it, why is
                 nothing happening?" — the answer is that saving starts it. */}
-            <p className="rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <p className="rounded-surface bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
               {t("connect.autostartHint")}
             </p>
-            <button className={btnPrimary} onClick={() => void save()} disabled={saving || busy}>
+            <Button variant="unstyled" className={btnPrimary} onClick={() => void save()} disabled={saving || busy}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       <div className={card}>
         <h3 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">{t("connect.howTitle")}</h3>
-        <ol className="ml-4 list-decimal space-y-2 text-xs text-slate-600 dark:text-slate-300">
+        <ol className="ml-4 list-decimal space-y-2 text-sm text-slate-600 dark:text-slate-300">
           <li>{t("connect.how1")}</li>
           <li>{t("connect.how2")}</li>
           <li>{t("connect.how3")}</li>
@@ -1532,15 +1534,15 @@ function ConnectTab({
           <li>{t("connect.how5")}</li>
         </ol>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className={btnGhost} onClick={() => act("plan").then(() => showToast(t("planBuilt")))} disabled={busy}>
+          <Button variant="unstyled" className={btnGhost} onClick={() => act("plan").then(() => showToast(t("planBuilt")))} disabled={busy}>
             <CalendarClock className="h-3.5 w-3.5" /> {t("connect.buildPlan")}
-          </button>
-          <button className={btnGhost} onClick={() => act("run").then(() => showToast(t("runDone")))} disabled={busy}>
+          </Button>
+          <Button variant="unstyled" className={btnGhost} onClick={() => act("run").then(() => showToast(t("runDone")))} disabled={busy}>
             <Play className="h-3.5 w-3.5" /> {t("connect.runNow")}
-          </button>
-          <button className={btnGhost} onClick={() => act("links").then(() => showToast(t("linksCreated")))} disabled={busy}>
+          </Button>
+          <Button variant="unstyled" className={btnGhost} onClick={() => act("links").then(() => showToast(t("linksCreated")))} disabled={busy}>
             <Link2 className="h-3.5 w-3.5" /> {t("connect.makeLinks")}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1551,17 +1553,17 @@ function ConnectTab({
         <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
           <Server className="h-4 w-4 text-indigo-500" /> {t("env.panelTitle")}
         </h3>
-        <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">{t("env.panelHint")}</p>
+        <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">{t("env.panelHint")}</p>
         <ul className="space-y-1.5">
           {data.env.checklist.map((row) => {
             const bad = row.set && row.valid === false;
             const tone = bad ? "text-rose-600 dark:text-rose-400" : row.set ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500 dark:text-slate-400";
             return (
-              <li key={row.key} className="rounded-lg border border-slate-200 px-2.5 py-2 text-[11px] dark:border-slate-700">
+              <li key={row.key} className="rounded-control border border-slate-200 px-2.5 py-2 text-sm dark:border-slate-700">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <code className="font-bold text-slate-800 dark:text-slate-100">{row.key}</code>
                   <span className={`font-semibold ${tone}`}>{bad ? t("env.bad") : row.set ? t("env.set") : t("env.missing")}</span>
-                  {row.level === "required" && <span className="rounded bg-slate-100 px-1 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">{t("env.required")}</span>}
+                  {row.level === "required" && <span className="rounded-control bg-slate-100 px-1 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">{t("env.required")}</span>}
                   {row.preview && <span className="text-slate-500 dark:text-slate-400">= {row.preview}</span>}
                 </div>
                 <p className="mt-0.5 text-slate-500 dark:text-slate-400">{t(`env.where.${row.key}`)}</p>
@@ -1661,7 +1663,7 @@ function PlanTab({ settings, showToast, reload }: { settings: Settings; showToas
         <div className="mt-3">
           <Field label={t("plan.priorityCountries")} hint={t("plan.priorityCountriesHint")}>
             <textarea
-              className={`${inputCls} min-h-20 font-mono text-[11px]`}
+              className={`${inputCls} min-h-20 font-mono text-sm`}
               rows={4}
               value={plan.priorityCountries.join("\n")}
               onChange={(e) =>
@@ -1682,19 +1684,19 @@ function PlanTab({ settings, showToast, reload }: { settings: Settings; showToas
             { key: "weeklyPin" as const, label: t("plan.weeklyPin") },
             { key: "digestEnabled" as const, label: t("plan.digest") },
           ].map((toggle) => (
-            <label key={toggle.key} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+            <label key={toggle.key} className="flex items-center gap-2 rounded-surface border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
               <input type="checkbox" checked={Boolean(plan[toggle.key])} onChange={(e) => setPlan({ ...plan, [toggle.key]: e.target.checked })} />
               {toggle.label}
             </label>
           ))}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className={btnPrimary} onClick={() => void save()} disabled={saving}>
+          <Button variant="unstyled" className={btnPrimary} onClick={() => void save()} disabled={saving}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
-          </button>
-          <button className={btnGhost} onClick={() => void runPreview()} disabled={loadingPreview}>
+          </Button>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void runPreview()} disabled={loadingPreview}>
             {loadingPreview ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BarChart3 className="h-3.5 w-3.5" />} {t("plan.preview14")}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1710,17 +1712,17 @@ function PlanTab({ settings, showToast, reload }: { settings: Settings; showToas
           </div>
           <div className="space-y-2">
             {preview.days.map((day) => (
-              <details key={day.planDate} className="rounded-xl border border-slate-200 p-2 text-xs dark:border-slate-700">
+              <details key={day.planDate} className="rounded-surface border border-slate-200 p-2 text-xs dark:border-slate-700">
                 <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">
                   {day.planDate} · {day.quiet ? t("plan.quietDayShort") : `${day.items.length} ${t("plan.posts")}`}
                 </summary>
                 {day.items.map((item) => (
-                  <div key={`${day.planDate}-${item.slot}`} className="mt-2 rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60">
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  <div key={`${day.planDate}-${item.slot}`} className="mt-2 rounded-control bg-slate-50 p-2 dark:bg-slate-800/60">
+                    <div className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">
                       {item.sendAt} · {item.kind} · {item.lane}
                       {item.skipped ? ` · ${t("plan.skipped")}: ${item.skipped}` : ""}
                     </div>
-                    <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words font-sans text-[11px] leading-relaxed text-slate-700 dark:text-slate-200">
+                    <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-slate-700 dark:text-slate-200">
                       {item.parts.join("\n\n———\n\n")}
                     </pre>
                   </div>
@@ -1742,7 +1744,7 @@ function LinkRows({ rows, onChange, label }: { rows: LinkItem[]; onChange: (rows
   const t = useTranslations("adminChannel");
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</div>
       {rows.map((row, index) => (
         <div key={index} className="flex flex-wrap items-center gap-2">
           <input
@@ -1757,14 +1759,14 @@ function LinkRows({ rows, onChange, label }: { rows: LinkItem[]; onChange: (rows
             placeholder="https://t.me/…"
             onChange={(e) => onChange(rows.map((r, i) => (i === index ? { ...r, url: e.target.value } : r)))}
           />
-          <button className={btnGhost} onClick={() => onChange(rows.filter((_, i) => i !== index))} aria-label={t("links.remove")}>
+          <Button variant="unstyled" className={btnGhost} onClick={() => onChange(rows.filter((_, i) => i !== index))} aria-label={t("links.remove")}>
             <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       ))}
-      <button className={btnGhost} onClick={() => onChange([...rows, { label: "", url: "" }])}>
+      <Button variant="unstyled" className={btnGhost} onClick={() => onChange([...rows, { label: "", url: "" }])}>
         <Plus className="h-3.5 w-3.5" /> {t("links.add")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -1807,15 +1809,15 @@ function LinksTab({ settings, showToast, reload }: { settings: Settings; showToa
           <Link2 className="h-4 w-4 text-indigo-500" /> {t("links.footerTitle")}
         </h3>
         <LinkRows rows={footerMain} onChange={setFooterMain} label={t("links.footerMain")} />
-        <p className="text-[11px] text-slate-400">{t("links.footerMainHint")}</p>
+        <p className="text-sm text-slate-500">{t("links.footerMainHint")}</p>
         <LinkRows rows={footerSocial} onChange={setFooterSocial} label={t("links.footerSocial")} />
-        <p className="text-[11px] text-slate-400">{t("links.footerSocialHint")}</p>
-        <button className={btnPrimary} onClick={() => void save("footer_main", footerMain)} disabled={saving}>
+        <p className="text-sm text-slate-500">{t("links.footerSocialHint")}</p>
+        <Button variant="unstyled" className={btnPrimary} onClick={() => void save("footer_main", footerMain)} disabled={saving}>
           <Save className="h-3.5 w-3.5" /> {t("save")}
-        </button>
-        <button className={btnGhost} onClick={() => void save("footer_social", footerSocial)} disabled={saving}>
+        </Button>
+        <Button variant="unstyled" className={btnGhost} onClick={() => void save("footer_social", footerSocial)} disabled={saving}>
           <Save className="h-3.5 w-3.5" /> {t("links.saveSocial")}
-        </button>
+        </Button>
       </div>
 
       <div className={`${card} space-y-3`}>
@@ -1850,9 +1852,9 @@ function LinksTab({ settings, showToast, reload }: { settings: Settings; showToa
           ))}
         </div>
         <div className="space-y-1">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("links.previews")}</div>
+          <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("links.previews")}</div>
           {kindKeys.map((kind) => (
-            <label key={kind} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+            <label key={kind} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"
                 checked={previews[kind] === true}
@@ -1863,12 +1865,12 @@ function LinksTab({ settings, showToast, reload }: { settings: Settings; showToa
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className={btnPrimary} onClick={() => void save("hashtags", tags)} disabled={saving}>
+          <Button variant="unstyled" className={btnPrimary} onClick={() => void save("hashtags", tags)} disabled={saving}>
             <Save className="h-3.5 w-3.5" /> {t("links.saveTags")}
-          </button>
-          <button className={btnGhost} onClick={() => void save("link_preview", previews)} disabled={saving}>
+          </Button>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void save("link_preview", previews)} disabled={saving}>
             <Save className="h-3.5 w-3.5" /> {t("links.savePreviews")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -1964,18 +1966,18 @@ function ContentTab({ showToast }: { showToast: ShowToast }) {
       <div className={`${card} space-y-2`}>
         <div className="flex gap-2">
           <input className={inputCls} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("content.search")} />
-          <button className={btnGhost} onClick={() => void search()} disabled={busy}>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void search()} disabled={busy}>
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          </button>
+          </Button>
         </div>
         <div className="max-h-[32rem] space-y-1 overflow-auto">
           {rows === null && <LoadingBlock label={t("loading")} />}
           {rows?.length === 0 && <EmptyState icon={ClipboardList} title={t("content.empty")} />}
           {rows?.map((row) => (
-            <button
+            <Button variant="unstyled"
               key={row.id}
               onClick={() => void open(row.id)}
-              className={`w-full rounded-xl border px-3 py-2 text-left text-xs transition ${
+              className={`w-full rounded-surface border px-3 py-2 text-left text-xs transition ${
                 selected?.scholarship.id === row.id
                   ? "border-indigo-300 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10"
                   : "border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
@@ -1995,10 +1997,10 @@ function ContentTab({ showToast }: { showToast: ShowToast }) {
                   {row.filled}/{row.total}
                 </span>
               </div>
-              <div className="truncate text-[11px] text-slate-400">
+              <div className="truncate text-xs text-slate-500">
                 {row.provider} · {row.country ?? "—"} · {row.deadlineDate ?? "—"}
               </div>
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -2010,14 +2012,14 @@ function ContentTab({ showToast }: { showToast: ShowToast }) {
           <>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">{selected.scholarship.title}</h3>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-sm text-slate-500">
                 {selected.scholarship.provider} · {selected.scholarship.country ?? "—"} · {selected.scholarship.verificationStatus}
               </p>
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {t("content.missing")}: {selected.report.missing.length ? selected.report.missing.join(", ") : t("content.nothing")}
               </p>
             </div>
-            <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+            <p className="rounded-surface bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
               {t("content.manualNote")}
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -2046,13 +2048,13 @@ function ContentTab({ showToast }: { showToast: ShowToast }) {
               <textarea rows={4} className={inputCls} value={form.aboutUz} onChange={(e) => setForm({ ...form, aboutUz: e.target.value })} />
             </Field>
             <div className="flex flex-wrap gap-2">
-              <button className={btnPrimary} onClick={() => void save()} disabled={busy}>
+              <Button variant="unstyled" className={btnPrimary} onClick={() => void save()} disabled={busy}>
                 {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
-              </button>
+              </Button>
             </div>
             <div>
-              <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("content.preview")}</div>
-              <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 font-sans text-[11px] leading-relaxed text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{t("content.preview")}</div>
+              <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-surface bg-slate-50 p-3 font-sans text-xs leading-relaxed text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
                 {preview ?? t("content.previewHint")}
               </pre>
             </div>
@@ -2143,19 +2145,19 @@ function CountriesTab({ showToast }: { showToast: ShowToast }) {
           <input className={inputCls} placeholder={t("countries.name")} value={draft.nameUz} onChange={(e) => setDraft({ ...draft, nameUz: e.target.value })} />
           <input className={inputCls} placeholder={t("countries.locative")} value={draft.nameUzLoc} onChange={(e) => setDraft({ ...draft, nameUzLoc: e.target.value })} />
           <input className={inputCls} placeholder={t("countries.hashtag")} value={draft.hashtag} onChange={(e) => setDraft({ ...draft, hashtag: e.target.value })} />
-          <button
+          <Button variant="unstyled"
             className={btnPrimary}
             onClick={() => void save({ ...draft, aliases: draft.aliases.split(",").map((s) => s.trim()).filter(Boolean) }).then(() => setDraft({ key: "", iso2: "", flag: "", nameUz: "", nameUzLoc: "", hashtag: "", aliases: "" }))}
             disabled={busy || !draft.key || !draft.nameUz}
           >
             <Save className="h-3.5 w-3.5" /> {t("save")}
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className={`${card} overflow-x-auto`}>
         <table className="w-full text-left text-xs">
-          <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+          <thead className="text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-2 py-2">{t("countries.key")}</th>
               <th className="px-2 py-2">{t("countries.name")}</th>
@@ -2188,7 +2190,7 @@ function CountryRowEditor({
   const [draft, setDraft] = useState({ ...row, aliases: row.aliases.join(", ") });
   return (
     <tr className="border-t border-slate-100 dark:border-slate-800">
-      <td className="px-2 py-1 font-mono text-[11px] text-slate-500">{row.key}</td>
+      <td className="px-2 py-1 font-mono text-xs text-slate-500">{row.key}</td>
       <td className="px-2 py-1">
         <div className="flex items-center gap-1">
           <input className={`${inputCls} max-w-[3.5rem]`} value={draft.flag} onChange={(e) => setDraft({ ...draft, flag: e.target.value })} />
@@ -2203,12 +2205,12 @@ function CountryRowEditor({
       </td>
       <td className="px-2 py-1">
         <div className="flex gap-1">
-          <button className={btnGhost} onClick={() => void onSave({ ...draft, aliases: draft.aliases.split(",").map((s) => s.trim()).filter(Boolean) })}>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void onSave({ ...draft, aliases: draft.aliases.split(",").map((s) => s.trim()).filter(Boolean) })}>
             <Save className="h-3.5 w-3.5" />
-          </button>
-          <button className={btnGhost} onClick={() => void onDelete(row.key)} aria-label={t("delete")}>
+          </Button>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void onDelete(row.key)} aria-label={t("delete")}>
             <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </td>
     </tr>
@@ -2290,11 +2292,11 @@ function ShortLinksTab({ showToast }: { showToast: ShowToast }) {
             <option value="official">official</option>
           </select>
           <input className={inputCls} placeholder={t("short.note")} value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
-          <button className={btnPrimary} onClick={() => void create()} disabled={busy || !draft.code || !draft.url}>
+          <Button variant="unstyled" className={btnPrimary} onClick={() => void create()} disabled={busy || !draft.code || !draft.url}>
             <Save className="h-3.5 w-3.5" /> {t("save")}
-          </button>
+          </Button>
         </div>
-        <p className="mt-2 text-[11px] text-slate-400">{t("short.hint")}</p>
+        <p className="mt-2 text-sm text-slate-500">{t("short.hint")}</p>
       </div>
 
       <div className={`${card} overflow-x-auto`}>
@@ -2304,7 +2306,7 @@ function ShortLinksTab({ showToast }: { showToast: ShowToast }) {
           </a>
         </div>
         <table className="w-full text-left text-xs">
-          <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+          <thead className="text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-2 py-2">{t("short.code")}</th>
               <th className="px-2 py-2">URL</th>
@@ -2316,19 +2318,19 @@ function ShortLinksTab({ showToast }: { showToast: ShowToast }) {
           <tbody>
             {rows.map((row) => (
               <tr key={row.code} className="border-t border-slate-100 dark:border-slate-800">
-                <td className="px-2 py-1 font-mono text-[11px]">{row.code}</td>
+                <td className="px-2 py-1 font-mono text-xs">{row.code}</td>
                 <td className="max-w-[22rem] truncate px-2 py-1">
                   <a href={row.url} target="_blank" rel="noreferrer noopener" className="text-indigo-600 hover:underline dark:text-indigo-400">
                     {row.url}
                   </a>
-                  {row.note ? <span className="ml-2 text-slate-400">· {row.note}</span> : null}
+                  {row.note ? <span className="ml-2 text-slate-500">· {row.note}</span> : null}
                 </td>
                 <td className="px-2 py-1 font-semibold">{row.clicks7}</td>
                 <td className="px-2 py-1 font-semibold">{row.clicks30}</td>
                 <td className="px-2 py-1">
-                  <button className={btnGhost} onClick={() => void remove(row.code)} aria-label={t("delete")}>
+                  <Button variant="unstyled" className={btnGhost} onClick={() => void remove(row.code)} aria-label={t("delete")}>
                     <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -2370,12 +2372,12 @@ function QueueTab({ rows, showToast, reload }: { rows: QueueRow[]; showToast: Sh
         icon={CalendarClock}
         title={t("queue.empty")}
         action={
-          <button
+          <Button variant="unstyled"
             className={btnPrimary}
             onClick={() => void api("/api/admin/channel", { method: "POST", body: JSON.stringify({ action: "plan" }) }).then(() => reload())}
           >
             <CalendarClock className="h-3.5 w-3.5" /> {t("queue.build")}
-          </button>
+          </Button>
         }
       />
     );
@@ -2400,19 +2402,19 @@ function QueueTab({ rows, showToast, reload }: { rows: QueueRow[]; showToast: Sh
               >
                 {row.status}
               </span>
-              {row.scholarshipId ? <span className="text-slate-400">#{row.scholarshipId}</span> : null}
+              {row.scholarshipId ? <span className="text-slate-500">#{row.scholarshipId}</span> : null}
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <button className={btnGhost} onClick={() => void run(row.id, "test")} disabled={busyId === row.id}>
+              <Button variant="unstyled" className={btnGhost} onClick={() => void run(row.id, "test")} disabled={busyId === row.id}>
                 <Wand2 className="h-3.5 w-3.5" /> {t("queue.test")}
-              </button>
-              <button className={btnGhost} onClick={() => void run(row.id, "post_now")} disabled={busyId === row.id}>
+              </Button>
+              <Button variant="unstyled" className={btnGhost} onClick={() => void run(row.id, "post_now")} disabled={busyId === row.id}>
                 <Play className="h-3.5 w-3.5" /> {t("queue.postNow")}
-              </button>
-              <button className={btnGhost} onClick={() => void run(row.id, "pin", { pinned: true })} disabled={busyId === row.id}>
+              </Button>
+              <Button variant="unstyled" className={btnGhost} onClick={() => void run(row.id, "pin", { pinned: true })} disabled={busyId === row.id}>
                 {t("queue.pin")}
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 className={btnGhost}
                 onClick={() => {
                   setEditing(row.id);
@@ -2421,33 +2423,33 @@ function QueueTab({ rows, showToast, reload }: { rows: QueueRow[]; showToast: Sh
                 }}
               >
                 {t("queue.edit")}
-              </button>
-              <button className={btnGhost} onClick={() => void run(row.id, "skip", { reason: t("queue.skippedByAdmin") })} disabled={busyId === row.id}>
+              </Button>
+              <Button variant="unstyled" className={btnGhost} onClick={() => void run(row.id, "skip", { reason: t("queue.skippedByAdmin") })} disabled={busyId === row.id}>
                 {t("queue.skip")}
-              </button>
+              </Button>
             </div>
           </div>
 
-          {row.skipReason ? <p className="mt-1 text-[11px] text-slate-400">{row.skipReason}</p> : null}
+          {row.skipReason ? <p className="mt-1 text-sm text-slate-500">{row.skipReason}</p> : null}
 
           {editing === row.id ? (
             <div className="mt-2 space-y-2">
               <textarea rows={6} className={inputCls} value={text} onChange={(e) => setText(e.target.value)} />
               <div className="flex flex-wrap items-center gap-2">
                 <input type="time" className={`${inputCls} max-w-[8rem]`} value={time} onChange={(e) => setTime(e.target.value)} />
-                <button className={btnPrimary} onClick={() => void run(row.id, "override", { text }).then(() => setEditing(null))}>
+                <Button variant="unstyled" className={btnPrimary} onClick={() => void run(row.id, "override", { text }).then(() => setEditing(null))}>
                   {t("queue.saveText")}
-                </button>
-                <button className={btnGhost} onClick={() => void run(row.id, "postpone", { sendAt: time })}>
+                </Button>
+                <Button variant="unstyled" className={btnGhost} onClick={() => void run(row.id, "postpone", { sendAt: time })}>
                   {t("queue.postpone")}
-                </button>
-                <button className={btnGhost} onClick={() => setEditing(null)}>
+                </Button>
+                <Button variant="unstyled" className={btnGhost} onClick={() => setEditing(null)}>
                   {t("cancel")}
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 font-sans text-[11px] leading-relaxed text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+            <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-surface bg-slate-50 p-3 font-sans text-xs leading-relaxed text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
               {row.parts.length ? row.parts.join("\n\n———\n\n") : t("queue.notRendered")}
             </pre>
           )}
@@ -2479,7 +2481,7 @@ function AuditTab() {
   return (
     <div className={`${card} overflow-x-auto`}>
       <table className="w-full text-left text-xs">
-        <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+        <thead className="text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <th className="px-2 py-2">{t("audit.when")}</th>
             <th className="px-2 py-2">{t("audit.actor")}</th>
@@ -2577,14 +2579,14 @@ function PollsTab({ showToast }: { showToast: ShowToast }) {
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
           <BarChart3 className="h-4 w-4 text-indigo-500" /> {t("polls.title")}
         </h3>
-        <p className="mt-1 text-xs text-slate-500">{t("polls.hint")}</p>
+        <p className="mt-1 text-sm text-slate-500">{t("polls.hint")}</p>
       </div>
       {rows.map((row) => (
         <div key={row.id} className={card}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-bold text-slate-900 dark:text-white">{row.question}</p>
-              <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+              <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                 <span className={`${chip} bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300`}>{row.pollType}</span>
                 <span>{row.topic ?? "—"}</span>
                 <span>·</span>
@@ -2608,22 +2610,22 @@ function PollsTab({ showToast }: { showToast: ShowToast }) {
                 {row.totalVoters} {t("polls.votes")}
               </span>
               {row.status === "open" && (
-                <button className={btnGhost} disabled={closing === row.id} onClick={() => void close(row.id)}>
+                <Button variant="unstyled" className={btnGhost} disabled={closing === row.id} onClick={() => void close(row.id)}>
                   {closing === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
                   {t("polls.close")}
-                </button>
+                </Button>
               )}
             </div>
           </div>
           <div className="mt-3 space-y-1.5">
-            {row.options.length === 0 && <p className="text-xs text-slate-500">{t("polls.noVotes")}</p>}
+            {row.options.length === 0 && <p className="text-sm text-slate-500">{t("polls.noVotes")}</p>}
             {row.options.map((option) => (
               <div key={option.key} className="flex items-center gap-2 text-xs">
                 <span className="w-40 shrink-0 truncate text-slate-600 dark:text-slate-300">{option.text}</span>
                 <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.round(option.share * 100)}%` }} />
+                  <ProgressFill value={Math.round(option.share * 100)} className="h-full rounded-full bg-indigo-500" />
                 </div>
-                <span className="w-16 shrink-0 text-right font-mono text-[11px] text-slate-500">
+                <span className="w-16 shrink-0 text-right font-mono text-xs text-slate-500">
                   {option.voters} · {Math.round(option.share * 100)}%
                 </span>
               </div>
@@ -2712,11 +2714,11 @@ function PrefsTab({ showToast }: { showToast: ShowToast }) {
             <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
               <Settings2 className="h-4 w-4 text-indigo-500" /> {t("prefs.title")}
             </h3>
-            <p className="mt-1 text-xs text-slate-500">{t("prefs.hint")}</p>
+            <p className="mt-1 text-sm text-slate-500">{t("prefs.hint")}</p>
           </div>
-          <button className={btnGhost} onClick={() => void reset()} disabled={busy || !rows.length}>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void reset()} disabled={busy || !rows.length}>
             <RefreshCw className="h-3.5 w-3.5" /> {t("prefs.reset")}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -2725,7 +2727,7 @@ function PrefsTab({ showToast }: { showToast: ShowToast }) {
       ) : (
         <div className={`${card} overflow-x-auto`}>
           <table className="w-full text-left text-xs">
-            <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-2 py-2">{t("prefs.topic")}</th>
                 <th className="px-2 py-2">{t("prefs.weight")}</th>
@@ -2736,7 +2738,7 @@ function PrefsTab({ showToast }: { showToast: ShowToast }) {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.topic} className="border-t border-slate-100 dark:border-slate-800">
-                  <td className="px-2 py-1 font-mono text-[11px] text-slate-600 dark:text-slate-300">{row.topic}</td>
+                  <td className="px-2 py-1 font-mono text-xs text-slate-600 dark:text-slate-300">{row.topic}</td>
                   <td className="px-2 py-1">
                     <input
                       className={`${inputCls} max-w-[6rem]`}
@@ -2747,9 +2749,9 @@ function PrefsTab({ showToast }: { showToast: ShowToast }) {
                   </td>
                   <td className="px-2 py-1 text-slate-500">{row.samples}</td>
                   <td className="px-2 py-1">
-                    <button className={btnGhost} disabled={busy} onClick={() => void save(row.topic)}>
+                    <Button variant="unstyled" className={btnGhost} disabled={busy} onClick={() => void save(row.topic)}>
                       <Save className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -2842,7 +2844,7 @@ function StoriesTab({ showToast }: { showToast: ShowToast }) {
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
           <ClipboardList className="h-4 w-4 text-indigo-500" /> {draft.id ? t("stories.edit") : t("stories.add")}
         </h3>
-        <p className="mt-1 text-xs text-slate-500">{t("stories.hint")}</p>
+        <p className="mt-1 text-sm text-slate-500">{t("stories.hint")}</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <Field label={t("stories.storyTitle")}>
             <input className={inputCls} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
@@ -2870,7 +2872,7 @@ function StoriesTab({ showToast }: { showToast: ShowToast }) {
               onChange={(e) => setDraft({ ...draft, sourceUrl: e.target.value })}
             />
           </Field>
-          <label className="flex items-end gap-2 pb-2 text-xs text-slate-600 dark:text-slate-300">
+          <label className="flex items-end gap-2 pb-2 text-sm text-slate-600 dark:text-slate-300">
             <input
               type="checkbox"
               checked={draft.approved}
@@ -2880,13 +2882,13 @@ function StoriesTab({ showToast }: { showToast: ShowToast }) {
           </label>
         </div>
         <div className="mt-3 flex gap-2">
-          <button className={btnPrimary} onClick={() => void save()} disabled={busy || !draft.title.trim() || !draft.body.trim()}>
+          <Button variant="unstyled" className={btnPrimary} onClick={() => void save()} disabled={busy || !draft.title.trim() || !draft.body.trim()}>
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
-          </button>
+          </Button>
           {draft.id > 0 && (
-            <button className={btnGhost} onClick={() => setDraft({ ...emptyStory })}>
+            <Button variant="unstyled" className={btnGhost} onClick={() => setDraft({ ...emptyStory })}>
               {t("cancel")}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -2904,8 +2906,8 @@ function StoriesTab({ showToast }: { showToast: ShowToast }) {
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{row.title}</p>
-                <p className="line-clamp-2 text-xs text-slate-500">{row.body}</p>
-                <p className="mt-0.5 text-[11px] text-slate-400">
+                <p className="line-clamp-2 text-sm text-slate-500">{row.body}</p>
+                <p className="mt-0.5 text-sm text-slate-500">
                   {row.authorLabel ?? "—"} · {new Date(row.createdAt).toLocaleDateString()}
                 </p>
               </div>
@@ -2915,11 +2917,11 @@ function StoriesTab({ showToast }: { showToast: ShowToast }) {
                 >
                   {row.approved ? t("stories.approved") : t("stories.pending")}
                 </span>
-                <button className={btnGhost} onClick={() => void toggle(row)}>
+                <Button variant="unstyled" className={btnGhost} onClick={() => void toggle(row)}>
                   {row.approved ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                   {row.approved ? t("stories.unapprove") : t("stories.approve")}
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   className={btnGhost}
                   onClick={() =>
                     setDraft({
@@ -2933,10 +2935,10 @@ function StoriesTab({ showToast }: { showToast: ShowToast }) {
                   }
                 >
                   <Play className="h-3.5 w-3.5" />
-                </button>
-                <button className={btnGhost} onClick={() => void remove(row.id)} aria-label={t("delete")}>
+                </Button>
+                <Button variant="unstyled" className={btnGhost} onClick={() => void remove(row.id)} aria-label={t("delete")}>
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             </div>
           ))}
@@ -3046,13 +3048,13 @@ function LexiconTab({ showToast }: { showToast: ShowToast }) {
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
           <BookOpen className="h-4 w-4 text-indigo-500" /> {t("lexicon.title")}
         </h3>
-        <p className="mt-1 text-xs text-slate-500">{t("lexicon.hint")}</p>
+        <p className="mt-1 text-sm text-slate-500">{t("lexicon.hint")}</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           <StatCard label={t("lexicon.bundled")} value={data ? String(data.meta.bundled) : "—"} />
           <StatCard label={t("lexicon.inDatabase")} value={data ? String(data.total) : "—"} />
           <StatCard label={t("lexicon.edited")} value={data ? String(data.edited) : "—"} />
         </div>
-        <p className="mt-2 text-[11px] text-slate-400">
+        <p className="mt-2 text-sm text-slate-500">
           {t("lexicon.version")}: {data?.meta.version ?? "—"} · {t("lexicon.installedVersion")}:{" "}
           {data?.meta.installed ?? t("lexicon.notInstalled")}
         </p>
@@ -3070,13 +3072,13 @@ function LexiconTab({ showToast }: { showToast: ShowToast }) {
               />
             </Field>
           </div>
-          <button className={btnPrimary} onClick={() => void load(query.trim())}>
+          <Button variant="unstyled" className={btnPrimary} onClick={() => void load(query.trim())}>
             <Search className="h-3.5 w-3.5" /> {t("lexicon.search")}
-          </button>
-          <button className={btnGhost} onClick={() => void install()} disabled={busy}>
+          </Button>
+          <Button variant="unstyled" className={btnGhost} onClick={() => void install()} disabled={busy}>
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}{" "}
             {t("lexicon.import")}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -3104,14 +3106,14 @@ function LexiconTab({ showToast }: { showToast: ShowToast }) {
               </Field>
             </div>
           </div>
-          <p className="mt-2 text-[11px] text-slate-400">{t("lexicon.editHint")}</p>
+          <p className="mt-2 text-sm text-slate-500">{t("lexicon.editHint")}</p>
           <div className="mt-3 flex gap-2">
-            <button className={btnPrimary} onClick={() => void save()} disabled={busy || !draft.uz.trim()}>
+            <Button variant="unstyled" className={btnPrimary} onClick={() => void save()} disabled={busy || !draft.uz.trim()}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
-            </button>
-            <button className={btnGhost} onClick={() => setDraft(null)}>
+            </Button>
+            <Button variant="unstyled" className={btnGhost} onClick={() => setDraft(null)}>
               {t("cancel")}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -3133,8 +3135,8 @@ function LexiconTab({ showToast }: { showToast: ShowToast }) {
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{row.en}</p>
-                <p className="truncate text-xs text-slate-600 dark:text-slate-300">{row.uz}</p>
-                {row.ru ? <p className="truncate text-[11px] text-slate-400">{row.ru}</p> : null}
+                <p className="truncate text-sm text-slate-600 dark:text-slate-300">{row.uz}</p>
+                {row.ru ? <p className="truncate text-sm text-slate-500">{row.ru}</p> : null}
               </div>
               <div className="flex items-center gap-1">
                 <span
@@ -3144,16 +3146,16 @@ function LexiconTab({ showToast }: { showToast: ShowToast }) {
                 >
                   {row.source === "admin" ? t("lexicon.sourceAdmin") : t("lexicon.sourcePdf")}
                 </span>
-                <button
+                <Button variant="unstyled"
                   className={btnGhost}
                   onClick={() => setDraft({ key: row.key, en: row.en, uz: row.uz, ru: row.ru ?? "" })}
                 >
                   <Pencil className="h-3.5 w-3.5" /> {t("lexicon.edit")}
-                </button>
+                </Button>
                 {row.source === "admin" && (
-                  <button className={btnGhost} onClick={() => void reset(row.key)}>
+                  <Button variant="unstyled" className={btnGhost} onClick={() => void reset(row.key)}>
                     <XCircle className="h-3.5 w-3.5" /> {t("lexicon.reset")}
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

@@ -14,6 +14,7 @@ import {
   type StudyInterestArea,
   type StudyInterestSelection,
 } from "@/lib/studyInterests";
+import { Button } from "@/components/ui/Button";
 
 interface StudyInterestPickerProps {
   value: StudyInterestSelection[];
@@ -187,7 +188,7 @@ export function StudyInterestPicker({
   });
 
   const buttonBase =
-    "min-h-11 w-full rounded-xl border px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-950";
+    "min-h-11 w-full rounded-surface border px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-950";
 
   return (
     <fieldset
@@ -196,7 +197,7 @@ export function StudyInterestPicker({
       disabled={disabled}
     >
       <legend className="mb-1 text-sm font-bold text-slate-800 dark:text-slate-100">{t("title")}</legend>
-      <p id={helpId} className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+      <p id={helpId} className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
         {t("helper", { max: MAX_STUDY_INTERESTS })}
       </p>
 
@@ -204,7 +205,7 @@ export function StudyInterestPicker({
         {t("searchLabel")}
       </label>
       <div className="relative">
-        <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <input
           id={searchId}
           type="search"
@@ -213,17 +214,17 @@ export function StudyInterestPicker({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t("searchPlaceholder")}
-          className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-indigo-900"
+          className="min-h-11 w-full rounded-surface border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-indigo-900"
         />
         {query && (
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => setQuery("")}
             aria-label={t("clearSearch")}
-            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-slate-800"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-control text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-slate-800"
           >
             <X aria-hidden="true" className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -263,7 +264,7 @@ export function StudyInterestPicker({
             return (
               <li key={area.id} className="min-w-0">
                 <div
-                  className={`rounded-xl border p-2 transition-colors ${
+                  className={`rounded-surface border p-2 transition-colors ${
                     selectedBroad
                       ? "border-indigo-400 bg-indigo-50/80 dark:border-indigo-700 dark:bg-indigo-950/40"
                       : selectedSpecializations.length > 0
@@ -272,7 +273,7 @@ export function StudyInterestPicker({
                   }`}
                 >
                   <div className="flex min-w-0 items-start gap-1.5">
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       aria-pressed={selectedBroad}
                       aria-label={t(selectedBroad ? "deselectArea" : "selectArea", { area: areaLabel })}
@@ -283,7 +284,7 @@ export function StudyInterestPicker({
                       <span className="flex items-start gap-2">
                         <span
                           aria-hidden="true"
-                          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+                          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-control border text-xs ${
                             selectedBroad
                               ? "border-indigo-600 bg-indigo-600 text-white"
                               : "border-slate-400 bg-white text-transparent dark:border-slate-500 dark:bg-slate-950"
@@ -293,18 +294,18 @@ export function StudyInterestPicker({
                         </span>
                         <span className="min-w-0 leading-snug">{areaLabel}</span>
                       </span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="unstyled"
                       type="button"
                       aria-expanded={areaExpanded}
                       aria-controls={listId}
                       aria-label={t(areaExpanded ? "hideSpecializations" : "showSpecializations", { area: areaLabel })}
                       onClick={() => setExpandedAreaId(areaExpanded ? null : area.id)}
-                      className="mt-0.5 flex min-h-9 shrink-0 items-center justify-center rounded-lg px-2 text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-950"
+                      className="mt-0.5 flex min-h-9 shrink-0 items-center justify-center rounded-control px-2 text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-950"
                     >
                       {areaExpanded ? <ChevronUp aria-hidden="true" className="h-4 w-4" /> : <ChevronDown aria-hidden="true" className="h-4 w-4" />}
-                      <span className="text-[10px] font-semibold leading-none">{t(areaExpanded ? "hideSpecializationsShort" : "viewSpecializationsShort")}</span>
-                    </button>
+                      <span className="text-xs font-semibold leading-none">{t(areaExpanded ? "hideSpecializationsShort" : "viewSpecializationsShort")}</span>
+                    </Button>
                   </div>
                   <ul
                     id={listId}
@@ -320,7 +321,7 @@ export function StudyInterestPicker({
                           (!selected && !selectedBroad && value.length >= MAX_STUDY_INTERESTS && !isExploring);
                         return (
                           <li key={item.id}>
-                            <button
+                            <Button variant="unstyled"
                               type="button"
                               aria-pressed={selected}
                               aria-label={t(selected ? "deselectSpecialization" : "selectSpecialization", { specialization: specLabel, area: areaLabel })}
@@ -331,7 +332,7 @@ export function StudyInterestPicker({
                               <span className="flex items-center gap-2">
                                 <span
                                   aria-hidden="true"
-                                  className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-[9px] ${
+                                  className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-control border text-xs ${
                                     selected
                                       ? "border-indigo-600 bg-indigo-600 text-white"
                                       : "border-slate-400 text-transparent dark:border-slate-500"
@@ -341,7 +342,7 @@ export function StudyInterestPicker({
                                 </span>
                                 {specLabel}
                               </span>
-                            </button>
+                            </Button>
                           </li>
                         );
                       })}
@@ -352,23 +353,23 @@ export function StudyInterestPicker({
           })}
         </ul>
       ) : normalizedQuery ? (
-        <p className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <p className="rounded-surface border border-dashed border-slate-300 px-3 py-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
           {t("noSearchResults")}
         </p>
       ) : null}
 
       {!normalizedQuery && (
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={() => setShowAllAreas((shown) => !shown)}
-          className="min-h-10 rounded-lg px-3 text-sm font-semibold text-indigo-700 underline decoration-indigo-300 underline-offset-4 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-950"
+          className="min-h-10 rounded-control px-3 text-sm font-semibold text-indigo-700 underline decoration-indigo-300 underline-offset-4 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-950"
         >
           {showAllAreas ? t("viewFewerFields") : t("viewAllFields", { count: STUDY_INTEREST_AREAS.length - STUDY_INTEREST_AREAS.filter((area) => area.featured).length })}
-        </button>
+        </Button>
       )}
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <button
+        <Button variant="unstyled"
           type="button"
           aria-pressed={Boolean(selectedOther)}
           aria-expanded={Boolean(selectedOther)}
@@ -378,11 +379,11 @@ export function StudyInterestPicker({
           className={`${buttonBase} ${selectedOther ? "border-indigo-400 bg-indigo-50 text-indigo-800 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200" : "border-slate-200 bg-white font-semibold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/30"}`}
         >
           <span className="flex items-center gap-2">
-            <span aria-hidden="true" className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${selectedOther ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-400 text-transparent dark:border-slate-500"}`}>✓</span>
+            <span aria-hidden="true" className={`flex h-4 w-4 items-center justify-center rounded-control border text-xs ${selectedOther ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-400 text-transparent dark:border-slate-500"}`}>✓</span>
             <span>{t("other")}</span>
           </span>
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           type="button"
           aria-pressed={isExploring}
           onClick={toggleExploring}
@@ -390,11 +391,11 @@ export function StudyInterestPicker({
           className={`${buttonBase} ${isExploring ? "border-violet-400 bg-violet-50 text-violet-800 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-200" : "border-slate-200 bg-white font-semibold text-slate-700 hover:border-violet-300 hover:bg-violet-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-violet-800 dark:hover:bg-violet-950/30"}`}
         >
           <span className="flex items-center gap-2">
-            <span aria-hidden="true" className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${isExploring ? "border-violet-600 bg-violet-600 text-white" : "border-slate-400 text-transparent dark:border-slate-500"}`}>✓</span>
+            <span aria-hidden="true" className={`flex h-4 w-4 items-center justify-center rounded-control border text-xs ${isExploring ? "border-violet-600 bg-violet-600 text-white" : "border-slate-400 text-transparent dark:border-slate-500"}`}>✓</span>
             <span>{t("exploring")}</span>
           </span>
-          <span className="mt-1 block pl-6 text-[11px] font-normal text-slate-500 dark:text-slate-400">{t("exploringHint")}</span>
-        </button>
+          <span className="mt-1 block pl-6 text-xs font-normal text-slate-500 dark:text-slate-400">{t("exploringHint")}</span>
+        </Button>
       </div>
 
       <div
@@ -404,7 +405,7 @@ export function StudyInterestPicker({
       >
         {selectedOther && (
           <>
-            <label htmlFor={`${prefix}-other-text`} className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <label htmlFor={`${prefix}-other-text`} className="block text-sm font-semibold text-slate-700 dark:text-slate-200">
               {t("otherInputLabel")}
             </label>
             <input
@@ -417,9 +418,9 @@ export function StudyInterestPicker({
               aria-describedby={`${prefix}-other-help${errorMessage ? ` ${errorId}` : ""}`}
               onChange={(event) => updateOtherValue(event.target.value)}
               placeholder={t("otherPlaceholder")}
-              className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-indigo-900"
+              className="min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-indigo-900"
             />
-            <p id={`${prefix}-other-help`} className="text-[11px] text-slate-500 dark:text-slate-400">{t("otherHelper", { max: 160 })}</p>
+            <p id={`${prefix}-other-help`} className="text-sm text-slate-500 dark:text-slate-400">{t("otherHelper", { max: 160 })}</p>
           </>
         )}
       </div>
@@ -427,9 +428,9 @@ export function StudyInterestPicker({
       {selectedLabels.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label={t("selectedLabel")}>
           {selectedLabels.map(({ selection, label }, index) => (
-            <li key={`${selection.kind}-${index}`} className="flex min-h-11 max-w-full min-w-0 items-center gap-1 rounded-2xl border border-indigo-200 bg-indigo-50 py-1 pl-2.5 pr-1.5 text-xs font-semibold text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-200">
+            <li key={`${selection.kind}-${index}`} className="flex min-h-11 max-w-full min-w-0 items-center gap-1 rounded-overlay border border-indigo-200 bg-indigo-50 py-1 pl-2.5 pr-1.5 text-sm font-semibold text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-200">
               <span className="min-w-0 flex-1 break-words whitespace-normal leading-snug">{label}</span>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => removeSelection(selection)}
                 disabled={disabled}
@@ -437,14 +438,14 @@ export function StudyInterestPicker({
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-indigo-900"
               >
                 <X aria-hidden="true" className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
       )}
 
       {errorMessage && (
-        <p id={errorId} role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
+        <p id={errorId} role="alert" className="rounded-control border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200">
           {errorMessage}
         </p>
       )}

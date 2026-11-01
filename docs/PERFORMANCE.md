@@ -113,7 +113,7 @@ split chunk repeats a little module boilerplate; a visitor never downloads all o
 them. What a visitor pays for opening a hub went down.
 
 Allowed to stay static: `PremiumGate` (tiny, rendered three times) and
-`@/components/journey/ui` (the shell's own UI kit). `npm run test:perf` enforces
+`@/components/ui/journey` (the shell's own UI kit). `npm run test:perf` enforces
 the rule.
 
 ## 2. One boot request instead of three

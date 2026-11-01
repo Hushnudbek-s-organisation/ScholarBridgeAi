@@ -3,6 +3,7 @@
 import React, { useEffect, useSyncExternalStore } from "react";
 import type { Locale } from "@/i18n/config";
 import { dictionaries } from "@/i18n/messages";
+import { Button } from "@/components/ui/Button";
 
 /**
  * The fallback reads checked-in message files directly, not next-intl hooks:
@@ -56,40 +57,40 @@ export function AppErrorFallback({
   }, [error]);
 
   const card = (
-    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className="w-full max-w-md rounded-overlay border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
       <span
         role="img"
         aria-hidden="true"
-        className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-amber-50 text-2xl dark:bg-amber-500/10"
+        className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-overlay bg-amber-50 text-2xl dark:bg-amber-500/10"
       >
         ⚠️
       </span>
       <h1 className="text-lg font-bold text-slate-900 dark:text-white">{t.title}</h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{t.body}</p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={reset}
-          className="min-h-11 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="min-h-11 rounded-surface bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
           {t.retry}
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           type="button"
           onClick={() => window.location.reload()}
-          className="min-h-11 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
+          className="min-h-11 rounded-surface border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
         >
           {t.reload}
-        </button>
+        </Button>
       </div>
       {error?.message ? (
         <details className="mt-5 text-left">
           <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-medium text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:text-slate-400">
             {t.details}
           </summary>
-          <p className="mt-2 break-words text-xs text-slate-500 dark:text-slate-400">{error.message}</p>
+          <p className="mt-2 break-words text-sm text-slate-500 dark:text-slate-400">{error.message}</p>
           {error.digest ? (
-            <p className="mt-1 break-all text-[10px] text-slate-400 dark:text-slate-500">ref: {error.digest}</p>
+            <p className="mt-1 break-all text-sm text-slate-500 dark:text-slate-500">ref: {error.digest}</p>
           ) : null}
         </details>
       ) : null}

@@ -48,7 +48,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       nodes.push(
         <code
           key={k}
-          className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-slate-700"
+          className="rounded-control bg-slate-100 px-1 py-0.5 font-mono text-[0.85em] text-slate-700"
         >
           {code.slice(1, -1)}
         </code>

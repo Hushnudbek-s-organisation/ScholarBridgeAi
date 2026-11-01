@@ -138,7 +138,7 @@ the `prefers-reduced-motion` rule in `src/app/globals.css`.
 | Where | What it gives you |
 | --- | --- |
 | `src/components/motion/` | `MotionProvider` (`reducedMotion="user"`), `PageTransition`, `SectionTransition`, `Reveal` / `RevealGroup` / `RevealItem`, `AnimatedNumber` / `AnimatedBar` / `AnimatedRing`, and the shared springs/variants. |
-| `src/components/journey/ui.tsx` | `JourneyCard` (entrance + `tone="hero"` aurora + `interactive` hover lift), `ProgressBar` (draws its fill, sheen while incomplete), `Loading` (shimmer skeleton), `SkeletonCard`, `StatTile` (counting number, state-tinted), `ProgressRing`, `Pill`, `Empty`, `SourceTag`. |
+| `src/components/ui/journey.tsx` | `JourneyCard` (entrance + `tone="hero"` aurora + `interactive` hover lift), `ProgressBar` (draws its fill, sheen while incomplete), `Loading` (shimmer skeleton), `SkeletonCard`, `StatTile` (counting number, state-tinted), `ProgressRing`, `Pill`, `Empty`, `SourceTag`. |
 | `src/app/globals.css` → “JOURNEY POLISH” | `sb-skeleton`, `sb-shimmer`, `sb-rise`, `sb-card-hover`, `sb-progress-sheen`, `sb-gradient-text`, `sb-aurora`, `sb-pop`, `sb-fade-in`. |
 
 **Conventions**

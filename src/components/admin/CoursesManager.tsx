@@ -22,6 +22,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { SmartVideoPlayer, parseVideoEmbed, youtubeThumbnailUrl } from "@/components/SmartVideoPlayer";
+import { Button } from "@/components/ui/Button";
 
 interface CoursesManagerProps {
   adminProfileId: number;
@@ -120,7 +121,7 @@ const emptyCourse = (): CourseDraft => ({
 });
 
 const inputCls =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500";
+  "w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500";
 
 export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
   const t = useTranslations("courses");
@@ -520,66 +521,66 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
   if (!draft) {
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-violet-50 flex items-center justify-center">
+        <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+          <div className="h-9 w-9 rounded-surface bg-violet-50 flex items-center justify-center">
             <Video className="h-5 w-5 text-violet-600" />
           </div>
           <div>
             <h2 className="text-sm font-extrabold text-slate-800">Courses Manager</h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
               {courses.length} course{courses.length === 1 ? "" : "s"} on the platform
             </p>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button
+            <Button variant="unstyled"
               onClick={syncBuiltInCourses}
               disabled={syncing}
               title={t("syncSeedHint")}
-              className="flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-surface border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-60"
             >
               {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               {t("syncSeed")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               onClick={fetchCourses}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
               <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               onClick={startNew}
-              className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700"
+              className="flex items-center gap-1.5 rounded-surface bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700"
             >
               <Plus className="h-3.5 w-3.5" /> New Course
-            </button>
+            </Button>
           </div>
         </div>
 
         {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+          <div className="rounded-overlay border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
             {error}
           </div>
         )}
         {success && (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+          <div className="rounded-overlay border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
             {success}
           </div>
         )}
 
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center gap-2 p-8 text-xs font-semibold text-slate-500">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading courses…
             </div>
           ) : courses.length === 0 ? (
-            <p className="p-8 text-center text-xs font-semibold text-slate-500">
+            <p className="p-8 text-center text-sm font-semibold text-slate-500">
               No courses yet — click &quot;New Course&quot; to create one.
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-3 font-bold">Course</th>
                     <th className="px-4 py-3 font-bold">Level</th>
                     <th className="px-4 py-3 font-bold">Instructor</th>
@@ -593,7 +594,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                     <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
                       <td className="px-4 py-3">
                         <div className="font-bold text-slate-800">{c.title}</div>
-                        <div className="max-w-xs truncate text-[11px] text-slate-500">{c.description}</div>
+                        <div className="max-w-xs truncate text-xs text-slate-500">{c.description}</div>
                       </td>
                       <td className="px-4 py-3 text-slate-600">{c.level}</td>
                       <td className="px-4 py-3 text-slate-600">{c.instructorName}</td>
@@ -602,21 +603,21 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                       </td>
                       <td className="px-4 py-3">
                         {c.isPublished ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
                             <CheckCircle2 className="h-3 w-3" /> Published
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
                             Hidden
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
+                          <Button variant="unstyled"
                             onClick={() => startEdit(c)}
                             disabled={loadingCourse === c.id}
-                            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-violet-600 hover:bg-violet-50 disabled:opacity-60"
+                            className="flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-violet-600 hover:bg-violet-50 disabled:opacity-60"
                           >
                             {loadingCourse === c.id ? (
                               <Loader2 className="h-3 w-3 animate-spin" />
@@ -624,13 +625,13 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                               <Pencil className="h-3 w-3" />
                             )}
                             Edit
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="unstyled"
                             onClick={() => handleDelete(c)}
-                            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                            className="flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50"
                           >
                             <Trash2 className="h-3 w-3" /> Delete
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -647,8 +648,8 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
   // ================= EDITOR VIEW =================
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-violet-50 flex items-center justify-center">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-violet-50 flex items-center justify-center">
           {draft.id != null ? (
             <Pencil className="h-5 w-5 text-violet-600" />
           ) : (
@@ -659,54 +660,54 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
           <h2 className="text-sm font-extrabold text-slate-800">
             {draft.id != null ? "Edit Course" : "New Course"}
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             {draft.id != null
               ? "Saving updates the top-level course fields. Modules, lessons and quizzes are set at creation time."
               : "Build the course, then add modules with lessons and quizzes."}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={cancelEdit}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
           >
             <X className="h-3.5 w-3.5" /> Cancel
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="submit"
             disabled={saving}
-            className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-surface bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {draft.id != null ? "Save Course" : "Create Course"}
-          </button>
+          </Button>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+        <div className="rounded-overlay border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
           {error}
         </div>
       )}
       {notice && (
-        <div className="flex items-start justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800">
+        <div className="flex items-start justify-between gap-3 rounded-overlay border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800">
           <span className="flex items-start gap-1.5">
             <Wand2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {notice}
           </span>
-          <button type="button" onClick={() => setNotice("")} className="rounded-lg p-0.5 hover:bg-sky-100">
+          <Button variant="unstyled" type="button" onClick={() => setNotice("")} className="rounded-control p-0.5 hover:bg-sky-100">
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Top-level course fields */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs space-y-3">
         <h3 className="text-sm font-extrabold text-slate-800">Course Details</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Title</label>
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Title</label>
             <input
               value={draft.title}
               onChange={(e) => updateTop("title", e.target.value)}
@@ -715,7 +716,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
             />
           </div>
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Description</label>
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Description</label>
             <textarea
               value={draft.description}
               onChange={(e) => updateTop("description", e.target.value)}
@@ -725,7 +726,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Instructor Name</label>
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Instructor Name</label>
             <input
               value={draft.instructorName}
               onChange={(e) => updateTop("instructorName", e.target.value)}
@@ -733,7 +734,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Level</label>
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Level</label>
             <select
               value={draft.level}
               onChange={(e) => updateTop("level", e.target.value)}
@@ -745,7 +746,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Category ID (video platform)</label>
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Category ID (video platform)</label>
             <input
               value={draft.categoryId}
               onChange={(e) => updateTop("categoryId", e.target.value)}
@@ -754,7 +755,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Instructor ID (video platform)</label>
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Instructor ID (video platform)</label>
             <input
               value={draft.instructorId}
               onChange={(e) => updateTop("instructorId", e.target.value)}
@@ -763,7 +764,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
             />
           </div>
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Student Experience (sharing story)</label>
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">Student Experience (sharing story)</label>
             <textarea
               value={draft.studentExperience}
               onChange={(e) => updateTop("studentExperience", e.target.value)}
@@ -773,7 +774,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
               {t("thumbnailUrlLabel")}
             </label>
             <input
@@ -782,52 +783,52 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
               className={inputCls}
               placeholder="https://…"
             />
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={autoFillThumbnailFromYoutube}
-              className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded-control border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
               <ImageIcon className="h-3.5 w-3.5" /> {t("autoThumbnail")}
-            </button>
+            </Button>
           </div>
         </div>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <input
             type="checkbox"
             checked={draft.isPublished}
             onChange={(e) => updateTop("isPublished", e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+            className="h-4 w-4 rounded-control border-slate-300 text-violet-600 focus:ring-violet-500"
           />
           Published (visible to students)
         </label>
       </div>
 
       {/* Modules */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs space-y-3">
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-violet-600" />
           <h3 className="text-sm font-extrabold text-slate-800">
             Modules ({draft.modules.length})
           </h3>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={addModule}
-            className="ml-auto flex items-center gap-1 rounded-xl bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-700 hover:bg-violet-100"
+            className="ml-auto flex items-center gap-1 rounded-surface bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100"
           >
             <Plus className="h-3 w-3" /> Add Module
-          </button>
+          </Button>
         </div>
 
         {draft.modules.length === 0 && (
-          <p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs font-semibold text-slate-500">
+          <p className="rounded-surface border border-dashed border-slate-200 p-6 text-center text-sm font-semibold text-slate-500">
             No modules yet — add one to start building lessons.
           </p>
         )}
 
         {draft.modules.map((m, mi) => (
-          <div key={mi} className="rounded-2xl border border-violet-100 bg-violet-50/40 p-4 space-y-3">
+          <div key={mi} className="rounded-overlay border border-violet-100 bg-violet-50/40 p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => toggleModule(mi)}
                 className="flex items-center gap-1 text-xs font-extrabold text-slate-700"
@@ -838,28 +839,28 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                   <ChevronRight className="h-4 w-4 text-violet-600" />
                 )}
                 Module {mi + 1}
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => addLesson(mi)}
-                className="ml-auto flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-700"
+                className="ml-auto flex items-center gap-1 rounded-control bg-violet-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-violet-700"
               >
                 <PlayCircle className="h-3 w-3" /> Add Lesson
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => removeModule(mi)}
-                className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                className="flex items-center gap-1 rounded-control border border-rose-200 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50"
               >
                 <Trash2 className="h-3 w-3" />
-              </button>
+              </Button>
             </div>
 
             {expanded[mi] && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                    <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                       Module Title
                     </label>
                     <input
@@ -870,7 +871,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                    <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                       Module Description
                     </label>
                     <input
@@ -883,28 +884,28 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                 </div>
 
                 {m.lessons.length === 0 && (
-                  <p className="text-[11px] font-semibold text-slate-500">
+                  <p className="text-sm font-semibold text-slate-500">
                     No lessons in this module yet.
                   </p>
                 )}
 
                 {m.lessons.map((l, li) => (
-                  <div key={li} className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                  <div key={li} className="rounded-surface border border-slate-200 bg-white p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <PlayCircle className="h-4 w-4 text-violet-600" />
                       <span className="text-xs font-extrabold text-slate-700">Lesson {li + 1}</span>
-                      <button
+                      <Button variant="unstyled"
                         type="button"
                         onClick={() => removeLesson(mi, li)}
-                        className="ml-auto flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                        className="ml-auto flex items-center gap-1 rounded-control border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50"
                       >
                         <Trash2 className="h-3 w-3" /> Remove
-                      </button>
+                      </Button>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                        <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                           Lesson Title
                         </label>
                         <input
@@ -915,7 +916,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                         />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                        <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                           {t("videoUrlLabel")}
                         </label>
                         <input
@@ -924,18 +925,18 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                           className={inputCls}
                           placeholder="https://www.youtube.com/watch?v=… / https://vimeo.com/… / https://www.loom.com/share/… / https://cdn.example.com/lesson.mp4"
                         />
-                        <p className="mt-1 text-[10px] font-medium text-slate-400">{t("videoUrlHint")}</p>
+                        <p className="mt-1 text-sm font-medium text-slate-500">{t("videoUrlHint")}</p>
 
                         {/* Quick video lesson helper: the admin sees the actual
                             player (or a clear warning) before clicking Save. */}
                         {l.videoUrl.trim() ? (
                           parseVideoEmbed(l.videoUrl).kind === "none" ? (
-                            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-800">
+                            <p className="mt-2 rounded-control border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-sm font-semibold text-amber-800">
                               {t("videoUnsupported")}
                             </p>
                           ) : (
-                            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-                              <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                            <div className="mt-2 rounded-surface border border-slate-200 bg-slate-50 p-2">
+                              <p className="mb-1.5 flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-wide text-slate-500">
                                 <Wand2 className="h-3 w-3" />
                                 {t("quickVideoHelper")} · {t("videoPreview")} (
                                 {parseVideoEmbed(l.videoUrl).provider})
@@ -946,7 +947,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                         ) : null}
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                        <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                           Duration (seconds)
                         </label>
                         <input
@@ -958,7 +959,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                         />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                        <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                           Content
                         </label>
                         <textarea
@@ -973,22 +974,22 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
 
                     {/* Quiz */}
                     {l.quiz ? (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
+                      <div className="rounded-surface border border-amber-200 bg-amber-50/50 p-4 space-y-3">
                         <div className="flex items-center gap-2">
                           <FileQuestion className="h-4 w-4 text-amber-600" />
                           <span className="text-xs font-extrabold text-slate-700">Quiz</span>
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             onClick={() => removeQuiz(mi, li)}
-                            className="ml-auto flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                            className="ml-auto flex items-center gap-1 rounded-control border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50"
                           >
                             <X className="h-3 w-3" /> Remove Quiz
-                          </button>
+                          </Button>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                               Quiz Title
                             </label>
                             <input
@@ -998,7 +999,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                               Pass Threshold (%)
                             </label>
                             <input
@@ -1013,32 +1014,32 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
 
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wide">
+                            <span className="text-xs font-extrabold text-slate-600 uppercase tracking-wide">
                               Questions ({l.quiz.questions.length})
                             </span>
-                            <button
+                            <Button variant="unstyled"
                               type="button"
                               onClick={() => addQuestion(mi, li)}
-                              className="ml-auto flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1.5 text-[11px] font-bold text-white sb-ink-on-warm hover:bg-amber-600"
+                              className="ml-auto flex items-center gap-1 rounded-control bg-amber-500 px-2.5 py-1.5 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600"
                             >
                               <Plus className="h-3 w-3" /> Add Question
-                            </button>
+                            </Button>
                           </div>
 
                           {l.quiz.questions.map((q, qi) => (
-                            <div key={qi} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                            <div key={qi} className="rounded-surface border border-slate-200 bg-white p-3 space-y-2">
                               <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-extrabold text-slate-600">Q{qi + 1}</span>
-                                <button
+                                <span className="text-xs font-extrabold text-slate-600">Q{qi + 1}</span>
+                                <Button variant="unstyled"
                                   type="button"
                                   onClick={() => removeQuestion(mi, li, qi)}
-                                  className="ml-auto flex items-center gap-1 rounded-lg border border-red-200 px-1.5 py-1 text-[10px] font-bold text-red-600 hover:bg-red-50"
+                                  className="ml-auto flex items-center gap-1 rounded-control border border-rose-200 px-1.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50"
                                 >
                                   <Trash2 className="h-3 w-3" />
-                                </button>
+                                </Button>
                               </div>
                               <div>
-                                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                                <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                                   Question
                                 </label>
                                 <textarea
@@ -1051,7 +1052,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <div className="sm:col-span-2">
-                                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                                  <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                                     Options (JSON array)
                                   </label>
                                   <textarea
@@ -1063,7 +1064,7 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                                  <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                                     Correct Option Index
                                   </label>
                                   <input
@@ -1082,13 +1083,13 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
                         </div>
                       </div>
                     ) : (
-                      <button
+                      <Button variant="unstyled"
                         type="button"
                         onClick={() => addQuiz(mi, li)}
-                        className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-100"
+                        className="flex items-center gap-1.5 rounded-control border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100"
                       >
                         <FileQuestion className="h-3 w-3" /> Add Quiz
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -1099,21 +1100,21 @@ export function CoursesManager({ adminProfileId }: CoursesManagerProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <button
+        <Button variant="unstyled"
           type="submit"
           disabled={saving}
-          className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-60"
+          className="flex items-center gap-1.5 rounded-surface bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-60"
         >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
           {draft.id != null ? "Save Course" : "Create Course"}
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           type="button"
           onClick={cancelEdit}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
         >
           <X className="h-3.5 w-3.5" /> Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

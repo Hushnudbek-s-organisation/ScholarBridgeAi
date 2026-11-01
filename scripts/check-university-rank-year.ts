@@ -182,7 +182,7 @@ check("the cards omit the badge instead of printing a dash", () => {
   const explorer = source("src/components/UniversityExplorer.tsx");
   assert.match(explorer, /\{uni\.worldRanking != null && \(\s*<div className="absolute top-3 right-3/, "the explorer badge renders without a rank");
   const modal = source("src/components/UniversityDetail.tsx");
-  assert.match(modal, /\{uni\.worldRanking != null && \(\s*<div className="mt-3 inline-flex items-center gap-2 rounded-xl/, "the detail modal renders a rank block without a rank");
+  assert.match(modal, /\{uni\.worldRanking != null && \(\s*<div className="mt-3 inline-flex items-center gap-2 rounded-surface/, "the detail modal renders a rank block without a rank");
 });
 
 /* ------------------------------------------------------- the data contract */

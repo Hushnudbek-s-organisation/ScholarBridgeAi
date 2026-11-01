@@ -5,7 +5,9 @@ import { useLocale, useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { CheckSquare, Plus, Trash2, Check, Clock } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
-import { ShowMoreToggle } from "@/components/hubs/ui";
+import { ShowMoreToggle } from "@/components/ui/hubs";
+import { Button } from "@/components/ui/Button";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 export interface TaskItem {
   id: number;
@@ -174,7 +176,7 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
   return (
     <div className="space-y-6">
       {/* Header & Progress Bar */}
-      <div className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-6">
+      <div className="min-w-0 space-y-4 rounded-overlay border border-slate-200 bg-white p-4 shadow-xs sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             {/* h2 — the Deadline hub owns this screen's single <h1>. */}
@@ -182,59 +184,56 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
               <CheckSquare className="h-5 w-5 text-indigo-600" />
               {tr("title")}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-sm text-slate-500 mt-0.5">
               {tr("subtitle")}
             </p>
           </div>
 
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => setShowAddForm(!showAddForm)}
             aria-expanded={showAddForm}
             aria-controls="task-roadmap-add-form"
-            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-indigo-700"
+            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-indigo-700"
           >
             <Plus className="h-4 w-4" /> {tr("addTask")}
-          </button>
+          </Button>
         </div>
 
         {/* Progress Bar */}
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2">
+        <div className="bg-slate-50 p-4 rounded-surface border border-slate-100 space-y-2">
           <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
             <span className="break-words">{tr("progress", { done: completedCount, total: tasks.length })}</span>
             <span className="text-indigo-600 font-bold">{progressPercent}%</span>
           </div>
           <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
+            <ProgressFill value={progressPercent} className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300" />
           </div>
         </div>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 pt-2" role="group" aria-label={tr("filterTasks")}>
           {(["All", "Pending", "Completed"] as const).map((st) => (
-            <button
+            <Button variant="unstyled"
               key={st}
               type="button"
               aria-pressed={filter === st}
               onClick={() => setFilter(st)}
-              className={`min-h-11 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+              className={`min-h-11 rounded-control px-3 py-2 text-xs font-semibold transition-all ${
                 filter === st
                   ? "bg-indigo-600 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               {filterLabel(st)}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
       {/* New Task Inline Form */}
       {showAddForm && (
-        <form id="task-roadmap-add-form" onSubmit={handleAddTask} className="min-w-0 space-y-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 sm:p-5">
+        <form id="task-roadmap-add-form" onSubmit={handleAddTask} className="min-w-0 space-y-4 rounded-overlay border border-indigo-200 bg-indigo-50/60 p-4 sm:p-5">
           <h3 className="break-words text-xs font-bold uppercase tracking-wider text-slate-900">{tr("formTitle")}</h3>
           <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-4">
             <div className="min-w-0 sm:col-span-2">
@@ -246,7 +245,7 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
                 placeholder={tr("taskPlaceholder")}
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
@@ -256,7 +255,7 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
                 id="task-roadmap-category"
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="Document Prep">{tr("categories.documentPrep")}</option>
                 <option value="Standardized Test">{tr("categories.standardizedTest")}</option>
@@ -275,25 +274,25 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
                 required
                 value={newDueDate}
                 onChange={(e) => setNewDueDate(e.target.value)}
-                className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="min-h-11 w-full rounded-surface border border-slate-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
 
           <div className="flex flex-wrap justify-end gap-2">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setShowAddForm(false)}
-              className="min-h-11 rounded-lg px-3 py-2 text-xs text-slate-600 hover:bg-slate-200"
+              className="min-h-11 rounded-control px-3 py-2 text-xs text-slate-600 hover:bg-slate-200"
             >
               {tr("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="submit"
-              className="min-h-11 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+              className="min-h-11 rounded-control bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
             >
               {tr("saveTask")}
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -304,32 +303,32 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
           {monthPlan.map((m) => {
             const done = m.tasks.filter((t) => t.isCompleted).length;
             return (
-              <div key={m.key} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+              <div key={m.key} className="min-w-0 rounded-overlay border border-slate-200 bg-white p-4 shadow-xs">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-800">
                     {m.label}
                   </h3>
-                  <span className="text-[11px] font-bold text-slate-500" aria-label={tr("monthProgress", { done, total: m.tasks.length })}>
+                  <span className="text-xs font-bold text-slate-500" aria-label={tr("monthProgress", { done, total: m.tasks.length })}>
                     {done}/{m.tasks.length}
                   </span>
                 </div>
                 <ul className="mt-3 space-y-1.5">
                   {m.tasks.map((t) => (
                     <li key={t.id} className="flex items-center gap-2">
-                      <button
+                      <Button variant="unstyled"
                         onClick={() => handleToggleTask(t.id, t.isCompleted)}
                         aria-label={tr(t.isCompleted ? "markIncomplete" : "markComplete", { title: t.title })}
-                        className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                        className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control border transition-colors ${
                           t.isCompleted
-                            ? "bg-emerald-600 border-emerald-600 text-white"
+                            ? "bg-emerald-700 border-emerald-600 text-white"
                             : "border-slate-300 hover:border-indigo-500 bg-white"
                         }`}
                       >
                         {t.isCompleted && <Check className="h-3.5 w-3.5" />}
-                      </button>
+                      </Button>
                       <span
                         className={`min-w-0 break-words text-xs font-semibold ${
-                          t.isCompleted ? "line-through text-slate-400" : "text-slate-700"
+                          t.isCompleted ? "line-through text-slate-500" : "text-slate-700"
                         }`}
                       >
                         {t.title}
@@ -345,11 +344,11 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
 
       {/* Task List */}
       {loading ? (
-        <div className="p-8 text-center text-slate-500 font-medium bg-white rounded-2xl border border-slate-200">
+        <div className="p-8 text-center text-slate-500 font-medium bg-white rounded-overlay border border-slate-200">
           {tr("loading")}
         </div>
       ) : filteredTasks.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
+        <div className="p-8 text-center text-slate-500 bg-white rounded-overlay border border-slate-200">
           {tr("empty")}
         </div>
       ) : (
@@ -357,36 +356,36 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
           {filteredTasks.slice(0, visibleTaskCount).map((t) => (
             <div
               key={t.id}
-              className={`flex min-w-0 items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-xs transition-all sm:gap-4 ${
+              className={`flex min-w-0 items-center justify-between gap-3 rounded-overlay border bg-white p-4 shadow-xs transition-all sm:gap-4 ${
                 t.isCompleted
                   ? "border-emerald-200 bg-emerald-50/20"
                   : "border-slate-200 hover:border-indigo-300"
               }`}
             >
               <div className="flex min-w-0 flex-1 items-start gap-3">
-                <button
+                <Button variant="unstyled"
                   onClick={() => handleToggleTask(t.id, t.isCompleted)}
                   aria-label={tr(t.isCompleted ? "markIncomplete" : "markComplete", { title: t.title })}
-                  className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                  className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control border transition-colors ${
                     t.isCompleted
-                      ? "bg-emerald-600 border-emerald-600 text-white"
+                      ? "bg-emerald-700 border-emerald-600 text-white"
                       : "border-slate-300 hover:border-indigo-500 bg-white"
                   }`}
                 >
                   {t.isCompleted && <Check className="h-4 w-4" />}
-                </button>
+                </Button>
 
                 <div className="min-w-0 flex-1 space-y-1">
                   <span
                     className={`block break-words text-sm font-bold ${
-                      t.isCompleted ? "line-through text-slate-400" : "text-slate-900"
+                      t.isCompleted ? "line-through text-slate-500" : "text-slate-900"
                     }`}
                   >
                     {t.title}
                   </span>
 
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                    <span className="max-w-full break-words rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <span className="max-w-full break-words rounded-control bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
                       {categoryLabel(t.category)}
                     </span>
 
@@ -403,14 +402,14 @@ export function TaskRoadmap({ activeProfile }: TaskRoadmapProps) {
                 </div>
               </div>
 
-              <button
+              <Button variant="unstyled"
                 onClick={() => handleDeleteTask(t.id)}
                 aria-label={tr("deleteTask")}
                 title={tr("deleteTask")}
-                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control text-slate-300 transition-colors hover:bg-rose-50 hover:text-rose-600"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           ))}
           <ShowMoreToggle

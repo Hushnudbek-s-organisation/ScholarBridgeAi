@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, ExternalLink, Loader2, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Telegram flows shared by sign-in and by "connect Telegram" (settings page).
@@ -259,16 +260,16 @@ export function TelegramCodeFlow({
   if (!attempt) {
     return (
       <div className={compact ? "space-y-3" : "space-y-4"}>
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={start}
           disabled={starting}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-sm font-bold text-white sb-ink-on-bright shadow-sm transition-colors hover:bg-sky-600 disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-surface bg-sky-500 px-4 py-3 text-sm font-bold text-white sb-ink-on-bright shadow-sm transition-colors hover:bg-sky-600 disabled:opacity-60"
         >
           {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           {starting ? t("starting") : purpose === "login" ? t("loginButton") : t("connectButton")}
-        </button>
-        <ol className="space-y-1.5 text-[12px] leading-relaxed text-slate-500">
+        </Button>
+        <ol className="space-y-1.5 text-sm leading-relaxed text-slate-500">
           <li className="flex gap-2">
             <StepDot n={1} />
             <span>{t("howStep1")}</span>
@@ -290,7 +291,7 @@ export function TelegramCodeFlow({
   return (
     <div className="space-y-3">
       {/* Step 1 — open the bot */}
-      <div className={`rounded-xl border px-3 py-2.5 ${codeSent || status?.status === "used" ? "border-emerald-200 bg-emerald-50" : "border-sky-200 bg-sky-50"}`}>
+      <div className={`rounded-surface border px-3 py-2.5 ${codeSent || status?.status === "used" ? "border-emerald-200 bg-emerald-50" : "border-sky-200 bg-sky-50"}`}>
         <div className="flex items-start gap-2.5">
           {codeSent || status?.status === "used" ? (
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
@@ -298,7 +299,7 @@ export function TelegramCodeFlow({
             <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-600" />
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-[12px] font-bold text-slate-800">
+            <p className="text-sm font-bold text-slate-800">
               {status?.status === "confirming"
                 ? t("linkConfirmInBot", { name: tgName })
                 : purpose === "link" && status?.status === "used"
@@ -308,9 +309,9 @@ export function TelegramCodeFlow({
                     : t("waiting")}
             </p>
             {!codeSent && status?.status !== "used" && (
-              <p className="mt-0.5 text-[11px] text-slate-500">{t("step1", { bot: `@${bot}` })}</p>
+              <p className="mt-0.5 text-sm text-slate-500">{t("step1", { bot: `@${bot}` })}</p>
             )}
-            {popupBlocked && !codeSent && <p className="mt-1 text-[11px] font-semibold text-amber-700">{t("popupBlocked")}</p>}
+            {popupBlocked && !codeSent && <p className="mt-1 text-sm font-semibold text-amber-700">{t("popupBlocked")}</p>}
           </div>
         </div>
         {!codeSent && status?.status !== "used" && (
@@ -318,7 +319,7 @@ export function TelegramCodeFlow({
             href={attempt.deepLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-sky-500 px-3 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600"
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-control bg-sky-500 px-3 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600"
           >
             <ExternalLink className="h-3.5 w-3.5" /> {t("openBot", { bot: `@${bot}` })}
           </a>
@@ -328,19 +329,19 @@ export function TelegramCodeFlow({
       {purpose === "link" ? (
         <div className="space-y-2">
           {status?.status === "used" ? (
-            <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white">
+            <div className="flex items-center justify-center gap-2 rounded-surface bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white">
               <ShieldCheck className="h-4 w-4" /> {t("linked")}
             </div>
           ) : null}
           <AnimatePresence>{error && <ErrorBox key="err" text={error} />}</AnimatePresence>
           {status?.status !== "used" && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={reset}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="flex w-full items-center justify-center gap-2 rounded-surface border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
               <RotateCcw className="h-3.5 w-3.5" /> {t("restart")}
-            </button>
+            </Button>
           )}
         </div>
       ) : (
@@ -352,7 +353,7 @@ export function TelegramCodeFlow({
         }}
         className="space-y-2"
       >
-        <label htmlFor={`tg-code-${purpose}`} className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        <label htmlFor={`tg-code-${purpose}`} className="block text-sm font-bold uppercase tracking-wide text-slate-500">
           {t("codeLabel")}
         </label>
         <input
@@ -367,45 +368,45 @@ export function TelegramCodeFlow({
           placeholder="••••••"
           disabled={verifying || finished || status?.status === "used"}
           aria-describedby={`tg-code-hint-${purpose}`}
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-center font-mono text-2xl font-bold tracking-[0.5em] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
+          className="w-full rounded-surface border border-slate-200 bg-white px-4 py-3 text-center font-mono text-2xl font-bold tracking-[0.5em] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-60"
         />
-        <p id={`tg-code-hint-${purpose}`} className="text-[11px] text-slate-500">
+        <p id={`tg-code-hint-${purpose}`} className="text-sm text-slate-500">
           {codeSent && mmss ? t("expiresIn", { time: mmss }) : t("step2")}
         </p>
 
         <AnimatePresence>{error && <ErrorBox key="err" text={error} />}</AnimatePresence>
 
         {status?.status === "used" ? (
-          <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white">
+          <div className="flex items-center justify-center gap-2 rounded-surface bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white">
             <ShieldCheck className="h-4 w-4" /> {purpose === "login" ? t("signedIn") : t("linked")}
           </div>
         ) : finished ? (
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={reset}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800"
+            className="flex w-full items-center justify-center gap-2 rounded-surface bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800"
           >
             <RotateCcw className="h-3.5 w-3.5" /> {t("restart")}
-          </button>
+          </Button>
         ) : (
           <div className="flex gap-2">
-            <button
+            <Button variant="unstyled"
               type="submit"
               disabled={verifying || code.length !== 6}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-2 rounded-surface bg-sky-500 px-4 py-2.5 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600 disabled:opacity-50"
             >
               {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
               {verifying ? t("verifying") : t("verify")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={reset}
               title={t("restart")}
-              className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="flex items-center justify-center gap-1 rounded-surface border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{t("restart")}</span>
-            </button>
+            </Button>
           </div>
         )}
       </form>
@@ -416,7 +417,7 @@ export function TelegramCodeFlow({
 
 function StepDot({ n }: { n: number }) {
   return (
-    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[9px] font-extrabold text-sky-700">
+    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-extrabold text-sky-700">
       {n}
     </span>
   );
@@ -429,7 +430,7 @@ function ErrorBox({ text }: { text: string }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       role="alert"
-      className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700"
+      className="rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
     >
       {text}
     </motion.div>

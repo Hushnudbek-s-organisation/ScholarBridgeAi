@@ -35,7 +35,7 @@ export default async function ForgotPasswordPage() {
       <div className="min-h-screen bg-slate-50">
         <PublicCatalogHeader />
         <main className="mx-auto max-w-lg px-4 py-10 sm:px-6 sm:py-14">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">{copy.forgotEyebrow}</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">{copy.forgotEyebrow}</p>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{copy.forgotTitle}</h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-700">{copy.forgotBody}</p>
 
@@ -43,7 +43,7 @@ export default async function ForgotPasswordPage() {
             <ForgotPasswordForm />
           </div>
 
-          <p className="mt-6 text-center text-xs leading-relaxed text-slate-500">
+          <p className="mt-6 text-center text-sm leading-relaxed text-slate-500">
             <Link href="/privacy" className="font-semibold text-indigo-700 hover:text-indigo-900">
               {copy.privacyLink}
             </Link>

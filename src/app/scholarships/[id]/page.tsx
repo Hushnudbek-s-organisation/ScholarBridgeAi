@@ -126,7 +126,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
           <p className="mt-2 text-sm text-slate-600">{t.notFoundBody}</p>
           <Link
             href={backHref}
-            className="mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
+            className="mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
             {fromApp ? t.backToApp : t.back}
@@ -268,8 +268,8 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
         <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           {/* ---------------------------------------------------------- main */}
           <div className="min-w-0 space-y-4">
-            <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+            <header className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-800 ring-1 ring-amber-200 ring-inset">
                   <Award className="h-3 w-3" aria-hidden />
                   {coverage}
@@ -294,7 +294,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                 {title}
               </h1>
               <p className="mt-1.5 break-words text-sm text-slate-600">{provider}</p>
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span className="break-words">{country}</span>
               </p>
@@ -303,7 +303,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
             {deadlinePassed && (
               <div
                 role="status"
-                className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
+                className="mt-4 rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900"
               >
                 {formatMessage(t.deadlinePassedNote, { date: deadlineLabel ?? t.notPublished })}
               </div>
@@ -371,7 +371,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                 </>
               )}
 
-              <p className="mt-4 text-xs text-slate-500">{t.applyNote}</p>
+              <p className="mt-4 text-sm text-slate-500">{t.applyNote}</p>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {applyHref && (
@@ -379,7 +379,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                     href={applyHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
                   >
                     {applyLabel}
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />
@@ -390,7 +390,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                     href={s.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     {t.officialLink}
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />
@@ -407,7 +407,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                 <Fact label={t.lastVerified} value={verifiedOn ?? t.notPublished} />
               </dl>
               {verifiedOn && (
-                <p className="mt-3 border-t border-slate-100 pt-3 text-[11px] leading-relaxed text-slate-500">
+                <p className="mt-3 border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-500">
                   {formatMessage(t.verifiedNote, { date: verifiedOn })}
                 </p>
               )}
@@ -416,12 +416,12 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
 
           {/* --------------------------------------------------------- aside */}
           <aside className="space-y-4">
-            <nav className="rounded-2xl border border-slate-200 bg-white p-4" aria-label={t.contents}>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t.contents}</p>
-              <ul className="mt-2 space-y-1 text-xs">
+            <nav className="rounded-overlay border border-slate-200 bg-white p-4" aria-label={t.contents}>
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t.contents}</p>
+              <ul className="mt-2 space-y-1 text-sm">
                 {sections.map((section) => (
                   <li key={section.id}>
-                    <a href={`#${section.id}`} className="block rounded px-1 py-1 text-slate-700 hover:text-blue-700">
+                    <a href={`#${section.id}`} className="block rounded-control px-1 py-1 text-slate-700 hover:text-blue-700">
                       · {section.label}
                     </a>
                   </li>
@@ -429,8 +429,8 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
               </ul>
             </nav>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t.keyDetails}</p>
+            <section className="rounded-overlay border border-slate-200 bg-white p-4">
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t.keyDetails}</p>
               <dl className="mt-3 space-y-2.5 text-xs">
                 <SideFact icon={<Languages className="h-3.5 w-3.5" aria-hidden />} label={t.language} value={languageLine ?? t.notPublished} />
                 <SideFact icon={<Award className="h-3.5 w-3.5" aria-hidden />} label={t.opportunityType} value={coverage} />
@@ -447,12 +447,12 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
 
               {universityName && (
                 <div className="mt-3 border-t border-slate-100 pt-3">
-                  <p className="text-[11px] leading-relaxed text-slate-600">
+                  <p className="text-sm leading-relaxed text-slate-600">
                     {formatMessage(t.linkedUniversity, { university: universityName })}
                   </p>
                   <Link
                     href="/universities"
-                    className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:text-blue-900"
+                    className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
                   >
                     {t.openUniversity}
                   </Link>
@@ -466,7 +466,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                   href={s.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-surface border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   {t.officialLink}
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden />
@@ -477,7 +477,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                   href={applyHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-rose-700 px-3 text-sm font-bold text-white hover:bg-rose-800"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-surface bg-rose-700 px-3 text-sm font-bold text-white hover:bg-rose-800"
                 >
                   {applyLabel}
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden />
@@ -494,7 +494,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
         */}
         <PublicFeaturePromo className="mt-6" />
 
-        <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
+        <p className="mt-6 border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-600">
           {copy.publicCatalog.independentGuide}
         </p>
       </main>
@@ -514,7 +514,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
+    <section id={id} className="scroll-mt-20 rounded-overlay border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
       <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 sm:text-base">
         <span className="text-slate-500">{icon}</span>
         {title}
@@ -536,9 +536,9 @@ function Fact({ label, value }: { label: string; value: string }) {
 function SideFact({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="mt-0.5 text-slate-400">{icon}</span>
+      <span className="mt-0.5 text-slate-500">{icon}</span>
       <div className="min-w-0 flex-1">
-        <dt className="text-[10px] uppercase tracking-wide text-slate-400">{label}</dt>
+        <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
         <dd className="break-words font-semibold text-slate-800">{value}</dd>
       </div>
     </div>

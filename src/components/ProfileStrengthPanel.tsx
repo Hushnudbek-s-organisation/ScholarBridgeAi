@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Activity, AlertTriangle, Loader2, Ruler } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 /**
  * Profile information coverage dashboard. None of its percentages grades
@@ -75,11 +76,11 @@ function Bar({
     return (
       <div>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[11px] font-semibold text-slate-600">{label}</span>
-          <span className="text-xs font-bold text-slate-400">—</span>
+          <span className="text-xs font-semibold text-slate-600">{label}</span>
+          <span className="text-xs font-bold text-slate-500">—</span>
         </div>
         {(missing?.[0] || unknownLabel) && (
-          <p className="mt-0.5 text-[10px] leading-snug text-slate-400">{missing?.[0] ?? unknownLabel}</p>
+          <p className="mt-0.5 text-sm leading-snug text-slate-500">{missing?.[0] ?? unknownLabel}</p>
         )}
         <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100" />
       </div>
@@ -89,22 +90,19 @@ function Bar({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-semibold text-slate-600">{label}</span>
+        <span className="text-xs font-semibold text-slate-600">{label}</span>
         <span className="flex items-baseline gap-1">
-          {showPrecise && <span className="text-[10px] font-semibold text-slate-400">{precise.toFixed(1)}</span>}
+          {showPrecise && <span className="text-xs font-semibold text-slate-500">{precise.toFixed(1)}</span>}
           <span className="text-xs font-extrabold text-slate-800 tabular-nums">{score}%</span>
         </span>
       </div>
-      {hint && <p className="mt-0.5 text-[10px] text-slate-400">{hint}</p>}
+      {hint && <p className="mt-0.5 text-sm text-slate-500">{hint}</p>}
       <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all"
-          style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
-        />
+        <ProgressFill value={Math.max(0, Math.min(100, score))} className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all" />
       </div>
       <div className="mt-1 flex items-center justify-between gap-2">
         {missing?.[0] && (
-          <p className="text-right text-[10px] leading-snug text-amber-700">
+          <p className="text-right text-sm leading-snug text-amber-700">
             {missing[0]}
           </p>
         )}
@@ -149,7 +147,7 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
 
   if (loading && !data) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-6 text-sm text-slate-500">
+      <div className="flex items-center gap-2 rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-6 text-sm text-slate-500">
         <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
       </div>
     );
@@ -157,7 +155,7 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+      <div className="flex items-center gap-2 rounded-surface border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
         <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
       </div>
     );
@@ -176,31 +174,31 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+      <div className="rounded-overlay border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
               <Activity className="h-3.5 w-3.5" /> {t("title")}
             </h3>
-            <p className="mt-1 max-w-md text-[11px] text-slate-500">{t("subtitle")}</p>
+            <p className="mt-1 max-w-md text-sm text-slate-500">{t("subtitle")}</p>
           </div>
-          <div className="shrink-0 rounded-xl bg-indigo-50 px-3 py-2 text-right dark:bg-indigo-950/50">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">{t("overall")}</div>
+          <div className="shrink-0 rounded-surface bg-indigo-50 px-3 py-2 text-right dark:bg-indigo-950/50">
+            <div className="text-xs font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">{t("overall")}</div>
             <div className="flex items-baseline justify-end gap-1">
               <span className="text-2xl font-black text-indigo-800 tabular-nums dark:text-indigo-100">{preciseOverall.toFixed(1)}</span>
-              <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-300">%</span>
+              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">%</span>
             </div>
           </div>
         </div>
 
         {/* How the headline number was built — stated, never implied. */}
-        <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-1.5 text-[11px] font-medium text-slate-600">
-          <Ruler className="h-3 w-3 shrink-0 text-slate-400" aria-hidden />
+        <p className="mt-2 flex items-center gap-1.5 rounded-control bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600">
+          <Ruler className="h-3 w-3 shrink-0 text-slate-500" aria-hidden />
           {t("basisLine", { measured, total })}
         </p>
 
         {strength.overall === 0 && (
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">{t("noteLow")}</p>
+          <p className="mt-3 rounded-control bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">{t("noteLow")}</p>
         )}
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -220,7 +218,7 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 dark:border-slate-700 dark:bg-slate-900">
+      <div className="rounded-overlay border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 dark:border-slate-700 dark:bg-slate-900">
         <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-600 dark:text-slate-300">
           <Activity className="h-3.5 w-3.5" aria-hidden /> {t("extraTitle")}
         </h3>
@@ -231,13 +229,13 @@ export function ProfileStrengthPanel({ activeProfile }: { activeProfile: { id: n
             [t("extraResearch"), extracurriculars.research],
             [t("extraAwards"), extracurriculars.awards],
           ].map(([label, value]) => (
-            <div key={String(label)} className="min-h-16 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
-              <p className="break-words text-[11px] font-semibold leading-snug text-slate-600 dark:text-slate-300">{label}</p>
+            <div key={String(label)} className="min-h-16 rounded-surface bg-slate-50 p-3 dark:bg-slate-800/60">
+              <p className="break-words text-sm font-semibold leading-snug text-slate-600 dark:text-slate-300">{label}</p>
               <p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900 dark:text-slate-100 dark:text-slate-100">{value}</p>
             </div>
           ))}
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-slate-600 dark:text-slate-300">{t("activityNote")}</p>
+        <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{t("activityNote")}</p>
       </div>
     </div>
   );

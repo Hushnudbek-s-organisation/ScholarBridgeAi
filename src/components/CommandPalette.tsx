@@ -20,6 +20,7 @@ import {
   Video,
   X,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export interface PaletteItem {
   id: string;
@@ -213,7 +214,7 @@ export function CommandPalette({
           aria-label={t("searchTitle")}
         >
           <motion.div
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            className="w-full max-w-lg overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-2xl"
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
@@ -221,7 +222,7 @@ export function CommandPalette({
             onKeyDown={onKey}
           >
             <div className="flex items-center gap-2 border-b border-slate-100 px-4">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <Search className="h-4 w-4 shrink-0 text-slate-500" />
               <input
                 ref={inputRef}
                 value={query}
@@ -230,16 +231,16 @@ export function CommandPalette({
                   setCursor(0);
                 }}
                 placeholder={t("searchPlaceholder")}
-                className="h-12 w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                className="h-12 w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none"
                 aria-label={t("searchPlaceholder")}
               />
-              <button
+              <Button variant="unstyled"
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-control p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                 aria-label={t("close")}
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
             <ul ref={listRef} className="max-h-[55vh] overflow-y-auto p-2" role="listbox">
               {results.length === 0 && (
@@ -252,15 +253,15 @@ export function CommandPalette({
                 const active = idx === cursor;
                 return (
                   <li key={it.id} data-idx={idx} role="option" aria-selected={active}>
-                    <button
+                    <Button variant="unstyled"
                       onClick={() => chooseItem(it)}
                       onMouseMove={() => setCursor(idx)}
-                      className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                      className={`flex w-full items-start gap-3 rounded-surface px-3 py-2.5 text-left transition-colors ${
                         active ? "bg-indigo-50" : "hover:bg-slate-50"
                       }`}
                     >
                       <span
-                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-control ${
                           active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
                         }`}
                       >
@@ -270,23 +271,23 @@ export function CommandPalette({
                         <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
                           {it.label}
                           {it.premium && (
-                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">{t("proBadge")}</span>
+                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-bold uppercase text-amber-700">{t("proBadge")}</span>
                           )}
                         </span>
                         {it.hint && <span className="mt-0.5 block text-xs leading-snug text-slate-500">{it.hint}</span>}
                         {it.group && (
-                          <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                          <span className="mt-0.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
                             {it.group}
                           </span>
                         )}
                       </span>
                       {active && <CornerDownLeft className="mt-2 h-3.5 w-3.5 shrink-0 text-indigo-400" />}
-                    </button>
+                    </Button>
                   </li>
                 );
               })}
             </ul>
-            <div className="hidden items-center justify-between border-t border-slate-100 px-4 py-2 text-[10px] text-slate-400 sm:flex">
+            <div className="hidden items-center justify-between border-t border-slate-100 px-4 py-2 text-xs text-slate-500 sm:flex">
               <span>{t("searchKeys")}</span>
               <span>Ctrl / ⌘ + K</span>
             </div>

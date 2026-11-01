@@ -42,6 +42,7 @@ import {
   type ColdEmailGrade,
   type OutreachInput,
 } from "@/lib/professorOutreach";
+import { Button } from "@/components/ui/Button";
 
 const BAND_TONE: Record<ColdEmailGrade["band"], string> = {
   strong: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100",
@@ -162,19 +163,19 @@ export function ProfessorOutreachStudio({ profile, defaultUniversityName, classN
   const missingFacts = FACT_FIELDS.filter((field) => !facts[field].trim());
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 ${className}`} aria-labelledby="outreach-title">
+    <section className={`rounded-overlay border border-slate-200 bg-white p-4 sm:p-5 ${className}`} aria-labelledby="outreach-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 id="outreach-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
             <Send className="h-4 w-4 text-indigo-600" aria-hidden />
             {t("title")}
           </h3>
-          <p className="mt-1 max-w-2xl break-words text-[11px] leading-relaxed text-slate-500">{t("subtitle")}</p>
+          <p className="mt-1 max-w-2xl break-words text-sm leading-relaxed text-slate-500">{t("subtitle")}</p>
         </div>
         {grade && (
-          <div className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-1.5 ${BAND_TONE[grade.band]}`}>
+          <div className={`flex shrink-0 items-center gap-2 rounded-surface border px-3 py-1.5 ${BAND_TONE[grade.band]}`}>
             <span className="text-lg font-extrabold leading-none">{grade.score}</span>
-            <span className="text-[10px] font-bold uppercase tracking-wide">
+            <span className="text-xs font-bold uppercase tracking-wide">
               {t(`bands.${grade.band}`)}
               <span className="block font-semibold normal-case opacity-80">
                 {t("wordCount", { words: grade.wordCount })}
@@ -187,55 +188,55 @@ export function ProfessorOutreachStudio({ profile, defaultUniversityName, classN
       <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* ---------------- facts ---------------- */}
         <div className="space-y-2">
-          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+          <p className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wide text-slate-500">
             <GraduationCap className="h-3.5 w-3.5" aria-hidden />
             {t("factsTitle")}
           </p>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {FACT_FIELDS.map((field) => (
-              <label key={field} className="block text-[11px] font-semibold text-slate-600">
+              <label key={field} className="block text-sm font-semibold text-slate-600">
                 {t(`fields.${field}`)}
                 <input
                   value={facts[field]}
                   onChange={(event) => setFact(field, event.target.value)}
                   placeholder={t(`fields.${field}Placeholder`)}
-                  className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
+                  className="sb-field mt-1 min-h-11 w-full rounded-surface border px-3 py-2 text-sm text-slate-800"
                 />
               </label>
             ))}
-            <label className="block text-[11px] font-semibold text-slate-600">
+            <label className="block text-sm font-semibold text-slate-600">
               {t("fields.targetLevel")}
               <input
                 value={targetLevel}
                 onChange={(event) => setTargetLevel(event.target.value)}
                 placeholder={profile?.degreeLevel ?? t("fields.targetLevelPlaceholder")}
-                className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
+                className="sb-field mt-1 min-h-11 w-full rounded-surface border px-3 py-2 text-sm text-slate-800"
               />
             </label>
-            <label className="block text-[11px] font-semibold text-slate-600">
+            <label className="block text-sm font-semibold text-slate-600">
               {t("fields.targetIntake")}
               <input
                 value={targetIntake}
                 onChange={(event) => setTargetIntake(event.target.value)}
                 placeholder={t("fields.targetIntakePlaceholder")}
-                className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
+                className="sb-field mt-1 min-h-11 w-full rounded-surface border px-3 py-2 text-sm text-slate-800"
               />
             </label>
           </div>
 
-          <fieldset className="rounded-xl border border-slate-200 p-2.5">
-            <legend className="px-1 text-[11px] font-bold text-slate-600">{t("attachmentsTitle")}</legend>
+          <fieldset className="rounded-surface border border-slate-200 p-2.5">
+            <legend className="px-1 text-xs font-bold text-slate-600">{t("attachmentsTitle")}</legend>
             <div className="flex flex-wrap gap-1.5">
               {ATTACHMENT_OPTIONS.map((option) => {
                 const on = attachments.includes(option);
                 return (
-                  <button
+                  <Button variant="unstyled"
                     key={option}
                     type="button"
                     onClick={() => toggleAttachment(option)}
                     aria-pressed={on}
-                    className={`flex min-h-11 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                    className={`flex min-h-11 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors ${
                       on
                         ? "border-indigo-300 bg-indigo-50 text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-100"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
@@ -243,41 +244,41 @@ export function ProfessorOutreachStudio({ profile, defaultUniversityName, classN
                   >
                     {on ? <Check className="h-3 w-3" aria-hidden /> : null}
                     {option}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
           </fieldset>
 
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={build}
               disabled={building}
-              className="flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:opacity-60"
+              className="flex min-h-11 items-center gap-1.5 rounded-surface bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:opacity-60"
             >
               {building ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Mail className="h-3.5 w-3.5" aria-hidden />}
               {t("buildButton")}
-            </button>
+            </Button>
             {(subject || body) && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={reset}
-                className="flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                className="flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
               >
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden />
                 {t("resetButton")}
-              </button>
+              </Button>
             )}
           </div>
 
           {missingFacts.length > 0 && (
-            <p className="break-words rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+            <p className="break-words rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
               {t("missingFacts", { count: missingFacts.length })}{" "}
               {missingFacts.map((field) => t(`fields.${field}`)).join(" · ")}
             </p>
           )}
-          <p className="break-words text-[10px] leading-relaxed text-slate-500">
+          <p className="break-words text-sm leading-relaxed text-slate-500">
             {t("profileFacts", {
               name: profile?.name?.trim() || t("unknownFact"),
               level: profile?.degreeLevel?.trim() || t("unknownFact"),
@@ -288,17 +289,17 @@ export function ProfessorOutreachStudio({ profile, defaultUniversityName, classN
 
         {/* ---------------- editor + grade ---------------- */}
         <div className="space-y-2">
-          <label className="block text-[11px] font-semibold text-slate-600">
+          <label className="block text-sm font-semibold text-slate-600">
             {t("subjectLabel")}
             <input
               value={subject}
               onChange={(event) => setSubject(event.target.value)}
               placeholder={t("subjectPlaceholder")}
-              className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs font-semibold text-slate-800"
+              className="sb-field mt-1 min-h-11 w-full rounded-surface border px-3 py-2 text-sm font-semibold text-slate-800"
             />
           </label>
 
-          <label className="block text-[11px] font-semibold text-slate-600">
+          <label className="block text-sm font-semibold text-slate-600">
             {t("bodyLabel", {
               min: COLD_EMAIL_LENGTH_HINT.targetMin,
               max: COLD_EMAIL_LENGTH_HINT.targetMax,
@@ -308,40 +309,40 @@ export function ProfessorOutreachStudio({ profile, defaultUniversityName, classN
               onChange={(event) => setBody(event.target.value)}
               placeholder={t("bodyPlaceholder")}
               rows={14}
-              className="sb-field mt-1 w-full rounded-xl border p-3 text-xs leading-relaxed text-slate-800"
+              className="sb-field mt-1 w-full rounded-surface border p-3 text-sm leading-relaxed text-slate-800"
             />
           </label>
 
           <div className="flex flex-wrap gap-1.5">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => void copy("all")}
               disabled={!subject.trim() && !body.trim()}
-              className="flex min-h-11 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-[11px] font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+              className="flex min-h-11 items-center gap-1 rounded-surface bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {copied === "all" ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
               {t("copyAll")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => void copy("subject")}
               disabled={!subject.trim()}
-              className="flex min-h-11 items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex min-h-11 items-center gap-1 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               {copied === "subject" ? <Check className="h-3 w-3 text-emerald-600" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
               {t("copySubject")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => void copy("body")}
               disabled={!body.trim()}
-              className="flex min-h-11 items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex min-h-11 items-center gap-1 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               {copied === "body" ? <Check className="h-3 w-3 text-emerald-600" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
               {t("copyBody")}
-            </button>
+            </Button>
             {subject.trim() && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 // Open the student's own mail client with the draft ready. The
                 // platform never stores a professor's address, so the recipient
@@ -350,21 +351,21 @@ export function ProfessorOutreachStudio({ profile, defaultUniversityName, classN
                   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
                 }}
                 title={t("openInMailHint")}
-                className="flex min-h-11 items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-800 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100"
+                className="flex min-h-11 items-center gap-1 rounded-surface border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100"
               >
                 <Send className="h-3 w-3" aria-hidden />
                 {t("openInMail")}
-              </button>
+              </Button>
             )}
           </div>
 
           {grade && (
-            <div className="rounded-xl border border-slate-200 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("rubricTitle")}</p>
+            <div className="rounded-surface border border-slate-200 p-3">
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("rubricTitle")}</p>
 
               <ul className="mt-2 space-y-1.5">
                 {grade.checks.map((check) => (
-                  <li key={check.id} className="flex items-start gap-2 text-[11px] leading-relaxed">
+                  <li key={check.id} className="flex items-start gap-2 text-sm leading-relaxed">
                     {check.passed ? (
                       <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
                     ) : (
@@ -395,14 +396,14 @@ export function ProfessorOutreachStudio({ profile, defaultUniversityName, classN
               </ul>
 
               {grade.penalties.length > 0 && (
-                <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5 dark:border-rose-500/30 dark:bg-rose-500/10">
-                  <p className="flex items-center gap-1.5 text-[11px] font-extrabold text-rose-800 dark:text-rose-100">
+                <div className="mt-2 rounded-control border border-rose-200 bg-rose-50 p-2.5 dark:border-rose-500/30 dark:bg-rose-500/10">
+                  <p className="flex items-center gap-1.5 text-sm font-extrabold text-rose-800 dark:text-rose-100">
                     <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
                     {t("penaltiesTitle", { count: grade.penalties.length })}
                   </p>
                   <ul className="mt-1 space-y-1">
                     {grade.penalties.map((penalty) => (
-                      <li key={`${penalty.id}-${penalty.matched}`} className="break-words text-[11px] leading-relaxed text-rose-800 dark:text-rose-100">
+                      <li key={`${penalty.id}-${penalty.matched}`} className="break-words text-sm leading-relaxed text-rose-800 dark:text-rose-100">
                         <b>{t(`penalties.${penalty.id}`)}</b> −{penalty.points}
                         <span className="ml-1 text-rose-700/90 dark:text-rose-200/90">“{penalty.matched}”</span>
                       </li>
@@ -412,11 +413,11 @@ export function ProfessorOutreachStudio({ profile, defaultUniversityName, classN
               )}
 
               {grade.toFix.length > 0 ? (
-                <p className="mt-2 break-words text-[11px] font-semibold leading-relaxed text-slate-700">
+                <p className="mt-2 break-words text-sm font-semibold leading-relaxed text-slate-700">
                   {t("fixFirst", { item: t(`checks.${grade.toFix[0]}`) })}
                 </p>
               ) : (
-                <p className="mt-2 break-words text-[11px] font-semibold leading-relaxed text-emerald-700 dark:text-emerald-200">
+                <p className="mt-2 break-words text-sm font-semibold leading-relaxed text-emerald-700 dark:text-emerald-200">
                   {t("allChecksPassed")}
                 </p>
               )}

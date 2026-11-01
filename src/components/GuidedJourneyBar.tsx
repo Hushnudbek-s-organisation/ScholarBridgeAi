@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import type { StudentProfile } from "./Navbar";
 import { profileCompletenessRatio } from "@/lib/chancing";
+import { Button } from "@/components/ui/Button";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 /**
  * Guided journey bar (Pillar 3) — the four-stage path every new student
@@ -191,38 +193,39 @@ export function GuidedJourneyBar({
   return (
     <section
       aria-label={t("title")}
-      className="rounded-2xl border border-indigo-200/80 bg-white shadow-xs dark:border-indigo-500/30 dark:bg-[#111a2e]"
+      className="rounded-overlay border border-indigo-200/80 bg-white shadow-xs dark:border-indigo-500/30 dark:bg-surface"
     >
       <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-3 ${collapsed ? "py-2" : "pt-2.5 pb-1"} sm:px-4`}>
-        <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+        <span className="flex min-w-0 items-center gap-1.5 text-xs font-black uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
           <Briefcase className="h-3.5 w-3.5 shrink-0" aria-hidden />
           <span className="min-w-0 break-words">{t("title")}</span>
         </span>
-        <span className="min-w-0 break-words rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
+        <span className="min-w-0 break-words rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
           {t("stepLabel", { n: activeStep.id })} · {completed}/4 {t("doneStep")}
         </span>
         {/* Slim overall progress — the collapsed state keeps ONLY this. */}
         <span className="relative h-1.5 w-full max-w-40 shrink-0 overflow-hidden rounded-full bg-slate-200/80 sm:w-24" aria-hidden>
-          <span
+          <ProgressFill
+            as="span"
+            value={(completed / steps.length) * 100}
             className="absolute inset-y-0 left-0 rounded-full bg-indigo-600 transition-all"
-            style={{ width: `${(completed / steps.length) * 100}%` }}
           />
         </span>
         {collapsed ? (
-          <span className="min-w-0 flex-1 break-words text-[11px] font-bold text-slate-700 dark:text-slate-200">
+          <span className="min-w-0 flex-1 break-words text-xs font-bold text-slate-700 dark:text-slate-200">
             {activeStep.label} — {activeStep.hint}
           </span>
         ) : null}
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={toggleCollapsed}
           aria-expanded={!collapsed}
           aria-label={collapsed ? t("showLabel") : t("hideLabel")}
-          className="ml-auto inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-500 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-700 dark:hover:bg-slate-800"
+          className="ml-auto inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-surface border border-slate-200 px-2 text-xs font-bold text-slate-500 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-700 dark:hover:bg-slate-800"
         >
           {collapsed ? <ChevronDown className="h-3.5 w-3.5" aria-hidden /> : <ChevronUp className="h-3.5 w-3.5" aria-hidden />}
           <span className="hidden sm:inline">{collapsed ? t("cta") : t("title")}</span>
-        </button>
+        </Button>
       </div>
 
       {!collapsed && (
@@ -232,18 +235,18 @@ export function GuidedJourneyBar({
               const isCurrent = step.id === activeStep.id;
               return (
                 <li key={step.id}>
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     onClick={step.onClick}
                     aria-current={isCurrent ? "step" : undefined}
-                    className={`flex min-h-11 w-full items-start gap-2 rounded-xl border px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 ${
+                    className={`flex min-h-11 w-full items-start gap-2 rounded-surface border px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 ${
                       isCurrent
                         ? "border-indigo-300 bg-indigo-50/70 hover:bg-indigo-50 dark:border-indigo-400/50 dark:bg-indigo-500/10"
                         : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-transparent dark:hover:bg-slate-800/60"
                     }`}
                   >
                     <span
-                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-black ${
                         step.done
                           ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
                           : isCurrent
@@ -255,32 +258,32 @@ export function GuidedJourneyBar({
                       {step.done ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.id}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1 min-w-0 break-words text-[11px] font-extrabold leading-snug text-slate-800 dark:text-slate-100">
+                      <span className="flex items-center gap-1 min-w-0 break-words text-xs font-extrabold leading-snug text-slate-800 dark:text-slate-100">
                         {step.icon}
                         {step.label}
                       </span>
-                      <span className="mt-0.5 block min-w-0 break-words text-[10px] font-medium leading-snug text-slate-500 dark:text-slate-400">
+                      <span className="mt-0.5 block min-w-0 break-words text-xs font-medium leading-snug text-slate-500 dark:text-slate-400">
                         {step.hint}
                       </span>
                     </span>
-                  </button>
+                  </Button>
                 </li>
               );
             })}
           </ol>
           {activeStep.cta ? (
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-2 sm:px-4 dark:border-slate-800">
-              <p className="min-w-0 break-words text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+              <p className="min-w-0 break-words text-sm font-semibold text-slate-600 dark:text-slate-300">
                 {t("currentStep")}: {activeStep.label}
               </p>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={activeStep.onClick}
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 text-[11px] font-black text-white shadow-xs transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-surface bg-indigo-600 px-4 text-xs font-black text-white shadow-xs transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
               >
                 {activeStep.icon}
                 {activeStep.cta}
-              </button>
+              </Button>
             </div>
           ) : null}
         </>

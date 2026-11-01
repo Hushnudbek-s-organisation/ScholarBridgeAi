@@ -548,7 +548,7 @@ check("every gate reports why, not just that it failed", () => {
   const growthApi = readFileSync(join(import.meta.dirname, "..", "src/lib/growth/api.ts"), "utf8");
   assert.match(growthApi, /reason: \(status as \{ reason\?: string \| null \}\)\.reason/);
   // …and the client appends it to the message it throws.
-  const ui = readFileSync(join(import.meta.dirname, "..", "src/components/growth/ui.tsx"), "utf8");
+  const ui = readFileSync(join(import.meta.dirname, "..", "src/components/ui/growth.tsx"), "utf8");
   assert.match(ui, /const reason = typeof payload\?\.reason === "string"/);
 });
 

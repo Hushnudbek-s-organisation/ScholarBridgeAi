@@ -63,17 +63,17 @@ export type AppNoteKind =
  * explicit and a new kind cannot silently inherit a shouting style.
  */
 const TONE: Record<AppNoteKind, string> = {
-  general: "text-slate-400 dark:text-slate-500",
-  ai: "text-slate-400 dark:text-slate-500",
-  catalogue: "text-slate-400 dark:text-slate-500",
-  estimate: "text-slate-400 dark:text-slate-500",
-  money: "text-slate-400 dark:text-slate-500",
-  planning: "text-slate-400 dark:text-slate-500",
-  visa: "text-slate-400 dark:text-slate-500",
-  community: "text-slate-400 dark:text-slate-500",
-  thirdParty: "text-slate-400 dark:text-slate-500",
-  prototype: "text-slate-400 dark:text-slate-500",
-  certificate: "text-slate-400 dark:text-slate-500",
+  general: "text-slate-500 dark:text-slate-500",
+  ai: "text-slate-500 dark:text-slate-500",
+  catalogue: "text-slate-500 dark:text-slate-500",
+  estimate: "text-slate-500 dark:text-slate-500",
+  money: "text-slate-500 dark:text-slate-500",
+  planning: "text-slate-500 dark:text-slate-500",
+  visa: "text-slate-500 dark:text-slate-500",
+  community: "text-slate-500 dark:text-slate-500",
+  thirdParty: "text-slate-500 dark:text-slate-500",
+  prototype: "text-slate-500 dark:text-slate-500",
+  certificate: "text-slate-500 dark:text-slate-500",
 };
 
 export function AppNote({
@@ -93,7 +93,7 @@ export function AppNote({
     <p
       role="note"
       data-app-note={kind}
-      className={`${variant === "inline" ? "" : "flex items-start gap-1.5 "}text-[11px] leading-normal ${TONE[kind]} ${className}`}
+      className={`${variant === "inline" ? "" : "flex items-start gap-1.5 "}text-sm leading-normal ${TONE[kind]} ${className}`}
     >
       {variant === "block" && <Info className="mt-[2px] h-3 w-3 shrink-0 opacity-60" aria-hidden />}
       <span>{text}</span>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import localFont from "next/font/local";
 import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { SiteTracker } from "@/components/SiteTracker";
@@ -9,6 +10,25 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { MotionProvider } from "@/components/motion";
 import { isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
+
+// Self-hosted Inter keeps the brand font available offline and avoids a
+// render-blocking third-party font request. Separate subsets let Russian and
+// Uzbek text use Inter too, while the browser downloads only the glyphs it needs.
+const interLatin = localFont({
+  src: "../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
+  variable: "--font-inter-latin",
+  display: "swap",
+  weight: "100 900",
+  declarations: [{ prop: "unicode-range", value: "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD" }],
+});
+const interCyrillic = localFont({
+  src: "../../node_modules/@fontsource-variable/inter/files/inter-cyrillic-wght-normal.woff2",
+  variable: "--font-inter-cyrillic",
+  display: "swap",
+  weight: "100 900",
+  preload: false,
+  declarations: [{ prop: "unicode-range", value: "U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116" }],
+});
 
 // The middleware sends a per-request nonce-based CSP. Next.js can only stamp
 // that nonce on its <script> tags when the page is rendered per request —
@@ -126,7 +146,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <link rel="preconnect" href="https://upload.wikimedia.org" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
       </head>
-      <body className="bg-slate-50 text-slate-900 antialiased">
+      <body className={`${interLatin.variable} ${interCyrillic.variable} bg-slate-50 font-sans text-sm text-slate-900 antialiased`}>
         <ThemeProvider defaultTheme={initialTheme}>
           <MotionProvider>
             {/* Anonymous, first-party traffic counter for Admin → Analytics. */}

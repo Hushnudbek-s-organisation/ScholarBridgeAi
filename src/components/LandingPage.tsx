@@ -8,6 +8,7 @@ import { Reveal, RevealGroup, RevealItem } from "./motion";
 import { staggerParent } from "./motion/variants";
 import { ThemeSwitch } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { SVG_COLORS } from "@/components/ui/tokens";
 
 /** Hero children: each one rises a beat after the previous. */
 const heroGroup = staggerParent(0.1, 0.08);
@@ -56,6 +57,8 @@ import {
 } from "@/lib/navSections";
 import { AppNote } from "./AppNote";
 import { toWikimediaThumb, onWikimediaThumbError, viaImageProxy, campusPhotoSrc } from "@/lib/wikimediaThumb";
+import { Button } from "@/components/ui/Button";
+import { MotionButton } from "@/components/ui/MotionButton";
 
 export interface MarqueeUniversityItem {
   /**
@@ -458,7 +461,7 @@ function SectionIndex({
 }) {
   return (
     <div
-      className={`mb-3 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] ${
+      className={`mb-3 inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.18em] ${
         onDark ? "text-indigo-300" : "text-indigo-600 dark:text-indigo-400"
       }`}
     >
@@ -615,7 +618,7 @@ function PhotoCraftKineticHud() {
         style={{ top: `${val * 24}px` }}
       >
         {major ? (
-          <span className="font-mono text-[10px] font-semibold leading-none text-slate-500 dark:text-zinc-400">
+          <span className="font-mono text-xs font-semibold leading-none text-slate-500 dark:text-zinc-400">
             {val}
           </span>
         ) : null}
@@ -637,20 +640,18 @@ function PhotoCraftKineticHud() {
       <div className="pointer-events-none absolute inset-y-0 right-0 w-14 overflow-hidden">
         <div
           ref={tapeRef}
-          className="absolute left-0 top-0 w-full"
-          style={{ height: 101 * 24, transform: "translate3d(0, 0, 0)", willChange: "transform" }}
+          className="sb-gpu-transform sb-kinetic-track absolute left-0 top-0 w-full"
         >
           {ticks}
         </div>
         <div
           ref={laserRef}
-          className="absolute right-0 top-0 w-full"
-          style={{ transform: "translate3d(0, 0, 0)", willChange: "transform" }}
+          className="sb-gpu-transform absolute right-0 top-0 w-full"
         >
           <span className="block h-[2px] w-full bg-sky-400 shadow-[0_0_12px_2px_rgba(56,189,248,0.95)]" />
           <span
             ref={readoutRef}
-            className="mt-1 block pr-1.5 text-right font-mono text-[10px] font-bold tracking-wider text-sky-600 drop-shadow-[0_0_8px_rgba(56,189,248,0.7)] dark:text-sky-400"
+            className="mt-1 block pr-1.5 text-right font-mono text-xs font-bold tracking-wider text-sky-600 drop-shadow-[0_0_8px_rgba(56,189,248,0.7)] dark:text-sky-400"
           >
             000 %
           </span>
@@ -658,7 +659,7 @@ function PhotoCraftKineticHud() {
       </div>
       {/* Kinetic section words — peel, swell, dock (see useEffect for math). */}
       {HUD_SECTIONS.map((sec, idx) => (
-        <button
+        <Button variant="unstyled"
           key={sec.id}
           ref={(el) => {
             wordRefs.current[idx] = el;
@@ -666,11 +667,10 @@ function PhotoCraftKineticHud() {
           type="button"
           tabIndex={-1}
           onClick={() => scrollToId(sec.id)}
-          style={{ transformOrigin: "right center", willChange: "transform, opacity", opacity: 0 }}
-          className="sb-kinetic-word pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-[12px] font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-slate-950 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
+          className="sb-kinetic-word pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-xs font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-slate-950 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
         >
           {sec.word[locale as "en" | "uz" | "ru"] ?? sec.word.en}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -853,28 +853,28 @@ export function LandingPage({
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900 antialiased selection:bg-indigo-600 selection:text-white dark:bg-[#090e1a] dark:text-white dark:selection:bg-indigo-300 dark:selection:text-slate-950">
+    <div className="min-h-screen bg-canvas font-sans text-slate-900 antialiased selection:bg-indigo-600 selection:text-white dark:bg-canvas dark:text-white dark:selection:bg-indigo-300 dark:selection:text-slate-950">
       <ScrollFlightPath />
       <PhotoCraftKineticHud />
 
       {/* ===== Header ===== */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-[#f8fafc]/90 backdrop-blur-md dark:border-slate-800 dark:bg-[#090e1a]/90">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-canvas/90 backdrop-blur-md dark:border-slate-800 dark:bg-canvas/90">
         <div className="mx-auto flex h-16 w-[min(1180px,94%)] items-center justify-between gap-2">
           <a
             href="#top"
-            className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl text-base font-black tracking-[-0.02em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:focus-visible:ring-indigo-400 sm:gap-2.5 sm:text-lg"
+            className="flex min-h-11 min-w-0 items-center gap-2 rounded-surface text-base font-black tracking-[-0.02em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:focus-visible:ring-indigo-400 sm:gap-2.5 sm:text-lg"
             onClick={(event) => {
               event.preventDefault();
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
           >
-            <span className="sb-logo-well grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-200 bg-white p-0.5 dark:border-slate-800 dark:bg-[#111a2e]">
+            <span className="sb-logo-well grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-surface border border-slate-200 bg-white p-0.5 dark:border-slate-800 dark:bg-surface">
               <BrandingImage
                 alt={t("logoAlt")}
-                className="h-full w-full rounded-[9px] object-cover"
+                className="h-full w-full rounded-control object-cover"
               />
             </span>
-            <span className="min-w-0 break-words whitespace-normal text-[15px] leading-tight sm:text-lg">
+            <span className="min-w-0 break-words whitespace-normal text-sm leading-tight sm:text-lg">
               {tm("appName")}
             </span>
           </a>
@@ -889,13 +889,13 @@ export function LandingPage({
               { id: "chancing", label: t("navChancing") },
               { id: "roadmap", label: t("navPlanning") },
             ].map((item) => (
-              <button
+              <Button variant="unstyled"
                 key={item.id}
                 onClick={() => scrollToId(item.id)}
-                className="inline-flex min-h-11 items-center rounded-lg px-1 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
+                className="inline-flex min-h-11 items-center rounded-control px-1 transition hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
               >
                 {item.label}
-              </button>
+              </Button>
             ))}
           </nav>
 
@@ -903,34 +903,34 @@ export function LandingPage({
             <LanguageSwitcher compact />
             <ThemeSwitch />
             {onSignIn && (
-              <button
+              <Button variant="unstyled"
                 onClick={onSignIn}
-                className="hidden min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:-translate-y-px hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400 sm:block"
+                className="hidden min-h-11 rounded-surface border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:-translate-y-px hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400 sm:block"
               >
                 {t("signIn")}
-              </button>
+              </Button>
             )}
-            <button
+            <Button variant="unstyled"
               onClick={onStart}
-              className="hidden min-h-11 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-[#090e1a] sm:block"
+              className="hidden min-h-11 rounded-surface bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-canvas sm:block"
             >
               {t("getStarted")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               ref={menuTriggerRef}
               type="button"
               onClick={() => setMenuOpen((value) => !value)}
               aria-expanded={menuOpen}
               aria-controls="landing-mobile-nav"
               aria-label={t("navAria")}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400 lg:hidden"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-surface border border-slate-200 bg-white text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400 lg:hidden"
             >
               {menuOpen ? (
                 <X className="h-5 w-5" aria-hidden />
               ) : (
                 <Menu className="h-5 w-5" aria-hidden />
               )}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -938,7 +938,7 @@ export function LandingPage({
           <nav
             id="landing-mobile-nav"
             aria-label={t("navAria")}
-            className="border-t border-slate-200 bg-[#f8fafc] px-4 pb-3 pt-2 dark:border-slate-800 dark:bg-[#090e1a] lg:hidden"
+            className="border-t border-slate-200 bg-canvas px-4 pb-3 pt-2 dark:border-slate-800 dark:bg-canvas lg:hidden"
           >
             <ul className="mx-auto flex w-[min(1180px,100%)] flex-col">
               {[
@@ -948,38 +948,38 @@ export function LandingPage({
                 { id: "roadmap", label: t("navPlanning") },
               ].map((item) => (
                 <li key={item.id}>
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => goToSection(item.id)}
-                    className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-200 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
+                    className="flex min-h-11 w-full items-center rounded-control px-2 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-200 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
                   >
                     {item.label}
-                  </button>
+                  </Button>
                 </li>
               ))}
               <li className="mt-1 border-t border-slate-200 pt-1 dark:border-slate-800 sm:hidden">
-                <button
+                <Button variant="unstyled"
                   onClick={() => {
                     menuTriggerRef.current?.focus();
                     setMenuOpen(false);
                     onStart();
                   }}
-                  className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-black text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
+                  className="flex min-h-11 w-full items-center rounded-control px-2 text-left text-sm font-black text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
                 >
                   {t("getStarted")}
-                </button>
+                </Button>
               </li>
               {onSignIn && (
                 <li className="sm:mt-1 sm:border-t sm:border-slate-200 sm:pt-1">
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => {
                       menuTriggerRef.current?.focus();
                       setMenuOpen(false);
                       onSignIn();
                     }}
-                    className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-200 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
+                    className="flex min-h-11 w-full items-center rounded-control px-2 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-200 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
                   >
                     {t("signIn")}
-                  </button>
+                  </Button>
                 </li>
               )}
             </ul>
@@ -1001,7 +1001,7 @@ export function LandingPage({
               </div>
               <motion.span
                 variants={heroItem}
-                className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
+                className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-300" />
                 {t("heroBadge")}
@@ -1025,18 +1025,18 @@ export function LandingPage({
                 variants={heroItem}
                 className="mt-6 flex flex-wrap items-center gap-3"
               >
-                <button
+                <Button variant="unstyled"
                   onClick={onStart}
-                  className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-xl shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-[#090e1a]"
+                  className="inline-flex min-h-12 items-center gap-2 rounded-surface bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-xl shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-canvas"
                 >
                   {t("ctaStart")} <ArrowRight className="h-4 w-4" aria-hidden />
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   onClick={() => scrollToId("how")}
-                  className="min-h-12 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:-translate-y-px hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
+                  className="min-h-12 rounded-surface border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:-translate-y-px hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
                 >
                   {t("ctaHow")}
-                </button>
+                </Button>
               </motion.div>
               <motion.div
                 variants={heroItem}
@@ -1053,13 +1053,13 @@ export function LandingPage({
                 ))}
               </motion.div>
               {onEnterApp && (
-                <motion.button
+                <MotionButton variant="unstyled"
                   variants={heroItem}
                   onClick={onEnterApp}
-                  className="mt-3 inline-flex min-h-11 items-center rounded px-1 text-xs font-semibold text-indigo-700 underline-offset-4 hover:text-indigo-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200 dark:focus-visible:ring-indigo-400"
+                  className="mt-3 inline-flex min-h-11 items-center rounded-control px-1 text-xs font-semibold text-indigo-700 underline-offset-4 hover:text-indigo-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200 dark:focus-visible:ring-indigo-400"
                 >
                   {t("enterApp")}
-                </motion.button>
+                </MotionButton>
               )}
             </motion.div>
 
@@ -1074,41 +1074,41 @@ export function LandingPage({
                 ease: [0.16, 1, 0.3, 1],
               }}
             >
-              <div className="rounded-[26px] border border-indigo-100 bg-white p-2 shadow-2xl shadow-indigo-900/10 dark:border-slate-700 dark:bg-[#111a2e] dark:shadow-black/40">
-                <div className="overflow-hidden rounded-[18px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-[#111a2e]">
+              <div className="rounded-overlay border border-indigo-100 bg-white p-2 shadow-2xl shadow-indigo-900/10 dark:border-slate-700 dark:bg-surface dark:shadow-black/40">
+                <div className="overflow-hidden rounded-overlay border border-slate-200 bg-white dark:border-slate-800 dark:bg-surface">
                   <div className="flex h-9 items-center gap-1.5 border-b border-slate-200 px-4 dark:border-slate-800">
                     <span className="h-2 w-2 rounded-full bg-rose-400 dark:bg-rose-300" />
                     <span className="h-2 w-2 rounded-full bg-amber-400 dark:bg-amber-300" />
                     <span className="h-2 w-2 rounded-full bg-emerald-400 dark:bg-emerald-300" />
-                    <span className="ml-auto rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                    <span className="ml-auto rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                       {t("demoBadge")}
                     </span>
                   </div>
                   <div className="grid min-h-[392px] grid-cols-1 sm:grid-cols-[146px_1fr]">
-                    <aside className="hidden border-r border-slate-200 bg-[#f8fafc] p-2.5 dark:border-slate-800 dark:bg-[#0b1222] sm:block">
+                    <aside className="hidden border-r border-slate-200 bg-canvas p-2.5 dark:border-slate-800 dark:bg-canvas sm:block">
                       <div className="mb-2 flex items-center gap-1.5 px-1">
-                        <span className="sb-logo-well grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-md border border-slate-200 dark:border-slate-800">
+                        <span className="sb-logo-well grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-control border border-slate-200 dark:border-slate-800">
                           <BrandingImage
                             alt={t("logoAlt")}
                             className="h-full w-full object-cover"
                           />
                         </span>
-                        <span className="text-[10px] font-black text-slate-900 dark:text-white">
+                        <span className="text-xs font-black text-slate-900 dark:text-white">
                           ScholarBridge
                         </span>
-                        <span className="rounded bg-indigo-50 px-1 text-[6px] font-black text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                        <span className="rounded-control bg-indigo-50 px-1 text-xs font-black text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                           AI
                         </span>
                       </div>
                       {mockSidebarGroups.map((group) => (
                         <div key={group.id} className="mb-1">
-                          <div className="px-2 pb-0.5 pt-1 text-[7px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                          <div className="px-2 pb-0.5 pt-1 text-xs font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                             {group.label}
                           </div>
                           {group.items.map(({ id, label, icon: Icon, pro }) => (
                             <div
                               key={id}
-                              className={`mb-0.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-[8px] font-semibold ${
+                              className={`mb-0.5 flex items-center gap-1.5 rounded-control px-2 py-1 text-xs font-semibold ${
                                 id === "dashboard"
                                   ? "bg-indigo-600 text-white dark:bg-indigo-500 dark:text-white"
                                   : pro
@@ -1122,7 +1122,7 @@ export function LandingPage({
                               />
                               <span className="truncate">{label}</span>
                               {pro && (
-                                <span className="ml-auto rounded bg-amber-100 px-1 text-[5px] font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+                                <span className="ml-auto rounded-control bg-amber-100 px-1 text-xs font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
                                   PRO
                                 </span>
                               )}
@@ -1131,14 +1131,14 @@ export function LandingPage({
                         </div>
                       ))}
                       <div className="mt-1 border-t border-slate-200 pt-1 dark:border-slate-800">
-                        <div className="px-2 pb-0.5 text-[7px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                        <div className="px-2 pb-0.5 text-xs font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                           {nav("accountCluster")}
                         </div>
                         {mockAccountItems.map(
                           ({ id, label, icon: Icon, pro }) => (
                             <div
                               key={id}
-                              className={`mb-0.5 flex items-center gap-1.5 rounded-md px-2 py-1 text-[8px] font-semibold ${pro ? "border border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-300" : "text-slate-600 dark:text-slate-300"}`}
+                              className={`mb-0.5 flex items-center gap-1.5 rounded-control px-2 py-1 text-xs font-semibold ${pro ? "border border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-300" : "text-slate-600 dark:text-slate-300"}`}
                             >
                               <Icon
                                 className="h-2.5 w-2.5 shrink-0"
@@ -1146,7 +1146,7 @@ export function LandingPage({
                               />
                               <span className="truncate">{label}</span>
                               {pro && (
-                                <span className="ml-auto rounded bg-amber-100 px-1 text-[5px] font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+                                <span className="ml-auto rounded-control bg-amber-100 px-1 text-xs font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
                                   PRO
                                 </span>
                               )}
@@ -1156,38 +1156,38 @@ export function LandingPage({
                       </div>
                     </aside>
 
-                    <div className="bg-slate-50 p-3 dark:bg-[#090e1a] sm:p-4">
-                      <div className="flex gap-3 rounded-2xl bg-gradient-to-br from-[#12143a] via-[#1b1f5e] to-[#2a3ba8] p-4 text-white dark:border dark:border-indigo-500/20 dark:from-[#0c1324] dark:via-[#151d4b] dark:to-[#243486]">
+                    <div className="bg-slate-50 p-3 dark:bg-canvas sm:p-4">
+                      <div className="flex gap-3 rounded-overlay bg-gradient-to-br from-hero-from via-hero-via to-hero-to p-4 text-white dark:border dark:border-indigo-500/20 dark:from-hero-from dark:via-hero-via dark:to-hero-to">
                         <div className="min-w-0 flex-1">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[8px] font-semibold">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-xs font-semibold">
                             <Sparkles
                               className="h-2.5 w-2.5 text-amber-300"
                               aria-hidden
                             />{" "}
                             {t("mockActiveApplicant")}
                           </span>
-                          <div className="mt-2 text-[13px] font-black leading-tight sm:text-[15px]">
+                          <div className="mt-2 text-sm font-black leading-tight sm:text-sm">
                             {td("heroTitle")}
                           </div>
-                          <p className="mt-1.5 text-[8px] leading-snug text-slate-300">
+                          <p className="mt-1.5 text-sm leading-snug text-slate-300">
                             {t("mockHubSub")}
                           </p>
-                          <div className="mt-2 flex flex-wrap gap-1 text-[7px] font-semibold">
-                            <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5">
+                          <div className="mt-2 flex flex-wrap gap-1 text-xs font-semibold">
+                            <span className="inline-flex items-center gap-0.5 rounded-control bg-white/10 px-1.5 py-0.5">
                               <GraduationCap
                                 className="h-2.5 w-2.5"
                                 aria-hidden
                               />{" "}
                               {t("mockChipBachelor")}
                             </span>
-                            <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5">
+                            <span className="inline-flex items-center gap-0.5 rounded-control bg-white/10 px-1.5 py-0.5">
                               <Wallet
                                 className="h-2.5 w-2.5 text-emerald-300"
                                 aria-hidden
                               />{" "}
                               $25 000/yr
                             </span>
-                            <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5">
+                            <span className="inline-flex items-center gap-0.5 rounded-control bg-white/10 px-1.5 py-0.5">
                               <Trophy
                                 className="h-2.5 w-2.5 text-amber-300"
                                 aria-hidden
@@ -1196,16 +1196,16 @@ export function LandingPage({
                             </span>
                           </div>
                         </div>
-                        <div className="hidden w-[108px] shrink-0 flex-col items-center rounded-xl border border-white/20 p-2 sm:flex">
-                          <div className="text-[7px] font-bold uppercase tracking-wider text-slate-300">
+                        <div className="hidden w-[108px] shrink-0 flex-col items-center rounded-surface border border-white/20 p-2 sm:flex">
+                          <div className="text-xs font-bold uppercase tracking-wider text-slate-300">
                             {td("readinessLabel")}
                           </div>
                           <div className="my-1.5 grid h-12 w-12 place-items-center rounded-full border-[3px] border-indigo-400/70">
                             <span className="text-base font-black text-amber-300">
-                              47<small className="text-[7px]">%</small>
+                              47<small className="text-xs">%</small>
                             </span>
                           </div>
-                          <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-[7px] font-black text-slate-950 sb-ink-on-warm">
+                          <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-control bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-xs font-black text-slate-950 sb-ink-on-warm">
                             <Bot className="h-2.5 w-2.5" aria-hidden />{" "}
                             {td("runAudit")}
                           </div>
@@ -1217,14 +1217,14 @@ export function LandingPage({
                           ({ label, value, sub, icon: Icon, tone }) => (
                             <div
                               key={label}
-                              className="rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#111a2e]"
+                              className="rounded-surface border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-surface"
                             >
                               <div className="flex items-start justify-between gap-1">
-                                <small className="text-[7px] font-semibold text-slate-500 dark:text-slate-400">
+                                <small className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                                   {label}
                                 </small>
                                 <span
-                                  className={`grid h-4 w-4 place-items-center rounded ${tone}`}
+                                  className={`grid h-4 w-4 place-items-center rounded-control ${tone}`}
                                 >
                                   <Icon className="h-2.5 w-2.5" aria-hidden />
                                 </span>
@@ -1232,19 +1232,19 @@ export function LandingPage({
                               <strong className="mt-1 block text-base font-black text-slate-950 dark:text-white">
                                 {value}
                               </strong>
-                              <span className="text-[8px] text-slate-600 dark:text-slate-300">
+                              <span className="text-xs text-slate-600 dark:text-slate-300">
                                 {sub}
                               </span>
                             </div>
                           ),
                         )}
                       </div>
-                      <div className="mt-3 rounded-xl border border-indigo-200 bg-white p-3 dark:border-indigo-500/30 dark:bg-[#111a2e]">
-                        <div className="flex items-center gap-1 text-[10px] font-black text-indigo-700 dark:text-indigo-300">
+                      <div className="mt-3 rounded-surface border border-indigo-200 bg-white p-3 dark:border-indigo-500/30 dark:bg-surface">
+                        <div className="flex items-center gap-1 text-xs font-black text-indigo-700 dark:text-indigo-300">
                           <Compass className="h-3 w-3" aria-hidden />{" "}
                           {td("portfolioTitle")}
                         </div>
-                        <p className="mt-1.5 text-[8px] leading-snug text-slate-500 dark:text-slate-400">
+                        <p className="mt-1.5 text-sm leading-snug text-slate-500 dark:text-slate-400">
                           {t("mockPortfolioNote")}
                         </p>
                       </div>
@@ -1266,7 +1266,7 @@ export function LandingPage({
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
               <SectionIndex n="03" label={t("secHow")} />
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
                 {t("howEyebrow")}
               </div>
               <h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.035em] text-slate-950 dark:text-white sm:text-[40px]">
@@ -1280,9 +1280,9 @@ export function LandingPage({
               {steps.map((step) => (
                 <RevealItem
                   key={step.num}
-                  className="rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#111a2e]"
+                  className="rounded-overlay border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-surface"
                 >
-                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900">
+                  <div className="overflow-hidden rounded-surface border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={step.photo}
@@ -1293,13 +1293,13 @@ export function LandingPage({
                     />
                   </div>
                   <div className="px-3 pb-3 pt-4">
-                    <div className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
+                    <div className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
                       {step.num} — {step.label}
                     </div>
                     <h3 className="mb-1.5 mt-2 text-base font-black text-slate-950 dark:text-white">
                       {step.title}
                     </h3>
-                    <p className="text-[13px] leading-relaxed text-slate-600 dark:text-slate-300">
+                    <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                       {step.text}
                     </p>
                   </div>
@@ -1317,7 +1317,7 @@ export function LandingPage({
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
               <SectionIndex n="04" label={t("secCapabilities")} onDark />
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
                 {t("featEyebrow")}
               </div>
               <h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.035em] sm:text-[40px]">
@@ -1331,9 +1331,9 @@ export function LandingPage({
               {features.map((feature) => (
                 <RevealItem
                   key={feature.title}
-                  className="min-h-[170px] rounded-2xl border border-white/10 bg-slate-800 p-5 dark:border-slate-700/70 dark:bg-[#111a2e]"
+                  className="min-h-[170px] rounded-overlay border border-white/10 bg-slate-800 p-5 dark:border-slate-700/70 dark:bg-surface"
                 >
-                  <div className="mb-3 grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-xs font-black text-indigo-300">
+                  <div className="mb-3 grid h-9 w-9 place-items-center rounded-control bg-white/10 text-xs font-black text-indigo-300">
                     {feature.icon}
                   </div>
                   <h3 className="text-base font-black text-white">
@@ -1356,7 +1356,7 @@ export function LandingPage({
           <div className="mx-auto grid w-[min(1180px,94%)] items-center gap-7 lg:grid-cols-2">
             <Reveal>
               <SectionIndex n="05" label={t("secChancing")} />
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
                 {t("chanceEyebrow")}
               </div>
               <h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.035em] text-slate-950 dark:text-white sm:text-[40px]">
@@ -1381,18 +1381,18 @@ export function LandingPage({
             </Reveal>
             <Reveal
               delay={0.12}
-              className="rounded-2xl border border-slate-200 bg-white p-2 shadow-lg shadow-black/5 dark:border-slate-800 dark:bg-[#111a2e] dark:shadow-black/30"
+              className="rounded-overlay border border-slate-200 bg-white p-2 shadow-lg shadow-black/5 dark:border-slate-800 dark:bg-surface dark:shadow-black/30"
             >
-              <div className="rounded-xl border border-slate-200 p-5 dark:border-slate-800">
+              <div className="rounded-surface border border-slate-200 p-5 dark:border-slate-800">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <strong className="text-sm font-black text-slate-950 dark:text-white">
                     {t("chanceCardLabel")}
                   </strong>
                   <span className="flex items-center gap-1.5">
-                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
                       {t("demoBadge")}
                     </span>
-                    <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+                    <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-black text-emerald-700 dark:text-emerald-300">
                       {t("chanceBadge")}
                     </span>
                   </span>
@@ -1421,7 +1421,7 @@ export function LandingPage({
                     {t("chanceDataPublished")}
                   </strong>
                 </div>
-                <p className="mt-2 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                <p className="mt-2 border-t border-slate-200 pt-3 text-sm leading-relaxed text-slate-500 dark:border-slate-800 dark:text-slate-400">
                   {t("chanceNote")}
                 </p>
               </div>
@@ -1437,7 +1437,7 @@ export function LandingPage({
           <div className="mx-auto w-[min(1180px,94%)]">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
               <SectionIndex n="06" label={t("secRoadmap")} />
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
                 {t("roadEyebrow")}
               </div>
               <h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.035em] text-slate-950 dark:text-white sm:text-[40px]">
@@ -1451,9 +1451,9 @@ export function LandingPage({
               {roadItems.map((item) => (
                 <RevealItem
                   key={item.num}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-[#111a2e]"
+                  className="rounded-overlay border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-surface"
                 >
-                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-50 text-sm font-black text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                  <div className="grid h-9 w-9 place-items-center rounded-control bg-indigo-50 text-sm font-black text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
                     {item.num}
                   </div>
                   <h3 className="mb-1.5 mt-3 text-base font-black text-slate-950 dark:text-white">
@@ -1472,7 +1472,7 @@ export function LandingPage({
         <section className="border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10">
           <div className="mx-auto w-[min(1180px,94%)]">
             <Reveal>
-              <div className="mx-auto max-w-[900px] rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-7 text-center dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-[#111a2e] dark:bg-[#111a2e] sm:p-8">
+              <div className="mx-auto max-w-[900px] rounded-overlay border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-7 text-center dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-surface dark:bg-surface sm:p-8">
                 <div className="mx-auto grid h-9 w-9 place-items-center rounded-full border border-indigo-200 bg-white/70 dark:border-indigo-500/30 dark:bg-indigo-500/10">
                   <Sparkles
                     className="h-4 w-4 text-indigo-500 dark:text-indigo-300"
@@ -1482,7 +1482,7 @@ export function LandingPage({
                 <p className="mx-auto mt-3 max-w-[760px] font-serif text-xl font-semibold italic leading-relaxed tracking-[-0.01em] text-slate-950 dark:text-white sm:text-2xl">
                   “{t("quote")}”
                 </p>
-                <p className="mt-3 text-[12px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                <p className="mt-3 text-sm font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                   {t("quoteBy")}
                 </p>
               </div>
@@ -1494,13 +1494,13 @@ export function LandingPage({
         <section id="cta" className="sb-cv-section scroll-mt-20 py-8 sm:py-10">
           <div className="mx-auto w-[min(1180px,94%)]">
             <Reveal>
-              <div className="relative overflow-hidden rounded-[26px] border border-indigo-900/20 bg-gradient-to-br from-[#161b38] via-[#20205a] to-[#29235b] px-6 py-10 text-center text-white dark:border-indigo-500/20 dark:from-[#0c1324] dark:via-[#171b47] dark:to-[#241d50] sm:px-14 sm:py-12">
+              <div className="relative overflow-hidden rounded-overlay border border-indigo-900/20 bg-gradient-to-br from-cta-from via-cta-via to-cta-to px-6 py-10 text-center text-white dark:border-indigo-500/20 dark:from-cta-from dark:via-cta-via dark:to-cta-to sm:px-14 sm:py-12">
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_88%_0%,rgba(148,92,255,0.35),transparent_42%)]"
                 />
                 <div className="relative">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em]">
                     <ShieldCheck
                       className="h-3.5 w-3.5 text-emerald-300"
                       aria-hidden
@@ -1513,12 +1513,12 @@ export function LandingPage({
                   <p className="mx-auto mt-2 max-w-[620px] text-sm leading-relaxed text-slate-300 sm:text-base">
                     {t("ctaText")}
                   </p>
-                  <button
+                  <Button variant="unstyled"
                     onClick={onStart}
-                    className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-7 py-3 text-sm font-black text-indigo-700 shadow-xl transition hover:-translate-y-px hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-900 dark:ring-offset-[#111a2e]"
+                    className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-surface bg-white px-7 py-3 text-sm font-black text-indigo-700 shadow-xl transition hover:-translate-y-px hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-900 dark:ring-offset-surface"
                   >
                     {t("ctaBtn")} <ArrowRight className="h-4 w-4" aria-hidden />
-                  </button>
+                  </Button>
                 </div>
               </div>
             </Reveal>
@@ -1533,10 +1533,10 @@ export function LandingPage({
             © {new Date().getFullYear()} {t("footerLeft")}
           </div>
           <div className="flex items-center gap-4">
-            <a href="/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 transition hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400">
+            <a href="/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-1 transition hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400">
               {t("footerPrivacy")}
             </a>
-            <a href="/terms" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 transition hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400">
+            <a href="/terms" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-1 transition hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400">
               {t("footerTerms")}
             </a>
           </div>
@@ -1623,7 +1623,7 @@ function ExecutiveMonochromeJet({
       >
         <path
           d="M 38 0 L 10 -5 L -8 -36 L -17 -36 L -10 -5 L -28 -4 L -36 -17 L -42 -17 L -36 0 L -42 17 L -36 17 L -28 4 L -10 5 L -17 36 L -8 36 L 10 5 Z"
-          fill="#000"
+          fill={SVG_COLORS.black}
         />
       </g>
       {/* Fading exhaust behind each nacelle, with a soft monochrome pulse.
@@ -1645,8 +1645,8 @@ function ExecutiveMonochromeJet({
         width="14"
         height="6.5"
         rx="3"
-        fill="#27272a"
-        stroke="#09090b"
+        fill={SVG_COLORS.zinc800}
+        stroke={SVG_COLORS.zinc950}
         strokeWidth="1.2"
       />
       <rect
@@ -1655,8 +1655,8 @@ function ExecutiveMonochromeJet({
         width="14"
         height="6.5"
         rx="3"
-        fill="#27272a"
-        stroke="#09090b"
+        fill={SVG_COLORS.zinc800}
+        stroke={SVG_COLORS.zinc950}
         strokeWidth="1.2"
       />
       <path
@@ -1669,18 +1669,18 @@ function ExecutiveMonochromeJet({
       <path
         d="M 12 -4.5 L -9 -37 L -16 -39 L -18 -34 L -8 -5.5 Z M 12 4.5 L -9 37 L -16 39 L -18 34 L -8 5.5 Z"
         fill="url(#jetWingGrad)"
-        stroke="#09090b"
+        stroke={SVG_COLORS.zinc950}
         strokeWidth="1.8"
         strokeLinejoin="round"
       />
       <path
         d="M -9 -37 L -16 -39 L -17 -35 L -11 -34 Z M -9 37 L -16 39 L -17 35 L -11 34 Z"
-        fill="#18181b"
+        fill={SVG_COLORS.zinc900}
       />
       <path
         d="M -2 -10 L -12 -31 M -2 10 L -12 31"
         fill="none"
-        stroke="#52525b"
+        stroke={SVG_COLORS.zinc600}
         strokeWidth="1"
         strokeDasharray="3 2"
       />
@@ -1688,20 +1688,20 @@ function ExecutiveMonochromeJet({
       <path
         d="M -24 -3.2 L -36 -18 L -42 -18 L -34 -2.5 Z M -24 3.2 L -36 18 L -42 18 L -34 2.5 Z"
         fill="url(#jetWingGrad)"
-        stroke="#09090b"
+        stroke={SVG_COLORS.zinc950}
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
       <path
         d="M 40 0 C 31 -4.6, 18 -5.8, 4 -5.8 L -26 -4.2 L -39 -1.5 L -39 1.5 L -26 4.2 L 4 5.8 C 18 5.8, 31 4.6, 40 0 Z"
         fill="url(#jetFuselageGrad)"
-        stroke="#09090b"
+        stroke={SVG_COLORS.zinc950}
         strokeWidth="2"
         strokeLinejoin="round"
       />
       <path
         d="M 29 0 C 25 -3.1, 20 -3.6, 17 -3.2 C 19 -1.2, 19 1.2, 17 3.2 C 20 3.6, 25 3.1, 29 0 Z"
-        fill="#09090b"
+        fill={SVG_COLORS.zinc950}
       />
       <path
         d="M 26 -1.4 C 23 -2.2, 20 -2.2, 19 -1.6"
@@ -1713,21 +1713,21 @@ function ExecutiveMonochromeJet({
       />
       <path
         d="M -26 0 H 14"
-        stroke="#71717a"
+        stroke={SVG_COLORS.zinc500}
         strokeWidth="1.1"
         strokeLinecap="round"
       />
       <path
         d="M -14 -3.3 L 10 -3.6 M -14 3.3 L 10 3.6"
-        stroke="#18181b"
+        stroke={SVG_COLORS.zinc900}
         strokeWidth="1.2"
         strokeDasharray="1.5 3"
         strokeLinecap="round"
       />
       <path
         d="M -25 0 L -41 -2.2 L -43 0 L -41 2.2 Z"
-        fill="#18181b"
-        stroke="#09090b"
+        fill={SVG_COLORS.zinc900}
+        stroke={SVG_COLORS.zinc950}
         strokeWidth="1.2"
       />
       {/* Dorsal / ventral shade overlays — during the barrel roll the side
@@ -1736,14 +1736,14 @@ function ExecutiveMonochromeJet({
       <path
         ref={dorsalShadeRef}
         d="M 40 0 C 31 -4.6, 18 -5.8, 4 -5.8 L -9 -37 L -16 -39 L -18 -34 L -10 -6 L -24 -3.2 L -36 -18 L -42 -18 L -39 -1.5 L -39 0 Z"
-        fill="#09090b"
+        fill={SVG_COLORS.zinc950}
         opacity="0"
       />
       <path
         ref={bellyShadeRef}
         transform="scale(1 -1)"
         d="M 40 0 C 31 -4.6, 18 -5.8, 4 -5.8 L -9 -37 L -16 -39 L -18 -34 L -10 -6 L -24 -3.2 L -36 -18 L -42 -18 L -39 -1.5 L -39 0 Z"
-        fill="#09090b"
+        fill={SVG_COLORS.zinc950}
         opacity="0"
       />
     </g>
@@ -1982,8 +1982,7 @@ function ScrollFlightPath() {
   return (
     <div
       aria-hidden="true"
-      className="sb-flight pointer-events-none fixed inset-0 z-20 overflow-hidden text-zinc-900/75 dark:text-white/80"
-      style={{ contain: "strict", pointerEvents: "none" }}
+      className="sb-flight sb-contain-strict pointer-events-none fixed inset-0 z-20 overflow-hidden text-zinc-900/75 dark:text-white/80"
     >
       <svg
         viewBox="0 0 1200 1000"
@@ -1998,14 +1997,14 @@ function ScrollFlightPath() {
             x2="0%"
             y2="100%"
           >
-            <stop offset="0%" stopColor="#fff" />
-            <stop offset="50%" stopColor="#f4f4f5" />
-            <stop offset="100%" stopColor="#d4d4d8" />
+            <stop offset="0%" stopColor={SVG_COLORS.white} />
+            <stop offset="50%" stopColor={SVG_COLORS.zinc100} />
+            <stop offset="100%" stopColor={SVG_COLORS.zinc300} />
           </linearGradient>
           <linearGradient id="jetWingGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#fff" />
-            <stop offset="65%" stopColor="#e4e4e7" />
-            <stop offset="100%" stopColor="#a1a1aa" />
+            <stop offset="0%" stopColor={SVG_COLORS.white} />
+            <stop offset="65%" stopColor={SVG_COLORS.zinc200} />
+            <stop offset="100%" stopColor={SVG_COLORS.zinc400} />
           </linearGradient>
           <linearGradient id="jetPlumeGrad" x1="100%" y1="0%" x2="0%" y2="0%">
             <stop offset="0%" stopColor="currentColor" stopOpacity="0.55" />
@@ -2013,12 +2012,12 @@ function ScrollFlightPath() {
             <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
           </linearGradient>
           <linearGradient id="jetAfterburnGrad" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor="#eff6ff" stopOpacity="0.95" />
-            <stop offset="40%" stopColor="#38bdf8" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+            <stop offset="0%" stopColor={SVG_COLORS.blue50} stopOpacity="0.95" />
+            <stop offset="40%" stopColor={SVG_COLORS.sky400} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={SVG_COLORS.sky400} stopOpacity="0" />
           </linearGradient>
         </defs>
-        <g ref={cameraRef} transform="translate(0 380)" style={{ willChange: "transform" }}>
+        <g ref={cameraRef} transform="translate(0 380)" className="sb-will-transform">
           <path
             d={FLIGHT_PATH_D}
             fill="none"
@@ -2042,7 +2041,7 @@ function ScrollFlightPath() {
           <g
             ref={jetGroupRef}
             transform="translate(580 90) scale(1 1) rotate(7)"
-            style={{ willChange: "transform" }}
+            className="sb-will-transform"
           >
             <ExecutiveMonochromeJet
               bankDeg={0}
@@ -2095,14 +2094,14 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
             aria-hidden={copy === 1 ? true : undefined}
           >
             {items.map((university, index) => (
-              <button
+              <Button variant="unstyled"
                 key={university.name}
                 type="button"
                 tabIndex={copy === 1 ? -1 : undefined}
                 onClick={onStart}
-                className="group relative w-64 shrink-0 rounded-2xl border border-slate-200/90 bg-white p-2 text-left shadow-xs transition-all hover:border-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-72 dark:border-slate-700/80 dark:bg-[#111a2e] dark:hover:border-indigo-400 dark:focus-visible:ring-indigo-400"
+                className="group relative w-64 shrink-0 rounded-overlay border border-slate-200/90 bg-white p-2 text-left shadow-xs transition-all hover:border-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-72 dark:border-slate-700/80 dark:bg-surface dark:hover:border-indigo-400 dark:focus-visible:ring-indigo-400"
               >
-                <span className="relative block h-32 w-full overflow-hidden rounded-xl border border-slate-200/70 bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900">
+                <span className="relative block h-32 w-full overflow-hidden rounded-surface border border-slate-200/70 bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900">
                   {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -2119,22 +2118,22 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
-                  <span className="absolute left-2 top-2 rounded-md bg-indigo-600/95 px-2 py-0.5 text-[10px] font-black text-white shadow-xs">
+                  <span className="absolute left-2 top-2 rounded-control bg-indigo-600/95 px-2 py-0.5 text-xs font-black text-white shadow-xs">
                     {`QS #${university.qsRank}`}
                   </span>
-                  <span className="absolute right-2 top-2 rounded-md bg-white/95 px-2 py-0.5 text-[10px] font-bold text-slate-950">
+                  <span className="absolute right-2 top-2 rounded-control bg-white/95 px-2 py-0.5 text-xs font-bold text-slate-950">
                     {university.country}
                   </span>
                   <span className="absolute bottom-2 left-2.5 right-2.5 text-white">
                     <span className="block truncate text-xs font-black leading-tight">
                       {university.name}
                     </span>
-                    <span className="block truncate text-[10px] text-slate-300">
+                    <span className="block truncate text-xs text-slate-300">
                       {university.landmark}
                     </span>
                   </span>
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
         ))}
@@ -2148,11 +2147,11 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       id="campuses"
       aria-labelledby="university-marquee-title"
       data-paused="false"
-      className="relative z-10 border-b border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-[#0b1222] sm:py-10"
+      className="relative z-10 border-b border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-canvas sm:py-10"
     >
       <div className="mx-auto mb-5 w-[min(1180px,94%)]">
         <SectionIndex n="02" label={tIndex("secCampuses")} />
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-indigo-700 dark:text-indigo-300">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-indigo-700 dark:text-indigo-300">
           {tIndex("marqueeBadge")}
         </span>
         <h2

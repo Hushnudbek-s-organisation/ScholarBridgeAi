@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import type { StudentProfile } from "./Navbar";
 import { AppNote } from "@/components/AppNote";
-import { ShowMoreToggle } from "@/components/hubs/ui";
+import { ShowMoreToggle } from "@/components/ui/hubs";
 import { formatMoney } from "@/lib/format";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import {
@@ -50,6 +50,7 @@ import {
   type FeeWaiverUniversityResult,
   type GeneratedLetter,
 } from "@/lib/feeWaivers";
+import { Button } from "@/components/ui/Button";
 
 /* -------------------------------------------------------------------------- */
 /* Source rows                                                                 */
@@ -309,37 +310,37 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
 
   /* ---- render ------------------------------------------------------------ */
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 ${className}`} aria-labelledby="fee-waiver-title">
+    <section className={`rounded-overlay border border-slate-200 bg-white p-4 sm:p-5 ${className}`} aria-labelledby="fee-waiver-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 id="fee-waiver-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
             <BadgeDollarSign className="h-4 w-4 text-emerald-600" aria-hidden />
             {t("title")}
           </h3>
-          <p className="mt-1 max-w-2xl break-words text-[11px] leading-relaxed text-slate-500">{t("subtitle")}</p>
+          <p className="mt-1 max-w-2xl break-words text-sm leading-relaxed text-slate-500">{t("subtitle")}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+        <div className="flex shrink-0 items-center gap-1.5 rounded-surface border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
           <PiggyBank className="h-3.5 w-3.5" aria-hidden />
           {t("savingTotal", { amount: formatMoney(evaluation.totals.avoidableTotalUsd, "USD") })}
         </div>
       </div>
 
       {/* ---- eligibility indicators ---- */}
-      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("eligibilityTitle")}</p>
-        <p className="mt-1 break-words text-xs font-semibold text-slate-700">
+      <div className="mt-3 rounded-surface border border-slate-200 bg-slate-50 p-3">
+        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("eligibilityTitle")}</p>
+        <p className="mt-1 break-words text-sm font-semibold text-slate-700">
           {t(`eligibility.${eligibility.headline}`)}
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {eligibility.indicators.length === 0 && (
-            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500">
+            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-slate-500">
               {t("noIndicators")}
             </span>
           )}
           {eligibility.indicators.map((indicator) => (
             <span
               key={indicator}
-              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:border-emerald-500/30 dark:text-emerald-200"
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-xs font-bold text-emerald-700 dark:border-emerald-500/30 dark:text-emerald-200"
             >
               <Check className="h-3 w-3" aria-hidden />
               {t(`indicators.${indicator}`)}
@@ -349,30 +350,30 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
             <span
               key={`missing-${indicator}`}
               title={t(`indicators.${indicator}Hint`)}
-              className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:border-amber-500/30 dark:text-amber-200"
+              className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-white px-2 py-0.5 text-xs font-bold text-amber-700 dark:border-amber-500/30 dark:text-amber-200"
             >
               <AlertCircle className="h-3 w-3" aria-hidden />
               {t("missingIndicator", { name: t(`indicators.${indicator}`) })}
             </span>
           ))}
         </div>
-        <p className="mt-2 break-words text-[10px] leading-relaxed text-slate-500">
+        <p className="mt-2 break-words text-sm leading-relaxed text-slate-500">
           {t("eligibilityDisclaimer", { threshold: formatMoney(FEE_WAIVER_INCOME_THRESHOLD_USD, "USD") })}
         </p>
       </div>
 
       {/* ---- totals ---- */}
       {loading ? (
-        <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-500">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
           {t("loading")}
         </p>
       ) : error ? (
-        <p role="alert" className="mt-3 break-words rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+        <p role="alert" className="mt-3 break-words rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
           {error}
         </p>
       ) : rows.length === 0 ? (
-        <p className="mt-3 break-words rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+        <p className="mt-3 break-words rounded-surface border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-600">
           {t("empty")}
         </p>
       ) : (
@@ -391,25 +392,25 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
                       ? "published_fee"
                       : "fee_unknown";
               return (
-                <span key={key} className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${CATEGORY_TONE[category]}`}>
+                <span key={key} className={`rounded-full border px-2.5 py-1 text-xs font-bold ${CATEGORY_TONE[category]}`}>
                   {t(`categories.${category}.short`, { count: value })}
                 </span>
               );
             })}
-            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600">
+            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-600">
               {t("publishedFeeTotal", { amount: formatMoney(evaluation.totals.publishedFeeTotalUsd, "USD") })}
             </span>
           </div>
 
           {source === "catalogue" && (
-            <p className="mt-2 break-words text-[10px] leading-relaxed text-slate-500">{t("catalogueSourceNote")}</p>
+            <p className="mt-2 break-words text-sm leading-relaxed text-slate-500">{t("catalogueSourceNote")}</p>
           )}
 
           {/* ---- per-university rows, best option first ---- */}
           <div className="mt-3 space-y-2">
             {visibleGrouped.map(([category, list]) => (
-              <div key={category} className="rounded-xl border border-slate-200">
-                <p className={`rounded-t-xl border-b px-3 py-1.5 text-[11px] font-extrabold ${CATEGORY_TONE[category]}`}>
+              <div key={category} className="rounded-surface border border-slate-200">
+                <p className={`rounded-t-xl border-b px-3 py-1.5 text-sm font-extrabold ${CATEGORY_TONE[category]}`}>
                   {t(`categories.${category}.title`)}
                 </p>
                 <ul className="divide-y divide-slate-100">
@@ -419,13 +420,13 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
                       <li key={`${result.university.id ?? result.university.name}`} className="px-3 py-2">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="break-words text-xs font-bold text-slate-800">
+                            <p className="break-words text-sm font-bold text-slate-800">
                               {result.university.name}
                               {result.university.country ? (
                                 <span className="font-semibold text-slate-500"> · {result.university.country}</span>
                               ) : null}
                             </p>
-                            <p className="mt-0.5 break-words text-[11px] leading-relaxed text-slate-600">
+                            <p className="mt-0.5 break-words text-sm leading-relaxed text-slate-600">
                               {t(`categories.${result.category}.explain`)}
                               {result.route ? ` ${t(`routes.${result.route.id}.desc`)}` : ""}
                             </p>
@@ -438,7 +439,7 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     title={t(`programs.${program.id}.desc`)}
-                                    className="inline-flex min-h-9 items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-800 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100"
+                                    className="inline-flex min-h-9 items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-bold text-violet-800 hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100"
                                   >
                                     {t(`programs.${program.id}.name`)}
                                     <ExternalLink className="h-2.5 w-2.5" aria-hidden />
@@ -451,7 +452,7 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
                                 href={result.route.portalUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="mt-1 inline-flex min-h-9 items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:underline"
+                                className="mt-1 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-indigo-700 hover:underline"
                               >
                                 {t(`routes.${result.route.id}.name`)}
                                 <ExternalLink className="h-3 w-3" aria-hidden />
@@ -459,7 +460,7 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
                             )}
                           </div>
                           <div className="shrink-0 text-right">
-                            <p className="text-xs font-extrabold text-slate-900">
+                            <p className="text-sm font-extrabold text-slate-900">
                               {result.category === "zero_fee"
                                 ? t("feeZero")
                                 : fee != null
@@ -467,7 +468,7 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
                                   : t("feeUnknown")}
                             </p>
                             {result.avoidableUsd != null && result.avoidableUsd > 0 && (
-                              <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                              <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
                                 {t("avoidable", { amount: formatMoney(result.avoidableUsd, "USD") })}
                               </p>
                             )}
@@ -476,7 +477,7 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
                                 href={result.route.sourceUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="mt-0.5 inline-flex min-h-9 items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-indigo-600"
+                                className="mt-0.5 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-slate-500 hover:text-indigo-600"
                               >
                                 <FileText className="h-2.5 w-2.5" aria-hidden />
                                 {t("officialSource")}
@@ -502,40 +503,40 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
       )}
 
       {/* ---- letter generator ---- */}
-      <div className="mt-4 rounded-xl border border-slate-200 p-3">
+      <div className="mt-4 rounded-surface border border-slate-200 p-3">
         <h4 className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900">
           <ScrollText className="h-3.5 w-3.5 text-indigo-600" aria-hidden />
           {t("letterTitle")}
         </h4>
-        <p className="mt-1 break-words text-[11px] leading-relaxed text-slate-500">{t("letterSubtitle")}</p>
+        <p className="mt-1 break-words text-sm leading-relaxed text-slate-500">{t("letterSubtitle")}</p>
 
         <div className="mt-2 flex flex-wrap gap-1.5">
           {(["request", "attestation"] as const).map((option) => (
-            <button
+            <Button variant="unstyled"
               key={option}
               type="button"
               onClick={() => setTemplate(option)}
               aria-pressed={template === option}
-              className={`min-h-11 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors ${
+              className={`min-h-11 rounded-surface border px-3 py-2 text-xs font-bold transition-colors ${
                 template === option
                   ? "border-indigo-300 bg-indigo-50 text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/15 dark:text-indigo-100"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
               {t(`templates.${option}`)}
-            </button>
+            </Button>
           ))}
         </div>
 
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label className="block text-[11px] font-semibold text-slate-600">
+          <label className="block text-sm font-semibold text-slate-600">
             {t("letterUniversityLabel")}
             <input
               list="fee-waiver-universities"
               value={letterUniversity}
               onChange={(event) => setLetterUniversity(event.target.value)}
               placeholder={t("letterUniversityPlaceholder")}
-              className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
+              className="sb-field mt-1 min-h-11 w-full rounded-surface border px-3 py-2 text-sm text-slate-800"
             />
             <datalist id="fee-waiver-universities">
               {scoped.map((row) => (
@@ -546,31 +547,31 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
 
           {template === "attestation" && (
             <>
-              <label className="block text-[11px] font-semibold text-slate-600">
+              <label className="block text-sm font-semibold text-slate-600">
                 {t("counselorNameLabel")}
                 <input
                   value={counselorName}
                   onChange={(event) => setCounselorName(event.target.value)}
                   placeholder={t("counselorNamePlaceholder")}
-                  className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
+                  className="sb-field mt-1 min-h-11 w-full rounded-surface border px-3 py-2 text-sm text-slate-800"
                 />
               </label>
-              <label className="block text-[11px] font-semibold text-slate-600">
+              <label className="block text-sm font-semibold text-slate-600">
                 {t("counselorTitleLabel")}
                 <input
                   value={counselorTitle}
                   onChange={(event) => setCounselorTitle(event.target.value)}
                   placeholder={t("counselorTitlePlaceholder")}
-                  className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
+                  className="sb-field mt-1 min-h-11 w-full rounded-surface border px-3 py-2 text-sm text-slate-800"
                 />
               </label>
-              <label className="block text-[11px] font-semibold text-slate-600">
+              <label className="block text-sm font-semibold text-slate-600">
                 {t("schoolNameLabel")}
                 <input
                   value={schoolName}
                   onChange={(event) => setSchoolName(event.target.value)}
                   placeholder={t("schoolNamePlaceholder")}
-                  className="sb-field mt-1 min-h-11 w-full rounded-xl border px-3 py-2 text-xs text-slate-800"
+                  className="sb-field mt-1 min-h-11 w-full rounded-surface border px-3 py-2 text-sm text-slate-800"
                 />
               </label>
             </>
@@ -578,51 +579,51 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
         </div>
 
         {letter ? (
-          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mt-3 rounded-surface border border-slate-200 bg-slate-50 p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("letterSubject")}</p>
-                <p className="break-words text-xs font-bold text-slate-800">{letter.subject}</p>
+                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("letterSubject")}</p>
+                <p className="break-words text-sm font-bold text-slate-800">{letter.subject}</p>
               </div>
               <div className="flex shrink-0 gap-1.5">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => void copy("subject", letter.subject)}
-                  className="flex min-h-11 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100"
+                  className="flex min-h-11 items-center gap-1 rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
                 >
                   {copied === "subject" ? <Check className="h-3 w-3 text-emerald-600" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
                   {t("copySubject")}
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => void copy("body", letter.body)}
-                  className="flex min-h-11 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700"
+                  className="flex min-h-11 items-center gap-1 rounded-control bg-indigo-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
                 >
                   {copied === "body" ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
                   {t("copyBody")}
-                </button>
+                </Button>
               </div>
             </div>
 
-            <pre className="mt-2 max-h-72 overflow-auto rounded-lg border border-slate-200 bg-white p-3 text-[11px] leading-relaxed whitespace-pre-wrap break-words text-slate-700">
+            <pre className="mt-2 max-h-72 overflow-auto rounded-control border border-slate-200 bg-white p-3 text-xs leading-relaxed whitespace-pre-wrap break-words text-slate-700">
               {letter.body}
             </pre>
 
             {letter.placeholders.length > 0 && (
-              <p className="mt-2 flex flex-wrap items-center gap-1.5 break-words text-[11px] font-semibold text-amber-800 dark:text-amber-200">
+              <p className="mt-2 flex flex-wrap items-center gap-1.5 break-words text-sm font-semibold text-amber-800 dark:text-amber-200">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 {t("placeholders", { count: letter.placeholders.length })}
                 {letter.placeholders.map((placeholder) => (
-                  <code key={placeholder} className="rounded bg-amber-100 px-1 py-0.5 text-[10px] dark:bg-amber-500/20">
+                  <code key={placeholder} className="rounded-control bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-500/20">
                     {placeholder}
                   </code>
                 ))}
               </p>
             )}
-            <p className="mt-2 break-words text-[10px] leading-relaxed text-slate-500">{t("letterDisclaimer")}</p>
+            <p className="mt-2 break-words text-sm leading-relaxed text-slate-500">{t("letterDisclaimer")}</p>
           </div>
         ) : (
-          <p className="mt-3 break-words rounded-xl border border-dashed border-slate-200 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
+          <p className="mt-3 break-words rounded-surface border border-dashed border-slate-200 px-3 py-3 text-sm leading-relaxed text-slate-500">
             {t("letterEmpty")}
           </p>
         )}

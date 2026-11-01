@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { ShieldCheck, Trash2, CheckCircle2, XCircle, RefreshCw, Loader2, Flag, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface ReportsManagerProps {
   adminProfileId: number;
@@ -95,65 +96,65 @@ export function ReportsManager({ adminProfileId }: ReportsManagerProps) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-red-50 flex items-center justify-center">
-          <Flag className="h-5 w-5 text-red-500" />
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-rose-50 flex items-center justify-center">
+          <Flag className="h-5 w-5 text-rose-500" />
         </div>
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Community Reports</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             {openCount} open report{openCount === 1 ? "" : "s"} — shown to admins as notifications
           </p>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={() => fetchReports()}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+          className="ml-auto flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Status filter */}
       <div className="flex gap-2">
         {(["open", "resolved", "dismissed"] as const).map((s) => (
-          <button
+          <Button variant="unstyled"
             key={s}
             onClick={() => {
               setStatusFilter(s);
               fetchReports(s);
             }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-colors ${
+            className={`px-3 py-1.5 rounded-surface text-xs font-bold capitalize transition-colors ${
               statusFilter === s
                 ? "bg-slate-900 text-white"
                 : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
             }`}
           >
             {s} ({s === "open" ? openCount : ""})
-          </button>
+          </Button>
         ))}
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700 flex items-center gap-2">
+        <div className="rounded-overlay border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700 flex items-center gap-2">
           <AlertCircle className="h-4 w-4 shrink-0" /> {error}
         </div>
       )}
       {success && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+        <div className="rounded-overlay border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
           {success}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center gap-2 p-8 text-xs font-semibold text-slate-500 rounded-2xl border border-slate-200 bg-white">
+        <div className="flex items-center justify-center gap-2 p-8 text-xs font-semibold text-slate-500 rounded-overlay border border-slate-200 bg-white">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading reports…
         </div>
       ) : reports.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-8 text-center">
+        <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-8 text-center">
           <ShieldCheck className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
           <p className="text-sm font-semibold text-slate-600">No {statusFilter} reports</p>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             New reports from the community appear here and in the admins&apos; notification bell.
           </p>
         </div>
@@ -162,14 +163,14 @@ export function ReportsManager({ adminProfileId }: ReportsManagerProps) {
           {reports.map((r) => (
             <div
               key={r.id}
-              className={`rounded-2xl border bg-white p-4 shadow-xs ${
-                r.status === "open" ? "border-red-200" : "border-slate-200"
+              className={`rounded-overlay border bg-white p-4 shadow-xs ${
+                r.status === "open" ? "border-rose-200" : "border-slate-200"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    r.status === "open" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-500"
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${
+                    r.status === "open" ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500"
                   }`}>
                     {r.status}
                   </span>
@@ -180,29 +181,29 @@ export function ReportsManager({ adminProfileId }: ReportsManagerProps) {
                   <span>· {new Date(r.createdAt).toLocaleString()}</span>
                 </div>
               </div>
-              <p className="text-xs text-slate-700 mt-2 bg-red-50/60 border border-red-100 rounded-lg px-3 py-2">
+              <p className="text-sm text-slate-700 mt-2 bg-rose-50/60 border border-rose-100 rounded-control px-3 py-2">
                 “{r.reason}”
               </p>
               {r.status === "open" && (
                 <div className="flex items-center gap-2 mt-3">
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => handleDeleteTarget(r.targetType, r.targetId)}
-                    className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                    className="flex items-center gap-1 rounded-control border border-rose-200 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50"
                   >
                     <Trash2 className="h-3 w-3" /> Delete {r.targetType}
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="unstyled"
                     onClick={() => handleStatus(r.id, "resolved")}
-                    className="flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50"
+                    className="flex items-center gap-1 rounded-control border border-emerald-200 px-2.5 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50"
                   >
                     <CheckCircle2 className="h-3 w-3" /> Resolve
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="unstyled"
                     onClick={() => handleStatus(r.id, "dismissed")}
-                    className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+                    className="flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
                   >
                     <XCircle className="h-3 w-3" /> Dismiss
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

@@ -27,10 +27,11 @@ import {
   CURRENCY_RATES_TO_USD,
   formatCurrencyAmount,
 } from "@/lib/countryCostBenchmarks";
-import { ScrollRegion } from "@/components/hubs/ui";
+import { ScrollRegion } from "@/components/ui/hubs";
 import { AppNote } from "@/components/AppNote";
 import { HighlightedText, SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import type { CvBuilderSample } from "@/lib/samples/exemplars";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Planning Studio (Phase 3) — multi-currency cost calculator, scholarship
@@ -308,7 +309,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
   if (!activeProfile) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-overlay border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
         Sign in to build your plan.
       </div>
     );
@@ -381,25 +382,25 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{tPortfolio("studioTitle")}</h2>
-        <p className="mt-0.5 text-xs text-slate-500">
+        <p className="mt-0.5 text-sm text-slate-500">
           Multi-currency global cost calculator, scholarship portfolio, a CV built from your profile, and a side-by-side
           university comparison.
         </p>
 
         <div className="mt-3 flex flex-wrap gap-1.5">
           {TABS.map((t) => (
-            <button
+            <Button variant="unstyled"
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex min-h-11 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold ${
+              className={`flex min-h-11 items-center gap-1.5 rounded-surface px-3 py-2 text-xs font-bold ${
                 tab === t.id ? "bg-indigo-600 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700"
               }`}
             >
               <t.icon className="h-3.5 w-3.5" />
               {tPortfolio(`tab${t.id.charAt(0).toUpperCase()}${t.id.slice(1)}`)}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -407,12 +408,12 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           <div className="mt-4 space-y-3 border-t border-slate-100 pt-3">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
                   {tPortfolio("lblUniversityTarget")}
                 </label>
                 <select
                   aria-label="University or target selection"
-                  className="sb-flag-emoji mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="sb-flag-emoji mt-1 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   value={universityId === 0 ? "0" : String(universityId ?? data.costTarget?.id ?? "")}
                   onChange={(e) => {
                     const val = Number(e.target.value);
@@ -448,12 +449,12 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
                   {tPortfolio("lblDestinationCountry")}
                 </label>
                 <select
                   aria-label="Destination country"
-                  className="sb-flag-emoji mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="sb-flag-emoji mt-1 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   value={activeCountry}
                   onChange={(e) => {
                     setCountryOverride(e.target.value);
@@ -470,12 +471,12 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
                   {tPortfolio("lblDisplayCurrency")}
                 </label>
                 <select
                   aria-label="Display currency"
-                  className="sb-flag-emoji mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="sb-flag-emoji mt-1 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   value={displayCurrency}
                   onChange={(e) => setDisplayCurrency(e.target.value)}
                 >
@@ -489,12 +490,12 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
                     {tPortfolio("lblDegree")}
                   </label>
                   <select
                     aria-label="Degree level"
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    className="mt-1 w-full rounded-control border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     value={resolvedDegree}
                     onChange={(e) => {
                       setDegreeLevel(e.target.value);
@@ -507,12 +508,12 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
                     {tPortfolio("lblDuration")}
                   </label>
                   <select
                     aria-label="Programme duration in years"
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    className="mt-1 w-full rounded-control border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     value={resolvedYears}
                     onChange={(e) => setYearsOverride(e.target.value)}
                   >
@@ -528,7 +529,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <div className="flex flex-wrap items-center gap-2">
-                <label className="text-xs font-semibold text-slate-700">
+                <label className="text-sm font-semibold text-slate-700">
                   {tPortfolio("lblFamilyContribution")}
                 </label>
                 <input
@@ -538,111 +539,111 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   placeholder="e.g. 5000"
                   value={familyContributionUsd}
                   onChange={(e) => setFamilyContributionUsd(e.target.value)}
-                  className="w-32 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className="w-32 rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => setCustomizeOpen((prev) => !prev)}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   {customizeOpen ? tPortfolio("hideCustomAmounts") : tPortfolio("customizeAmounts")}
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   onClick={resetCustomizations}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   {tPortfolio("reset")}
-                </button>
+                </Button>
               </div>
             </div>
 
             {customizeOpen && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="mb-2 text-[11px] font-semibold text-slate-600">
+              <div className="rounded-surface border border-slate-200 bg-slate-50 p-3">
+                <p className="mb-2 text-sm font-semibold text-slate-600">
                   {tPortfolio("customizeHint")}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500">Tuition (USD/yr)</label>
+                    <label className="block text-sm font-bold uppercase text-slate-500">Tuition (USD/yr)</label>
                     <input
                       type="number"
                       min={0}
                       placeholder={String(data.resolvedInputs?.annualTuitionUsd ?? "")}
                       value={customAmounts.tuitionUsd}
                       onChange={(e) => setCustomAmounts({ ...customAmounts, tuitionUsd: e.target.value })}
-                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-0.5 w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500">Living (USD/yr)</label>
+                    <label className="block text-sm font-bold uppercase text-slate-500">Living (USD/yr)</label>
                     <input
                       type="number"
                       min={0}
                       placeholder={String(data.resolvedInputs?.annualLivingEstUsd ?? "")}
                       value={customAmounts.livingUsd}
                       onChange={(e) => setCustomAmounts({ ...customAmounts, livingUsd: e.target.value })}
-                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-0.5 w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500">Insurance (USD/yr)</label>
+                    <label className="block text-sm font-bold uppercase text-slate-500">Insurance (USD/yr)</label>
                     <input
                       type="number"
                       min={0}
                       placeholder={String(data.resolvedInputs?.insurancePerYearUsd ?? "")}
                       value={customAmounts.insuranceUsd}
                       onChange={(e) => setCustomAmounts({ ...customAmounts, insuranceUsd: e.target.value })}
-                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-0.5 w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500">Books (USD/yr)</label>
+                    <label className="block text-sm font-bold uppercase text-slate-500">Books (USD/yr)</label>
                     <input
                       type="number"
                       min={0}
                       placeholder={String(data.resolvedInputs?.booksPerYearUsd ?? "")}
                       value={customAmounts.booksUsd}
                       onChange={(e) => setCustomAmounts({ ...customAmounts, booksUsd: e.target.value })}
-                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-0.5 w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500">Flights Home (USD/yr)</label>
+                    <label className="block text-sm font-bold uppercase text-slate-500">Flights Home (USD/yr)</label>
                     <input
                       type="number"
                       min={0}
                       placeholder={String(data.resolvedInputs?.flightsPerYearUsd ?? "")}
                       value={customAmounts.flightsUsd}
                       onChange={(e) => setCustomAmounts({ ...customAmounts, flightsUsd: e.target.value })}
-                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-0.5 w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500">Visa Fee (USD one-off)</label>
+                    <label className="block text-sm font-bold uppercase text-slate-500">Visa Fee (USD one-off)</label>
                     <input
                       type="number"
                       min={0}
                       placeholder={String(data.resolvedInputs?.visaFeeUsd ?? "")}
                       value={customAmounts.visaUsd}
                       onChange={(e) => setCustomAmounts({ ...customAmounts, visaUsd: e.target.value })}
-                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-0.5 w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500">Application Fee (USD)</label>
+                    <label className="block text-sm font-bold uppercase text-slate-500">Application Fee (USD)</label>
                     <input
                       type="number"
                       min={0}
                       placeholder={String(data.resolvedInputs?.applicationFeeUsd ?? "")}
                       value={customAmounts.appFeeUsd}
                       onChange={(e) => setCustomAmounts({ ...customAmounts, appFeeUsd: e.target.value })}
-                      className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      className="mt-0.5 w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
                 </div>
@@ -653,7 +654,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
 
         {data && data.universities.length > 0 && tab === "compare" && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">University</span>
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">University</span>
             <span className="text-xs text-slate-600">
               {compareIds.length} saved — showing up to 6
             </span>
@@ -662,11 +663,11 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>
+        <div className="rounded-surface border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>
       )}
 
       {loading && !data && (
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center gap-2 rounded-surface border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">
           <Loader2 className="h-4 w-4 animate-spin" /> Building…
         </div>
       )}
@@ -676,12 +677,12 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           {/* ------------------------- COST ------------------------- */}
           {tab === "cost" && (
             <div className="space-y-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-bold text-slate-900">
                     {data.costTarget ? `${data.costTarget.name} (${data.costTarget.country}) — cost breakdown` : "Annual cost"}
                   </h3>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/50 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
                     <Globe className="h-3 w-3" />
                     {resolvedDegree} · {resolvedYears} {Number(resolvedYears) === 1 ? "year" : "years"} · {displayCurrency}
                   </span>
@@ -692,14 +693,14 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                       <span className="flex flex-wrap items-center gap-2 text-xs text-slate-700">
                         {line.label}
                         {line.estimated && (
-                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-700">
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">
                             country benchmark
                           </span>
                         )}
                       </span>
                       <span className="text-xs font-bold text-slate-900">
                         {line.frequency === "one_time" ? money(line.totalUsd) : money(line.annualUsd)}
-                        <span className="ml-1 font-normal text-slate-400">{line.frequency === "one_time" ? "one time" : "/yr"}</span>
+                        <span className="ml-1 font-normal text-slate-500">{line.frequency === "one_time" ? "one time" : "/yr"}</span>
                       </span>
                     </li>
                   ))}
@@ -709,7 +710,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                   <span className="text-base font-extrabold text-slate-900">{money(data.costs.annualTotalUsd)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">{tPortfolio("wholeProgramme")} ({resolvedYears} {Number(resolvedYears) === 1 ? "yr" : "yrs"} + one-off fees)</span>
+                  <span className="text-xs text-slate-500">{tPortfolio("wholeProgramme")} ({resolvedYears} {Number(resolvedYears) === 1 ? "yr" : "yrs"} + one-off fees)</span>
                   <span className="text-xs font-bold text-slate-600">{money(data.costs.totalUsd)}</span>
                 </div>
               </div>
@@ -742,12 +743,12 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                           <span className="block text-xs font-bold text-slate-800">
                             {r.title}
                             {/full/i.test(r.coverageType) && (
-                              <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-700">
+                              <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-black uppercase tracking-wide text-emerald-700">
                                 full coverage
                               </span>
                             )}
                           </span>
-                          <span className="block text-[11px] text-slate-500">
+                          <span className="block text-xs text-slate-500">
                             {r.provider} · {r.country}
                             {r.deadlineDate ? ` · deadline ${r.deadlineDate}` : ""}
                           </span>
@@ -759,22 +760,22 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                           : "amount not published"}
                       </span>
                       {!r.saved && (
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() => void saveAwardForPlan(r.id)}
                           disabled={savingScholarshipId === r.id}
-                          className="shrink-0 rounded-md border border-indigo-200 bg-white px-2 py-0.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                          className="shrink-0 rounded-control border border-indigo-200 bg-white px-2 py-0.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
                         >
                           {savingScholarshipId === r.id ? "saving…" : "Save"}
-                        </button>
+                        </Button>
                       )}
                     </li>
                   );
                   return (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                    <div className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                       <h3 className="text-sm font-bold text-slate-900">
                         Scholarships applied to {targetName}
-                        <span className="ml-2 text-[11px] font-semibold text-slate-400">
+                        <span className="ml-2 text-xs font-semibold text-slate-500">
                           {data.activeTargetCountry ? `for ${data.activeTargetCountry} awards` : ""}
                         </span>
                       </h3>
@@ -782,22 +783,22 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                         <ul className="mt-2">{applicable.map(awardRow)}</ul>
                       )}
                       {applicable.length === 0 && (
-                        <p className="mt-2 text-[11px] text-slate-500">
+                        <p className="mt-2 text-sm text-slate-500">
                           No saved award applies to {data.activeTargetCountry ?? "this destination"} yet — pick one below,
                           or save it from the Scholarship hub first.
                         </p>
                       )}
                       {suggested.length > 0 && (
-                        <details className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5">
-                          <summary className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[11px] font-bold text-indigo-700">
+                        <details className="mt-2 rounded-surface border border-slate-200 bg-slate-50 px-3 py-1.5">
+                          <summary className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-xs font-bold text-indigo-700">
                             Recommended for {data.activeTargetCountry ?? "this country"} ({suggested.length}) — tick to simulate
                           </summary>
                           <ul className="pb-2">{suggested.map(awardRow)}</ul>
                         </details>
                       )}
                       {elsewhere.length > 0 && (
-                        <details className="mt-2 rounded-xl bg-slate-50 px-3 py-1.5">
-                          <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-[11px] font-medium text-slate-500 hover:underline">
+                        <details className="mt-2 rounded-surface bg-slate-50 px-3 py-1.5">
+                          <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-xs font-medium text-slate-500 hover:underline">
                             Other saved scholarships not applicable to {data.activeTargetCountry ?? "this country"} ({elsewhere.length})
                           </summary>
                           <ul className="pb-2 opacity-70">{elsewhere.map(awardRow)}</ul>
@@ -808,7 +809,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 })()}
 
               {data.benchmarkSource && (
-                <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
+                <div className="rounded-overlay border border-indigo-200 bg-indigo-50/50 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
                       Official {data.benchmarkSource.country} Benchmark Source
@@ -823,9 +824,9 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-700">{data.benchmarkSource.notes}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-700">{data.benchmarkSource.notes}</p>
                   {data.conversionNotes && data.conversionNotes.length > 0 && (
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       {data.conversionNotes.join(" · ")}
                     </p>
                   )}
@@ -840,14 +841,14 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 Collapsed by default so the detail stays available, not loud.
               */}
               {data.costs.annualTotalUsd == null && data.costs.unknowns.length > 0 && (
-                <details className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-900/40">
-                  <summary className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:underline dark:text-slate-400">
+                <details className="rounded-overlay border border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-900/40">
+                  <summary className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-500 hover:underline dark:text-slate-400">
                     <AlertTriangle className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
                     Unknown inputs — excluded from totals
                   </summary>
                   <ul className="mt-1.5 space-y-1">
                     {data.costs.unknowns.map((u, i) => (
-                      <li key={i} className="flex gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                      <li key={i} className="flex gap-1.5 text-sm text-slate-500 dark:text-slate-400">
                         <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 opacity-60" aria-hidden />
                         <span>{u}</span>
                       </li>
@@ -857,7 +858,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               )}
 
               <div
-                className={`rounded-2xl border p-4 ${
+                className={`rounded-overlay border p-4 ${
                   data.costs.net.affordable === true
                     ? "border-emerald-200 bg-emerald-50"
                     : data.costs.net.affordable === false
@@ -876,8 +877,8 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                     <span className="text-xs font-bold text-slate-500">/yr</span>
                   </span>
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-slate-700">{data.costs.verdict}</p>
-                <p className="mt-2 text-[11px] text-slate-500">
+                <p className="mt-2 text-sm leading-relaxed text-slate-700">{data.costs.verdict}</p>
+                <p className="mt-2 text-sm text-slate-500">
                   Best-case recurring scholarships {money(data.costs.scholarship.bestCaseAnnualUsd)}/yr · one-time awards{" "}
                   {money(data.costs.scholarship.bestCaseOneTimeUsd)} · confirmed family support{" "}
                   {data.costs.net.familyContributionKnown ? `${money(data.costs.net.familyContributionUsd)}/yr` : "Unknown"} · whole-programme gap{" "}
@@ -890,30 +891,30 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           {/* --------------------- SCHOLARSHIPS --------------------- */}
           {tab === "scholarship" && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between gap-3 rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <span className="text-xs font-bold text-slate-600">{tPortfolio("savedCount")}</span>
                 <span className="text-xl font-extrabold text-slate-900">{data.portfolio.count}</span>
               </div>
 
-              <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
+              <div className="rounded-overlay border border-indigo-200 bg-indigo-50/50 p-4">
                 <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-700">
                   {tPortfolio("reviewHeading")}
                 </h3>
                 <ul className="mt-2 space-y-2">
                   {data.portfolio.advice.map((item, i) => (
-                    <li key={`${item.key}-${i}`} className="flex gap-1.5 text-xs text-slate-700">
+                    <li key={`${item.key}-${i}`} className="flex gap-1.5 text-sm text-slate-700">
                       <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
                       <span>{item.count == null ? tPortfolio(item.key) : tPortfolio(item.key, { count: item.count })}</span>
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[11px] text-slate-500">{tPortfolio("probabilityUnavailable")}</p>
+                <p className="mt-2 text-sm text-slate-500">{tPortfolio("probabilityUnavailable")}</p>
               </div>
 
               {data.costs.scholarship.misaligned.map((m, i) => (
                 <p
                   key={i}
-                  className="flex gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900"
+                  className="flex gap-1.5 rounded-surface border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
                 >
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>{m}</span>
@@ -925,31 +926,31 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           {/* --------------------------- CV --------------------------- */}
           {tab === "cv" && (
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">{tCv("cvTitle")}</h3>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-sm text-slate-500">
                     {tCv("cvMeta", { items: data.cv.totalItems, pages: data.cv.estimatedPages })}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     onClick={() => void copyCv()}
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
                   >
                     <Copy className="h-3.5 w-3.5" aria-hidden />
                     {copied ? tCv("copied") : tCv("copy")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="unstyled"
                     type="button"
                     onClick={() => window.print()}
                     aria-label={tCv("printSummaryHint")}
-                    className="print:hidden inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="print:hidden inline-flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <Printer className="h-3.5 w-3.5" aria-hidden />
                     {tCv("printSummary")}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -960,29 +961,29 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 onLoad={(sample) => setCompareCv(sample)}
               />
               {compareCv && (
-                <section aria-label={ts("cvCompareTitle")} className="rounded-2xl border border-slate-200 bg-white p-4 print:hidden">
+                <section aria-label={ts("cvCompareTitle")} className="rounded-overlay border border-slate-200 bg-white p-4 print:hidden">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h4 className="min-w-0 break-words text-sm font-bold text-slate-900">{ts("cvCompareTitle")}</h4>
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       onClick={() => setCompareCv(null)}
-                      className="inline-flex min-h-11 items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                      className="inline-flex min-h-11 items-center rounded-control border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                     >
                       {ts("cvCompareClose")}
-                    </button>
+                    </Button>
                   </div>
                   <div className="mt-3 grid gap-3 lg:grid-cols-2">
                     <div className="min-w-0">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{ts("cvYours")}</p>
-                      <pre className="mt-1 max-h-[36rem] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-slate-50 p-3 font-sans text-xs leading-relaxed text-slate-800">
+                      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{ts("cvYours")}</p>
+                      <pre className="mt-1 max-h-[36rem] overflow-auto whitespace-pre-wrap break-words rounded-surface border border-slate-200 bg-slate-50 p-3 font-sans text-xs leading-relaxed text-slate-800">
                         {data.cvText}
                       </pre>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-200">
+                      <p className="text-sm font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-200">
                         {ts("cvSample")} · {ts(`tracks.${compareCv.id}` as never)}
                       </p>
-                      <pre className="mt-1 max-h-[36rem] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 font-sans text-xs leading-relaxed text-slate-800 dark:border-indigo-500/20 dark:bg-indigo-950/20">
+                      <pre className="mt-1 max-h-[36rem] overflow-auto whitespace-pre-wrap break-words rounded-surface border border-indigo-100 bg-indigo-50/40 p-3 font-sans text-xs leading-relaxed text-slate-800 dark:border-indigo-500/20 dark:bg-indigo-950/20">
                         <HighlightedText text={compareCv.text} />
                       </pre>
                     </div>
@@ -991,10 +992,10 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               )}
 
               {data.cv.warnings.length > 0 && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="rounded-overlay border border-amber-200 bg-amber-50 p-4">
                   <ul className="space-y-1">
                     {data.cv.warnings.map((w, i) => (
-                      <li key={i} className="flex gap-1.5 text-xs text-amber-900">
+                      <li key={i} className="flex gap-1.5 text-sm text-amber-900">
                         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                         <span>{w}</span>
                       </li>
@@ -1004,16 +1005,16 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               )}
 
               {data.cv.missing.length > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <div className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                   <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
                     {tCv("missingTitle")}
                   </h4>
-                  <p className="mt-1 text-[11px] text-slate-500">
+                  <p className="mt-1 text-sm text-slate-500">
                     {tCv("missingNote")}
                   </p>
                   <ul className="mt-2 grid gap-1 sm:grid-cols-2">
                     {data.cv.missing.map((m, i) => (
-                      <li key={i} className="text-xs text-slate-600">
+                      <li key={i} className="text-sm text-slate-600">
                         · {m}
                       </li>
                     ))}
@@ -1024,21 +1025,21 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               {data.cv.guidance.length > 0 && (
                 <section
                   aria-labelledby="cv-revision-guidance-title"
-                  className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/20 sm:p-5"
+                  className="rounded-overlay border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-900 dark:bg-indigo-950/20 sm:p-5"
                 >
                   <h4 id="cv-revision-guidance-title" className="text-sm font-bold text-indigo-950 dark:text-indigo-100">
                     {tCv("adviceTitle")}
                   </h4>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                     {tCv("adviceSubtitle")}
                   </p>
                   <ol className="mt-4 space-y-3">
                     {data.cv.guidance.map((tip, index) => (
                       <li key={`${tip.key}-${index}`} className="flex items-start gap-3">
-                        <span aria-hidden="true" className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-200 dark:bg-slate-900 dark:text-indigo-200 dark:ring-indigo-800">
+                        <span aria-hidden="true" className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-indigo-700 ring-1 ring-indigo-200 dark:bg-slate-900 dark:text-indigo-200 dark:ring-indigo-800">
                           {index + 1}
                         </span>
-                        <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-200 sm:text-sm">
+                        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200 sm:text-sm">
                           {tCv(`advice.${tip.key}` as never, tip.values as never)}
                         </p>
                       </li>
@@ -1047,21 +1048,21 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                 </section>
               )}
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="rounded-overlay border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <h3 className="text-base font-extrabold uppercase tracking-wide text-slate-900">{data.cv.name}</h3>
-                <p className="text-xs text-slate-600">{data.cv.headline}</p>
+                <p className="text-sm text-slate-600">{data.cv.headline}</p>
                 {data.cv.contact.length > 0 && (
-                  <p className="text-[11px] text-slate-500">{data.cv.contact.join("  ·  ")}</p>
+                  <p className="text-sm text-slate-500">{data.cv.contact.join("  ·  ")}</p>
                 )}
                 <div className="mt-4 space-y-3">
                   {data.cv.sections.map((section) => (
                     <div key={section.heading}>
-                      <h4 className="text-[11px] font-extrabold uppercase tracking-wide text-indigo-700">
+                      <h4 className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">
                         {section.heading}
                       </h4>
                       <ul className="mt-1 space-y-0.5">
                         {section.items.map((item, i) => (
-                          <li key={i} className="text-xs text-slate-700">
+                          <li key={i} className="text-sm text-slate-700">
                             • {item}
                           </li>
                         ))}
@@ -1076,16 +1077,16 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
           {/* ------------------------ COMPARE ------------------------ */}
           {tab === "compare" && (
             <div className="space-y-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p className="text-xs text-slate-700">{data.comparison.verdict}</p>
+              <div className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-sm text-slate-700">{data.comparison.verdict}</p>
               </div>
 
               {compareIds.length < 2 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                <div className="rounded-surface border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
                   Save at least two universities to compare them.
                 </div>
               ) : (
-                <ScrollRegion label="University comparison" className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                <ScrollRegion label="University comparison" className="overflow-x-auto rounded-overlay border border-slate-200 bg-white">
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50">
@@ -1094,7 +1095,7 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
                           <th key={u.id} className="px-3 py-2 font-extrabold text-slate-700">
                             {u.name}
                             {data.comparison.scores[u.id] && (
-                              <span className="ml-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] text-indigo-700">
+                              <span className="ml-1 rounded-control bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700">
                                 {data.comparison.scores[u.id].wins} won
                               </span>
                             )}
@@ -1126,16 +1127,16 @@ export function PlanningStudio({ activeProfile }: PlanningStudioProps) {
               )}
 
               {data.comparison.dataGaps.length > 0 && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="rounded-overlay border border-amber-200 bg-amber-50 p-4">
                   <h4 className="text-xs font-extrabold uppercase tracking-wide text-amber-800">Missing data</h4>
                   <ul className="mt-1.5 space-y-1">
                     {data.comparison.dataGaps.map((gap) => (
-                      <li key={gap.universityId} className="text-xs text-amber-900">
+                      <li key={gap.universityId} className="text-sm text-amber-900">
                         <b>{gap.name}:</b> {gap.missing.join(", ")}
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-[11px] text-amber-800">
+                  <p className="mt-2 text-sm text-amber-800">
                     A blank cell is not a zero — it means the university has not published it.
                   </p>
                 </div>

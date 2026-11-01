@@ -22,7 +22,8 @@ import { CheckCircle2, Circle, ExternalLink, Info, Lock } from "lucide-react";
 import { ARRIVAL_WINDOWS, type ArrivalWindow } from "@/lib/journey/arrival";
 import { getJson, sendJson, useResource } from "./useResource";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
-import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar } from "./ui";
+import { Empty, JourneyCard, Loading, Pill, ProgressBar } from "@/components/ui/journey";
+import { Button } from "@/components/ui/Button";
 
 interface ArrivalItemView {
   key: string;
@@ -111,7 +112,7 @@ export function ArrivalPlanPanel({
   return (
     <div className="space-y-4">
       <JourneyCard title={t("title")} subtitle={t("subtitle")}>
-        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900 flex items-start gap-2">
+        <div className="rounded-surface border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900 flex items-start gap-2">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{t("guidanceNote")}</span>
         </div>
@@ -130,7 +131,7 @@ export function ArrivalPlanPanel({
         >
           <ul className="space-y-3">
             {resource.data.countryGuidance.tips.map((tip) => (
-              <li key={tip.key} className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 dark:border-slate-700">
+              <li key={tip.key} className="rounded-surface border border-slate-200 dark:border-slate-700 p-3 dark:border-slate-700">
                 <div className="flex flex-wrap items-center gap-2">
                   <Pill tone="slate">{t(`windows.${tip.window}`)}</Pill>
                   <Pill tone="info">{t("countrySourceBadge")}</Pill>
@@ -142,7 +143,7 @@ export function ArrivalPlanPanel({
                   href={tip.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+                  className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
                 >
                   {tip.sourceLabel[locale] ?? tip.sourceLabel.en}
                   <ExternalLink className="h-3 w-3" />
@@ -170,10 +171,10 @@ export function ArrivalPlanPanel({
           {!resource.data.unlocked && (
             <JourneyCard title={t("lockedTitle")}>
               <div className="flex items-start gap-3">
-                <Lock className="h-5 w-5 text-slate-400 mt-0.5 shrink-0" />
+                <Lock className="h-5 w-5 text-slate-500 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-sm text-slate-600 dark:text-slate-300">{t("lockedBody")}</p>
-                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">{t("previewHint")}</p>
+                  <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">{t("previewHint")}</p>
                   {onNavigateTab && (
                     <div className="mt-3">
                       <Button variant="outline" onClick={() => onNavigateTab("offers")}>
@@ -205,26 +206,26 @@ export function ArrivalPlanPanel({
                     return (
                       <li
                         key={item.key}
-                        className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${
+                        className={`flex items-start gap-3 rounded-surface border px-3 py-2.5 ${
                           doneFlag
                             ? "border-emerald-200 bg-emerald-50/60"
                             : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                         }`}
                       >
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           aria-pressed={doneFlag}
                           aria-label={t(doneFlag ? "markPendingItem" : "markDoneItem", { item: t(`items.${item.key}`) })}
                           onClick={() => toggle(item)}
                           disabled={busy === item.key}
-                          className="mt-0.5 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:text-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+                          className="mt-0.5 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control text-slate-500 hover:text-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
                         >
                           {doneFlag ? (
                             <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                           ) : (
                             <Circle className="h-5 w-5" />
                           )}
-                        </button>
+                        </Button>
                         <div className="min-w-0 flex-1">
                           <p className={`text-sm font-medium ${doneFlag ? "text-slate-500 line-through" : "text-slate-800"}`}>
                             {t(`items.${item.key}`)}
@@ -233,14 +234,14 @@ export function ArrivalPlanPanel({
                             {item.guidanceOnly && <Pill tone="slate">{t("guidanceBadge")}</Pill>}
                             {item.requires && <Pill tone="warn">{t(`conditional.${item.requires}`)}</Pill>}
                             {item.tab && onNavigateTab && (
-                              <button
+                              <Button variant="unstyled"
                                 type="button"
                                 onClick={() => onNavigateTab(item.tab!)}
                                 aria-label={t("openItemSection", { item: t(`items.${item.key}`) })}
-                                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-indigo-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-control px-2 py-1 text-xs font-semibold text-indigo-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                               >
                                 {t("openSection")} <ExternalLink className="h-3 w-3" />
-                              </button>
+                              </Button>
                             )}
                           </div>
                         </div>

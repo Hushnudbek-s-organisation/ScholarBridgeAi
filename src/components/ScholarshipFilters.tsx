@@ -18,6 +18,7 @@ import {
   type ScholarshipFacets,
   type ScholarshipFilters,
 } from "@/lib/scholarshipFilters";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Scholarship filters — the row of dropdowns that sits in the catalogue
@@ -49,6 +50,8 @@ export interface ScholarshipFiltersPanelProps {
   onReset: () => void;
   /** Personal dimensions (chance, fit) are only answerable with a profile. */
   hasProfile?: boolean;
+  /** Keeps desktop IDs stable while allowing a separately mounted phone sheet. */
+  idPrefix?: string;
 }
 
 function Field({
@@ -64,7 +67,7 @@ function Field({
     <div className="min-w-0">
       <label
         htmlFor={htmlFor}
-        className="mb-1 block break-words text-[10px] font-bold uppercase tracking-wide text-slate-400"
+        className="mb-1 block break-words text-sm font-bold uppercase tracking-wide text-slate-500"
       >
         {label}
       </label>
@@ -87,7 +90,7 @@ const FIT_LABEL_KEY: Record<string, string> = {
 };
 
 const SELECT_CLASS =
-  "min-h-11 w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm";
+  "min-h-11 w-full rounded-surface border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm";
 
 export function ScholarshipFiltersPanel({
   filters,
@@ -95,6 +98,7 @@ export function ScholarshipFiltersPanel({
   onChange,
   onReset,
   hasProfile = false,
+  idPrefix = "scholarship-filter",
 }: ScholarshipFiltersPanelProps) {
   const t = useTranslations("scholarshipHub");
   const tCountry = useTranslations("countryNames");
@@ -124,9 +128,9 @@ export function ScholarshipFiltersPanel({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
       {/* ---- Host country */}
-      <Field label={t("filterCountry")} htmlFor="scholarship-filter-country">
+      <Field label={t("filterCountry")} htmlFor={`${idPrefix}-country}`}>
         <select
-          id="scholarship-filter-country"
+          id={`${idPrefix}-country}`}
           value={filters.country}
           onChange={(event) => onChange({ ...filters, country: event.target.value })}
           aria-label={t("allCountries")}
@@ -147,9 +151,9 @@ export function ScholarshipFiltersPanel({
       </Field>
 
       {/* ---- Degree level */}
-      <Field label={t("filterDegree")} htmlFor="scholarship-filter-degree">
+      <Field label={t("filterDegree")} htmlFor={`${idPrefix}-degree}`}>
         <select
-          id="scholarship-filter-degree"
+          id={`${idPrefix}-degree}`}
           value={filters.degrees[0] ?? "All"}
           onChange={(event) => setSingle("degrees", event.target.value)}
           className={SELECT_CLASS}
@@ -164,9 +168,9 @@ export function ScholarshipFiltersPanel({
       </Field>
 
       {/* ---- Funding (coverage) type */}
-      <Field label={t("filterCoverage")} htmlFor="scholarship-filter-coverage">
+      <Field label={t("filterCoverage")} htmlFor={`${idPrefix}-coverage}`}>
         <select
-          id="scholarship-filter-coverage"
+          id={`${idPrefix}-coverage}`}
           value={filters.coverages[0] ?? "All"}
           onChange={(event) => setSingle("coverages", event.target.value)}
           aria-label={t("allCoverage")}
@@ -182,9 +186,9 @@ export function ScholarshipFiltersPanel({
       </Field>
 
       {/* ---- Application status */}
-      <Field label={t("filterStatus")} htmlFor="scholarship-filter-status">
+      <Field label={t("filterStatus")} htmlFor={`${idPrefix}-status}`}>
         <select
-          id="scholarship-filter-status"
+          id={`${idPrefix}-status}`}
           value={filters.statuses[0] ?? "All"}
           onChange={(event) => setSingle("statuses", event.target.value)}
           className={SELECT_CLASS}
@@ -199,9 +203,9 @@ export function ScholarshipFiltersPanel({
       </Field>
 
       {/* ---- Award basis */}
-      <Field label={t("filterBasis")} htmlFor="scholarship-filter-basis">
+      <Field label={t("filterBasis")} htmlFor={`${idPrefix}-basis}`}>
         <select
-          id="scholarship-filter-basis"
+          id={`${idPrefix}-basis}`}
           value={filters.basis[0] ?? "All"}
           onChange={(event) => setSingle("basis", event.target.value)}
           className={SELECT_CLASS}
@@ -217,9 +221,9 @@ export function ScholarshipFiltersPanel({
 
       {/* ---- Chance: published-gate check (personal, profile required) */}
       {hasProfile && (
-        <Field label={t("filterChance")} htmlFor="scholarship-filter-chance">
+        <Field label={t("filterChance")} htmlFor={`${idPrefix}-chance}`}>
           <select
-            id="scholarship-filter-chance"
+            id={`${idPrefix}-chance}`}
             value={filters.chance[0] ?? "All"}
             onChange={(event) => setSingle("chance", event.target.value)}
             aria-label={t("allChance")}
@@ -237,9 +241,9 @@ export function ScholarshipFiltersPanel({
 
       {/* ---- Fit: the card's match score, banded (personal) */}
       {hasProfile && (
-        <Field label={t("filterFit")} htmlFor="scholarship-filter-fit">
+        <Field label={t("filterFit")} htmlFor={`${idPrefix}-fit}`}>
           <select
-            id="scholarship-filter-fit"
+            id={`${idPrefix}-fit}`}
             value={filters.fit[0] ?? "All"}
             onChange={(event) => setSingle("fit", event.target.value)}
             aria-label={t("allFit")}
@@ -259,17 +263,17 @@ export function ScholarshipFiltersPanel({
           something — a permanently disabled "Clear" is noise. */}
       {activeCount > 0 && (
         <div className="col-span-full flex justify-end">
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onReset}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden />
             <span className="min-w-0 break-words">{t("filtersClear")}</span>
-            <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-xs font-bold text-white">
               {activeCount}
             </span>
-          </button>
+          </Button>
         </div>
       )}
     </div>

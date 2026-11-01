@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Award, CheckCircle2, Copy, Loader2, Lock, Printer } from "lucide-react";
 import { CertificateView, type CertificateData } from "./CertificateView";
 import { StudentProfile } from "./Navbar";
+import { Button } from "@/components/ui/Button";
 
 /**
  * My certificates (audit A22) — the student-facing place to FIND, VIEW and
@@ -87,35 +88,35 @@ export function MyCertificatesPanel({ activeProfile }: { activeProfile: StudentP
   if (!activeProfile) return null;
 
   return (
-    <section aria-labelledby="my-certs-heading" className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+    <section aria-labelledby="my-certs-heading" className="rounded-overlay border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
       <h3 id="my-certs-heading" className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
         <Award className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
         {t("title")}
       </h3>
-      <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">{t("description")}</p>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">{t("description")}</p>
 
       {ready && locked && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+        <div className="flex items-start gap-3 rounded-surface border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-          <p className="text-xs text-amber-800 dark:text-amber-200">{t("premiumOnly")}</p>
+          <p className="text-sm text-amber-800 dark:text-amber-200">{t("premiumOnly")}</p>
         </div>
       )}
 
       {ready && error && (
-        <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+        <p role="alert" className="rounded-control bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
           {t("loadError")}
         </p>
       )}
 
       {!ready && !locked && !error && (
-        <p role="status" className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <p role="status" className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           {t("loading")}
         </p>
       )}
 
       {ready && !locked && !error && certs !== null && certs.length === 0 && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">{t("empty")}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t("empty")}</p>
       )}
 
       {ready && !locked && !error && certs !== null && certs.length > 0 && (
@@ -127,29 +128,29 @@ export function MyCertificatesPanel({ activeProfile }: { activeProfile: StudentP
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                   <span className="break-words">{c.courseTitle || t("unknownCourse")}</span>
                 </p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                   {t("issued", { when: fmt(c.issuedAt) })} · {t("codeLabel")}: <code className="font-mono">{c.certificateCode}</code>
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => setOpenCert(openCert?.id === c.id ? null : c)}
                   aria-expanded={openCert?.id === c.id}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-600 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
+                  className="inline-flex items-center gap-1.5 rounded-control border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-600 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-400"
                 >
                   <Printer className="h-3.5 w-3.5" aria-hidden="true" />
                   {t("view")}
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => void copyLink(c.certificateCode)}
                   aria-label={t("copyVerifyAria", { course: c.courseTitle || t("unknownCourse") })}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
+                  className="inline-flex items-center gap-1.5 rounded-control border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-emerald-400 hover:text-emerald-600 dark:border-slate-600 dark:text-slate-200 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
                 >
                   {copied === c.certificateCode ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
                   {copied === c.certificateCode ? t("copied") : t("copyVerify")}
-                </button>
+                </Button>
               </div>
               {openCert?.id === c.id && (
                 <div className="w-full pt-2">
@@ -165,7 +166,7 @@ export function MyCertificatesPanel({ activeProfile }: { activeProfile: StudentP
       )}
 
       {ready && !locked && !error && (
-        <p className="mt-4 text-[11px] text-slate-400 dark:text-slate-500">{t("verifyHint")}</p>
+        <p className="mt-4 text-sm text-slate-500 dark:text-slate-500">{t("verifyHint")}</p>
       )}
     </section>
   );

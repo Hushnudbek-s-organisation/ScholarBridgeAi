@@ -25,6 +25,8 @@ import {
   Award,
   Layers,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 interface MatchDimensionScore {
   score: number;
@@ -431,7 +433,7 @@ export function ChancingPanel({
 
   if (!profileId) {
     return (
-      <div className="p-6 text-center text-slate-500 border border-dashed border-slate-300 rounded-2xl">
+      <div className="p-6 text-center text-slate-500 border border-dashed border-slate-300 rounded-overlay">
         {t("signIn")}
       </div>
     );
@@ -446,20 +448,20 @@ export function ChancingPanel({
             <Sparkles className="w-5 h-5 text-indigo-600" />
             {t("title")} &amp; {t("titleSuffix")}
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5 max-w-3xl">{t("subtitle")}</p>
+          <p className="text-sm text-slate-500 mt-0.5 max-w-3xl">{t("subtitle")}</p>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={() => load()}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-3 py-2 rounded-xl border border-indigo-200 bg-indigo-50"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-3 py-2 rounded-surface border border-indigo-200 bg-indigo-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           {t("refresh")}
-        </button>
+        </Button>
       </div>
 
       {/* 1. University & Program Explorer / Switcher Bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-indigo-600" />
@@ -468,14 +470,14 @@ export function ChancingPanel({
             </h3>
           </div>
           {isCatalogSample && (
-            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
               {t("showingTopQs")}
             </span>
           )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-          <label className="text-xs text-slate-600">
+          <label className="text-sm text-slate-600">
               <span className="font-medium block mb-1">{t("jumpToUniversity")}</span>
             <select
               value={selectedUniFilterId}
@@ -484,7 +486,7 @@ export function ChancingPanel({
                 setSelectedUniFilterId(val);
                 load({ uniId: val });
               }}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+              className="w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900"
             >
               <option value="">{t("shortlistTop")}</option>
               {catalogUniversities.map((u) => (
@@ -496,7 +498,7 @@ export function ChancingPanel({
             </select>
           </label>
 
-          <label className="text-xs text-slate-600">
+          <label className="text-sm text-slate-600">
             <span className="font-medium block mb-1">{t("filterCountryLabel")}</span>
             <select
               value={countryFilter}
@@ -506,7 +508,7 @@ export function ChancingPanel({
                 setSelectedUniFilterId("");
                 load({ uniId: "", country: val });
               }}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+              className="w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900"
             >
               <option value="">{t("allCountriesCount", { count: availableCountries.length || 20 })}</option>
               {availableCountries.map((c) => (
@@ -517,11 +519,11 @@ export function ChancingPanel({
             </select>
           </label>
 
-          <label className="text-xs text-slate-600 sm:col-span-2">
+          <label className="text-sm text-slate-600 sm:col-span-2">
             <span className="font-medium block mb-1">{t("searchUniversity")}</span>
             <div className="flex gap-1.5">
               <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -533,21 +535,21 @@ export function ChancingPanel({
                     }
                   }}
                   placeholder={t("searchPlaceholder")}
-                  className="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-2.5 py-1.5 text-xs text-slate-900"
+                  className="w-full rounded-control border border-slate-200 bg-white pl-8 pr-2.5 py-1.5 text-sm text-slate-900"
                 />
               </div>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => {
                   setSelectedUniFilterId("");
                   load({ uniId: "", search: searchQuery });
                 }}
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                className="rounded-control bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
               >
                 Explore
-              </button>
+              </Button>
               {(selectedUniFilterId || countryFilter || searchQuery) && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => {
                     setSelectedUniFilterId("");
@@ -555,10 +557,10 @@ export function ChancingPanel({
                     setSearchQuery("");
                     load({ uniId: "", country: "", search: "" });
                   }}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  className="rounded-control border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                 >
                   Reset
-                </button>
+                </Button>
               )}
             </div>
           </label>
@@ -566,19 +568,19 @@ export function ChancingPanel({
       </div>
 
       {/* 2. Interactive What-If Simulator with Sliders & Major/Program Dropdown */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-sm space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
               {t("scenarioTitle")} — {t("scenarioSimTitle")}
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">{t("scenarioDescription")}</p>
+            <p className="text-sm text-slate-500 mt-0.5">{t("scenarioDescription")}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <label className="text-xs text-slate-600 space-y-1">
+          <label className="text-sm text-slate-600 space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-medium">{t("scenarioGpa")}</span>
               <span className="font-bold text-indigo-600">{scenarioGpa4 || "—"}</span>
@@ -600,11 +602,11 @@ export function ChancingPanel({
               value={scenarioGpa4}
               onChange={(e) => setScenarioGpa4(e.target.value)}
               placeholder="3.85"
-              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900"
+              className="w-full rounded-control border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900"
             />
           </label>
 
-          <label className="text-xs text-slate-600 space-y-1">
+          <label className="text-sm text-slate-600 space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-medium">{t("scenarioSat")}</span>
               <span className="font-bold text-indigo-600">{scenarioSat || "—"}</span>
@@ -626,11 +628,11 @@ export function ChancingPanel({
               value={scenarioSat}
               onChange={(e) => setScenarioSat(e.target.value)}
               placeholder="1480"
-              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900"
+              className="w-full rounded-control border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900"
             />
           </label>
 
-          <label className="text-xs text-slate-600 space-y-1">
+          <label className="text-sm text-slate-600 space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-medium">{t("scenarioIelts")}</span>
               <span className="font-bold text-indigo-600">{scenarioIelts || "—"}</span>
@@ -652,16 +654,16 @@ export function ChancingPanel({
               value={scenarioIelts}
               onChange={(e) => setScenarioIelts(e.target.value)}
               placeholder="7.5"
-              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900"
+              className="w-full rounded-control border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900"
             />
           </label>
 
-          <label className="text-xs text-slate-600 space-y-1">
+          <label className="text-sm text-slate-600 space-y-1">
             <span className="font-medium block">{t("scenarioDegreeLevel")}</span>
             <select
               value={scenarioDegreeLevel}
               onChange={(e) => setScenarioDegreeLevel(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 mt-1"
+              className="w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 mt-1"
             >
               <option value="Bachelor">{t("degreeBachelor")}</option>
               <option value="Master">{t("degreeMaster")}</option>
@@ -669,12 +671,12 @@ export function ChancingPanel({
             </select>
           </label>
 
-          <label className="text-xs text-slate-600 space-y-1">
+          <label className="text-sm text-slate-600 space-y-1">
             <span className="font-medium block">{t("scenarioMajor")}</span>
             <select
               value={scenarioMajor}
               onChange={(e) => setScenarioMajor(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 mt-1"
+              className="w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 mt-1"
             >
               <option value="">{t("useProfileMajor")}</option>
               {MAJOR_PRESETS.map((m) => (
@@ -685,7 +687,7 @@ export function ChancingPanel({
             </select>
           </label>
 
-          <label className="text-xs text-slate-600 space-y-1">
+          <label className="text-sm text-slate-600 space-y-1">
             <span className="font-medium block">{t("scenarioBudget")}</span>
             <input
               type="number"
@@ -694,46 +696,46 @@ export function ChancingPanel({
               value={scenarioBudgetUsd}
               onChange={(e) => setScenarioBudgetUsd(e.target.value)}
               placeholder="25000"
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 mt-1"
+              className="w-full rounded-control border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 mt-1"
             />
           </label>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <p className="text-[11px] text-slate-500">{t("scenarioDisclaimer")}</p>
+          <p className="text-sm text-slate-500">{t("scenarioDisclaimer")}</p>
           <div className="flex items-center gap-2">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={runScenario}
               disabled={scenarioLoading}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              className="rounded-control bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {scenarioLoading ? t("scenarioRunning") : t("scenarioRun")}
-            </button>
+            </Button>
             {Object.keys(scenarioResults).length > 0 && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={resetScenario}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-control border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
                 {t("scenarioReset")}
-              </button>
+              </Button>
             )}
           </div>
         </div>
-        {scenarioError && <div className="text-xs text-red-600">{scenarioError}</div>}
+        {scenarioError && <div className="text-xs text-rose-600">{scenarioError}</div>}
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200">
+        <div className="p-4 bg-rose-50 text-rose-700 text-sm rounded-surface border border-rose-200">
           {error}
         </div>
       )}
 
       {loading && results.length === 0 ? (
-        <div className="p-8 text-center text-slate-400 text-sm">{t("assessing")}</div>
+        <div className="p-8 text-center text-slate-500 text-sm">{t("assessing")}</div>
       ) : results.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 border border-dashed border-slate-300 rounded-2xl text-sm">
+        <div className="p-8 text-center text-slate-500 border border-dashed border-slate-300 rounded-overlay text-sm">
           {t("empty")}
         </div>
       ) : (
@@ -774,7 +776,7 @@ export function ChancingPanel({
             return (
               <div
                 key={baseItem.universityId}
-                className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm transition hover:shadow-md space-y-4"
+                className="rounded-overlay border border-slate-200 bg-white p-4 sm:p-5 shadow-sm transition hover:shadow-md space-y-4"
               >
                 {/* Top University Row */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -803,7 +805,7 @@ export function ChancingPanel({
                           : activeProgram.cohortPositionTier}
                         </span>
                       )}
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
                         {t("fitBadge")}
                       </span>
                     </div>
@@ -821,7 +823,7 @@ export function ChancingPanel({
                       )}
                     </div>
 
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-sm text-slate-500 mt-0.5">
                       {t("comparedDimensions", {
                         compared: activeItem.comparedDimensions,
                         total: activeItem.totalDimensions,
@@ -836,11 +838,11 @@ export function ChancingPanel({
                         <div className="text-2xl font-extrabold text-indigo-600">
                           {activeProgram.compositeProgramFitScore}%
                         </div>
-                        <div className="text-[11px] font-medium text-slate-500">
+                        <div className="text-xs font-medium text-slate-500">
                           {t("programPositioning")}
                         </div>
                         {progDelta !== null && progDelta !== 0 && (
-                          <div className="text-[11px] font-semibold text-emerald-700">
+                          <div className="text-xs font-semibold text-emerald-700">
                             {progDelta > 0 ? `+${progDelta}%` : `${progDelta}%`} {t("scenarioBadgeWord")}
                           </div>
                         )}
@@ -850,9 +852,9 @@ export function ChancingPanel({
                       <div className="text-2xl font-extrabold text-slate-900">
                         {activeItem.fitScore}
                       </div>
-                      <div className="text-[11px] text-slate-500">{t("fitScore")}</div>
+                      <div className="text-xs text-slate-500">{t("fitScore")}</div>
                       {scenarioItem && (
-                        <div className="mt-0.5 text-[11px] font-semibold text-indigo-700">
+                        <div className="mt-0.5 text-xs font-semibold text-indigo-700">
                           {scenarioDelta === 0
                             ? t("scenarioNoChange")
                             : t("scenarioDelta", {
@@ -866,7 +868,7 @@ export function ChancingPanel({
 
                 {/* Program Selector & University vs Program Selectivity Strip */}
                 {activeProgram && (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
+                  <div className="rounded-surface border border-slate-200 bg-slate-50 p-3.5 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <GraduationCap className="w-4 h-4 text-indigo-600" />
@@ -880,7 +882,7 @@ export function ChancingPanel({
                                 [baseItem.universityId]: Number(e.target.value),
                               }))
                             }
-                            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900"
+                            className="rounded-control border border-slate-300 bg-white px-2.5 py-1 text-sm font-semibold text-slate-900"
                           >
                             {programList.map((prog, idx) => (
                               <option key={`${prog.programId ?? idx}`} value={String(prog.programId ?? "")}>
@@ -893,7 +895,7 @@ export function ChancingPanel({
                             {activeProgram.programName} ({activeProgram.degreeLevel})
                           </span>
                         )}
-                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600">
+                        <span className="text-xs px-2 py-0.5 rounded-control bg-white border border-slate-200 text-slate-600">
                           {activeProgram.departmentLabel}
                         </span>
                       </div>
@@ -913,31 +915,31 @@ export function ChancingPanel({
 
                     {/* Selectivity Comparison Metrics */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                      <div className="rounded-lg bg-white p-2.5 border border-slate-200">
-                        <div className="text-[11px] text-slate-500">{t("offerRate")}</div>
+                      <div className="rounded-control bg-white p-2.5 border border-slate-200">
+                        <div className="text-xs text-slate-500">{t("offerRate")}</div>
                         <div className="text-sm font-bold text-slate-900 mt-0.5">
                           {activeProgram.universityAcceptRatePct}%
                         </div>
                       </div>
-                      <div className="rounded-lg bg-white p-2.5 border border-slate-200">
-                        <div className="text-[11px] text-slate-500">
+                      <div className="rounded-control bg-white p-2.5 border border-slate-200">
+                        <div className="text-xs text-slate-500">
                           Program Offer Rate ({activeProgram.acceptRateMultiplier}x)
                         </div>
                         <div className="text-sm font-bold text-indigo-600 mt-0.5">
                           {activeProgram.effectiveProgramAcceptRatePct}%
                         </div>
                       </div>
-                      <div className="rounded-lg bg-white p-2.5 border border-slate-200">
-                        <div className="text-[11px] text-slate-500">{t("admittedGpaBand")}</div>
+                      <div className="rounded-control bg-white p-2.5 border border-slate-200">
+                        <div className="text-xs text-slate-500">{t("admittedGpaBand")}</div>
                         <div className="text-sm font-bold text-slate-900 mt-0.5">
                           {activeProgram.programGpa25.toFixed(2)} – {activeProgram.programGpa75.toFixed(2)}{" "}
-                          <span className="text-[11px] font-normal text-slate-500">
+                          <span className="text-xs font-normal text-slate-500">
                             {t("medianAbbr", { value: activeProgram.programGpa50.toFixed(2) })}
                           </span>
                         </div>
                       </div>
-                      <div className="rounded-lg bg-white p-2.5 border border-slate-200">
-                        <div className="text-[11px] text-slate-500">{t("englishRequirement")}</div>
+                      <div className="rounded-control bg-white p-2.5 border border-slate-200">
+                        <div className="text-xs text-slate-500">{t("englishRequirement")}</div>
                         <div className="text-sm font-bold text-slate-900 mt-0.5">
                           IELTS {activeProgram.effectiveMinIelts.toFixed(1)} / TOEFL {activeProgram.effectiveMinToefl}
                         </div>
@@ -947,7 +949,7 @@ export function ChancingPanel({
                     {/* Visual 25th - 50th - 75th Percentile Range Bars */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
                       {/* GPA Percentile Bar */}
-                      <div className="rounded-lg bg-white p-3 border border-slate-200 space-y-1.5">
+                      <div className="rounded-control bg-white p-3 border border-slate-200 space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-slate-700 flex items-center gap-1">
                             <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
@@ -975,13 +977,10 @@ export function ChancingPanel({
                           />
                           {/* Student marker */}
                           {activeProgram.studentGpaPercentile !== null && (
-                            <div
-                              className="h-full bg-indigo-600 rounded-full transition-all"
-                              style={{ width: `${activeProgram.studentGpaPercentile}%` }}
-                            />
+                            <ProgressFill value={activeProgram.studentGpaPercentile} className="h-full bg-indigo-600 rounded-full transition-all" />
                           )}
                         </div>
-                        <div className="flex justify-between text-[10px] text-slate-500">
+                        <div className="flex justify-between text-xs text-slate-500">
                           <span>{t("pct25")} {activeProgram.programGpa25.toFixed(2)}</span>
                           <span>{t("pct50")} {activeProgram.programGpa50.toFixed(2)}</span>
                           <span>{t("pct75")} {activeProgram.programGpa75.toFixed(2)}</span>
@@ -989,7 +988,7 @@ export function ChancingPanel({
                       </div>
 
                       {/* SAT Percentile Bar */}
-                      <div className="rounded-lg bg-white p-3 border border-slate-200 space-y-1.5">
+                      <div className="rounded-control bg-white p-3 border border-slate-200 space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-slate-700 flex items-center gap-1">
                             <Award className="w-3.5 h-3.5 text-indigo-600" />
@@ -1005,13 +1004,10 @@ export function ChancingPanel({
                         </div>
                         <div className="relative h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
                           {activeProgram.studentSatPercentile !== null && (
-                            <div
-                              className="h-full bg-indigo-600 rounded-full transition-all"
-                              style={{ width: `${activeProgram.studentSatPercentile}%` }}
-                            />
+                            <ProgressFill value={activeProgram.studentSatPercentile} className="h-full bg-indigo-600 rounded-full transition-all" />
                           )}
                         </div>
-                        <div className="flex justify-between text-[10px] text-slate-500">
+                        <div className="flex justify-between text-xs text-slate-500">
                           {activeProgram.programSat25 && activeProgram.programSat50 && activeProgram.programSat75 ? (
                             <>
                               <span>{t("pct25")} {activeProgram.programSat25}</span>
@@ -1025,7 +1021,7 @@ export function ChancingPanel({
                       </div>
 
                       {/* English Proficiency Bar */}
-                      <div className="rounded-lg bg-white p-3 border border-slate-200 space-y-1.5">
+                      <div className="rounded-control bg-white p-3 border border-slate-200 space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-slate-700 flex items-center gap-1">
                             <Layers className="w-3.5 h-3.5 text-indigo-600" />
@@ -1039,13 +1035,10 @@ export function ChancingPanel({
                         </div>
                         <div className="relative h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
                           {activeProgram.studentEnglishPercentile !== null && (
-                            <div
-                              className="h-full bg-emerald-600 rounded-full transition-all"
-                              style={{ width: `${activeProgram.studentEnglishPercentile}%` }}
-                            />
+                            <ProgressFill value={activeProgram.studentEnglishPercentile} className="h-full bg-emerald-600 rounded-full transition-all" />
                           )}
                         </div>
-                        <div className="flex justify-between text-[10px] text-slate-500">
+                        <div className="flex justify-between text-xs text-slate-500">
                           <span>{t("minIeltsWord")} {activeProgram.effectiveMinIelts.toFixed(1)}</span>
                           <span>{t("medIeltsWord")} {activeProgram.medianIelts.toFixed(1)}</span>
                           <span>{t("toeflMinPlus", { value: activeProgram.effectiveMinToefl })}</span>
@@ -1055,7 +1048,7 @@ export function ChancingPanel({
                   </div>
                 )}
 
-                <button
+                <Button variant="unstyled"
                   onClick={() => setExpanded(open ? null : baseItem.universityId)}
                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
                 >
@@ -1068,7 +1061,7 @@ export function ChancingPanel({
                       <ChevronDown className="w-3.5 h-3.5" /> {t("toggleShow")} &amp; {t("programRequirementsWord")}
                     </>
                   )}
-                </button>
+                </Button>
 
                 {open && (
                   <div className="mt-2 pt-4 border-t border-slate-100 space-y-4 text-xs">
@@ -1084,26 +1077,26 @@ export function ChancingPanel({
                             return (
                               <div
                                 key={`${chk.dimension}-${idx}`}
-                                className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-1"
+                                className="rounded-surface border border-slate-200 bg-slate-50 p-2.5 space-y-1"
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="font-semibold text-slate-800">{chk.label}</span>
                                   <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.className}`}
+                                    className={`text-xs font-bold px-2 py-0.5 rounded-full border ${badge.className}`}
                                   >
                                     {badge.label}
                                   </span>
                                 </div>
-                                <div className="flex justify-between text-[11px] text-slate-600">
+                                <div className="flex justify-between text-xs text-slate-600">
                                   <span>{t("yourProfile")} {chk.studentValue}</span>
                                   <span>{t("targetValue")} {chk.requiredValue}</span>
                                 </div>
-                                <p className="text-[11px] text-slate-500">{chk.detail}</p>
+                                <p className="text-sm text-slate-500">{chk.detail}</p>
                               </div>
                             );
                           })}
                         </div>
-                        <p className="text-[11px] text-slate-500 italic">
+                        <p className="text-sm text-slate-500 italic">
                           {activeProgram.degreeCalibrationNote}
                         </p>
                       </div>
@@ -1111,7 +1104,7 @@ export function ChancingPanel({
 
                     {/* Layer 5: Empirical Consented Cohort Outcomes Summary */}
                     {activeProgram && activeProgram.empiricalOutcomes.totalConsented > 0 && (
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-wrap items-center justify-between gap-2">
+                      <div className="rounded-surface border border-slate-200 bg-slate-50 p-3 flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <span className="font-semibold text-slate-800">
                             {t("cohortArchiveTitle", { university: baseItem.universityName })}
@@ -1126,7 +1119,7 @@ export function ChancingPanel({
                           </span>
                         </div>
                         {activeProgram.empiricalOutcomes.medianAdmittedGpa && (
-                          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700">
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700">
                             {t("archiveMedianGpa")}{" "}
                             {activeProgram.empiricalOutcomes.medianAdmittedGpa.toFixed(2)}
                             {activeProgram.empiricalOutcomes.medianAdmittedSat
@@ -1145,7 +1138,7 @@ export function ChancingPanel({
                         </div>
                         {activeItem.fitReasons.length === 0 &&
                         (!activeProgram || activeProgram.strengths.length === 0) ? (
-                          <p className="text-slate-400">{t("noSignals")}</p>
+                          <p className="text-slate-500">{t("noSignals")}</p>
                         ) : (
                           <ul className="space-y-1 text-slate-700 list-disc list-inside">
                             {(activeProgram?.strengths ?? []).map((s, idx) => (
@@ -1163,7 +1156,7 @@ export function ChancingPanel({
                         </div>
                         {activeItem.fitIssues.length === 0 &&
                         (!activeProgram || activeProgram.gaps.length === 0) ? (
-                          <p className="text-slate-400">{t("noIssues")}</p>
+                          <p className="text-slate-500">{t("noIssues")}</p>
                         ) : (
                           <ul className="space-y-1 text-slate-700 list-disc list-inside">
                             {(activeProgram?.gaps ?? []).map((g, idx) => (
@@ -1190,14 +1183,14 @@ export function ChancingPanel({
           to do about it. */}
       {profileId ? <TwinStrategyCard profileId={profileId} /> : null}
 
-      <p className="text-[11px] text-slate-400 leading-relaxed">{t("footnote")}</p>
+      <p className="text-sm text-slate-500 leading-relaxed">{t("footnote")}</p>
 
       {/*
         The methodology disclosure lives here, at the foot of the page, instead
         of as a banner above the results. The wording is unchanged — it is just
         no longer the first thing a student reads, and it stays one click away.
       */}
-      <details className="text-[11px] text-slate-400 dark:text-slate-500">
+      <details className="text-xs text-slate-500 dark:text-slate-500">
         <summary className="inline-flex cursor-pointer items-center gap-1 hover:underline">
           <Info className="h-3 w-3 shrink-0" aria-hidden />
           {t("methodologyNoteLabel")}

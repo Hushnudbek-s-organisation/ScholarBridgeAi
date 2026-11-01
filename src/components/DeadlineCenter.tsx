@@ -16,7 +16,8 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
-import { ShowMoreToggle } from "@/components/hubs/ui";
+import { ShowMoreToggle } from "@/components/ui/hubs";
+import { Button } from "@/components/ui/Button";
 
 interface DeadlineItem {
   id: string;
@@ -58,7 +59,7 @@ const TYPE_META: Record<DeadlineItem["type"], { labelKey: string; icon: React.Re
 };
 
 const URGENCY_META: Record<NonNullable<DeadlineItem["urgency"]>, { dot: string; labelKey: string; chip: string }> = {
-  critical: { dot: "🔴", labelKey: "urgency.critical", chip: "bg-red-50 text-red-700 border-red-200" },
+  critical: { dot: "🔴", labelKey: "urgency.critical", chip: "bg-rose-50 text-rose-700 border-rose-200" },
   soon: { dot: "🟠", labelKey: "urgency.soon", chip: "bg-orange-50 text-orange-700 border-orange-200" },
   planned: { dot: "🟡", labelKey: "urgency.planned", chip: "bg-yellow-50 text-yellow-700 border-yellow-200" },
   past: { dot: "⚪", labelKey: "urgency.passed", chip: "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700" },
@@ -189,37 +190,37 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-xs">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
+      <div className="flex flex-wrap items-start gap-3 rounded-overlay border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-xs">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-surface bg-indigo-50">
           <CalendarClock className="h-5 w-5 text-indigo-600" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-extrabold text-slate-800">{t("title")}</h2>
-          <p className="text-xs text-slate-500">{t("subtitle")}</p>
+          <p className="text-sm text-slate-500">{t("subtitle")}</p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
           {urgentCount > 0 && (
-            <span className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-600">
+            <span className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600">
               <Clock className="h-3 w-3 shrink-0" /> {t("criticalCount", { count: urgentCount })}
             </span>
           )}
           {soonCount > 0 && (
-            <span className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[10px] font-bold text-orange-600">
+            <span className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-600">
               🟠 {t("soonCount", { count: soonCount })}
             </span>
           )}
           {openCount > 0 && (
-            <span className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
+            <span className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
               {t("openCount", { count: openCount })}
             </span>
           )}
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => void load()}
-            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 sm:ml-auto sm:w-auto"
+            className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-surface border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 sm:ml-auto sm:w-auto"
           >
             <RefreshCw className="h-3.5 w-3.5" /> {t("refresh")}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -238,9 +239,9 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
         />
       ) : null}
 
-      <div data-deadline-list className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+      <div data-deadline-list className="overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-xs">
         {!profileId ? (
-          <p className="p-8 text-center text-xs font-semibold text-slate-500">{t("noProfile")}</p>
+          <p className="p-8 text-center text-sm font-semibold text-slate-500">{t("noProfile")}</p>
         ) : loading ? (
           <div className="flex items-center justify-center gap-2 p-8 text-xs font-semibold text-slate-500" role="status" aria-live="polite">
             <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
@@ -250,7 +251,7 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
             {t("loadFailed")}
           </div>
         ) : items.length === 0 ? (
-          <p className="p-8 text-center text-xs font-semibold text-slate-500">{t("empty")}</p>
+          <p className="p-8 text-center text-sm font-semibold text-slate-500">{t("empty")}</p>
         ) : (
           <>
             {personalCount > 0 && (
@@ -261,19 +262,19 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
                     { id: "all", label: t("filterAll", { count: items.length }), active: scope === "all" },
                   ] as const
                 ).map((pill) => (
-                  <button
+                  <Button variant="unstyled"
                     key={pill.id}
                     type="button"
                     aria-pressed={pill.active}
                     onClick={() => setScope(pill.id)}
-                    className={`min-h-11 rounded-full border px-3.5 py-1.5 text-[11px] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 ${
+                    className={`min-h-11 rounded-full border px-3.5 py-1.5 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 ${
                       pill.active
                         ? "border-indigo-300 bg-indigo-50 text-indigo-700"
                         : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     {pill.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -297,24 +298,24 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
               const date = item.date ? new Date(item.date) : null;
               return (
                 <li key={item.id} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-slate-50/60 sm:flex-nowrap">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-slate-50" aria-hidden="true">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-surface border border-slate-100 bg-slate-50" aria-hidden="true">
                     {meta.icon}
                   </div>
                   <span className="sr-only">{text(meta.labelKey)}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 break-words text-xs font-bold text-slate-800">{title}</span>
-                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLES[item.status] || "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700"}`}>
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-bold ${STATUS_STYLES[item.status] || "bg-slate-100 text-slate-500 border-slate-200 dark:border-slate-700"}`}>
                         {statusText(item.status)}
                       </span>
                       {item.type === "scholarship" && item.saved && item.verificationStatus !== "verified" && (
-                        <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                        <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
                           {t("unverifiedDeadline")}
                         </span>
                       )}
                       {urgency && (
                         <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${urgency.chip}`}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold ${urgency.chip}`}
                           title={text(urgency.labelKey)}
                         >
                           <span aria-hidden="true">{urgency.dot}</span>
@@ -322,14 +323,14 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
                         </span>
                       )}
                     </div>
-                    {subtitle && <p className="break-words text-[11px] text-slate-600">{subtitle}</p>}
+                    {subtitle && <p className="break-words text-sm text-slate-600">{subtitle}</p>}
                     {externalSource && (
                       <a
                         href={externalSource}
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={`${t("openReference")}: ${title}`}
-                        className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-semibold text-indigo-800 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700"
+                        className="inline-flex min-h-11 items-center gap-1 rounded-control px-1 text-xs font-semibold text-indigo-800 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700"
                       >
                         <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> {t("openReference")}
                       </a>
@@ -338,15 +339,15 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
                   <div className="ml-auto shrink-0 text-right sm:ml-0">
                     {date ? (
                       <>
-                        <p className="text-xs font-bold text-slate-700">{date.toLocaleDateString(locale)}</p>
+                        <p className="text-sm font-bold text-slate-700">{date.toLocaleDateString(locale)}</p>
                         {days !== null && !completed && (
-                          <p className={`text-[10px] font-bold ${isOverdue ? "text-red-600" : isUrgent ? "text-amber-700" : "text-slate-600"}`}>
+                          <p className={`text-sm font-bold ${isOverdue ? "text-rose-600" : isUrgent ? "text-amber-700" : "text-slate-600"}`}>
                             {isOverdue ? t("daysOverdue", { days: Math.abs(days) }) : t("daysLeft", { days })}
                           </p>
                         )}
                       </>
                     ) : (
-                      <p className="text-[10px] text-slate-500">{t("dateTba")}</p>
+                      <p className="text-sm text-slate-500">{t("dateTba")}</p>
                     )}
                   </div>
                 </li>
