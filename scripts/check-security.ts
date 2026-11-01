@@ -1425,6 +1425,75 @@ async function main() {
     assert.doesNotMatch(code, /AccountExists|NoAccount|notFound.*json|emailSent/i);
   });
 
+  console.log("\n— admin-assisted account recovery (Phase AH) —");
+
+  const adminAccountsRoute = readFileSync(join(ROOT, "src/app/api/admin/accounts/route.ts"), "utf8");
+  const adminPasswordRoute = readFileSync(
+    join(ROOT, "src/app/api/admin/accounts/[id]/password/route.ts"),
+    "utf8"
+  );
+  const adminLinkRoute = readFileSync(
+    join(ROOT, "src/app/api/admin/accounts/[id]/reset-link/route.ts"),
+    "utf8"
+  );
+  const adminRules = readFileSync(join(ROOT, "src/lib/adminAccountRules.ts"), "utf8");
+
+  check("account recovery is admin-only on every route", () => {
+    for (const [name, body] of [
+      ["list", adminAccountsRoute],
+      ["password", adminPasswordRoute],
+      ["reset-link", adminLinkRoute],
+    ] as const) {
+      assert.match(body, /requireAdmin\(req\)/, `${name} is not admin-gated`);
+    }
+  });
+
+  check("an admin cannot reset a password with a stolen cookie alone", () => {
+    for (const [name, body] of [
+      ["password", adminPasswordRoute],
+      ["reset-link", adminLinkRoute],
+    ] as const) {
+      assert.match(body, /verifyAdminReauth\(/, `${name} skips re-authentication`);
+      assert.match(body, /adminPassword/, `${name} does not require the admin's own password`);
+    }
+    // The attempt counter must be the shared one, not process memory.
+    const lib = readFileSync(join(ROOT, "src/lib/adminAccounts.ts"), "utf8");
+    assert.match(lib, /checkSharedRateLimit\(/, "admin re-auth is not rate limited");
+  });
+
+  check("no admin surface can return a stored password hash", () => {
+    for (const [name, body] of [
+      ["list", adminAccountsRoute],
+      ["password", adminPasswordRoute],
+      ["reset-link", adminLinkRoute],
+    ] as const) {
+      assert.doesNotMatch(body, /passwordHash\s*[,}]/, `${name} returns a password hash`);
+    }
+    // The row type the list uses carries the hash only to compute a boolean.
+    assert.match(adminRules, /hasPassword: boolean/, "the public row has no password state field");
+    assert.doesNotMatch(adminRules, /passwordHash/, "the public row type mentions a hash");
+  });
+
+  check("an admin reset revokes the target's sessions and old links", () => {
+    assert.match(adminPasswordRoute, /revokeAllSessionsForProfile\(target\.id\)/, "sessions survive an admin reset");
+    assert.match(adminPasswordRoute, /retireLiveResetTokens\(target\.id/, "an older link survives an admin reset");
+  });
+
+  check("editing someone else's password never issues them a session", () => {
+    const profiles = readFileSync(join(ROOT, "src/app/api/profiles/[id]/route.ts"), "utf8");
+    assert.match(profiles, /actorIsTarget/, "the self/other distinction disappeared from the profile route");
+    const cookieBranch = profiles.slice(profiles.indexOf('if (newPasswordHash && updatedProfile'));
+    assert.match(cookieBranch.slice(0, 220), /actorIsTarget/, "a session cookie is issued for any target");
+    // And the other direction: an admin reset closes the student's sessions.
+    assert.match(profiles, /revokeAllSessionsForProfile\(profileId\)/);
+  });
+
+  check("the recovery panel never offers to reveal a password", () => {
+    const panel = readFileSync(join(ROOT, "src/components/admin/AccountsManager.tsx"), "utf8");
+    assert.doesNotMatch(panel, /type=["']password["'][^>]*value=\{[^}]*stored/i, "a stored password is bound to an input");
+    assert.match(panel, /whyNoPassword/, "the panel does not explain that the hash is one-way");
+  });
+
   check("the reset flow never trusts a client-supplied profile id", () => {
     assert.doesNotMatch(resetConfirmRoute, /body\.(?:profileId|profile_id|userId)/, "the client can choose the account");
     assert.match(resetConfirmRoute, /row\.profileId/, "the profile must come from the token row");

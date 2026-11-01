@@ -1221,7 +1221,8 @@ and the migration is safely retried.
 | `id` | serial |  | yes | PK |
 | `name` | text |  | — |  |
 | `email` | text |  | — | unique |
-| `password_hash` | text | yes | — |  |
+| `password_hash` | text | yes | — | scrypt one-way hash (`scrypt:<salt>:<hash>`); never readable, only replaceable |
+| `password_changed_at` | timestamp | yes | — | When the password was last SET (student, reset link or administrator); NULL = set before this was recorded |
 | `degree_level` | text |  | yes |  |
 | `target_major` | text | yes | — |  |
 | `study_interests` | text | yes | — | Structured locale-independent IDs; nullable for legacy profiles |

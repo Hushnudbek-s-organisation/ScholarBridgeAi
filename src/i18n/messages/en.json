@@ -2686,7 +2686,8 @@
       "audit": "Audit log",
       "telegram": "Telegram bot",
       "ownership": "Ownership",
-      "channel": "Telegram channel"
+      "channel": "Telegram channel",
+      "accounts": "Accounts"
     },
     "desc": {
       "overview": "What needs attention today and the key numbers.",
@@ -2712,7 +2713,8 @@
       "audit": "Who changed what, and when.",
       "telegram": "Connect the bot, sign-in with codes, notifications, broadcast and delivery log.",
       "ownership": "Platform owner, safe ownership transfer and administrators.",
-      "channel": "Connect the channel, preview what will be posted and manage every link, country and short link."
+      "channel": "Connect the channel, preview what will be posted and manage every link, country and short link.",
+      "accounts": "Find an account and help it back in: reset links and temporary passwords."
     },
     "refTitle": "Referral rewards",
     "refSubtitle": "Everything a student sees about referrals comes from these numbers — the engine, the progress bar and the reward text.",
@@ -7405,5 +7407,38 @@
     "missingTokenBody": "The reset link is missing its token. Open the full link from the email, or request a new one.",
     "requestNewLink": "Request a new link",
     "privacyLink": "How we handle your data"
+  },
+  "adminAccounts": {
+    "searchPlaceholder": "Search by name or email",
+    "loading": "Loading accounts…",
+    "empty": "No account matches this search.",
+    "loadFailed": "Could not load the account list.",
+    "failed": "The action did not complete. Nothing was changed.",
+    "unknown": "Not recorded",
+    "adminBadge": "Admin",
+    "hasPassword": "Password set",
+    "noPassword": "No password",
+    "passwordSetAt": "Password set",
+    "sessions": "Signed-in devices",
+    "lastSeen": "Last seen",
+    "createdAt": "Account created",
+    "yourPassword": "Your password",
+    "yourPasswordHint": "Required for every change on this screen",
+    "linkTitle": "Create a reset link",
+    "linkBody": "The student sets a new password themselves — you never see it. The link works once, for 60 minutes, and is not emailed: copy it and send it through Telegram or WhatsApp. This is the option that works even when email delivery is down.",
+    "linkBtn": "Create link",
+    "linkReady": "Reset link created. Send it to the student now:",
+    "linkExpiry": "Valid until {when}. Creating another link cancels this one.",
+    "passwordTitle": "Set a temporary password",
+    "passwordBody": "Only if the student cannot open a link. The old password cannot be recovered — it can only be replaced. Every device signed in on this account is signed out immediately.",
+    "newPasswordPlaceholder": "New password (at least 8 characters)",
+    "setBtn": "Set",
+    "generateBtn": "Generate",
+    "passwordReady": "Password changed for {email}. It is not emailed to anyone — give it to the student yourself.",
+    "passwordShownOnce": "Shown once. It is not stored anywhere in readable form, so copy it now if you need it.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Could not copy. Select the text and copy it manually.",
+    "whyNoPassword": "No screen can show an account's password: it is stored as a one-way scrypt hash, so even the database has nothing to decode. What an administrator can do is what this page does — replace it with a new one, or issue a link the student uses to choose their own. Both are recorded in the audit log under the administrator's name."
   }
 }

@@ -3418,6 +3418,266 @@ async function main() {
   }
 
   // -----------------------------------------------------------------------
+  // 29. admin-assisted account recovery (Phase AH) — the screen that answers
+  //     "I cannot sign in" when the email path is unavailable.
+  // -----------------------------------------------------------------------
+  section("29. admin accounts — a password can be replaced, never read");
+
+  {
+    const { hashPassword, verifyPassword } = await import("../src/lib/password");
+    const { GET: accountsGet } = await import("../src/app/api/admin/accounts/route");
+    const { POST: setPasswordPost } = await import("../src/app/api/admin/accounts/[id]/password/route");
+    const { POST: resetLinkPost } = await import("../src/app/api/admin/accounts/[id]/reset-link/route");
+
+    const ADMIN_EMAIL = "admin.recovery@example.com";
+    const ADMIN_PASSWORD = "AdminRecoveryPassw0rd!";
+    const [recoveryAdmin] = await db
+      .insert(schema.studentProfiles)
+      .values({
+        name: "Recovery Admin",
+        email: ADMIN_EMAIL,
+        isAdmin: true,
+        passwordHash: hashPassword(ADMIN_PASSWORD),
+        passwordChangedAt: new Date(),
+      })
+      .returning();
+
+    const [student] = await db
+      .insert(schema.studentProfiles)
+      .values({
+        name: "Locked Out",
+        email: "locked.out@example.com",
+        passwordHash: hashPassword("ForgottenPassw0rd!"),
+        passwordChangedAt: new Date(Date.now() - 90 * 86400000),
+      })
+      .returning();
+
+    const { signSessionToken } = await import("../src/lib/auth");
+    const adminToken = signSessionToken({ id: recoveryAdmin.id, passwordHash: recoveryAdmin.passwordHash });
+    const adminCookie = `sb_session=${adminToken}`;
+    const studentToken = signSessionToken({ id: student.id, passwordHash: student.passwordHash });
+    await checkSessionRecord(studentToken, student.id, { scope: "web" });
+
+    const asAdmin = (path: string, init: RequestInit = {}) =>
+      callFrom(adminCookie, path, init);
+    async function callFrom(cookieHeader: string, path: string, init: RequestInit = {}) {
+      const req = new Request(`http://localhost${path}`, {
+        ...init,
+        headers: { cookie: cookieHeader, ...(init.headers ?? {}) },
+      });
+      const res = await (path.startsWith("/api/admin/accounts") && (!init.method || init.method === "GET")
+        ? accountsGet(req)
+        : path.endsWith("/password")
+          ? setPasswordPost(req, { params: Promise.resolve({ id: path.split("/")[4] }) })
+          : resetLinkPost(req, { params: Promise.resolve({ id: path.split("/")[4] }) }));
+      let body: any = null;
+      try {
+        body = await res.json();
+      } catch {
+        /* non-JSON */
+      }
+      return { status: res.status, body, headers: res.headers };
+    }
+
+    const post = (path: string, body: unknown) =>
+      asAdmin(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    // --- the list: state, never a credential
+    const list = await asAdmin("/api/admin/accounts?q=locked.out");
+    const listed = (list.body?.accounts ?? []).find((a: any) => a.id === student.id);
+    check(
+      "the account list reports password state without any hash",
+      list.status === 200 &&
+        Boolean(listed) &&
+        listed.hasPassword === true &&
+        listed.passwordChangedAt !== null &&
+        !JSON.stringify(list.body).includes("scrypt"),
+      `status=${list.status} row=${JSON.stringify(listed)?.slice(0, 210)}`
+    );
+    check(
+      "the list carries the live session count the admin needs",
+      listed?.liveSessions >= 1,
+      `liveSessions=${listed?.liveSessions}`
+    );
+
+    // --- a non-admin cannot see it
+    const studentList = await callFrom(`sb_session=${studentToken}`, "/api/admin/accounts");
+    check("a student is refused the admin list", studentList.status === 403, `status=${studentList.status}`);
+
+    // --- the admin's own password is required
+    const noReauth = await post(`/api/admin/accounts/${student.id}/password`, { password: "AnotherPassw0rd!" });
+    check(
+      "a password change without the admin's own password is refused",
+      noReauth.status === 400 && noReauth.body?.code === "password_required",
+      `status=${noReauth.status} code=${noReauth.body?.code}`
+    );
+    const wrongReauth = await post(`/api/admin/accounts/${student.id}/password`, {
+      adminPassword: "not-the-admin-password",
+      password: "AnotherPassw0rd!",
+    });
+    check(
+      "an incorrect admin password is refused",
+      wrongReauth.status === 403 && wrongReauth.body?.code === "invalid_password",
+      `status=${wrongReauth.status} code=${wrongReauth.body?.code}`
+    );
+    const [untouched] = await db
+      .select({ hash: schema.studentProfiles.passwordHash })
+      .from(schema.studentProfiles)
+      .where(eq(schema.studentProfiles.id, student.id));
+    check(
+      "a refused attempt changes nothing",
+      verifyPassword("ForgottenPassw0rd!", untouched?.hash),
+      "the stored password changed on a refused request"
+    );
+
+    // --- a weak password is refused by the same policy as everywhere else
+    const weak = await post(`/api/admin/accounts/${student.id}/password`, {
+      adminPassword: ADMIN_PASSWORD,
+      password: "12345678",
+    });
+    check(
+      "the shared password policy applies to an admin-set password",
+      weak.status === 400 && weak.body?.code === "weak_password",
+      `status=${weak.status} code=${weak.body?.code}`
+    );
+
+    // --- the reset link: the path that needs no email at all
+    const linkResponse = await post(`/api/admin/accounts/${student.id}/reset-link`, {
+      adminPassword: ADMIN_PASSWORD,
+    });
+    const issuedLink = String(linkResponse.body?.link ?? "");
+    check(
+      "an admin can issue a reset link with SMTP completely unconfigured",
+      linkResponse.status === 200 &&
+        /^https:\/\/[^/]+\/reset-password\?token=[A-Za-z0-9_-]{43}$/.test(issuedLink),
+      `status=${linkResponse.status} ${JSON.stringify(linkResponse.body)?.slice(0, 160)}`
+    );
+    check(
+      "the response says plainly that nothing was emailed",
+      linkResponse.body?.delivered === false,
+      "the response implies a delivery that did not happen"
+    );
+    const linkToken = issuedLink.split("token=")[1] ?? "";
+    const linkRows = await db
+      .select()
+      .from(schema.passwordResetTokens)
+      .where(eq(schema.passwordResetTokens.profileId, student.id));
+    check(
+      "only the hash of the admin-issued link is stored",
+      linkRows.length === 1 &&
+        linkRows[0].tokenHash !== linkToken &&
+        linkRows[0].tokenHash === (await import("../src/lib/passwordReset")).hashResetToken(linkToken),
+      `${linkRows.length} row(s); raw token present=${linkRows.some((r) => r.tokenHash === linkToken)}`
+    );
+
+    // The student uses it exactly like an emailed one.
+    const { POST: resetConfirm } = await import("../src/app/api/auth/password-reset/confirm/route");
+    const chosen = "ChosenByStudent1!";
+    const spent = await resetConfirm(
+      new Request("http://localhost/api/auth/password-reset/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: linkToken, password: chosen, passwordConfirm: chosen }),
+      })
+    );
+    check("the student can spend the admin-issued link", spent.status === 200, `status=${spent.status}`);
+    const [afterLink] = await db
+      .select({ hash: schema.studentProfiles.passwordHash })
+      .from(schema.studentProfiles)
+      .where(eq(schema.studentProfiles.id, student.id));
+    check("the student's own password now verifies", verifyPassword(chosen, afterLink?.hash));
+
+    // --- issuing a second link retires the first
+    const second = await post(`/api/admin/accounts/${student.id}/reset-link`, { adminPassword: ADMIN_PASSWORD });
+    check(
+      "issuing a new link retires the older ones",
+      second.status === 200 && Number(second.body?.retiredLinks) >= 0,
+      `status=${second.status} retired=${second.body?.retiredLinks}`
+    );
+
+    // --- the temporary password path
+    const generated = await post(`/api/admin/accounts/${student.id}/password`, {
+      adminPassword: ADMIN_PASSWORD,
+      generate: true,
+    });
+    const temporary = String(generated.body?.temporaryPassword ?? "");
+    check(
+      "a generated temporary password is returned once and is readable",
+      generated.status === 200 && /^[a-zA-Z0-9]{4}(-[a-zA-Z0-9]{4}){3}$/.test(temporary),
+      `status=${generated.status} value=${temporary ? "present" : "missing"}`
+    );
+    const [afterGenerate] = await db
+      .select({ hash: schema.studentProfiles.passwordHash, changedAt: schema.studentProfiles.passwordChangedAt })
+      .from(schema.studentProfiles)
+      .where(eq(schema.studentProfiles.id, student.id));
+    check("the temporary password verifies against the stored hash", verifyPassword(temporary, afterGenerate?.hash));
+    check(
+      "the stored value is still a scrypt hash, never the temporary password",
+      /^scrypt:[0-9a-f]{32}:[0-9a-f]{128}$/.test(afterGenerate?.hash ?? "") && !(afterGenerate?.hash ?? "").includes(temporary),
+      "unexpected stored value"
+    );
+    check("the change stamps password_changed_at", Boolean(afterGenerate?.changedAt));
+
+    // --- sessions die with the old password
+    const afterReset = await checkSessionRecord(studentToken, student.id, { scope: "web" });
+    check(
+      "an admin password reset revokes the student's open sessions",
+      afterReset === "revoked",
+      `session state=${afterReset}`
+    );
+    const liveRows = await db
+      .select({ revokedAt: schema.userSessions.revokedAt })
+      .from(schema.userSessions)
+      .where(eq(schema.userSessions.profileId, student.id));
+    check(
+      "the session rows are stamped revoked, not merely ignored",
+      liveRows.length > 0 && liveRows.every((row) => row.revokedAt !== null),
+      `${liveRows.filter((r) => !r.revokedAt).length} live row(s) left`
+    );
+
+    // --- the admin never receives the student's session cookie
+    const cookieHeader = String(generated.headers?.get?.("set-cookie") ?? "");
+    check(
+      "an admin reset does not hand the admin a session for the student",
+      !cookieHeader.includes("sb_session"),
+      "the response set a session cookie"
+    );
+
+    // --- self-target is refused
+    const selfTarget = await post(`/api/admin/accounts/${recoveryAdmin.id}/password`, {
+      adminPassword: ADMIN_PASSWORD,
+      password: "AnotherPassw0rd!",
+    });
+    check(
+      "an admin cannot reset their own password from this screen",
+      selfTarget.status === 400 && selfTarget.body?.code === "self_target",
+      `status=${selfTarget.status} code=${selfTarget.body?.code}`
+    );
+
+    // --- the audit trail names the administrator and holds no credential
+    const audits = await pool.query(
+      `SELECT field_changed, new_value, actor FROM audit_logs WHERE entity_id = $1 AND entity_type = 'profile' ORDER BY id`,
+      [student.id]
+    );
+    check(
+      "both actions are audited under the administrator's email",
+      audits.rows.length >= 2 && audits.rows.every((row: any) => row.actor === ADMIN_EMAIL),
+      `${audits.rows.length} row(s): ${audits.rows.map((r: any) => r.field_changed).join(", ")}`
+    );
+    check(
+      "the audit rows contain no password and no token",
+      audits.rows.every((row: any) => !String(row.new_value ?? "").includes(temporary) && !String(row.new_value ?? "").includes(linkToken)),
+      "a credential reached the audit log"
+    );
+
+    await db.delete(schema.studentProfiles).where(inArray(schema.studentProfiles.id, [student.id, recoveryAdmin.id]));
+  }
+
+  // -----------------------------------------------------------------------
   // -----------------------------------------------------------------------
   // Close the app's own pool before the server goes away. Killing Postgres
   // under a live pool makes node-postgres report 57P01 admin_shutdown, which

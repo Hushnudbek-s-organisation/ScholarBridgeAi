@@ -123,7 +123,7 @@ export async function POST(req: Request) {
 
     await db
       .update(studentProfiles)
-      .set({ passwordHash: hashPassword(password), updatedAt: now })
+      .set({ passwordHash: hashPassword(password), passwordChangedAt: now, updatedAt: now })
       .where(eq(studentProfiles.id, profile.id));
 
     // Every other outstanding link for this account dies with the reset.
