@@ -7648,6 +7648,21 @@
     "errSelfTarget": "You cannot reset your own password from here — use Edit Profile.",
     "errWeakPassword": "That password does not meet the rules: at least 8 characters, and not an easily guessed one.",
     "errAmbiguousRequest": "The request carried two passwords at once. Send either a typed password or \"generate\", not both.",
-    "errNotFound": "That account no longer exists."
+    "errNotFound": "That account no longer exists.",
+    "selfTitle": "Cannot reproduce your own password?",
+    "selfBody": "Replace the password for {email} right here — no old password needed, because this signed-in session is the proof. Your other devices are signed out and you stay signed in on this one.",
+    "selfBodyNoViewer": "Replace the password you sign in with, right here. No old password needed — this session is the proof. Your other devices are signed out.",
+    "selfOpen": "Change my password",
+    "selfCancel": "Close",
+    "selfNewPlaceholder": "New password (8+ characters)",
+    "selfConfirmPlaceholder": "Repeat the new password",
+    "selfSave": "Save and stay signed in",
+    "selfGenerate": "Generate one",
+    "selfPolicy": "At least 8 characters, not an easily guessed one.",
+    "selfDoneTitle": "Your password is now this. It is already in the confirmation field above:",
+    "selfDoneBody": "Every other device was signed out. Write it down — the app cannot show it to you again, but you can always replace it from this card.",
+    "selfErrWeak": "That password does not meet the rules: at least 8 characters, and not an easily guessed one.",
+    "selfErrMismatch": "The two passwords do not match.",
+    "selfErrConfirm": "Type the new password twice."
   }
 }

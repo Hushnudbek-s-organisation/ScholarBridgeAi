@@ -7648,6 +7648,21 @@
     "errSelfTarget": "O'zingizning parolingizni bu yerdan tiklab bo'lmaydi — «Profilni tahrirlash»dan foydalaning.",
     "errWeakPassword": "Parol talabga javob bermaydi: kamida 8 belgi va oson topiladigan parol bo'lmasligi kerak.",
     "errAmbiguousRequest": "So'rovda bir vaqtda ikkita parol kelgan. Yozilgan parol YOKI «yaratish» — ikkalasi emas.",
-    "errNotFound": "Bunday akkaunt topilmadi."
+    "errNotFound": "Bunday akkaunt topilmadi.",
+    "selfTitle": "O'z parolingizni eslay olmayapsizmi?",
+    "selfBody": "{email} uchun parolni shu yerda almashtirasiz — eski parol so'ralmaydi, chunki kirgan sessiyangiz isbot. Boshqa qurilmalaringiz o'chiriladi, shu brauzerda kirgan holda qolasiz.",
+    "selfBodyNoViewer": "Kirishda ishlatadigan parolingizni shu yerda almashtiring. Eski parol kerak emas — kirgan sessiyangiz isbot. Boshqa qurilmalar o'chiriladi.",
+    "selfOpen": "Parolimni almashtirish",
+    "selfCancel": "Yopish",
+    "selfNewPlaceholder": "Yangi parol (kamida 8 belgi)",
+    "selfConfirmPlaceholder": "Yangi parolni takrorlang",
+    "selfSave": "Saqlash va kirgan holda qolish",
+    "selfGenerate": "Yaratib berish",
+    "selfPolicy": "Kamida 8 belgi, oson topiladigan parol bo'lmasin.",
+    "selfDoneTitle": "Endi parolingiz shu. U yuqoridagi tasdiqlash maydoniga allaqachon yozildi:",
+    "selfDoneBody": "Boshqa barcha qurilmalar o'chirildi. Yozib oling — ilova uni boshqa ko'rsata olmaydi, lekin shu kartadan yana almashtirsangiz bo'ladi.",
+    "selfErrWeak": "Parol talabga javob bermaydi: kamida 8 belgi va oson topiladigan parol bo'lmasligi kerak.",
+    "selfErrMismatch": "Ikki parol bir xil emas.",
+    "selfErrConfirm": "Yangi parolni ikki marta yozing."
   }
 }

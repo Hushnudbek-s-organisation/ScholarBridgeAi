@@ -252,18 +252,20 @@ export async function adminViewer(adminId: number): Promise<AdminViewerRow | nul
 export async function auditPasswordAction(input: {
   actorEmail: string;
   targetId: number;
-  action: "admin_set_password" | "admin_reset_link";
+  action: "admin_set_password" | "admin_reset_link" | "admin_self_password";
 }): Promise<void> {
   try {
     await db.insert(auditLogs).values({
       entityType: "profile",
       entityId: input.targetId,
-      fieldChanged: input.action === "admin_set_password" ? "password_hash" : "password_reset_token",
+      fieldChanged: input.action === "admin_reset_link" ? "password_reset_token" : "password_hash",
       oldValue: null,
       newValue:
         input.action === "admin_set_password"
           ? "replaced with a temporary password by an administrator"
-          : "one-time reset link issued by an administrator",
+          : input.action === "admin_self_password"
+            ? "replaced by the account owner from the admin panel"
+            : "one-time reset link issued by an administrator",
       source: "admin_panel",
       actor: input.actorEmail,
       verificationStatus: "verified",

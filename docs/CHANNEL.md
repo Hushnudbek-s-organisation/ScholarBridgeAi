@@ -2478,6 +2478,89 @@ account, offers the way out, and writes nothing to `localStorage`,
 Also green: `check:i18n` (3 979 call sites), `lint:baseline`, `tsc --noEmit`,
 `next build`.
 
+## 11t. An operator who forgot their own password can replace it here (2026-11-01)
+
+§11s made the screen honest: it now says *whose* password the confirmation field
+wants. That was necessary and not sufficient. The operator read
+
+> **That was not the password of this admin account** — the field wants the
+> password you sign in with as `xakimovhushnud010@gmail.com`
+
+and had nowhere to go. The advice ("open Edit Profile") was correct but two
+screens away, and the panel kept asking for a credential the person simply no
+longer had. A support screen whose first step is "remember your own password"
+is a support screen that stops working the moment the operator does not.
+
+So the recovery action moved to where the failure happens.
+
+### `POST /api/admin/accounts/me/password`
+
+The signed-in administrator replaces **their own** password, without producing
+the old one. This is not a new privilege: `PUT /api/profiles/:id` already lets
+any signed-in account set a new password without the old one — that is what a
+session is for. What this route adds is the clean-up the profile editor does not
+do, and the guardrails a shared machine needs:
+
+* **admin session required** — a student gets 403;
+* it takes **no target at all** — no `[id]`, no query, no body id — so it can
+  never be pointed at anybody else;
+* the **shared password policy** applies, and a typed password must be
+  **confirmed twice**, so a typo cannot lock the operator out of their own admin
+  area;
+* `{ generate: true }` returns a readable password once (`XXXX-XXXX-XXXX-XXXX`,
+  no `0/O/o`, `1/l/I`, `5/S`);
+* **every other device is revoked**, then a **fresh session** is issued for the
+  browser that made the change — the operator stays at work, the phone in their
+  bag does not;
+* `password_changed_at` is stamped and the action is audited as
+  `admin_self_password` under the account's own email, with no credential in the
+  row;
+* rate limited through the same shared counter as sign-in.
+
+Order matters and is pinned by the gate: **revoke first, then adopt.** Issuing the
+new session before the cleanup would have the cleanup revoke the session it had
+just handed back — the operator would be logged out by their own password change.
+
+### In the panel
+
+A card at the top of **Accounts**: *"Cannot reproduce your own password?"* It
+names the signed-in address, explains that the session is the proof, and offers
+**Save and stay signed in** (twice-typed) or **Generate one**. The same card is
+offered inside the amber warning under the confirmation field — where the
+operator actually is when they discover the problem.
+
+After a successful change the new password is carried **straight into the
+confirmation field** and shown once in a green box with a copy button. That is
+the whole point: the operator should not have to type a password they just set in
+order to create the link they came for.
+
+### Verified
+
+`test:admin-accounts` **26 → 30**: the route is admin-only, accepts no target,
+does not re-verify an old password, applies the policy, requires the
+confirmation, hashes before storing, revokes, re-issues a cookie for the new
+fingerprint, adopts it *after* the revoke, stamps the timestamp, reports
+`otherSessionsRevoked`, rate limits, and audits `admin_self_password`; the panel
+calls `/api/admin/accounts/me/password`, wires `generate: true`, and drops the
+value into the confirmation field (`setAdminPassword(shown)`).
+
+integration **399 → 413** (+14), real Postgres: a student is refused; `12345678`
+is refused by the shared policy; a mismatched confirmation is refused; the change
+succeeds with **no old password**; the new password verifies and the **old one no
+longer does**; `password_changed_at` moves forward; the response sets an
+`sb_session` cookie that is **live immediately**; a second device that was signed
+in is **revoked**; the pre-change admin cookie is **revoked**; and the audit row
+names the account itself with no password in it.
+
+`test:security` **106 → 107**: the self-service route accepts no target id or
+query, scopes the update to the caller, applies the policy, stores no plaintext,
+revokes the other sessions and audits the change.
+
+`test:password-reset` 38/0 · `test:channel` 196/0 · `test:render` 369/0 ·
+`test:portability` 57/0 · `test:localization` 16/0 · `test:auth` 14 ·
+`test:remote` 41 · `test:schema` PASSED · `check:i18n` · `lint:baseline` ·
+`tsc --noEmit` · `next build` (route present as `ƒ /api/admin/accounts/me/password`).
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

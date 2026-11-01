@@ -1495,6 +1495,22 @@ async function main() {
     assert.doesNotMatch(lib, /error: `[^`]*\$\{password/, "the refusal echoes the submitted password");
   });
 
+  check("self-service password change cannot reach another account", () => {
+    const selfRoute = readFileSync(join(ROOT, "src/app/api/admin/accounts/me/password/route.ts"), "utf8");
+    assert.match(selfRoute, /requireAdmin\(req\)/, "the self-service route is not admin-gated");
+    // No id, no query parameter, no body field: the target is the session owner.
+    assert.doesNotMatch(selfRoute, /\bparams\b/, "the route accepts a target id");
+    assert.doesNotMatch(selfRoute, /searchParams/, "the route accepts a target from the query");
+    assert.doesNotMatch(selfRoute, /body\.[A-Za-z]*[Ii]d\b/, "the route accepts a target id in the body");
+    assert.match(selfRoute, /eq\(studentProfiles\.id, adminId\)/, "the update is not scoped to the caller");
+    // Policy still applies, and the password is never stored in the clear.
+    assert.match(selfRoute, /passwordPolicyProblem\(password\)/, "self-service skips the password policy");
+    assert.doesNotMatch(selfRoute, /values\(\{[^}]*password:/, "a plain password would be stored");
+    // Every other device goes, this one is re-issued deliberately.
+    assert.match(selfRoute, /revokeAllSessionsForProfile\(adminId\)/, "other devices survive a self-change");
+    assert.match(selfRoute, /auditPasswordAction\(/, "a self-change is not audited");
+  });
+
   check("the panel asks for the signed-in admin's own password, by name", () => {
     const panel = readFileSync(join(ROOT, "src/components/admin/AccountsManager.tsx"), "utf8");
     assert.match(panel, /yourPasswordWhose/, "the confirmation field never says whose password it wants");
