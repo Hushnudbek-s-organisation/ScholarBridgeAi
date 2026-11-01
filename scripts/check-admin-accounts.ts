@@ -26,7 +26,10 @@
  *      session cookie;
  *   8. a refusal is never a dead end: the panel names the account whose password
  *      it wants, and "wrong password", "no password yet" and "old hash format"
- *      are three different, translated answers with the same way out.
+ *      are three different, translated answers with the same way out;
+ *   9. an operator who has forgotten their own password can replace it from the
+ *      same screen (session = proof, no target, policy applied, other devices
+ *      dropped, this one kept, audited).
  *
  * Run: npm run test:admin-accounts
  */
@@ -286,6 +289,62 @@ check("the issued token has the same shape and lifetime as any other", () => {
   const body = code("src/app/api/admin/accounts/[id]/reset-link/route.ts");
   assert.match(body, /expiresAt/, "the response does not state the expiry");
   assert.match(body, /ttlMinutes/, "the response does not state the remaining life");
+});
+
+/* ---------------------- 5b. the operator can replace their own password */
+
+check("an admin can replace their OWN password without the old one", () => {
+  const body = code("src/app/api/admin/accounts/me/password/route.ts");
+  // Admin-only, and it takes no target: it can never be pointed at somebody else.
+  assert.match(body, /requireAdmin\(req\)/, "the self-service route is not admin-gated");
+  assert.doesNotMatch(body, /params/, "the route accepts a target — it must always act on the caller");
+  assert.match(body, /access\.session\.profile\.id/, "the target is not the signed-in account");
+  // The signed-in session is the proof, exactly like the profile editor.
+  assert.doesNotMatch(body, /verifyAdminReauth/, "an old password is required, which is the dead end");
+  // ...but the normal policy still applies, and a typo cannot lock the operator out.
+  assert.match(body, /passwordPolicyProblem\(password\)/, "the password policy is skipped");
+  assert.match(body, /code: "confirm_mismatch"/, "a mistyped password can be saved unchecked");
+  assert.match(body, /hashPassword\(password\)/, "the password is not hashed");
+  assert.doesNotMatch(body, /values\(\{[^}]*password:/, "a plain password would be stored");
+});
+
+check("changing your own password keeps this device and drops the rest", () => {
+  const body = code("src/app/api/admin/accounts/me/password/route.ts");
+  assert.match(body, /revokeAllSessionsForProfile\(adminId\)/, "other devices survive the change");
+  assert.match(body, /signSessionToken\(\{ id: adminId, passwordHash: newHash \}\)/, "the browser is not given a session for the new password");
+  assert.match(body, /sessionCookieFromToken\(token, req\)/, "no cookie is set, so the operator is logged out");
+  // Revoking must happen BEFORE the fresh token is adopted, or it dies at once.
+  const revokeAt = body.indexOf("revokeAllSessionsForProfile(adminId)");
+  const adoptAt = body.indexOf("checkSessionRecord(token");
+  assert.ok(revokeAt > 0 && adoptAt > revokeAt, "the new session is revoked by the cleanup");
+  assert.match(body, /passwordChangedAt: now/, "the change is not recorded on the account");
+  assert.match(body, /otherSessionsRevoked: true/, "the response does not say the other devices were dropped");
+});
+
+check("the self-service password change is audited and rate limited", () => {
+  const body = code("src/app/api/admin/accounts/me/password/route.ts");
+  assert.match(body, /checkSharedRateLimit\(`admin-self-password:\$\{adminId\}`/, "no shared attempt counter");
+  assert.match(body, /auditPasswordAction\(\{/, "the change is not audited");
+  assert.match(body, /action: "admin_self_password"/, "the audit action is unset");
+  assert.match(source("src/lib/adminAccounts.ts"), /admin_self_password/, "the audit action is not supported");
+  // The response may carry the generated password ONCE; never a hash.
+  assert.doesNotMatch(body, /passwordHash\s*[,}]/, "the response leaks a hash");
+});
+
+check("the panel offers self-service recovery where the failure happens", () => {
+  const panel = code("src/components/admin/AccountsManager.tsx");
+  assert.match(panel, /\/api\/admin\/accounts\/me\/password/, "the panel cannot change its own password");
+  assert.match(panel, /changeOwnPassword/, "no handler is wired");
+  assert.match(panel, /generate: true/, "no way to get a readable password");
+  assert.match(panel, /selfOpen/, "the card is not rendered");
+  // After a successful change the value must not have to be retyped.
+  assert.match(panel, /setAdminPassword\(shown\)/, "the operator must retype the password they just set");
+  for (const locale of ["en", "uz", "ru"]) {
+    const ns = JSON.parse(source(`src/i18n/messages/${locale}.json`)).adminAccounts;
+    for (const key of ["selfTitle", "selfBody", "selfOpen", "selfSave", "selfGenerate", "selfDoneBody"]) {
+      assert.equal(typeof ns[key], "string", `${locale} is missing ${key}`);
+    }
+  }
 });
 
 /* ----------------------------------------------- 6. the audit trail */

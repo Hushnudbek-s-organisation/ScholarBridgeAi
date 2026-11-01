@@ -102,6 +102,20 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result>(null);
   const [copied, setCopied] = useState(false);
+  /**
+   * "I cannot reproduce my own password" — the operator's own recovery.
+   *
+   * Every action on this screen re-authenticates the operator, which is the
+   * guard that makes a stolen cookie harmless. It is useless to an operator who
+   * has forgotten their own password, so the way to replace it lives HERE, not
+   * three clicks away in the profile editor.
+   */
+  const [selfOpen, setSelfOpen] = useState(false);
+  const [selfPw, setSelfPw] = useState("");
+  const [selfPw2, setSelfPw2] = useState("");
+  const [selfBusy, setSelfBusy] = useState(false);
+  const [selfDone, setSelfDone] = useState("");
+  const [selfError, setSelfError] = useState("");
 
   const load = useCallback(async (needle: string) => {
     setLoading(true);
@@ -237,6 +251,55 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
     }
   };
 
+  /**
+   * Replace the signed-in admin's own password.
+   *
+   * No old password is asked for: the session IS the proof, exactly as in the
+   * profile editor. What the route adds is the clean-up — every other device is
+   * signed out, this browser gets a fresh session, and the new date is stamped
+   * so the panel can show it. `generate` asks the server for a readable
+   * password instead of making the operator invent one.
+   */
+  const changeOwnPassword = async (generate: boolean) => {
+    setSelfBusy(true);
+    setSelfError("");
+    setSelfDone("");
+    try {
+      const json = await post("/api/admin/accounts/me/password", {
+        ...(generate ? { generate: true } : { password: selfPw, confirmPassword: selfPw2 }),
+      });
+      const shown = String(json.temporaryPassword ?? selfPw);
+      // Carry it straight into the confirmation field above: the operator has
+      // just proved the password, and asking them to retype it is the same dead
+      // end this card exists to remove.
+      setAdminPassword(shown);
+      setSelfDone(shown);
+      setSelfPw("");
+      setSelfPw2("");
+      setSelfOpen(false);
+      setError("");
+      setErrorCode("");
+      await load(q.trim());
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : "";
+      setSelfError(
+        code === "weak_password"
+          ? t("selfErrWeak")
+          : code === "confirm_mismatch"
+            ? t("selfErrMismatch")
+            : code === "confirm_required"
+              ? t("selfErrConfirm")
+              : code === "rate_limited"
+                ? t("errRateLimited")
+                : err instanceof Error && err.message
+                  ? err.message
+                  : t("failed")
+      );
+    } finally {
+      setSelfBusy(false);
+    }
+  };
+
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -270,6 +333,97 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
       <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-[11px] leading-relaxed text-sky-900">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
         <p>{t("whyNoPassword")}</p>
+      </div>
+
+      {/* The operator's own way out: replace the password they cannot recall. */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-800">{t("selfTitle")}</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
+              {viewer ? t("selfBody", { email: viewer.email }) : t("selfBodyNoViewer")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelfOpen((open) => !open);
+              setSelfError("");
+            }}
+            className={selfOpen ? btnLight : btnDark}
+            aria-expanded={selfOpen}
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+            {selfOpen ? t("selfCancel") : t("selfOpen")}
+          </button>
+        </div>
+
+        {selfDone && (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-[11px] font-bold text-emerald-900">{t("selfDoneTitle")}</p>
+            <div className="mt-1.5 flex items-start gap-2">
+              <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-2 py-1.5 text-xs font-bold tracking-wide text-slate-800">
+                {selfDone}
+              </code>
+              <button type="button" onClick={() => void copy(selfDone)} className={btnLight}>
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? t("copied") : t("copy")}
+              </button>
+            </div>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-emerald-800">{t("selfDoneBody")}</p>
+          </div>
+        )}
+
+        {selfOpen && (
+          <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={selfPw}
+                onChange={(e) => setSelfPw(e.target.value)}
+                placeholder={t("selfNewPlaceholder")}
+                aria-label={t("selfNewPlaceholder")}
+                className={inputCls}
+              />
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={selfPw2}
+                onChange={(e) => setSelfPw2(e.target.value)}
+                placeholder={t("selfConfirmPlaceholder")}
+                aria-label={t("selfConfirmPlaceholder")}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={selfBusy || selfPw.length < 8 || selfPw !== selfPw2}
+                onClick={() => void changeOwnPassword(false)}
+                className={btnDark}
+              >
+                {selfBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                {t("selfSave")}
+              </button>
+              <button
+                type="button"
+                disabled={selfBusy}
+                onClick={() => void changeOwnPassword(true)}
+                className={btnLight}
+              >
+                {selfBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
+                {t("selfGenerate")}
+              </button>
+              <span className="text-[10px] text-slate-500">{t("selfPolicy")}</span>
+            </div>
+            {selfError && (
+              <p role="alert" className="text-[11px] font-semibold text-red-700">
+                {selfError}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -404,12 +558,26 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                       ? t("viewerNoPasswordBody")
                       : t("reauthMismatchBody", { email: viewer?.email ?? "" })}
                 </p>
-                {onOpenProfileEditor && (
-                  <button type="button" onClick={onOpenProfileEditor} className={`${btnLight} mt-2`}>
-                    <UserRound className="h-3.5 w-3.5" />
-                    {t("openProfile")}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {/* The fix belongs where the failure happened, not two screens away. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelfOpen(true);
+                      setSelfError("");
+                    }}
+                    className={btnDark}
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    {t("selfOpen")}
                   </button>
-                )}
+                  {onOpenProfileEditor && (
+                    <button type="button" onClick={onOpenProfileEditor} className={btnLight}>
+                      <UserRound className="h-3.5 w-3.5" />
+                      {t("openProfile")}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>

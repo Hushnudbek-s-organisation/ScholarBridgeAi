@@ -3428,6 +3428,7 @@ async function main() {
     const { GET: accountsGet } = await import("../src/app/api/admin/accounts/route");
     const { POST: setPasswordPost } = await import("../src/app/api/admin/accounts/[id]/password/route");
     const { POST: resetLinkPost } = await import("../src/app/api/admin/accounts/[id]/reset-link/route");
+    const { POST: selfPasswordPost } = await import("../src/app/api/admin/accounts/me/password/route");
 
     const ADMIN_EMAIL = "admin.recovery@example.com";
     const ADMIN_PASSWORD = "AdminRecoveryPassw0rd!";
@@ -3467,7 +3468,9 @@ async function main() {
       });
       const res = await (path.startsWith("/api/admin/accounts") && (!init.method || init.method === "GET")
         ? accountsGet(req)
-        : path.endsWith("/password")
+        : path.endsWith("/me/password")
+          ? selfPasswordPost(req)
+          : path.endsWith("/password")
           ? setPasswordPost(req, { params: Promise.resolve({ id: path.split("/")[4] }) })
           : resetLinkPost(req, { params: Promise.resolve({ id: path.split("/")[4] }) }));
       let body: any = null;
@@ -3689,6 +3692,122 @@ async function main() {
       "the audit rows contain no password and no token",
       audits.rows.every((row: any) => !String(row.new_value ?? "").includes(temporary) && !String(row.new_value ?? "").includes(linkToken)),
       "a credential reached the audit log"
+    );
+
+    // ---------------------------------------------------------------------
+    // The operator's own password — the dead end this whole section exists for.
+    // Runs LAST: it replaces the admin's password, so every cookie above dies.
+    // ---------------------------------------------------------------------
+    const NEW_ADMIN_PASSWORD = "AdminChosenPassw0rd!2";
+    // A second signed-in device for the same admin, to prove it gets dropped.
+    const [adminNow] = await db
+      .select({ hash: schema.studentProfiles.passwordHash })
+      .from(schema.studentProfiles)
+      .where(eq(schema.studentProfiles.id, recoveryAdmin.id));
+    const secondDeviceToken = signSessionToken({ id: recoveryAdmin.id, passwordHash: adminNow?.hash });
+    await checkSessionRecord(secondDeviceToken, recoveryAdmin.id, { scope: "web" });
+
+    // A student may not use the self-service route at all.
+    const [studentRow] = await db
+      .select({ hash: schema.studentProfiles.passwordHash })
+      .from(schema.studentProfiles)
+      .where(eq(schema.studentProfiles.id, student.id));
+    const studentFreshToken = signSessionToken({ id: student.id, passwordHash: studentRow?.hash });
+    await checkSessionRecord(studentFreshToken, student.id, { scope: "web" });
+    const studentSelf = await callFrom(`sb_session=${studentFreshToken}`, "/api/admin/accounts/me/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "WhateverPassw0rd!", confirmPassword: "WhateverPassw0rd!" }),
+    });
+    check("a student cannot use the self-service password route", studentSelf.status === 403, `status=${studentSelf.status}`);
+
+    // The policy and the confirmation still apply — no old password, but no shortcuts.
+    const weakSelf = await post("/api/admin/accounts/me/password", { password: "12345678", confirmPassword: "12345678" });
+    check(
+      "the self-service change applies the shared password policy",
+      weakSelf.status === 400 && weakSelf.body?.code === "weak_password",
+      `status=${weakSelf.status} code=${weakSelf.body?.code}`
+    );
+    const mismatchSelf = await post("/api/admin/accounts/me/password", {
+      password: NEW_ADMIN_PASSWORD,
+      confirmPassword: "SomethingElse123!",
+    });
+    check(
+      "a mistyped confirmation is refused, so a typo cannot lock the operator out",
+      mismatchSelf.status === 400 && mismatchSelf.body?.code === "confirm_mismatch",
+      `status=${mismatchSelf.status} code=${mismatchSelf.body?.code}`
+    );
+
+    const beforeSelf = await pool.query(
+      "SELECT password_changed_at FROM student_profiles WHERE id = $1",
+      [recoveryAdmin.id]
+    );
+    const selfChange = await post("/api/admin/accounts/me/password", {
+      password: NEW_ADMIN_PASSWORD,
+      confirmPassword: NEW_ADMIN_PASSWORD,
+    });
+    check(
+      "an admin replaces their own password with no old one",
+      selfChange.status === 200 && selfChange.body?.ok === true && selfChange.body?.otherSessionsRevoked === true,
+      `status=${selfChange.status} body=${JSON.stringify(selfChange.body)?.slice(0, 180)}`
+    );
+    check(
+      "the self-service response carries the generated password only when asked for",
+      !("temporaryPassword" in (selfChange.body ?? {})) && !JSON.stringify(selfChange.body).includes("scrypt"),
+      `body=${JSON.stringify(selfChange.body)?.slice(0, 180)}`
+    );
+    const [adminAfterSelf] = await db
+      .select({ hash: schema.studentProfiles.passwordHash, changedAt: schema.studentProfiles.passwordChangedAt })
+      .from(schema.studentProfiles)
+      .where(eq(schema.studentProfiles.id, recoveryAdmin.id));
+    check("the new admin password verifies", verifyPassword(NEW_ADMIN_PASSWORD, adminAfterSelf?.hash));
+    check("the old admin password no longer verifies", !verifyPassword(ADMIN_PASSWORD, adminAfterSelf?.hash));
+    check(
+      "the self-service change stamps password_changed_at",
+      Boolean(adminAfterSelf?.changedAt) &&
+        new Date(adminAfterSelf?.changedAt as Date).getTime() > new Date(beforeSelf.rows[0]?.password_changed_at).getTime(),
+      `before=${beforeSelf.rows[0]?.password_changed_at} after=${adminAfterSelf?.changedAt}`
+    );
+
+    // This browser keeps working; the other device does not.
+    const selfCookie = String(selfChange.headers?.get?.("set-cookie") ?? "");
+    const newCookieValue = selfCookie.split(";")[0];
+    check(
+      "the operator stays signed in on this browser",
+      newCookieValue.startsWith("sb_session=") && newCookieValue.length > 40,
+      `cookie=${selfCookie.slice(0, 40)}`
+    );
+    const newToken = newCookieValue.replace("sb_session=", "");
+    check(
+      "the fresh session is live immediately",
+      (await checkSessionRecord(newToken, recoveryAdmin.id, { scope: "web" })) === "ok",
+      "the new session was revoked by its own cleanup"
+    );
+    check(
+      "every other device is signed out by the change",
+      (await checkSessionRecord(secondDeviceToken, recoveryAdmin.id, { scope: "web" })) === "revoked",
+      "an old device survived the change"
+    );
+    check(
+      "the pre-change admin cookie no longer works",
+      (await checkSessionRecord(adminToken, recoveryAdmin.id, { scope: "web" })) === "revoked",
+      "the old admin session is still live"
+    );
+
+    // Audited, under the account's own name, with no credential in the row.
+    const selfAudits = await pool.query(
+      `SELECT field_changed, new_value, actor FROM audit_logs WHERE entity_id = $1 AND entity_type = 'profile' ORDER BY id DESC`,
+      [recoveryAdmin.id]
+    );
+    check(
+      "the self-service change is audited under the account's own email",
+      selfAudits.rows[0]?.actor === ADMIN_EMAIL && selfAudits.rows[0]?.field_changed === "password_hash",
+      `row=${JSON.stringify(selfAudits.rows[0])?.slice(0, 160)}`
+    );
+    check(
+      "the audit row for a self-change holds no password",
+      !String(selfAudits.rows[0]?.new_value ?? "").includes(NEW_ADMIN_PASSWORD),
+      "the password reached the audit log"
     );
 
     await db.delete(schema.studentProfiles).where(inArray(schema.studentProfiles.id, [student.id, recoveryAdmin.id]));
