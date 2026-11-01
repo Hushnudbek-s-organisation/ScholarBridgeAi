@@ -7,6 +7,8 @@ import { LessonQuiz, Quiz } from "./LessonQuiz";
 import { CertificateView } from "./CertificateView";
 import { SmartVideoPlayer } from "./SmartVideoPlayer";
 import { LessonNotes } from "./LessonNotes";
+import { Button } from "@/components/ui/Button";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 interface LessonDetail {
   id: number;
@@ -118,7 +120,7 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
 
   if (!detail) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-10 text-center">
+      <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-10 text-center">
         <p className="text-sm text-slate-500">{t("loading")}</p>
       </div>
     );
@@ -127,25 +129,25 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <button onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+        <Button variant="unstyled" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
           <ArrowLeft className="h-4 w-4" /> {t("back")}
-        </button>
+        </Button>
         <div className="flex items-center gap-3">
           <div className="text-xs text-slate-500">
             {detail.completedLessons}/{detail.totalLessons} {t("lessons")} · {detail.progressPct}% {t("courseProgress")}
           </div>
           <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${detail.progressPct}%` }} />
+            <ProgressFill value={detail.progressPct} className="h-full bg-indigo-600 rounded-full" />
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lesson sidebar */}
-        <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-xs p-4 h-fit space-y-4">
+        <div className="lg:col-span-1 bg-white rounded-overlay border border-slate-200 shadow-xs p-4 h-fit space-y-4">
           <div>
             <h2 className="font-extrabold text-slate-900 text-base">{detail.course.title}</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-sm text-slate-500 mt-0.5">
               {t("instructor")}: {detail.course.instructorName}
             </p>
           </div>
@@ -153,7 +155,7 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
           <div className="space-y-3">
             {detail.modules.map((module, mIdx) => (
               <div key={module.id}>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-1.5">
                   {mIdx + 1}. {module.title}
                 </p>
                 <div className="space-y-1">
@@ -161,10 +163,10 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
                     const isActive = selectedLessonId === lesson.id;
                     const isDone = lesson.progress?.isCompleted;
                     return (
-                      <button
+                      <Button variant="unstyled"
                         key={lesson.id}
                         onClick={() => setSelectedLessonId(lesson.id)}
-                        className={`w-full text-left px-3 py-2 rounded-xl flex items-start gap-2 transition-colors ${
+                        className={`w-full text-left px-3 py-2 rounded-surface flex items-start gap-2 transition-colors ${
                           isActive ? "bg-indigo-600 text-white" : "hover:bg-slate-100 text-slate-700"
                         }`}
                       >
@@ -175,12 +177,12 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
                         )}
                         <span className="text-xs font-medium leading-tight">
                           {lIdx + 1}. {lesson.title}
-                          <span className={`block text-[10px] mt-0.5 ${isActive ? "text-indigo-200" : "text-slate-400"}`}>
+                          <span className={`block text-xs mt-0.5 ${isActive ? "text-indigo-200" : "text-slate-500"}`}>
                             <Clock className="h-3 w-3 inline mr-0.5" />
                             {Math.round((lesson.durationSeconds || 0) / 60)}m
                           </span>
                         </span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -193,7 +195,7 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
         <div className="lg:col-span-2 space-y-4">
           {selectedLesson && (
             <>
-              <div className="bg-slate-900 rounded-2xl overflow-hidden">
+              <div className="bg-slate-900 rounded-overlay overflow-hidden">
                 {/* YouTube / Vimeo / Loom links become real embeds; direct
                     .mp4 files keep the native player. */}
                 <SmartVideoPlayer
@@ -205,11 +207,11 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
                 />
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-3">
+              <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-5 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="break-words text-base font-bold text-slate-900">{selectedLesson.title}</h3>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       {selectedLesson.progress?.isCompleted
                         ? `✓ ${t("lessonCompleted")}`
                         : t("watchToComplete")}
@@ -218,40 +220,40 @@ export function CoursePlayer({ courseId, profileId, profileName, onBack }: Cours
 
                   <div className="flex flex-wrap items-center gap-2">
                     {selectedLesson.progress?.isCompleted ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-700">
+                      <span className="inline-flex items-center gap-1.5 rounded-surface border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-700">
                         <CheckCircle2 className="h-4 w-4" />
                         {t("lessonCompleted")}
                       </span>
                     ) : (
-                      <button
+                      <Button variant="unstyled"
                         type="button"
                         onClick={() => reportProgress(selectedLesson.durationSeconds || 300, true)}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-extrabold text-white shadow-xs transition-colors hover:bg-emerald-800"
+                        className="inline-flex items-center gap-1.5 rounded-surface bg-emerald-700 px-3.5 py-2 text-xs font-extrabold text-white shadow-xs transition-colors hover:bg-emerald-800"
                       >
                         <CheckCircle2 className="h-4 w-4" />
                         {t("markCompleteBtn")}
-                      </button>
+                      </Button>
                     )}
 
                     {nextLesson && (
-                      <button
+                      <Button variant="unstyled"
                         type="button"
                         onClick={() => {
                           setSelectedLessonId(nextLesson.id);
                           lastReport.current = 0;
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-extrabold text-indigo-700 transition-colors hover:bg-indigo-100"
+                        className="inline-flex items-center gap-1.5 rounded-surface border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-extrabold text-indigo-700 transition-colors hover:bg-indigo-100"
                       >
                         {t("nextLessonBtn")}
                         <ArrowRight className="h-4 w-4" />
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
 
                 {selectedLesson.content && (
                   <div className="border-t border-slate-100 pt-3">
-                    <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                    <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">
                       {t("lessonContent")}
                     </p>
                     <LessonNotes content={selectedLesson.content} />

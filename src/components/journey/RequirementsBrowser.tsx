@@ -14,13 +14,14 @@ import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ExternalLink } from "lucide-react";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
-import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, StatusIcon, daysLabel, toneForDays } from "./ui";
+import { Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, StatusIcon, daysLabel, toneForDays } from "@/components/ui/journey";
 import { AppNote } from "@/components/AppNote";
 import {
   DEFAULT_REQUIREMENT_TEMPLATES,
   REQUIREMENT_SECTIONS,
   type RequirementSection,
 } from "@/lib/journey/requirements";
+import { Button } from "@/components/ui/Button";
 
 interface AppRow {
   id: number;
@@ -255,20 +256,20 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
         <JourneyCard title={t("rbBlueprintTitle")} subtitle={t("rbBlueprintSubtitle")}>
           <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label={t("rbBlueprintDegreeLabel")}>
             {BLUEPRINT.map((b) => (
-              <button
+              <Button variant="unstyled"
                 key={b.degree}
                 type="button"
                 role="tab"
                 aria-selected={b.degree === degree}
                 onClick={() => setBlueprintDegree(b.degree)}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition ${
                   b.degree === degree
                     ? "border-indigo-600 bg-indigo-600 text-white"
                     : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`}
               >
                 {t(`rbDegree.${b.degree}`)}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -289,37 +290,37 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
               const extras = sec.items.filter((i) => !publishedTitles.has(i));
               if (published.length === 0 && extras.length === 0) return null;
               return (
-                <div key={sec.section} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <div key={sec.section} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
+                  <p className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     {t(`rbSection.${sec.section}`)}
                   </p>
                   <ul className="mt-1.5 space-y-1.5">
                     {published.map((item) => (
-                      <li key={item.itemKey} className="text-xs text-slate-600 dark:text-slate-300">
+                      <li key={item.itemKey} className="text-sm text-slate-600 dark:text-slate-300">
                         <span className="flex items-start gap-1.5">
-                          <span aria-hidden className="text-slate-400">•</span>
+                          <span aria-hidden className="text-slate-500">•</span>
                           <span className="font-semibold">{item.title}</span>
                           {/* Same uppercase micro-label the generated
                               checklist rows use, so the preview reads as a
                               preview of those rows. */}
                           <span
-                            className={`ml-auto shrink-0 text-[10px] uppercase ${
-                              item.isRequired ? "font-semibold text-indigo-600 dark:text-indigo-300" : "text-slate-400"
+                            className={`ml-auto shrink-0 text-xs uppercase ${
+                              item.isRequired ? "font-semibold text-indigo-600 dark:text-indigo-300" : "text-slate-500"
                             }`}
                           >
                             {item.isRequired ? t("rbRequired") : t("rbOptional")}
                           </span>
                         </span>
                         {item.instructions && (
-                          <span className="mt-0.5 block pl-3.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="mt-0.5 block pl-3.5 text-xs text-slate-500 dark:text-slate-400">
                             {item.instructions}
                           </span>
                         )}
                       </li>
                     ))}
                     {extras.map((item, i) => (
-                      <li key={`x${i}`} className="flex gap-1.5 text-xs text-slate-600 dark:text-slate-300">
-                        <span aria-hidden className="text-slate-400">•</span>
+                      <li key={`x${i}`} className="flex gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+                        <span aria-hidden className="text-slate-500">•</span>
                         <span>{item}</span>
                       </li>
                     ))}
@@ -328,7 +329,7 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
               );
             })}
           </div>
-          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500 dark:bg-slate-900/40 dark:text-slate-400">
+          <p className="mt-3 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:bg-slate-900/40 dark:text-slate-400">
             {t("rbBlueprintNote")}
           </p>
           <AppNote kind="catalogue" className="mt-2" />
@@ -345,24 +346,24 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
       >
         <div className="flex flex-wrap gap-1.5">
           {apps.map((a) => (
-            <button
+            <Button variant="unstyled"
               key={a.id}
               type="button"
               onClick={() => setSelected(a.id)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+              className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition ${
                 selected === a.id
                   ? "border-indigo-600 bg-indigo-600 text-white"
                   : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               }`}
             >
               {a.universityName}
-            </button>
+            </Button>
           ))}
         </div>
       </JourneyCard>
 
       {detailLoading && <Loading label={t("rbLoadingChecklist")} />}
-      {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
+      {error && <p className="rounded-control bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
 
       {data && !detailLoading && (
         <JourneyCard
@@ -371,7 +372,7 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
           action={
             <div className="text-right">
               <p className="text-xl font-extrabold text-slate-900 dark:text-white">{data.progress.pct}%</p>
-              <p className="text-[10px] font-bold uppercase text-slate-500">
+              <p className="text-sm font-bold uppercase text-slate-500">
                 {t("rbDone", { done: data.progress.done, total: data.progress.total })}
               </p>
             </div>
@@ -388,7 +389,7 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
                   <div className="mb-1.5 flex items-center justify-between">
                     <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{t(`sec${section[0].toUpperCase()}${section.slice(1)}`)}</h3>
                     {s && (
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-xs text-slate-500">
                         {s.done}/{s.total}
                       </span>
                     )}
@@ -397,19 +398,19 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
                     {items.map((r) => (
                       <li
                         key={r.id}
-                        className="flex flex-wrap items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700"
+                        className="flex flex-wrap items-start gap-2 rounded-control border border-slate-200 px-3 py-2 dark:border-slate-700"
                       >
                         <StatusIcon state={r.status} className="mt-0.5 h-4 w-4" />
                         <div className="min-w-0 flex-1">
                           <p
                             className={`text-sm font-medium ${
-                              r.status === "done" ? "text-slate-400 line-through" : "text-slate-800 dark:text-slate-100"
+                              r.status === "done" ? "text-slate-500 line-through" : "text-slate-800 dark:text-slate-100"
                             }`}
                           >
                             {r.title}
-                            {!r.isRequired && <span className="ml-1 text-[10px] uppercase text-slate-400">{t("rbOptional")}</span>}
+                            {!r.isRequired && <span className="ml-1 text-xs uppercase text-slate-500">{t("rbOptional")}</span>}
                           </p>
-                          {r.instructions && <p className="text-xs text-slate-500 dark:text-slate-400">{r.instructions}</p>}
+                          {r.instructions && <p className="text-sm text-slate-500 dark:text-slate-400">{r.instructions}</p>}
                           <div className="mt-0.5 flex flex-wrap items-center gap-2">
                             <SourceTag
                               url={r.sourceUrl}
@@ -435,7 +436,7 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
                 href={data.university.applicationUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="inline-flex items-center gap-1 rounded-control border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <ExternalLink className="h-3.5 w-3.5" /> {t("rbOfficialLink")}
               </a>

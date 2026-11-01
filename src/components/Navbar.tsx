@@ -69,6 +69,7 @@ import {
 } from "@/lib/navSections";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { loadBootConfig } from "@/lib/bootConfig";
+import { Button } from "@/components/ui/Button";
 
 export interface StudentProfile {
   id: number;
@@ -613,23 +614,23 @@ export function Navbar({
       ? "text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-500/10"
       : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white";
     return (
-      <button
+      <Button variant="unstyled"
         key={item.id}
         onClick={() => go(item.id)}
         aria-current={isActive ? "page" : undefined}
-        className={`relative flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors duration-150 ${stateCls}`}
+        className={`relative flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-control px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${stateCls}`}
       >
         {isActive && (
-          <motion.span layoutId={layoutId} className={`absolute inset-0 rounded-lg shadow-xs ${activeBg}`} transition={LAYOUT_SPRING} />
+          <motion.span layoutId={layoutId} className={`absolute inset-0 rounded-control shadow-xs ${activeBg}`} transition={LAYOUT_SPRING} />
         )}
         <Icon className={`relative h-4 w-4 shrink-0 ${isActive ? "" : item.premium ? "text-amber-500" : "text-slate-500 dark:text-slate-400"}`} />
         <span className="relative min-w-0 flex-1 break-words whitespace-normal">{item.label}</span>
         {item.premium && !isActive && (
-          <span className="relative rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+          <span className="relative rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
             {t("proBadge")}
           </span>
         )}
-      </button>
+      </Button>
     );
   };
 
@@ -649,11 +650,11 @@ export function Navbar({
     const open = !collapsedGroups[g];
     return (
       <div key={g}>
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={() => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }))}
           aria-expanded={open}
-          className="mb-1 flex min-h-11 w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="mb-1 flex min-h-11 w-full items-center gap-1.5 rounded-control px-3 py-1.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
           <span aria-hidden>{NAV_GROUP_ICONS[g]}</span>
           {t(NAV_GROUP_I18N[g])}
@@ -661,12 +662,12 @@ export function Navbar({
             // The badge is a visual hint; the accessible name of the group
             // button stays just the group name ("Explore"), so a screen reader
             // does not announce a bare number before the collapsed state.
-            <span aria-hidden="true" className="ml-auto rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            <span aria-hidden="true" className="ml-auto rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-semibold leading-none text-slate-500 dark:bg-slate-800 dark:text-slate-400">
               {items.length}
             </span>
           )}
           <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
-        </button>
+        </Button>
         {open && <div className="space-y-0.5">{items.map((item) => renderItem(item, layoutId))}</div>}
       </div>
     );
@@ -682,46 +683,46 @@ export function Navbar({
 
   const renderUtility = (layoutId: string) => (
     <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
-      <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t("accountCluster")}</p>
+      <p className="mb-1 px-3 text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t("accountCluster")}</p>
       <div className="space-y-0.5">{utilityItems.map((item) => renderItem(item, `${layoutId}-utility`))}</div>
     </div>
   );
 
   const Logo = (
     <div className="flex items-center gap-2.5 min-w-0">
-      <div className="sb-logo-well h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md shadow-indigo-200 dark:shadow-black/40">
+      <div className="sb-logo-well h-9 w-9 shrink-0 overflow-hidden rounded-surface border border-slate-200 bg-white shadow-md shadow-indigo-200 dark:shadow-black/40">
         <BrandingImage alt={t("logoAlt")} className="h-9 w-9 object-cover" />
       </div>
       <div className="min-w-0">
         <span className="block break-words text-lg font-bold tracking-tight text-slate-900 dark:text-white">{tm("appName")}</span>
-        <p className="break-words text-[10px] text-slate-500 dark:text-slate-400">{tm("tagline")}</p>
+        <p className="break-words text-sm text-slate-500 dark:text-slate-400">{tm("tagline")}</p>
       </div>
     </div>
   );
 
   const SearchButton = (
-    <button
+    <Button variant="unstyled"
       onClick={openSearch}
-      className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs text-slate-500 transition-colors hover:border-indigo-200 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+      className="flex min-h-11 w-full items-center gap-2 rounded-control border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs text-slate-500 transition-colors hover:border-indigo-200 hover:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
     >
       <Search className="h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1 break-words">{t("searchButton")}</span>
-      <kbd className="hidden rounded border border-slate-200 bg-white px-1.5 py-0.5 font-sans text-[10px] text-slate-500 dark:border-slate-600 dark:bg-slate-900 xl:inline">Ctrl K</kbd>
-    </button>
+      <kbd className="hidden rounded-control border border-slate-200 bg-white px-1.5 py-0.5 font-sans text-xs text-slate-500 dark:border-slate-600 dark:bg-slate-900 xl:inline">Ctrl K</kbd>
+    </Button>
   );
 
   const renderProfileCard = (inDrawer = false) => (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800/60">
+    <div className="rounded-surface border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-800/60">
       <div className="flex items-center gap-2.5">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 items-center gap-1 break-words text-xs font-bold text-slate-900 dark:text-white">
+          <p className="flex min-w-0 items-center gap-1 break-words text-sm font-bold text-slate-900 dark:text-white">
             <span className="min-w-0 break-words">{activeProfile?.name || t("noProfile")}</span>
             {isAdmin && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-slate-600 dark:text-slate-300" />}
           </p>
-          <p className="break-all text-[10px] text-slate-500 dark:text-slate-400">
+          <p className="break-all text-sm text-slate-500 dark:text-slate-400">
             {activeProfile?.email && !isTelegramPlaceholderEmail(activeProfile.email) ? activeProfile.email : activeProfile?.email ? "Telegram" : t("studentProfile")}
           </p>
         </div>
@@ -733,38 +734,38 @@ export function Navbar({
         {!inDrawer && <NotificationBell profileId={activeProfileId ?? null} placement="up" />}
       </div>
       <div className="mt-2 grid grid-cols-3 gap-1.5">
-        <button
+        <Button variant="unstyled"
           onClick={() => {
             setDrawerOpen(false);
             onOpenProfileModal(false);
           }}
-          className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-indigo-200 bg-indigo-50 px-0.5 py-1.5 text-[10px] font-bold leading-tight tracking-tight text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300"
+          className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-control border border-indigo-200 bg-indigo-50 px-0.5 py-1.5 text-xs font-bold leading-tight tracking-tight text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300"
           title={t("editProfile")}
         >
           <Pencil className="h-3.5 w-3.5" /> <span className="max-w-full break-words whitespace-normal">{t("edit")}</span>
-        </button>
+        </Button>
         {onSwitchProfile && (
-          <button
+          <Button variant="unstyled"
             onClick={() => {
               setDrawerOpen(false);
               onSwitchProfile();
             }}
-            className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-0.5 py-1.5 text-[10px] font-bold leading-tight tracking-tight text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+            className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-control border border-slate-200 bg-white px-0.5 py-1.5 text-xs font-bold leading-tight tracking-tight text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
             title={t("switchAccountTitle")}
           >
             <ArrowLeftRight className="h-3.5 w-3.5" /> <span className="max-w-full break-words whitespace-normal">{activeProfile ? t("switch") : t("signIn")}</span>
-          </button>
+          </Button>
         )}
-        <button
+        <Button variant="unstyled"
           onClick={() => {
             setDrawerOpen(false);
             (onStartOnboarding ?? (() => onOpenProfileModal(true)))();
           }}
-          className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-0.5 py-1.5 text-[10px] font-bold leading-tight tracking-tight text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+          className="flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-control border border-slate-200 bg-white px-0.5 py-1.5 text-xs font-bold leading-tight tracking-tight text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
           title={t("addNewTitle")}
         >
           <Plus className="h-3.5 w-3.5" /> <span className="max-w-full break-words whitespace-normal">{t("addShort")}</span>
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -774,14 +775,14 @@ export function Navbar({
       <LanguageSwitcher onLocaleChange={onLocaleChange} compact />
       <ThemeToggle />
       {onLogout && (
-        <button
+        <Button variant="unstyled"
           onClick={onLogout}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
           title={t("logout")}
           aria-label={t("logout")}
         >
           <LogOut className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -804,16 +805,16 @@ export function Navbar({
     <>
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[70] focus:rounded-lg focus:bg-indigo-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[70] focus:rounded-control focus:bg-indigo-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
       >
         {t("skipToContent")}
       </a>
 
       {/* ================= LAPTOP / DESKTOP: LEFT SIDEBAR ================= */}
       <aside className="sticky top-0 z-40 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex xl:w-72 dark:border-slate-800 dark:bg-slate-900">
-        <button className="min-h-11 border-b border-slate-100 px-5 py-4 text-left dark:border-slate-800" onClick={() => go("dashboard")}>
+        <Button variant="unstyled" className="min-h-11 border-b border-slate-100 px-5 py-4 text-left dark:border-slate-800" onClick={() => go("dashboard")}>
           {Logo}
-        </button>
+        </Button>
         <div className="px-3 pt-3">{SearchButton}</div>
         <nav className="no-scrollbar flex-1 overflow-y-auto overscroll-contain px-3 py-3" aria-label={t("mainNav")}>
           {renderGroups("nav-active-desktop")}
@@ -833,31 +834,31 @@ export function Navbar({
           list. */}
       <aside className="sticky top-0 z-40 hidden h-screen w-20 shrink-0 flex-col items-center justify-between border-r border-slate-200 bg-white py-3 md:flex lg:hidden dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col items-center gap-1.5">
-          <button
+          <Button variant="unstyled"
             onClick={() => go("dashboard")}
-            className="flex h-11 w-11 items-center justify-center rounded-xl transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="flex h-11 w-11 items-center justify-center rounded-surface transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
             aria-label={tm("appName")}
           >
-            <span className="sb-logo-well h-9 w-9 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <span className="sb-logo-well h-9 w-9 overflow-hidden rounded-control border border-slate-200 bg-white shadow-sm">
               <BrandingImage alt={t("logoAlt")} className="h-9 w-9 object-cover" />
             </span>
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             onClick={openSearch}
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="flex h-11 w-11 items-center justify-center rounded-control text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             aria-label={t("searchButton")}
           >
             <Search className="h-[18px] w-[18px]" />
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             onClick={() => setDrawerOpen(true)}
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex h-11 w-11 items-center justify-center rounded-control text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
             aria-label={t("openMenu")}
             aria-expanded={drawerOpen}
             aria-haspopup="dialog"
           >
             <Menu className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         <nav
@@ -868,12 +869,12 @@ export function Navbar({
             const Icon = item.icon;
             const isActive = isDestinationActive(item.id);
             return (
-              <button
+              <Button variant="unstyled"
                 key={item.id}
                 onClick={() => go(item.id)}
                 aria-current={isActive ? "page" : undefined}
                 title={item.label}
-                className={`relative flex min-h-16 w-full min-w-11 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition-colors ${
+                className={`relative flex min-h-16 w-full min-w-11 flex-col items-center justify-center gap-1 rounded-surface px-1 py-1.5 text-xs font-semibold transition-colors ${
                   isActive
                     ? "text-indigo-600 dark:text-indigo-300"
                     : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
@@ -882,7 +883,7 @@ export function Navbar({
                 {isActive && (
                   <motion.span
                     layoutId="nav-active-tablet"
-                    className="absolute inset-0 rounded-xl bg-indigo-50 dark:bg-indigo-500/10"
+                    className="absolute inset-0 rounded-surface bg-indigo-50 dark:bg-indigo-500/10"
                     transition={LAYOUT_SPRING}
                   />
                 )}
@@ -890,7 +891,7 @@ export function Navbar({
                 <span className="relative w-full min-w-0 break-words whitespace-normal text-center leading-tight">
                   {item.label}
                 </span>
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -898,43 +899,43 @@ export function Navbar({
         <div className="flex flex-col items-center gap-1.5">
           <NotificationBell profileId={activeProfileId ?? null} placement="up" />
           <ThemeSwitch />
-          <button
+          <Button variant="unstyled"
             onClick={() => onOpenProfileModal(false)}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white transition-colors hover:bg-indigo-700"
             aria-label={t("editProfile")}
             title={t("editProfile")}
           >
             {initials}
-          </button>
+          </Button>
         </div>
       </aside>
 
       {/* ================= PHONE: TOP BAR ================= */}
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-xs backdrop-blur-md md:hidden dark:border-slate-800 dark:bg-slate-900/95">
         <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
-          <button
+          <Button variant="unstyled"
             onClick={() => setDrawerOpen(true)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
             aria-label={t("openMenu")}
             aria-expanded={drawerOpen}
             aria-haspopup="dialog"
           >
             <Menu className="h-5 w-5" />
-          </button>
-          <button className="flex min-h-11 min-w-0 items-center gap-2" onClick={() => go("dashboard")}>
-            <div className="sb-logo-well h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          </Button>
+          <Button variant="unstyled" className="flex min-h-11 min-w-0 items-center gap-2" onClick={() => go("dashboard")}>
+            <div className="sb-logo-well h-8 w-8 shrink-0 overflow-hidden rounded-control border border-slate-200 bg-white shadow-sm">
               <BrandingImage alt={t("logoAlt")} className="h-8 w-8 object-cover" />
             </div>
             <span className="break-words text-base font-bold tracking-tight text-slate-900 dark:text-white">{tm("appName")}</span>
-          </button>
+          </Button>
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            <button
+            <Button variant="unstyled"
               onClick={openSearch}
-              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="flex h-11 w-11 items-center justify-center rounded-control text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               aria-label={t("searchButton")}
             >
               <Search className="h-[18px] w-[18px]" />
-            </button>
+            </Button>
             <NotificationBell profileId={activeProfileId ?? null} />
             <span className="hidden sm:inline-flex">
               <ThemeSwitch />
@@ -953,11 +954,11 @@ export function Navbar({
             const Icon = item.icon;
             const isActive = activeGroup === item.group;
             return (
-              <button
+              <Button variant="unstyled"
                 key={item.group}
                 onClick={() => go(item.section)}
                 aria-current={isActive ? "page" : undefined}
-                className={`relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-1.5 text-[10px] font-semibold transition-colors ${
+                className={`relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-1.5 text-xs font-semibold transition-colors ${
                   isActive ? "text-indigo-600 dark:text-indigo-300" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
                 }`}
               >
@@ -970,20 +971,20 @@ export function Navbar({
                 )}
                 <Icon className="h-5 w-5" />
                 <span className="w-full min-w-0 break-words whitespace-normal text-center leading-tight">{t(item.labelKey)}</span>
-              </button>
+              </Button>
             );
           })}
-          <button
+          <Button variant="unstyled"
             onClick={() => setDrawerOpen(true)}
             aria-expanded={drawerOpen}
             aria-haspopup="dialog"
-            className={`relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-1.5 text-[10px] font-semibold ${
+            className={`relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-1.5 text-xs font-semibold ${
               activeInBottomBar ? "text-slate-500 dark:text-slate-400" : "text-indigo-600 dark:text-indigo-300"
             }`}
           >
             <Menu className="h-5 w-5" />
             <span>{t("tabMore")}</span>
-          </button>
+          </Button>
         </div>
       </nav>
 
@@ -1010,13 +1011,13 @@ export function Navbar({
             >
               <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                 {Logo}
-                <button
+                <Button variant="unstyled"
                   onClick={() => setDrawerOpen(false)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                   aria-label={t("close")}
                 >
                   <X className="h-5 w-5" />
-                </button>
+                </Button>
               </div>
               <div className="space-y-2.5 px-3 pt-3">
                 {renderProfileCard(true)}

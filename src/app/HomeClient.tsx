@@ -25,12 +25,13 @@ import { SectionIntro } from "@/components/SectionIntro";
 import { AppNote } from "@/components/AppNote";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { DailyStreakCard } from "@/components/DailyStreakCard";
-import { PanelSkeleton } from "@/components/hubs/ui";
+import { PanelSkeleton } from "@/components/ui/hubs";
 import {
   SESSION_RESTORE_MAX_ATTEMPTS,
   sessionRestoreDelayMs,
   shouldRetrySessionRestore,
 } from "@/lib/sessionRestore";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Every heavy screen is a separate chunk: the admin panel, the payments and
@@ -154,27 +155,27 @@ function SessionNotice({
     <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex justify-center px-3 pt-3">
       <div
         role="status"
-        className="pointer-events-auto flex w-full max-w-2xl flex-wrap items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-left shadow-lg dark:border-amber-700 dark:bg-amber-950"
+        className="pointer-events-auto flex w-full max-w-2xl flex-wrap items-start gap-3 rounded-overlay border border-amber-300 bg-amber-50 px-4 py-3 text-left shadow-lg dark:border-amber-700 dark:bg-amber-950"
       >
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-amber-900 dark:text-amber-100">{text.noticeTitle}</p>
-          <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-200">{message || text.noticeBody}</p>
+          <p className="mt-0.5 text-sm text-amber-800 dark:text-amber-200">{message || text.noticeBody}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onRetry}
-            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700"
+            className="rounded-control bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-800"
           >
             {text.retry}
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             onClick={onDismiss}
-            className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
+            className="rounded-control border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
           >
             {text.dismiss}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -1044,7 +1045,7 @@ export function Home({
 
       <div className="flex-1 min-w-0 flex flex-col">
       <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 md:pb-6 lg:px-8 lg:pb-6">
-        <div className="mx-auto w-full max-w-7xl">
+        <div className="mx-auto w-full max-w-screen-2xl">
         {/*
           The new-account reminder lives in the shell, not in one tab: in the
           first ten days a student may land on any screen, and the point of the
@@ -1316,10 +1317,10 @@ export function Home({
         {/* Small print above Terms / Privacy: the app shows AI-written text
             and compiled catalogue data, both of which can be wrong or out of
             date. One honest line wherever the user ends up. */}
-        <div className="mx-auto mb-4 max-w-7xl border-b border-slate-100 px-4 pb-4">
+        <div className="mx-auto mb-4 max-w-screen-2xl border-b border-slate-100 px-4 pb-4">
           <AppNote kind="general" className="mx-auto max-w-[900px] text-left" />
         </div>
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="max-w-screen-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <p>© {new Date().getFullYear()} ScholarBridgeAI • Democratizing Global Higher Education Access</p>
             <div className="flex items-center gap-3">
@@ -1335,15 +1336,15 @@ export function Home({
               must be reachable with Tab and announced as controls. `flex-wrap`
               keeps the row inside the viewport at 200% zoom. */}
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("universities")}>
+            <Button variant="unstyled" type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("universities")}>
               University Matcher
-            </button>
-            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("scholarships")}>
+            </Button>
+            <Button variant="unstyled" type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("scholarships")}>
               Scholarship Discovery
-            </button>
-            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("mentor")}>
+            </Button>
+            <Button variant="unstyled" type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-1 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" onClick={() => setActiveTab("mentor")}>
               AI Mentor
-            </button>
+            </Button>
           </div>
         </div>
       </footer>

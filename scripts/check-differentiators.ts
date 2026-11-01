@@ -660,7 +660,7 @@ check("the SOP studio shows the structure bar for the generated draft", sopStudi
 check("the SOP studio shows the structure bar while pasting a draft too", sopStudio.includes("text={existingDraft}"));
 
 const deadlineCenter = read("src/components/DeadlineCenter.tsx");
-check("the deadline centre mounts the backwards timeline above its list", deadlineCenter.includes("<SmartTimelineCalendar") && deadlineCenter.indexOf("<SmartTimelineCalendar") < deadlineCenter.indexOf('className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"'));
+check("the deadline centre mounts the backwards timeline above its list", deadlineCenter.includes("<SmartTimelineCalendar") && deadlineCenter.indexOf("<SmartTimelineCalendar") < deadlineCenter.indexOf('className="overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-xs"'));
 
 const prepare = read("src/components/journey/PreparePanels.tsx");
 const explore = read("src/components/journey/ExplorePanels.tsx");

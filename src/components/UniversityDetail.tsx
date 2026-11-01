@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ShowMoreToggle } from "./hubs/ui";
+import { ShowMoreToggle } from "@/components/ui/hubs";
 import { useTranslations } from "next-intl";
 import { fitTier } from "@/lib/fitBadge";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
@@ -42,6 +42,7 @@ import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/client
 import { localizeCity, localizeCountry, localizeCoverageType } from "@/lib/catalogLocalizer";
 import { CountryFlag } from "@/components/CountryFlag";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
+import { Button } from "@/components/ui/Button";
 
 interface UniversityDetailData {
   id: number;
@@ -282,12 +283,12 @@ function Field({ label, value, icon }: { label: string; value: string; icon?: Re
     value === NOT_SPECIFIED ? t("notSpecified") : value === NOT_AVAILABLE ? t("notAvailable") : value;
   const isMissing = value === NOT_SPECIFIED || value === NOT_AVAILABLE;
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-3">
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+    <div className="rounded-surface border border-slate-100 bg-slate-50/60 px-3.5 py-3">
+      <p className="text-sm font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
         {icon}
         {label}
       </p>
-      <p className={`mt-1 text-sm font-bold ${isMissing ? "text-slate-400" : "text-slate-800"}`}>
+      <p className={`mt-1 text-sm font-bold ${isMissing ? "text-slate-500" : "text-slate-800"}`}>
         {display}
       </p>
     </div>
@@ -521,11 +522,11 @@ export function UniversityDetail({
       ? error === "load-failed" ? t("loadFailed") : error
       : t("notFound");
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-xs font-bold text-red-700">{errorText}</p>
-        <button onClick={onBack} className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white">
+      <div className="rounded-overlay border border-rose-200 bg-rose-50 p-8 text-center">
+        <p className="text-sm font-bold text-rose-700">{errorText}</p>
+        <Button variant="unstyled" onClick={onBack} className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2 text-xs font-bold text-white">
           <ArrowLeft className="h-3.5 w-3.5" /> {t("backToList")}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -533,15 +534,15 @@ export function UniversityDetail({
   return (
     <div className="space-y-6">
       {/* Back */}
-      <button
+      <Button variant="unstyled"
         onClick={onBack}
         className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> {t("backToUnis")}
-      </button>
+      </Button>
 
       {/* ===== HERO (spec §2) ===== */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-overlay bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl">
         {uni.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -559,7 +560,7 @@ export function UniversityDetail({
         <div className="absolute inset-0 bg-black/10" />
         <div className="relative p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row items-start gap-5">
-            <div className="sb-logo-well h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-white shadow-2xl border overflow-hidden flex items-center justify-center shrink-0">
+            <div className="sb-logo-well h-24 w-24 sm:h-28 sm:w-28 rounded-overlay bg-white shadow-2xl border overflow-hidden flex items-center justify-center shrink-0">
               {uni.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -591,13 +592,13 @@ export function UniversityDetail({
               </p>
               {match && (
                 <div className="mt-3 space-y-1">
-                  <div className="inline-flex flex-wrap items-center gap-2 rounded-xl bg-emerald-400/15 backdrop-blur-md border border-emerald-300/30 px-3 py-1.5">
+                  <div className="inline-flex flex-wrap items-center gap-2 rounded-surface bg-emerald-400/15 backdrop-blur-md border border-emerald-300/30 px-3 py-1.5">
                     <Target className="h-4 w-4 text-emerald-300" />
                     <span className="text-xs font-bold">
                       {t("fitBadge", { score: match.score, category: t(`fitTier.${fitTier(match.score)}` as never) })}
                     </span>
                   </div>
-                  <p className="max-w-xl text-[11px] leading-snug text-indigo-100/90">
+                  <p className="max-w-xl text-sm leading-snug text-indigo-100/90">
                     {t("fitNotChance")}
                     {match.reasons[0] ? ` ${match.reasons[0]}` : ""}
                   </p>
@@ -616,7 +617,7 @@ export function UniversityDetail({
               {typeof chance?.score === "number" && (
                 <div className="mt-3">
                   <span
-                    className="inline-flex flex-wrap items-center gap-1.5 rounded-xl bg-violet-500/20 backdrop-blur-md border border-violet-300/30 px-3 py-1.5 text-xs font-bold"
+                    className="inline-flex flex-wrap items-center gap-1.5 rounded-surface bg-violet-500/20 backdrop-blur-md border border-violet-300/30 px-3 py-1.5 text-xs font-bold"
                     title={chance.selectivityCategory || undefined}
                   >
                     🎯 {t("chanceBadgeLabel", { score: chance.score })}
@@ -632,7 +633,7 @@ export function UniversityDetail({
                   position, and the list API already drops it — so the block is
                   omitted rather than rendered as "QS Ranking —". */}
               {uni.worldRanking != null && (
-                <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">
+                <div className="mt-3 inline-flex items-center gap-2 rounded-surface bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">
                   <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
                   <span className="text-xs font-bold">
                     {t("qsRanking")}
@@ -646,7 +647,7 @@ export function UniversityDetail({
               {/* Pillar 5.1 — rank-verified state-scholarship eligibility. Stated
                   as a criterion match, never as an award promise. */}
               {uni.worldRanking != null && uni.worldRanking <= 300 && (
-                <p className="mt-2 inline-flex max-w-full items-center rounded-xl bg-amber-300/15 px-2.5 py-1 text-[10px] font-bold leading-snug text-amber-100 ring-1 ring-inset ring-amber-300/40">
+                <p className="mt-2 inline-flex max-w-full items-center rounded-surface bg-amber-300/15 px-2.5 py-1 text-sm font-bold leading-snug text-amber-100 ring-1 ring-inset ring-amber-300/40">
                   <span className="min-w-0 break-words">{t("exTop300Badge")}</span>
                 </p>
               )}
@@ -662,7 +663,7 @@ export function UniversityDetail({
                         href={site}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="sb-ink-on-bright inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-white text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg hover:bg-indigo-50 dark:bg-white dark:text-slate-900 dark:hover:bg-indigo-200"
+                        className="sb-ink-on-bright inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-white text-slate-900 px-5 py-2.5 text-xs font-bold shadow-lg hover:bg-indigo-50 dark:bg-white dark:text-slate-900 dark:hover:bg-indigo-200"
                       >
                         <Globe className="h-3.5 w-3.5" /> {t("officialWebsite")}
                       </a>
@@ -672,7 +673,7 @@ export function UniversityDetail({
                         href={apply}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 sb-ink-on-warm px-5 py-2.5 text-xs font-bold shadow-lg hover:from-amber-300 hover:to-yellow-400"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 sb-ink-on-warm px-5 py-2.5 text-xs font-bold shadow-lg hover:from-amber-300 hover:to-yellow-400"
                       >
                         <ExternalLink className="h-3.5 w-3.5" /> {t("applyNow")}
                       </a>
@@ -689,26 +690,26 @@ export function UniversityDetail({
           The three comparisons that decide whether this university is worth an
           application fee — the same engine, and therefore the same answer, as
           the pill strip on the explorer card. */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
               <Target className="h-4 w-4 text-indigo-600" /> {t("decisionTitle")}
             </h2>
-            <p className="mt-1 max-w-2xl text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
               {t("decisionSubtitle")}
             </p>
           </div>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => void startApplication()}
             disabled={startingApplication || !activeProfile?.id}
             title={activeProfile?.id ? t("startAppHint", { name: uni.name }) : t("startAppNeedsProfile")}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {startingApplication ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Zap className="h-3.5 w-3.5" aria-hidden />}
             {startAppDone ? t("startAppDoneShort") : t("startApp")}
-          </button>
+          </Button>
         </div>
 
         <DecisionPillStrip university={uni} profile={activeProfile ?? null} className="mt-3" />
@@ -726,25 +727,25 @@ export function UniversityDetail({
         </div>
 
         {startAppError && (
-          <p role="alert" className="mt-3 break-words rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+          <p role="alert" className="mt-3 break-words rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
             {startAppError}
           </p>
         )}
         {startAppDone && !startAppError && (
-          <p role="status" className="mt-3 break-words rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+          <p role="status" className="mt-3 break-words rounded-surface border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
             {t("startAppDone", { name: uni.name })}
           </p>
         )}
       </div>
 
       {/* ===== ADMISSIONS / APPLICATION CYCLES (spec §2, §3, §12) ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <FileText className="h-4 w-4 text-amber-600" /> {t("applicationTitle")}
         </h2>
         {cycles.length === 0 ? (
           <div className="mt-3">
-            <p className="text-xs text-slate-400">{t("noCycles")}</p>
+            <p className="text-sm text-slate-500">{t("noCycles")}</p>
             {(() => {
               const apply = uni.applicationUrl || uni.internationalAdmissionsUrl || uni.admissionsUrl;
               const site = uni.officialWebsiteUrl || uni.websiteUrl;
@@ -755,7 +756,7 @@ export function UniversityDetail({
                       href={apply}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-amber-400 text-slate-900 sb-ink-on-warm px-4 py-2 text-xs font-bold hover:bg-amber-300"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-amber-400 text-slate-900 sb-ink-on-warm px-4 py-2 text-xs font-bold hover:bg-amber-300"
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> {t("applyNow")}
                     </a>
@@ -765,7 +766,7 @@ export function UniversityDetail({
                       href={uni.undergraduateAdmissionsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> {t("undergradAdmissions")}
                     </a>
@@ -775,7 +776,7 @@ export function UniversityDetail({
                       href={uni.admissionsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> {t("admissions")}
                     </a>
@@ -785,7 +786,7 @@ export function UniversityDetail({
                       href={site}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                     >
                       <Globe className="h-3.5 w-3.5" /> {t("officialWebsiteLower")}
                     </a>
@@ -797,7 +798,7 @@ export function UniversityDetail({
         ) : (
           <div className="mt-3 space-y-3">
             {(showAllCycles ? cycles : cycles.slice(0, 2)).map((c) => (
-              <div key={c.id} className="rounded-xl border border-slate-200 p-4">
+              <div key={c.id} className="rounded-surface border border-slate-200 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-extrabold text-slate-800">
                     {/* "Fall 2027" already carries the year — repeating the
@@ -805,37 +806,37 @@ export function UniversityDetail({
                     {c.intake || c.academicYear || c.cycleYear || t("applicationTitle")}
                   </span>
                   {c.applicationType && (
-                    <span className="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 text-[10px] font-bold">
+                    <span className="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 text-xs font-bold">
                       {c.applicationType}
                     </span>
                   )}
                   {c.isEstimated && (
-                    <span className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-[10px] font-bold">
+                    <span className="rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 text-xs font-bold">
                       {t("estimated")}
                     </span>
                   )}
                 </div>
-                <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-[11px]">
+                <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                   <div>
-                    <span className="text-slate-400 block">{t("opens")}</span>
+                    <span className="text-slate-500 block">{t("opens")}</span>
                     <strong className="text-slate-800">
                       {c.openingDate ? new Date(c.openingDate + "T00:00:00").toLocaleDateString(locale) : t("notAnnounced")}
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">{t("deadline")}</span>
+                    <span className="text-slate-500 block">{t("deadline")}</span>
                     <strong className="text-slate-800">
                       {c.deadline ? new Date(c.deadline + "T00:00:00").toLocaleDateString(locale) : t("notAnnounced")}
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">{t("applicationFee")}</span>
+                    <span className="text-slate-500 block">{t("applicationFee")}</span>
                     <strong className="text-slate-800">
                       {formatMoney(c.applicationFee, c.applicationFeeCurrency)}
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">{t("timezone")}</span>
+                    <span className="text-slate-500 block">{t("timezone")}</span>
                     <strong className="text-slate-800">
                       {c.deadlineTimezone || t("notSpecified")}
                     </strong>
@@ -847,18 +848,18 @@ export function UniversityDetail({
                         href={c.applicationUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-slate-900 text-white px-3.5 py-2 text-[11px] font-bold hover:bg-slate-800"
+                        className="inline-flex min-h-11 items-center gap-1 rounded-surface bg-slate-900 text-white px-3.5 py-2 text-xs font-bold hover:bg-slate-800"
                       >
                         {t("applyNow")} <ArrowRight className="h-3 w-3" />
                       </a>
                     ) : (
-                      <span className="text-[10px] text-slate-400 italic">{t("applyLinkUnavailable")}</span>
+                      <span className="text-xs text-slate-500 italic">{t("applyLinkUnavailable")}</span>
                     )}
                   </div>
                 </div>
                 {/* Provenance (spec §19): an unverified cycle must read as
                     "not confirmed", and the source is linked when we have it. */}
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   {c.isEstimated && <span className="text-amber-600 font-semibold">{t("notConfirmed")}</span>}
                   {c.sourceUrl && (
                     <a
@@ -871,7 +872,7 @@ export function UniversityDetail({
                     </a>
                   )}
                   {c.lastVerifiedAt && (
-                    <span className="text-slate-400">
+                    <span className="text-slate-500">
                       {t("lastVerifiedDate")} {new Date(c.lastVerifiedAt).toLocaleDateString(locale)}
                       {isStaleVerified(c.lastVerifiedAt) && ` ${t("staleNote")}`}
                     </span>
@@ -896,7 +897,7 @@ export function UniversityDetail({
           and the requirement grid spans the full width under them. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {/* ===== ABOUT (spec §3) ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <BookOpen className="h-4 w-4 text-indigo-600" /> {t("about", { name: uni.name })}
         </h2>
@@ -907,7 +908,7 @@ export function UniversityDetail({
           <Field label={t("address")} value={fmtValue(uni.address)} icon={<MapPin className="h-3 w-3" />} />
         </div>
         {uni.descriptionSourceLanguage === "en" && (
-          <p className="mt-4 inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset">
+          <p className="mt-4 inline-flex items-center gap-1 rounded-control bg-slate-100 px-1.5 py-0.5 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset">
             <Languages className="h-3 w-3 shrink-0" aria-hidden />
             <span>{t("sourceLanguageLabel")}</span>
           </p>
@@ -921,7 +922,7 @@ export function UniversityDetail({
       </div>
 
       {/* ===== ACADEMIC REQUIREMENTS (spec §5) — compact, collapsible ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <GraduationCap className="h-4 w-4 text-indigo-600" /> {t("academicReqs")}
         </h2>
@@ -963,11 +964,11 @@ export function UniversityDetail({
             differ per programme it shows a range (e.g. IELTS 7-7.5) — say so,
             otherwise a lower bound reads like the requirement for all of
             them. */}
-        <p className="mt-2 break-words text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{t("catalogueRequirementsScope")}</p>
+        <p className="mt-2 break-words text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t("catalogueRequirementsScope")}</p>
         {["ielts", "toefl", "duolingo", "gpa", "sat", "act", "pte", "cambridgeEnglish"].some(
           (key) => Array.isArray(universityRequirements?.[key]?.values) && universityRequirements[key].values.length > 1,
         ) && (
-          <p className="mt-2 text-[11px] text-amber-700">{t("reqVariesByProgram")}</p>
+          <p className="mt-2 text-sm text-amber-700">{t("reqVariesByProgram")}</p>
         )}
 
         {/* Long text requirements: full-width, clamped by default */}
@@ -983,56 +984,55 @@ export function UniversityDetail({
           const hasLongContent = subjectReqs.length > 0 || otherReqs.length > 0;
           if (!hasLongContent && flags.length === 0) {
             return (
-              <p className="mt-3 text-[11px] text-slate-400 italic">{t("provenanceNote")}</p>
+              <p className="mt-3 text-sm text-slate-500 italic">{t("provenanceNote")}</p>
             );
           }
           return (
             <>
               <div className="relative">
                 <div
-                  className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
-                  style={{ maxHeight: reqsExpanded ? "2000px" : "5.5rem" }}
+                  className={`overflow-hidden transition-[max-height] duration-300 ease-in-out ${reqsExpanded ? "max-h-[2000px]" : "max-h-[5.5rem]"}`}
                 >
                   {subjectReqs.length > 0 && (
-                    <div className="mt-3 w-full rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-3">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t("subjectReqs")}</p>
-                      <p className="mt-1 text-xs text-slate-700 leading-relaxed">{subjectReqs.join("; ")}</p>
+                    <div className="mt-3 w-full rounded-surface border border-slate-100 bg-slate-50/60 px-3.5 py-3">
+                      <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">{t("subjectReqs")}</p>
+                      <p className="mt-1 text-sm text-slate-700 leading-relaxed">{subjectReqs.join("; ")}</p>
                     </div>
                   )}
                   {otherReqs.length > 0 && (
-                    <div className="mt-3 w-full rounded-xl border border-slate-100 bg-slate-50/60 px-3.5 py-3">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t("otherReqs")}</p>
-                      <p className="mt-1 text-xs text-slate-700 leading-relaxed">{otherReqs.join("; ")}</p>
+                    <div className="mt-3 w-full rounded-surface border border-slate-100 bg-slate-50/60 px-3.5 py-3">
+                      <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">{t("otherReqs")}</p>
+                      <p className="mt-1 text-sm text-slate-700 leading-relaxed">{otherReqs.join("; ")}</p>
                     </div>
                   )}
                   {flags.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
                       {flags.map((f) => (
                         <span key={f}>{f}</span>
                       ))}
                     </div>
                   )}
-                  <p className="mt-3 text-[11px] text-slate-400 italic">{t("provenanceNote")}</p>
+                  <p className="mt-3 text-sm text-slate-500 italic">{t("provenanceNote")}</p>
                 </div>
                 {!reqsExpanded && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
                 )}
               </div>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => setReqsExpanded((v) => !v)}
-                className="mt-2 inline-flex min-h-11 items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700"
+                className="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
                 aria-expanded={reqsExpanded}
               >
                 {reqsExpanded ? t("showLess") : t("showMore")}
-              </button>
+              </Button>
             </>
           );
         })()}
       </div>
 
       {/* ===== TUITION & COSTS (spec §6) ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-emerald-600" /> {t("tuitionCosts")}
         </h2>
@@ -1058,12 +1058,12 @@ export function UniversityDetail({
       </div>
 
       {/* ===== PROGRAMS (spec §7) ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <FileText className="h-4 w-4 text-violet-600" /> {t("programs", { count: programs.length })}
         </h2>
         {programs.length === 0 ? (
-          <p className="mt-3 text-xs text-slate-400">{t("noPrograms")}</p>
+          <p className="mt-3 text-sm text-slate-500">{t("noPrograms")}</p>
         ) : (
           <>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1071,25 +1071,25 @@ export function UniversityDetail({
                 const reqsOpen = !!expandedProgramReqs[p.id];
                 const hasLongReqs = p.requirements.length > 0;
                 return (
-                  <div key={p.id} className="rounded-xl border border-slate-200 p-4 hover:border-violet-300 transition-colors">
+                  <div key={p.id} className="rounded-surface border border-slate-200 p-4 hover:border-violet-300 transition-colors">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-extrabold text-slate-800">{p.name}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
+                        <p className="text-sm text-slate-500 mt-0.5">
                           {normalizeDegreeLevel(p.degree) ? <DegreeLevelLabel value={p.degree} /> : tVal(fmtValue(p.degree))} · {p.durationYears != null ? `${p.durationYears} ${p.durationUnit || t("yearsUnit", { years: p.durationYears })}` : t("durationNotSpecified")} · {tVal(fmtValue(p.studyMode))}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {/* Save to shortlist (spec §24) — only for signed-in students */}
                         {activeProfile?.id != null && (
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             onClick={() => toggleSaveProgram(p.id)}
                             disabled={savingProgramId != null}
-                            className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                            className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                               savedProgramIds[p.id] != null
                                 ? "bg-violet-600 text-white hover:bg-violet-700"
-                                : "text-slate-400 hover:bg-violet-50 hover:text-violet-600"
+                                : "text-slate-500 hover:bg-violet-50 hover:text-violet-600"
                             } disabled:opacity-50`}
                             title={savedProgramIds[p.id] != null ? t("removeFromShortlist") : t("saveToShortlist")}
                             aria-pressed={savedProgramIds[p.id] != null}
@@ -1099,7 +1099,7 @@ export function UniversityDetail({
                             ) : (
                               <Bookmark className="h-4 w-4" />
                             )}
-                          </button>
+                          </Button>
                         )}
                         {p.programUrl && (
                           <a href={p.programUrl} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:text-violet-800 shrink-0" title={t("viewProgram")}>
@@ -1108,7 +1108,7 @@ export function UniversityDetail({
                         )}
                       </div>
                     </div>
-                    <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600">
+                    <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
                       <span><b>{t("tuitionLabel")}</b> {tVal(fmtMoney(p.tuitionAmount, p.tuitionCurrency))}</span>
                       <span><b>{t("ieltsLabel")}</b> {p.minIelts != null ? p.minIelts : t("notSpecified")}</span>
                       {p.language && <span><b>{t("languageLabel")}</b> {p.language}</span>}
@@ -1119,7 +1119,7 @@ export function UniversityDetail({
                         Rendered only from DB data — unknown stays unknown,
                         and an unverified program is never shown as verified. */}
                     <div className="mt-2.5 space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                         {p.verificationStatus === "verified" ? (
                           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700">
                             <CheckCircle2 className="h-3 w-3" /> {t("verified")}
@@ -1150,7 +1150,7 @@ export function UniversityDetail({
                       {p.sources.length > 0 && (
                         <ul className="space-y-0.5" aria-label={t("sourcesTitle")}>
                           {p.sources.slice(0, 3).map((s, i) => (
-                            <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500">
+                            <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-500">
                               <a
                                 href={s.url}
                                 target="_blank"
@@ -1159,14 +1159,14 @@ export function UniversityDetail({
                               >
                                 {s.title || s.url}
                               </a>
-                              <span className="text-[9px] uppercase tracking-wide text-slate-400">{s.sourceType}</span>
+                              <span className="text-xs uppercase tracking-wide text-slate-500">{s.sourceType}</span>
                               {s.isOfficial && (
-                                <span className="rounded-full border border-blue-200 bg-blue-50 px-1.5 text-[9px] font-bold text-blue-700">
+                                <span className="rounded-full border border-blue-200 bg-blue-50 px-1.5 text-xs font-bold text-blue-700">
                                   {t("official")}
                                 </span>
                               )}
                               {s.accessedAt && (
-                                <span className="text-slate-400">
+                                <span className="text-slate-500">
                                   {t("lastChecked")} {new Date(s.accessedAt).toLocaleDateString(locale)}
                                   {isStaleVerified(s.accessedAt) && ` ${t("staleNote")}`}
                                 </span>
@@ -1179,36 +1179,35 @@ export function UniversityDetail({
 
                     {/* Program-specific requirements — clamped to 3 lines until expanded */}
                     {hasLongReqs && (
-                      <div className="mt-2.5 rounded-xl bg-slate-50 border border-slate-100 p-2.5">
+                      <div className="mt-2.5 rounded-surface bg-slate-50 border border-slate-100 p-2.5">
                         <div
-                          className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
-                          style={{ maxHeight: reqsOpen ? "2000px" : "3.9rem" }}
+                          className={`overflow-hidden transition-[max-height] duration-300 ease-in-out ${reqsOpen ? "max-h-[2000px]" : "max-h-[3.9rem]"}`}
                         >
                           <div className="space-y-1">
                             {p.requirements.map((r, i) => (
-                              <p key={i} className="text-[11px] text-slate-600">
+                              <p key={i} className="text-sm text-slate-600">
                                 <b className="capitalize">{r.requirementType}:</b>{" "}
                                 {r.minimumValue != null ? r.minimumValue : r.valueText ? r.valueText : t("requiredWord")}
                               </p>
                             ))}
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 pt-1 border-t border-slate-100">
-                              {p.portfolioRequired && <span className="text-[10px] text-slate-500">{t("flagPortfolio")}</span>}
-                              {p.interviewRequired && <span className="text-[10px] text-slate-500">{t("flagInterview")}</span>}
-                              {p.recommendationRequired && <span className="text-[10px] text-slate-500">{t("flagRecommendation")}</span>}
-                              {p.personalStatementRequired && <span className="text-[10px] text-slate-500">{t("flagPersonalStatement")}</span>}
+                              {p.portfolioRequired && <span className="text-xs text-slate-500">{t("flagPortfolio")}</span>}
+                              {p.interviewRequired && <span className="text-xs text-slate-500">{t("flagInterview")}</span>}
+                              {p.recommendationRequired && <span className="text-xs text-slate-500">{t("flagRecommendation")}</span>}
+                              {p.personalStatementRequired && <span className="text-xs text-slate-500">{t("flagPersonalStatement")}</span>}
                             </div>
                           </div>
                         </div>
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() =>
                             setExpandedProgramReqs((prev) => ({ ...prev, [p.id]: !prev[p.id] }))
                           }
-                          className="mt-1 inline-flex min-h-11 items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-slate-700"
+                          className="mt-1 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
                           aria-expanded={reqsOpen}
                         >
                           {reqsOpen ? t("showLess") : t("showMore")}
-                        </button>
+                        </Button>
                       </div>
                     )}
 
@@ -1217,7 +1216,7 @@ export function UniversityDetail({
                         href={p.applicationUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2.5 inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-violet-700 hover:underline"
+                        className="mt-2.5 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-violet-700 hover:underline"
                       >
                         <ExternalLink className="h-3 w-3" /> {t("applyForProgram")}
                       </a>
@@ -1227,21 +1226,21 @@ export function UniversityDetail({
               })}
             </div>
             {programs.length > 4 && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => setShowAllPrograms((v) => !v)}
                 className="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700"
                 aria-expanded={showAllPrograms}
               >
                 {showAllPrograms ? t("showFewerPrograms") : t("viewAllPrograms", { count: programs.length })}
-              </button>
+              </Button>
             )}
           </>
         )}
       </div>
 
       {/* ===== SCHOLARSHIPS (spec §8) ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <Award className="h-4 w-4 text-amber-500" /> {t("scholarships", { count: scholarships.length })}
@@ -1249,7 +1248,7 @@ export function UniversityDetail({
           {/* Pillar 5.1 — the grants catalogue, pre-filtered to THIS country.
               A single click from a university page to every grant it offers. */}
           {uni.country ? (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => {
                 window.dispatchEvent(
@@ -1258,14 +1257,14 @@ export function UniversityDetail({
                   })
                 );
               }}
-              className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 text-[11px] font-bold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
+              className="inline-flex min-h-11 items-center gap-1 rounded-surface border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
             >
               <span className="min-w-0 break-words">{t("exViewCountryScholarships")}</span>
-            </button>
+            </Button>
           ) : null}
         </div>
         {scholarships.length === 0 ? (
-          <p className="mt-3 text-xs text-slate-400">{t("noScholarships")}</p>
+          <p className="mt-3 text-sm text-slate-500">{t("noScholarships")}</p>
         ) : (
           <>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1274,10 +1273,10 @@ export function UniversityDetail({
               const deadline = sch.deadlineDate || sch.deadline || null;
               const url = sch.applicationUrl || sch.websiteUrl || null;
               return (
-                <div key={sch.id} className="rounded-xl border border-slate-200 p-4 hover:border-amber-300 transition-colors">
+                <div key={sch.id} className="rounded-surface border border-slate-200 p-4 hover:border-amber-300 transition-colors">
                   <p className="text-sm font-extrabold text-slate-800">{schName}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{sch.coverageType ? localizeCoverageType(sch.coverageType, locale) : t("coverageNotSpecified")}</p>
-                  <div className="mt-2 space-y-1 text-[11px] text-slate-600">
+                  <p className="text-sm text-slate-500 mt-0.5">{sch.coverageType ? localizeCoverageType(sch.coverageType, locale) : t("coverageNotSpecified")}</p>
+                  <div className="mt-2 space-y-1 text-xs text-slate-600">
                     <p><b>{t("amountLabel")}</b> {formatMoney(sch.amountUsdValue, "USD")}</p>
                     <p><b>{t("deadlineLabel")}</b> {deadline ? new Date(deadline + (deadline.length === 10 ? "T00:00:00" : "")).toLocaleDateString(locale) : t("notAnnounced")}</p>
                     <p><b>{t("eligibilityLabel")}</b> {sch.eligibilityText || t("notSpecified")}</p>
@@ -1287,7 +1286,7 @@ export function UniversityDetail({
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2.5 inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-amber-700 hover:underline"
+                      className="mt-2.5 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-amber-700 hover:underline"
                     >
                       <ExternalLink className="h-3 w-3" /> {t("officialScholarshipPage")}
                     </a>
@@ -1308,7 +1307,7 @@ export function UniversityDetail({
       </div>
 
       {/* ===== POST-STUDY (spec §11) ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <CheckCircle2 className="h-4 w-4 text-sky-600" /> {t("postStudyWorkTitle")}
         </h2>
@@ -1322,7 +1321,7 @@ export function UniversityDetail({
       </div>
 
       {/* ===== INTERNATIONAL STUDENTS (spec §9) ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <Globe className="h-4 w-4 text-teal-600" /> {t("intlStudentsTitle")}
         </h2>
@@ -1339,7 +1338,7 @@ export function UniversityDetail({
       </div>
 
       {/* ===== SOURCES (spec §13) ===== */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-emerald-600" /> {t("sourcesTitle")}
         </h2>
@@ -1349,16 +1348,16 @@ export function UniversityDetail({
             const site = uni.officialWebsiteUrl || uni.websiteUrl;
             if (!site) return null;
             return (
-              <a href={site} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+              <a href={site} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-surface border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                 <Globe className="h-4 w-4 text-indigo-600 shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-extrabold text-slate-800">{t("officialUniWebsite")}</span>
-                  <span className="block break-all text-[10px] text-slate-400">{site}</span>
+                  <span className="block break-all text-xs text-slate-500">{site}</span>
                 </span>
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shrink-0">
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-xs font-bold text-emerald-700 shrink-0">
                   <CheckCircle2 className="h-2.5 w-2.5" /> {t("official")}
                 </span>
-                <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <ExternalLink className="h-3.5 w-3.5 text-slate-500 shrink-0" />
               </a>
             );
           })()}
@@ -1380,14 +1379,14 @@ export function UniversityDetail({
             return (
               <>
                 {visibleLinks.map((link) => (
-                  <a key={link.type} href={link.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                  <a key={link.type} href={link.url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 flex-wrap items-center gap-2 rounded-surface border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                     <ExternalLink className="h-4 w-4 text-indigo-600 shrink-0" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-xs font-extrabold text-slate-800">{link.label}</span>
-                      <span className="block break-all text-[10px] text-slate-400">{link.url}</span>
+                      <span className="block break-all text-xs text-slate-500">{link.url}</span>
                     </span>
-                    <span className="shrink-0 text-[10px] font-bold text-slate-500">{t("official")}</span>
-                    <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <span className="shrink-0 text-xs font-bold text-slate-500">{t("official")}</span>
+                    <ExternalLink className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                   </a>
                 ))}
                 {visibleSources.map((sc) => {
@@ -1395,25 +1394,25 @@ export function UniversityDetail({
                   const title = sc.source?.title || sc.title || t("sourceFallback");
                   const type = sc.sourceType || sc.source?.title ? "official" : "source";
                   return (
-                    <a key={sc.id} href={url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                    <a key={sc.id} href={url} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 rounded-surface border border-slate-200 px-3.5 py-2.5 transition-colors hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                       <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
                       <span className="min-w-0 flex-1">
                         <span className="block text-xs font-extrabold text-slate-800">{title}</span>
-                        <span className="block break-all text-[10px] text-slate-400">{url}</span>
+                        <span className="block break-all text-xs text-slate-500">{url}</span>
                         {sc.source?.accessedAt && (
-                          <span className="block text-[10px] text-slate-400">
+                          <span className="block text-xs text-slate-500">
                             {t("lastChecked")} {new Date(sc.source.accessedAt).toLocaleDateString(locale)}
                             {isStaleVerified(sc.source.accessedAt) && ` ${t("staleNote")}`}
                           </span>
                         )}
                       </span>
-                      <span className="shrink-0 text-[10px] font-bold text-slate-500">{t(type === "official" ? "official" : "sourceLink")}</span>
+                      <span className="shrink-0 text-xs font-bold text-slate-500">{t(type === "official" ? "official" : "sourceLink")}</span>
                       {(sc.source?.isOfficial || sc.sourceType !== "ranking") && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shrink-0">
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-xs font-bold text-emerald-700 shrink-0">
                           <CheckCircle2 className="h-2.5 w-2.5" /> {t("official")}
                         </span>
                       )}
-                      <ExternalLink className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <ExternalLink className="h-3.5 w-3.5 text-slate-500 shrink-0" />
                     </a>
                   );
                 })}
@@ -1429,7 +1428,7 @@ export function UniversityDetail({
           })()}
 
           {sources.length === 0 && !uni.admissionsUrl && !uni.applicationUrl && (
-            <p className="text-[11px] text-slate-400">{t("noVerifiedSources")}</p>
+            <p className="text-sm text-slate-500">{t("noVerifiedSources")}</p>
           )}
         </div>
       </div>

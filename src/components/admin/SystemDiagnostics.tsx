@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertTriangle, CheckCircle2, Database, KeyRound, Loader2, RefreshCw, Table2 } from "lucide-react";
-import { api } from "../growth/ui";
+import { api } from "@/components/ui/growth";
+import { Button } from "@/components/ui/Button";
 
 interface Status {
   state: "idle" | "ready" | "failed";
@@ -127,17 +128,17 @@ export function SystemDiagnostics({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 text-[11px] dark:border-slate-700 dark:bg-slate-900">
+    <div className="rounded-surface border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">{t("title")}</p>
-        <button
+        <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100">{t("title")}</p>
+        <Button variant="unstyled"
           type="button"
           onClick={retry}
           disabled={busy === "retry"}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="inline-flex items-center gap-1 rounded-control border border-slate-200 px-2 py-1 font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           {busy === "retry" ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} {t("retry")}
-        </button>
+        </Button>
       </div>
       {error && <p className="mb-1 font-semibold text-rose-600">{error}</p>}
       <Row ok={Boolean(db?.reachable)} warn={Boolean(db?.reachable && db?.reason)} icon={Database} label={t("database")} value={dbText} />
@@ -155,7 +156,7 @@ export function SystemDiagnostics({ compact = false }: { compact?: boolean }) {
         </>
       )}
       {[...hints, ...gateHints].length > 0 && (
-        <div className="mt-1.5 flex gap-2 rounded-lg bg-amber-50 p-2 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="mt-1.5 flex gap-2 rounded-control bg-amber-50 p-2 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <ul className="space-y-1">
             {[...hints, ...gateHints].map((h) => (
@@ -165,8 +166,8 @@ export function SystemDiagnostics({ compact = false }: { compact?: boolean }) {
         </div>
       )}
       {detailRows.length > 0 && (
-        <div className="mt-1.5 space-y-1 rounded-lg border border-slate-200 p-2 font-mono text-[10px] leading-relaxed text-slate-600 dark:border-slate-700 dark:text-slate-300">
-          <p className="font-sans text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("detailTitle")}</p>
+        <div className="mt-1.5 space-y-1 rounded-control border border-slate-200 p-2 font-mono text-xs leading-relaxed text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <p className="font-sans text-sm font-bold uppercase tracking-wide text-slate-500">{t("detailTitle")}</p>
           {detailRows.map((row) => (
             <p key={row.key} className="break-words">
               <span className="font-sans font-semibold">{row.label}:</span>{" "}

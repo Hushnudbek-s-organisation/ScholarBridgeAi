@@ -64,6 +64,8 @@ import { scholarshipFundingPayload } from "@/lib/scholarshipChecks";
 import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import type { MatchBreakdown } from "@/lib/matching";
+import { Button } from "@/components/ui/Button";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 
 export interface Scholarship {
   id: number;
@@ -201,6 +203,7 @@ export function ScholarshipHub({
   autoFocusScholarship = null,
 }: ScholarshipHubProps) {
   const t = useTranslations("scholarshipHub");
+  const tCommon = useTranslations("common");
   const tCountry = useTranslations("countryNames");
   const { locale } = useLocaleContext();
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
@@ -292,8 +295,8 @@ export function ScholarshipHub({
   }
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
-  // `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, so 8 / 16 / 24 cards.
-  const perPage = useResponsivePerPage({ base: 1, md: 2, xl: 3 });
+  // `grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3`, so 8 / 16 / 24 cards.
+  const perPage = useResponsivePerPage({ base: 1, lg: 2, "2xl": 3 });
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -544,7 +547,7 @@ export function ScholarshipHub({
       {/* Search & Filter toolbar — ONE compact card. The hub header already
           shows the title and intro, so the catalogue repeats neither: the
           localized <h2> stays inline (outline + SSR), the paragraph goes. */}
-      <div className="bg-white rounded-2xl p-3 border border-slate-200 shadow-xs space-y-3 sm:p-4">
+      <div className="bg-white rounded-overlay p-3 border border-slate-200 shadow-xs space-y-3 sm:p-4">
         <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-slate-100">
           <Award className="h-4 w-4 shrink-0 text-amber-500" aria-hidden />
           <span className="min-w-0 break-words">{t("title")}</span>
@@ -557,29 +560,29 @@ export function ScholarshipHub({
         <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-4">
           {/* Search Box */}
           <div className="relative sm:col-span-2">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
             <input
               type="text"
               placeholder={t("searchPlaceholder")}
               aria-label={t("searchPlaceholder")}
               value={search}
               onChange={(e) => onSearchInput(e.target.value)}
-              className="min-h-11 w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              className="min-h-11 w-full pl-9 pr-3 py-2 text-sm sm:text-sm border border-slate-200 rounded-surface focus:ring-2 focus:ring-amber-500 focus:outline-none"
             />
           </div>
 
           {/* Ordering */}
           <div>
-            <label htmlFor="scholarship-sort" className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            <label htmlFor="scholarship-sort" className="mb-1 block text-sm font-bold uppercase tracking-wide text-slate-500">
               {t("sortLabel")}
             </label>
             <div className="relative">
-              <ArrowUpDown className="pointer-events-none absolute left-2.5 top-3.5 h-3.5 w-3.5 text-slate-400" aria-hidden />
+              <ArrowUpDown className="pointer-events-none absolute left-2.5 top-3.5 h-3.5 w-3.5 text-slate-500" aria-hidden />
               <select
                 id="scholarship-sort"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as ScholarshipSortOption)}
-                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm"
+                className="min-h-11 w-full rounded-surface border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm"
               >
                 {SCHOLARSHIP_SORT_OPTIONS.map((option) => (
                   <option key={option} value={option}>
@@ -592,16 +595,16 @@ export function ScholarshipHub({
 
           {/* Grouping */}
           <div>
-            <label htmlFor="scholarship-group" className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            <label htmlFor="scholarship-group" className="mb-1 block text-sm font-bold uppercase tracking-wide text-slate-500">
               {t("groupLabel")}
             </label>
             <div className="relative">
-              <Layers className="pointer-events-none absolute left-2.5 top-3.5 h-3.5 w-3.5 text-slate-400" aria-hidden />
+              <Layers className="pointer-events-none absolute left-2.5 top-3.5 h-3.5 w-3.5 text-slate-500" aria-hidden />
               <select
                 id="scholarship-group"
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value as ScholarshipGroupOption)}
-                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm"
+                className="min-h-11 w-full rounded-surface border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm"
               >
                 {SCHOLARSHIP_GROUP_OPTIONS.map((option) => (
                   <option key={option} value={option}>
@@ -613,30 +616,28 @@ export function ScholarshipHub({
           </div>
         </div>
 
-        {/* Phone-only: the dropdown row collapses behind this button so the
-            first card is not pushed off the screen. From `sm` up the row is
-            always visible — the controls stay MOUNTED, so a collapsed filter
-            keeps its value and its accessible name. */}
-        <button
+        {/* Phone-only: categorical filters open in an accessible bottom sheet
+            so the first card is not pushed off the screen. From `sm` up the
+            desktop row stays visible; the hub owns all filter state. */}
+        <Button variant="unstyled"
           type="button"
-          onClick={() => setMobileFiltersOpen((open) => !open)}
+          onClick={() => setMobileFiltersOpen(true)}
           aria-expanded={mobileFiltersOpen}
-          aria-controls="scholarship-filters"
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-amber-400 hover:text-amber-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 sm:hidden"
+          aria-controls="scholarship-filter-sheet"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-surface border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-amber-400 hover:text-amber-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 sm:hidden"
         >
           <Filter className="h-4 w-4" aria-hidden />
           <span className="break-words text-center">{t("filtersTitle")}</span>
           {activeFilterCount > 0 && (
-            <span className="sb-ink-on-warm rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="sb-ink-on-warm rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white">
               {activeFilterCount}
             </span>
           )}
-          <ChevronDown className={`h-4 w-4 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} aria-hidden />
-        </button>
+        </Button>
 
         <div
           id="scholarship-filters"
-          className={`${mobileFiltersOpen ? "block" : "hidden"} sm:block`}
+          className="hidden sm:block"
         >
           <ScholarshipFiltersPanel
             filters={filters}
@@ -646,30 +647,54 @@ export function ScholarshipHub({
             hasProfile={Boolean(activeProfile)}
           />
         </div>
+
+        <BottomSheet
+          id="scholarship-filter-sheet"
+          open={mobileFiltersOpen}
+          onClose={() => setMobileFiltersOpen(false)}
+          title={t("filtersTitle")}
+          footer={(
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}>{t("filtersClear")}</Button>
+              <Button onClick={() => setMobileFiltersOpen(false)}>
+                {tCommon("showResults")} ({totalCount})
+              </Button>
+            </div>
+          )}
+        >
+          <ScholarshipFiltersPanel
+            filters={filters}
+            facets={facets}
+            onChange={setFilters}
+            onReset={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
+            hasProfile={Boolean(activeProfile)}
+            idPrefix="mobile-scholarship-filter"
+          />
+        </BottomSheet>
       </div>
 
       {/* Pillar 3.2 — saved grants lead somewhere: find the universities they
           fund and manage the applications they feed. */}
       {savedScholarshipIds.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-400/30 dark:bg-amber-400/10">
-          <p className="min-w-0 flex-1 break-words text-xs font-extrabold text-amber-900 dark:text-amber-100">
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-overlay border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-400/30 dark:bg-amber-400/10">
+          <p className="min-w-0 flex-1 break-words text-sm font-extrabold text-amber-900 dark:text-amber-100">
             {t("shortlistBanner", { count: savedScholarshipIds.size })}
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent("scholarbridge:focus-record", { detail: { kind: "universities" } }))}
-              className="inline-flex min-h-11 items-center rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-900 transition-colors hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-slate-900 dark:text-amber-100"
+              className="inline-flex min-h-11 items-center rounded-surface border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 transition-colors hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-slate-900 dark:text-amber-100"
             >
               <span className="min-w-0 break-words">{t("findUniversities")}</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent("scholarbridge:focus-record", { detail: { kind: "applications" } }))}
-              className="inline-flex min-h-11 items-center rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-[11px] font-bold text-amber-900 transition-colors hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-slate-900 dark:text-amber-100"
+              className="inline-flex min-h-11 items-center rounded-surface border border-amber-200 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 transition-colors hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-500 dark:border-amber-400/30 dark:bg-slate-900 dark:text-amber-100"
             >
               <span className="min-w-0 break-words">{t("manageApplications")}</span>
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -688,7 +713,7 @@ export function ScholarshipHub({
       </div>
 
       {mercuryEligibilityReview && (
-        <aside className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 text-xs dark:border-indigo-300/20 dark:bg-indigo-300/10" aria-live="polite">
+        <aside className="rounded-surface border border-indigo-200 bg-indigo-50/60 p-3 text-xs dark:border-indigo-300/20 dark:bg-indigo-300/10" aria-live="polite">
           <h3 className="font-bold text-indigo-950 dark:text-indigo-100">{t("mercuryReviewTitle")}</h3>
           <p className="mt-1 leading-relaxed text-slate-700 dark:text-slate-200">{t("mercuryReviewDescription")}</p>
           <p className="mt-2 font-semibold text-indigo-900 dark:text-indigo-100">
@@ -702,39 +727,39 @@ export function ScholarshipHub({
       {/* Grid List */}
       {loading ? (
         // Skeleton cards sized like the real ones — no height jump on load.
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3" aria-busy="true">
+        <div className="grid auto-rows-fr grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2 2xl:grid-cols-3" aria-busy="true">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="h-[320px] animate-pulse rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#111a2e]"
+              className="h-[320px] animate-pulse rounded-overlay border border-slate-200 bg-white dark:border-slate-700 dark:bg-surface"
             >
               <div className="space-y-3 p-5">
-                <div className="h-3 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
-                <div className="h-5 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
-                <div className="h-24 w-full rounded-xl bg-slate-100 dark:bg-slate-800" />
-                <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-3 w-1/3 rounded-control bg-slate-200 dark:bg-slate-700" />
+                <div className="h-5 w-3/4 rounded-control bg-slate-200 dark:bg-slate-700" />
+                <div className="h-24 w-full rounded-surface bg-slate-100 dark:bg-slate-800" />
+                <div className="h-3 w-1/2 rounded-control bg-slate-200 dark:bg-slate-700" />
               </div>
             </div>
           ))}
           <span className="sr-only">{t("loading")}</span>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center sm:p-12">
+        <div className="rounded-overlay border border-slate-200 bg-white p-8 text-center sm:p-12">
           <p className="text-sm font-medium text-slate-600">{t("empty")}</p>
           {activeFilterCount > 0 && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
-              className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+              className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden />
               {t("filtersClear")}
-            </button>
+            </Button>
           )}
         </div>
       ) : (
         <div
-          className={`grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 transition-opacity duration-150 ${
+          className={`grid ${groupBy === "none" ? "auto-rows-fr" : ""} grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2 2xl:grid-cols-3 transition-opacity duration-150 ${
             refreshing ? "pointer-events-none opacity-60" : ""
           }`}
           aria-busy={refreshing}
@@ -756,7 +781,7 @@ export function ScholarshipHub({
             return (
               <React.Fragment key={s.id}>
                 {showHeading && (
-                  <h4 className="col-span-full flex items-center gap-1.5 border-b border-slate-200 pb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                  <h4 className="col-span-full flex items-center gap-1.5 border-b border-slate-200 pb-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
                     <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     <span className="min-w-0 break-words">{heading}</span>
                   </h4>
@@ -764,7 +789,7 @@ export function ScholarshipHub({
               <div
                 data-scholarship-id={s.id}
                 data-focused-record={isFocused ? "true" : undefined}
-                className={`flex h-full flex-col gap-4 rounded-2xl border bg-white p-5 shadow-xs transition-all ${
+                className={`flex h-full flex-col gap-4 rounded-overlay border bg-white p-5 shadow-xs transition-all ${
                   isFocused
                     ? "border-amber-500 ring-2 ring-amber-300 shadow-lg"
                     : "border-slate-200 hover:shadow-lg hover:border-indigo-300"
@@ -781,7 +806,7 @@ export function ScholarshipHub({
                         not a ragged box per line. Neutral, so amber stays
                         reserved for deadlines and match issues. */}
                     <span
-                      className="line-clamp-2 h-9 min-w-0 max-w-full break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+                      className="line-clamp-2 h-9 min-w-0 max-w-full break-words rounded-control border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
                       title={`${localizeCountry(s.country, locale)} • ${localizeScholarshipProvider(s.provider, locale)}`}
                     >
                       <CountryFlag country={s.country} size="xs" className="mr-1 align-[-2px]" />
@@ -830,7 +855,7 @@ export function ScholarshipHub({
                   {s.computedStatus && (
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide ${
                           s.computedStatus === "open"
                             ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
                             : s.computedStatus === "closed"
@@ -845,7 +870,7 @@ export function ScholarshipHub({
                         {s.statusLabel}
                       </span>
                       {s.expectedLabel && (
-                        <span className="text-[10px] text-slate-400 italic">({s.expectedLabel})</span>
+                        <span className="text-xs text-slate-500 italic">({s.expectedLabel})</span>
                       )}
                     </div>
                   )}
@@ -856,7 +881,7 @@ export function ScholarshipHub({
                     with the exact names from the catalogue, never invented. */}
                 {(s.coveredUniversities?.length ?? 0) > 0 && (
                   <p>
-                    <span className="inline-flex max-w-full items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                    <span className="inline-flex max-w-full items-center rounded-control border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
                       <span className="min-w-0 break-words">
                         {s.isFullForSavedUni
                           ? t("coversSavedFull", { unis: (s.coveredUniversities ?? []).slice(0, 2).join(", ") })
@@ -867,19 +892,19 @@ export function ScholarshipHub({
                 )}
 
                 {/* Key Details Cards */}
-                <div className="grid grid-cols-2 gap-3 text-[11px] bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div className="mt-auto grid grid-cols-2 gap-3 rounded-surface border border-slate-100 bg-slate-50 p-3 text-xs">
                   <div className="min-w-0">
-                    <span className="text-slate-400 block font-medium">{t("awardValue")}</span>
+                    <span className="text-slate-500 block font-medium">{t("awardValue")}</span>
                     <strong className="break-words text-emerald-700 font-extrabold">{awardLabel(s, t, locale)}</strong>
                   </div>
 
                   <div className="min-w-0">
-                    <span className="text-slate-400 block font-medium">{t("coverage")}</span>
+                    <span className="text-slate-500 block font-medium">{t("coverage")}</span>
                     <strong className="break-words text-slate-800 font-bold">{localizeCoverageType(s.coverageType, locale)}</strong>
                   </div>
 
                   <div className="col-span-2 min-w-0">
-                    <span className="text-slate-400 block font-medium">{t("deadline")}</span>
+                    <span className="text-slate-500 block font-medium">{t("deadline")}</span>
                     <strong className="flex min-w-0 items-start gap-1 break-words text-amber-800 font-bold">
                       <Calendar className="mt-0.5 h-3 w-3 shrink-0" />
                       <span className="min-w-0 break-words">{s.deadline}</span>
@@ -893,23 +918,23 @@ export function ScholarshipHub({
                     <details>: static SSR keeps asserting the pills and the
                     breakdown (they are in the markup), while the browser only
                     shows the summary line until asked. */}
-                <details className="group rounded-xl border border-slate-200/70 bg-slate-50/60 px-3 py-2 dark:border-slate-800/60 dark:bg-slate-900/40">
-                  <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                <details className="group rounded-surface border border-slate-200/70 bg-slate-50/60 px-3 py-2 dark:border-slate-800/60 dark:bg-slate-900/40">
+                  <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-control text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0 break-words">{t("cardDetails")}</span>
-                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden />
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
                   </summary>
                   <div className="mt-2 space-y-2.5">
                     {/* Why this match (spec §22) */}
                     {(s.matchReasons?.length || s.matchIssues?.length) && (
                       <div className="space-y-1">
                         {s.matchReasons?.map((r, i) => (
-                          <p key={`r${i}`} className="text-[10px] text-emerald-700 flex items-start gap-1">
+                          <p key={`r${i}`} className="text-sm text-emerald-700 flex items-start gap-1">
                             <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" />
                             <span><b>{t("strongBecause")}</b> {r}</span>
                           </p>
                         ))}
                         {s.matchIssues?.map((r, i) => (
-                          <p key={`p${i}`} className="text-[10px] text-amber-700 flex items-start gap-1">
+                          <p key={`p${i}`} className="text-sm text-amber-700 flex items-start gap-1">
                             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
                             <span><b>{t("potentialIssue")}</b> {r}</span>
                           </p>
@@ -919,7 +944,7 @@ export function ScholarshipHub({
                     <MatchBreakdownStrip breakdown={s.matchBreakdown} />
 
                     {s.description && (
-                      <p className="break-words text-xs leading-relaxed text-slate-600">
+                      <p className="break-words text-sm leading-relaxed text-slate-600">
                         {s.description}
                       </p>
                     )}
@@ -927,18 +952,18 @@ export function ScholarshipHub({
                     {/* Requirements Text */}
                     {/* A neutral spec box: requirements are reference data, not a
                         warning. Amber is kept for deadlines and match issues. */}
-                    <div className="space-y-1 rounded-xl border border-slate-200/80 bg-white p-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
-                      <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <div className="space-y-1 rounded-surface border border-slate-200/80 bg-white p-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                      <span className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         {t("requirements")}
                       </span>
                       {/* Priority 4.2 — the published gates, answered per
                           requirement instead of buried in the prose below. */}
                       <ScholarshipRequirementPills scholarship={s} profile={activeProfile} className="mb-1.5" />
-                      <p className="text-[11px] leading-relaxed">{s.requirements}</p>
+                      <p className="text-sm leading-relaxed">{s.requirements}</p>
                     </div>
 
                     {/* Source credibility footnote */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-200/70 pt-2 dark:border-slate-800/60">
+                    <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-200/70 pt-2 dark:border-slate-800/60">
                       {s.sourceUrl ? (
                         <a
                           href={s.sourceUrl}
@@ -949,21 +974,21 @@ export function ScholarshipHub({
                           <ExternalLink className="h-3 w-3" /> {t("source")}
                         </a>
                       ) : (
-                        <span className="text-slate-400">{t("sourcePending")}</span>
+                        <span className="text-slate-500">{t("sourcePending")}</span>
                       )}
                       {s.sourceLastVerifiedAt ? (
-                        <span className="text-slate-400">
+                        <span className="text-slate-500">
                           {t("lastVerified", { date: new Date(s.sourceLastVerifiedAt).toLocaleDateString() })}
                         </span>
                       ) : s.sourceUrl ? (
-                        <span className="text-slate-400">{t("lastVerifiedUnknown")}</span>
+                        <span className="text-slate-500">{t("lastVerifiedUnknown")}</span>
                       ) : null}
                     </div>
 
                     {/* Priority 4.2 — one click puts this award into the funding
                         plan, so the plan and the discovery feed stay in sync.
                         Lives with the details it depends on, not in the footer. */}
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       onClick={() => void addToFundingPlan(s)}
                       disabled={fundingBusyId != null || fundingAddedIds.has(s.id)}
@@ -974,10 +999,10 @@ export function ScholarshipHub({
                             ? t("fundingAddHint", { title: s.title })
                             : t("fundingNeedsProfile")
                       }
-                      className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
+                      className={`flex min-h-11 w-full items-center justify-center gap-1.5 rounded-surface px-3 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
                         fundingAddedIds.has(s.id)
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200"
-                          : "bg-emerald-600 text-white shadow-xs shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-60"
+                          : "bg-emerald-700 text-white shadow-xs shadow-emerald-600/20 hover:bg-emerald-800 disabled:opacity-60"
                       }`}
                     >
                       {fundingBusyId === s.id ? (
@@ -988,20 +1013,20 @@ export function ScholarshipHub({
                         <Wallet className="h-3.5 w-3.5" aria-hidden />
                       )}
                       {fundingAddedIds.has(s.id) ? t("fundingAdded") : t("fundingAdd")}
-                    </button>
+                    </Button>
                   </div>
                 </details>
 
                 {/* Actions — one row, two controls: the official portal link
                     and Track/Save. Everything else moved to the drawer. */}
-                <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
                   <span className="flex flex-wrap items-center gap-2">
                     <Link
                       // `?from=app` tells the detail page which catalogue the
                       // student came from, so "back" returns HERE (the hub) and
                       // not to the public catalogue.
                       href={`/scholarships/${s.id}?from=app`}
-                      className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-800 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:bg-slate-800 dark:text-slate-100"
+                      className="inline-flex min-h-11 items-center gap-1 rounded-control bg-slate-100 px-3 text-xs font-semibold text-slate-800 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:bg-slate-800 dark:text-slate-100"
                     >
                       {t("viewDetails")} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                     </Link>
@@ -1009,28 +1034,28 @@ export function ScholarshipHub({
                       href={s.websiteUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                      className="inline-flex min-h-11 items-center gap-1 rounded-control px-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
                     >
                       {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   </span>
 
                   {isSaved ? (
-                    <button
+                    <Button variant="unstyled"
                       onClick={() => onUnsaveScholarship(s.id)}
-                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs hover:bg-red-100 hover:text-red-700 transition-colors"
+                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-surface text-xs hover:bg-rose-100 hover:text-rose-700 transition-colors"
                     >
                       <Check className="h-3.5 w-3.5" />
                       {t("tracked")}
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button variant="unstyled"
                       onClick={() => onSaveScholarship(s.id)}
-                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs shadow-indigo-600/20 transition-colors"
+                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-surface text-xs shadow-xs shadow-indigo-600/20 transition-colors"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       {t("track")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -1054,20 +1079,20 @@ export function ScholarshipHub({
       {fundingError && (
         <div
           role="alert"
-          className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+          className="flex items-start justify-between gap-3 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
         >
           <span className="flex min-w-0 items-start gap-1.5">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 break-words whitespace-normal">{fundingError}</span>
           </span>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => setFundingError("")}
             aria-label={t("dismiss")}
-            className="min-h-11 min-w-11 rounded-lg p-1 text-rose-700 hover:bg-rose-100"
+            className="min-h-11 min-w-11 rounded-control p-1 text-rose-700 hover:bg-rose-100"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 

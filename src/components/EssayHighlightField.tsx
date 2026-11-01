@@ -22,6 +22,7 @@ import { sanitizePastedPlainText } from "@/lib/plainTextSanitizer";
 import { useTranslations } from "next-intl";
 import { Highlighter } from "lucide-react";
 import { annotateEssay, type EssayAnnotation, type SentenceTone } from "@/lib/essayInsights";
+import { Button } from "@/components/ui/Button";
 
 /** Wash behind the real glyphs. The glyphs themselves stay transparent here. */
 const TONE_WASH: Record<SentenceTone, string> = {
@@ -89,12 +90,12 @@ export function EssayHighlightField({
   return (
     <div className="mt-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={() => setHighlighted((prev) => !prev)}
           aria-pressed={highlighted}
           disabled={!value.trim()}
-          className={`flex min-h-11 items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`flex min-h-11 items-center gap-1.5 rounded-surface border px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
             highlighted
               ? "border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-100"
               : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -102,13 +103,13 @@ export function EssayHighlightField({
         >
           <Highlighter className="h-3.5 w-3.5" aria-hidden />
           {highlighted ? t("essayHighlightOn") : t("essayHighlightOff")}
-        </button>
+        </Button>
 
         {annotation && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-600">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-600">
             {tones.map((tone) => (
               <span key={tone} className="inline-flex items-center gap-1">
-                <span className={`h-2.5 w-2.5 rounded-sm ${TONE_SWATCH[tone]}`} aria-hidden />
+                <span className={`h-2.5 w-2.5 rounded-control ${TONE_SWATCH[tone]}`} aria-hidden />
                 {t(`essayHighlightLegend.${tone}`, { count: annotation.counts[tone] })}
               </span>
             ))}
@@ -125,7 +126,7 @@ export function EssayHighlightField({
         <div
           ref={mirrorRef}
           aria-hidden="true"
-          className="sb-field pointer-events-none absolute inset-0 overflow-hidden rounded-xl border p-3 text-sm leading-relaxed"
+          className="sb-field pointer-events-none absolute inset-0 overflow-hidden rounded-surface border p-3 text-sm leading-relaxed"
         >
           {annotation ? (
             <p className="m-0 break-words whitespace-pre-wrap">
@@ -160,7 +161,7 @@ export function EssayHighlightField({
           ref={fieldRef}
           aria-label={ariaLabel}
           onScroll={syncScroll}
-          className={`relative w-full rounded-xl border border-transparent bg-transparent p-3 text-sm leading-relaxed text-slate-800 focus:border-indigo-400 focus:outline-none ${className}`}
+          className={`relative w-full rounded-surface border border-transparent bg-transparent p-3 text-sm leading-relaxed text-slate-800 focus:border-indigo-400 focus:outline-none ${className}`}
           placeholder={placeholder}
           value={value}
           onChange={(event) => onChange(sanitizePastedPlainText(event.target.value))}

@@ -44,6 +44,7 @@ import {
   type TwinMeInput,
   type TwinStrategy,
 } from "@/lib/twinStrategy";
+import { Button } from "@/components/ui/Button";
 
 const DELTA_TONE: Record<DeltaState, string> = {
   ahead: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100",
@@ -177,8 +178,8 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
 
   if (loading) {
     return (
-      <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 ${className}`}>
-        <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+      <section className={`rounded-overlay border border-slate-200 bg-white p-4 sm:p-5 ${className}`}>
+        <p className="flex items-center gap-2 text-sm font-semibold text-slate-500">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
           {t("loading")}
         </p>
@@ -187,30 +188,30 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
   }
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 ${className}`} aria-labelledby="twin-title">
+    <section className={`rounded-overlay border border-slate-200 bg-white p-4 sm:p-5 ${className}`} aria-labelledby="twin-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 id="twin-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
             <Users className="h-4 w-4 text-indigo-600" aria-hidden />
             {t("title")}
           </h3>
-          <p className="mt-1 max-w-2xl break-words text-[11px] leading-relaxed text-slate-500">{t("subtitle")}</p>
+          <p className="mt-1 max-w-2xl break-words text-sm leading-relaxed text-slate-500">{t("subtitle")}</p>
         </div>
         {strategy.twinScore != null && (
-          <span className="shrink-0 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
+          <span className="shrink-0 rounded-surface border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-extrabold text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-100">
             {t("overlapScore", { score: strategy.twinScore })}
           </span>
         )}
       </div>
 
       {error && (
-        <p role="alert" className="mt-3 break-words rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+        <p role="alert" className="mt-3 break-words rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
           {error}
         </p>
       )}
 
       {!error && strategy.insufficient && (
-        <p className="mt-3 break-words rounded-xl border border-dashed border-slate-200 px-3 py-3 text-[11px] leading-relaxed text-slate-600">
+        <p className="mt-3 break-words rounded-surface border border-dashed border-slate-200 px-3 py-3 text-sm leading-relaxed text-slate-600">
           {twin ? t("insufficientWithTwin") : t("insufficientNoTwin")}
         </p>
       )}
@@ -218,14 +219,14 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
       {!error && !strategy.insufficient && strategy.twin && (
         <>
           {/* ---- who the twin is ---- */}
-          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="break-words text-xs font-extrabold text-slate-900">
+          <div className="mt-3 rounded-surface border border-slate-200 bg-slate-50 p-3">
+            <p className="break-words text-sm font-extrabold text-slate-900">
               {strategy.twin.displayName?.trim() || t("anonymousTwin")}
               {strategy.twin.intakeYear ? (
                 <span className="font-semibold text-slate-500"> · {t("intakeYear", { year: strategy.twin.intakeYear })}</span>
               ) : null}
             </p>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 break-words text-[11px] text-slate-600">
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 break-words text-sm text-slate-600">
               <GraduationCap className="h-3 w-3 shrink-0" aria-hidden />
               {strategy.twin.admittedUniversity?.trim() || t("unknownUniversity")}
               {strategy.twin.admittedCountry ? ` · ${strategy.twin.admittedCountry}` : ""}
@@ -235,14 +236,14 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
             {strategy.reasons.length > 0 && (
               <p className="mt-1.5 flex flex-wrap gap-1">
                 {strategy.reasons.map((reason) => (
-                  <span key={reason} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                  <span key={reason} className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-slate-600">
                     {t(`reasons.${reason}`)}
                   </span>
                 ))}
               </p>
             )}
             {strategy.twin.scholarshipName && (
-              <p className="mt-1.5 flex items-start gap-1.5 break-words text-[11px] font-semibold text-emerald-800 dark:text-emerald-200">
+              <p className="mt-1.5 flex items-start gap-1.5 break-words text-sm font-semibold text-emerald-800 dark:text-emerald-200">
                 <Award className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
                 {t("twinScholarship", {
                   name: strategy.twin.scholarshipName,
@@ -253,8 +254,8 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
           </div>
 
           {/* ---- the side-by-side delta table ---- */}
-          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-            <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+          <div className="mt-3 overflow-hidden rounded-surface border border-slate-200">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500">
               <span className="min-w-0 break-words whitespace-normal">{t("table.dimension")}</span>
               <span className="min-w-0 break-words whitespace-normal">{t("table.you")}</span>
               <span className="min-w-0 break-words whitespace-normal">{t("table.twin")}</span>
@@ -269,13 +270,13 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
                     className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 px-3 py-2"
                     data-delta-state={delta.state}
                   >
-                    <span className="min-w-0 break-words text-[11px] font-bold text-slate-800 whitespace-normal">
+                    <span className="min-w-0 break-words text-xs font-bold text-slate-800 whitespace-normal">
                       {t(`deltas.${delta.id}.label`)}
                     </span>
-                    <span className="min-w-0 break-words text-[11px] text-slate-700 whitespace-normal">
+                    <span className="min-w-0 break-words text-xs text-slate-700 whitespace-normal">
                       {delta.mine ?? t("notProvided")}
                     </span>
-                    <span className="min-w-0 break-words text-[11px] text-slate-700 whitespace-normal">
+                    <span className="min-w-0 break-words text-xs text-slate-700 whitespace-normal">
                       {delta.theirs ?? t("notProvided")}
                     </span>
                     <span
@@ -284,7 +285,7 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
                           ? t(`deltas.${delta.id}.compareNote`)
                           : t(`deltas.${delta.id}.notComparable`)
                       }
-                      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${DELTA_TONE[delta.state]}`}
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-extrabold ${DELTA_TONE[delta.state]}`}
                     >
                       <Icon className="h-3 w-3" aria-hidden />
                       {delta.comparable
@@ -300,7 +301,7 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
           </div>
 
           {strategy.unknowns.length > 0 && (
-            <p className="mt-2 break-words text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-2 break-words text-sm leading-relaxed text-slate-500">
               {t("unknownsNote", {
                 rows: strategy.unknowns.map((id) => t(`deltas.${id}.label`)).join(" · "),
               })}
@@ -310,27 +311,27 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
           {/* ---- the three-step blueprint ---- */}
           {strategy.actions.length > 0 && (
             <div className="mt-4">
-              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              <p className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wide text-slate-500">
                 <Target className="h-3.5 w-3.5" aria-hidden />
                 {t("blueprintTitle", { count: strategy.actions.length })}
               </p>
               <ol className="mt-2 space-y-2">
                 {strategy.actions.map((action) => (
-                  <li key={action.id} className="rounded-xl border border-slate-200 p-3">
+                  <li key={action.id} className="rounded-surface border border-slate-200 p-3">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="break-words text-xs font-extrabold text-slate-900">
-                          <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-extrabold text-white">
+                        <p className="break-words text-sm font-extrabold text-slate-900">
+                          <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-xs font-extrabold text-white">
                             {action.priority}
                           </span>
                           {t(`actions.${action.id}.title` as never, action.params as never)}
                         </p>
-                        <p className="mt-1 break-words text-[11px] leading-relaxed text-slate-600">
+                        <p className="mt-1 break-words text-sm leading-relaxed text-slate-600">
                           {t(`actions.${action.id}.why` as never, action.params as never)}
                         </p>
                         <ul className="mt-1.5 space-y-0.5">
                           {Array.from({ length: action.steps }, (_, index) => (
-                            <li key={index} className="flex items-start gap-1.5 break-words text-[11px] leading-relaxed text-slate-600">
+                            <li key={index} className="flex items-start gap-1.5 break-words text-sm leading-relaxed text-slate-600">
                               <ArrowRight className="mt-0.5 h-3 w-3 shrink-0 text-indigo-500" aria-hidden />
                               {t(`actions.${action.id}.step${index + 1}` as never, action.params as never)}
                             </li>
@@ -338,12 +339,12 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
                         </ul>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() => void addGoal(action)}
                           disabled={goalBusy != null || !profileId || !!goalDone[action.id]}
                           title={profileId ? t("addGoalHint") : t("goalNeedsProfile")}
-                          className={`flex min-h-11 items-center gap-1 rounded-xl px-3 py-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed ${
+                          className={`flex min-h-11 items-center gap-1 rounded-surface px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed ${
                             goalDone[action.id]
                               ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-100"
                               : "bg-indigo-600 text-white shadow-xs hover:bg-indigo-700 disabled:opacity-60"
@@ -357,16 +358,16 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
                             <Target className="h-3.5 w-3.5" aria-hidden />
                           )}
                           {goalDone[action.id] ? t("goalAdded") : t("addGoal")}
-                        </button>
+                        </Button>
                         {onNavigateTab && action.tab && (
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             onClick={() => onNavigateTab(action.tab)}
-                            className="flex min-h-11 items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+                            className="flex min-h-11 items-center gap-1 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
                           >
                             {t(`actions.${action.id}.open` as never)}
                             <ArrowRight className="h-3 w-3" aria-hidden />
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -377,19 +378,19 @@ export function TwinStrategyCard({ profileId, profile, onNavigateTab, className 
           )}
 
           {strategy.twin.advice?.trim() && (
-            <figure className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3 dark:border-violet-500/30 dark:bg-violet-500/10">
-              <blockquote className="break-words text-[11px] leading-relaxed text-violet-900 dark:text-violet-100">
+            <figure className="mt-3 rounded-surface border border-violet-200 bg-violet-50 p-3 dark:border-violet-500/30 dark:bg-violet-500/10">
+              <blockquote className="break-words text-sm leading-relaxed text-violet-900 dark:text-violet-100">
                 <Quote className="mr-1 inline h-3 w-3 align-[-1px]" aria-hidden />
                 {strategy.twin.advice}
               </blockquote>
-              <figcaption className="mt-1 text-[10px] font-bold text-violet-700 dark:text-violet-200">
+              <figcaption className="mt-1 text-xs font-bold text-violet-700 dark:text-violet-200">
                 {t("adviceFrom", { name: strategy.twin.displayName?.trim() || t("anonymousTwin") })}
               </figcaption>
             </figure>
           )}
 
           {goalError && (
-            <p role="alert" className="mt-3 break-words rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+            <p role="alert" className="mt-3 break-words rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
               {goalError}
             </p>
           )}

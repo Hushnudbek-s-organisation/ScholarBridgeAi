@@ -209,7 +209,7 @@ export async function POST(req: Request) {
         // this a student who reloads (or comes back on another device) after
         // step 1 was sent back to step 1 with the form empty, even though the
         // account already existed. Clamped to the wizard's 8 steps.
-        onboardingStep: Math.min(Math.max(Number(body.onboardingStep) || 0, 0), 7),
+        onboardingStep: Math.min(Math.max(Number(body.onboardingStep) || 0, 0), 3),
       // Sign-up password: stored ONLY as a scrypt hash (never plain text).
         passwordHash: plainPassword ? hashPassword(plainPassword) : null,
       }).returning();

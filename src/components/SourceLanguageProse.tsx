@@ -37,7 +37,7 @@ export function SourceLanguageProse({
   return (
     <div className={className}>
       {showLabel && (
-        <p className="mb-1.5 inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset">
+        <p className="mb-1.5 inline-flex items-center gap-1 rounded-control bg-slate-100 px-1.5 py-0.5 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset">
           <Languages className="h-3 w-3 shrink-0" aria-hidden />
           <span>{label}</span>
         </p>

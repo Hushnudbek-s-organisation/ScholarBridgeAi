@@ -4,6 +4,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Printer, Award } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
+import { Button } from "@/components/ui/Button";
 
 export interface CertificateData {
   id: number;
@@ -26,25 +27,25 @@ export function CertificateView({ certificate, profileName }: CertificateViewPro
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
-        <button
+        <Button variant="unstyled"
           onClick={() => window.print()}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md print:hidden transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-surface text-xs shadow-md print:hidden transition-colors"
         >
           <Printer className="h-4 w-4" /> {t("print")}
-        </button>
+        </Button>
       </div>
 
       {/* Printable certificate layout */}
-      <div className="bg-white rounded-2xl border-4 border-double border-indigo-300 shadow-lg p-8 print:border print:shadow-none">
+      <div className="bg-white rounded-overlay border-4 border-double border-indigo-300 shadow-lg p-8 print:border print:shadow-none">
         <div className="text-center space-y-6">
           <div className="flex justify-center">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-lg">
+            <div className="h-16 w-16 rounded-overlay bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-lg">
               <Award className="h-9 w-9" />
             </div>
           </div>
 
           <div>
-            <p className="text-[10px] tracking-[0.35em] text-slate-400 font-bold uppercase">ScholarBridgeAI</p>
+            <p className="text-sm tracking-[0.35em] text-slate-500 font-bold uppercase">ScholarBridgeAI</p>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">{t("certificate")}</h2>
           </div>
 

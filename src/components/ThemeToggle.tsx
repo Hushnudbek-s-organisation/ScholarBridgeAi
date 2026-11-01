@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme, type ThemeChoice } from "@/components/ThemeProvider";
+import { Button } from "@/components/ui/Button";
 
 const OPTIONS: { value: ThemeChoice; Icon: typeof Sun }[] = [
   { value: "light", Icon: Sun },
@@ -31,7 +32,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       {OPTIONS.map(({ value, Icon }) => {
         const active = theme === value;
         return (
-          <button
+          <Button variant="unstyled"
             key={value}
             type="button"
             role="radio"
@@ -49,7 +50,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
               />
             )}
             <Icon className="relative h-3.5 w-3.5" aria-hidden="true" />
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -67,12 +68,12 @@ export function ThemeSwitch({ className = "" }: { className?: string }) {
   const targetModeLabel = t(isDark ? "switchToLight" : "switchToDark");
 
   return (
-    <button
+    <Button variant="unstyled"
       type="button"
       onClick={toggleTheme}
       aria-label={targetModeLabel}
       title={targetModeLabel}
-      className={`relative grid min-h-11 min-w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${className}`}
+      className={`relative grid min-h-11 min-w-11 place-items-center rounded-control border border-slate-200 bg-white text-slate-600 transition-colors hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${className}`}
     >
       <AnimatePresence initial={false} mode="wait">
         <motion.span
@@ -90,6 +91,6 @@ export function ThemeSwitch({ className = "" }: { className?: string }) {
           )}
         </motion.span>
       </AnimatePresence>
-    </button>
+    </Button>
   );
 }

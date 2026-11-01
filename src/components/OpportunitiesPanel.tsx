@@ -5,7 +5,7 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { AlertTriangle, Compass, ExternalLink, Loader2, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AppNote } from "@/components/AppNote";
-import { ShowMoreToggle } from "@/components/hubs/ui";
+import { ShowMoreToggle } from "@/components/ui/hubs";
 import { ProfessorOutreachStudio } from "@/components/ProfessorOutreachStudio";
 import { useLocale } from "next-intl";
 import type { StudentProfile } from "./Navbar";
@@ -15,6 +15,7 @@ import {
   type OpportunityNote,
 } from "@/lib/opportunityNotes";
 import type { Locale } from "@/i18n/config";
+import { Button } from "@/components/ui/Button";
 
 interface OppItem {
   id: number;
@@ -141,12 +142,12 @@ export function OpportunitiesPanel({
     k === "competition" ? t("competition") : k === "research" ? t("research") : k === "internship" ? t("internship") : t("summerSchool");
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-overlay border border-slate-200 bg-white p-4">
       <div>
         <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
           <Compass className="h-3.5 w-3.5" /> {t("title")}
         </h3>
-        <p className="mt-1 max-w-2xl text-[11px] text-slate-500">
+        <p className="mt-1 max-w-2xl text-sm text-slate-500">
           {t("subtitle")}
           {data?.scoredFor ? ` · ${t("scoredFor")}: ${data.scoredFor}` : ""}
         </p>
@@ -161,32 +162,32 @@ export function OpportunitiesPanel({
           placeholder={t("searchPlaceholder")}
           aria-label={t("searchPlaceholder")}
           maxLength={120}
-          className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-[#46536b] dark:bg-[#111a2e] dark:text-white dark:placeholder:text-[#a9b4c7]"
+          className="min-h-11 w-full rounded-surface border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-border-strong dark:bg-surface dark:text-white dark:placeholder:text-ink-muted"
         />
       </label>
-      {loading && data && <p className="mt-1 text-[10px] text-slate-500" aria-live="polite">{t("loading")}</p>}
+      {loading && data && <p className="mt-1 text-sm text-slate-500" aria-live="polite">{t("loading")}</p>}
 
       {/* NEW FOR YOU — counts by type */}
       {data && (
         <div className="mt-3 flex flex-wrap gap-2">
           {TYPES.map((k) => (
-            <button
+            <Button variant="unstyled"
               key={k}
               onClick={() => setType(type === k ? null : k)}
-              className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+              className={`rounded-surface border px-3 py-2 text-left transition-colors ${
                 type === k ? "border-indigo-300 bg-indigo-50" : "border-slate-200 bg-white hover:bg-slate-50"
               }`}
             >
               <div className="text-lg font-black text-slate-800">{data.counts[k] ?? 0}</div>
-              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{typeLabel(k)}</div>
-            </button>
+              <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{typeLabel(k)}</div>
+            </Button>
           ))}
         </div>
       )}
 
-      {error && <p className="mt-3 text-xs font-semibold text-rose-600">{error}</p>}
+      {error && <p className="mt-3 text-sm font-semibold text-rose-600">{error}</p>}
       {loading && !data && (
-        <div className="mt-3 flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-6 text-sm text-slate-500">
+        <div className="mt-3 flex items-center gap-2 rounded-surface border border-slate-200 px-4 py-6 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
         </div>
       )}
@@ -194,19 +195,19 @@ export function OpportunitiesPanel({
       {data && (
         <div className="mt-3 space-y-2">
           {data.items.length === 0 && (
-            <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+            <p className="rounded-surface border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
               {t("noResults")}
             </p>
           )}
           {data.items.slice(0, visibleCount).map((o) => (
-            <div key={o.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+            <div key={o.id} className="rounded-surface border border-slate-200 bg-slate-50/50 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="text-xs font-bold text-slate-800">{o.title}</span>
                   {o.isVerified && (
-                    <span className="ml-1.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">✓ {t("verified")}</span>
+                    <span className="ml-1.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-xs font-bold text-emerald-700">✓ {t("verified")}</span>
                   )}
-                  <p className="flex flex-wrap items-center gap-1 text-[10px] text-slate-500">
+                  <p className="flex flex-wrap items-center gap-1 text-sm text-slate-500">
                     <CountryFlag country={o.country} size="xs" />
                     {[o.provider, o.country || "International", o.level].filter(Boolean).join(" · ")}
                   </p>
@@ -220,7 +221,7 @@ export function OpportunitiesPanel({
                       href={o.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50"
+                      className="flex items-center gap-1 rounded-control border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50"
                     >
                       <ExternalLink className="h-3 w-3" /> {t("view")}
                     </a>
@@ -228,11 +229,11 @@ export function OpportunitiesPanel({
                 </div>
               </div>
               {parseFields(o.fields).length > 0 && (
-                <p className="mt-1 text-[10px] text-slate-500">
+                <p className="mt-1 text-sm text-slate-500">
                   {t("fields")}: {parseFields(o.fields).join(", ")}
                 </p>
               )}
-              <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
+              <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
                 <span>{o.deadlineDate ? `${t("deadline")}: ${o.deadlineDate}` : t("recurring")}</span>
                 {hasOpportunityNote(o.notes, "deadline_passed") && (
                   <span className="rounded-full bg-slate-100 px-1.5 py-px font-semibold text-slate-600 ring-1 ring-slate-300 ring-inset">
@@ -243,7 +244,7 @@ export function OpportunitiesPanel({
               {reasonLines(o, locale).length > 0 && (
                 <ul className="mt-1 space-y-0.5">
                   {reasonLines(o, locale).slice(0, 3).map((r, i) => (
-                    <li key={i} className="text-[10px] text-emerald-700">
+                    <li key={i} className="text-sm text-emerald-700">
                       + {r}
                     </li>
                   ))}
@@ -252,7 +253,7 @@ export function OpportunitiesPanel({
               {flagLines(o, locale).length > 0 && (
                 <ul className="mt-1 space-y-0.5">
                   {flagLines(o, locale).slice(0, 3).map((r, i) => (
-                    <li key={i} className="flex items-start gap-1 text-[10px] text-amber-700">
+                    <li key={i} className="flex items-start gap-1 text-sm text-amber-700">
                       <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" /> {r}
                     </li>
                   ))}

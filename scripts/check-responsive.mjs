@@ -17,7 +17,7 @@ const source = {
   workspace: read("src/components/journey/ApplicationWorkspacePanel.tsx"),
   navbar: read("src/components/Navbar.tsx"),
   notificationBell: read("src/components/NotificationBell.tsx"),
-  hubsUi: read("src/components/hubs/ui.tsx"),
+  hubsUi: read("src/components/ui/hubs.tsx"),
   sectionIntro: read("src/components/SectionIntro.tsx"),
   languageSwitcher: read("src/components/LanguageSwitcher.tsx"),
   homeClient: read("src/app/HomeClient.tsx"),
@@ -34,7 +34,7 @@ const source = {
   scholarshipFilters: read("src/components/ScholarshipFilters.tsx"),
   university: read("src/components/UniversityDetail.tsx"),
   tasks: read("src/components/TaskRoadmap.tsx"),
-  growthUi: read("src/components/growth/ui.tsx"),
+  growthUi: read("src/components/ui/growth.tsx"),
   landing: read("src/components/LandingPage.tsx"),
   faq: read("src/components/FaqSection.tsx"),
   appErrorFallback: read("src/components/AppErrorFallback.tsx"),
@@ -65,7 +65,7 @@ const mobileAppLabels = Object.fromEntries(["en", "uz", "ru"].map((locale) => [
 ]));
 
 console.log("\nResponsive source-level regressions");
-check("landing wordmark wraps rather than truncates on narrow screens", landingHeader.includes("min-w-0 break-words whitespace-normal text-[15px]"));
+check("landing wordmark wraps rather than truncates on narrow screens", landingHeader.includes("min-w-0 break-words whitespace-normal text-sm"));
 check("landing header actions have 44px targets and no forced nowrap", /min-h-11/.test(landingHeader) && !/whitespace-nowrap/.test(landingHeader));
 check("theme switch and theme choices meet 44px touch targets", /min-h-11 min-w-11/.test(source.themeToggle));
 check("theme controls use translated mode names and switch labels", /useTranslations\("theme"\)/.test(source.themeToggle) && /aria-label=\{t\(value\)\}/.test(source.themeToggle) && /targetModeLabel/.test(source.themeToggle));
@@ -81,7 +81,7 @@ check("premium upgrade CTA is at least 48px high and wraps safely", /min-h-12 w-
 check("FAQ summaries meet mobile touch height, wrap translated text and show keyboard focus", /min-h-11[^\"]*focus-visible:ring-2/.test(source.faq) && source.faq.includes('useTranslations("faq")'));
 check("error fallback actions and disclosure meet touch height and show focus", (source.appErrorFallback.match(/min-h-11/g) ?? []).length >= 3 && /focus-visible:ring-2/.test(source.appErrorFallback));
 check("points badge uses translated points text and wraps in narrow layouts", source.pointsBadge.includes('useTranslations("rewards")') && source.pointsBadge.includes('t("points")') && /flex-wrap/.test(source.pointsBadge));
-check("Telegram Mini App controls keep 44px targets, visible focus and safe-area navigation", (source.telegramMiniApp.match(/min-h-11 min-w-11/g) ?? []).length >= 4 && source.telegramMiniApp.includes("focus-visible:outline") && source.telegramMiniApp.includes('paddingBottom: "env(safe-area-inset-bottom)"') && source.telegramMiniApp.includes("dictionaries.en.telegram.miniApp") && source.telegramMiniApp.includes("aria-label={t.navigationLabel}"));
+check("Telegram Mini App controls keep 44px targets, visible focus and safe-area navigation", (source.telegramMiniApp.match(/min-h-11 min-w-11/g) ?? []).length >= 4 && source.telegramMiniApp.includes("focus-visible:outline") && source.telegramMiniApp.includes("tg-safe-bottom") && source.globals.includes(".tg-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }") && source.telegramMiniApp.includes("dictionaries.en.telegram.miniApp") && source.telegramMiniApp.includes("aria-label={t.navigationLabel}"));
 check("arrival checklist toggles meet 44px targets and have visible keyboard focus", /min-h-11 min-w-11[^"]*focus-visible:outline/.test(source.arrival));
 check("arrival section links meet 44px targets and have item-specific accessible names", /min-h-11 min-w-11[^"]*focus-visible:outline/.test(source.arrival) && /aria-label=\{t\("openItemSection"/.test(source.arrival));
 check("onboarding consent links meet 44×44px and remain keyboard focusable", (source.onboarding.match(/inline-flex min-h-11 min-w-11/g) ?? []).length === 2 && /focus-visible:ring-2 focus-visible:ring-indigo-500/.test(source.onboarding));
@@ -103,12 +103,12 @@ check("mobile app header menu, brand and search controls meet 44px targets", (so
 check("notification bell is a 44×44px target wherever it appears", /min-h-11 min-w-11/.test(source.notificationBell));
 check("destination tabs retain 44px minimum touch targets", /min-h-11 min-w-11/.test(source.hubsUi));
 check("destination tabs control real, hidden-or-visible tab panels", /aria-controls=\{`hub-panel-\$\{pane\.id\}`\}/.test(source.hubsUi) && /role="tabpanel"/.test(source.hubsUi) && /hidden=\{!isActive\}/.test(source.hubsUi));
-check("university filters have accessible names, including the tuition range", /aria-label=\{t\("exCountryAll"\)\}/.test(source.explorer) && /aria-label=\{t\("exSortRank"\)\}/.test(source.explorer) && /htmlFor="university-max-tuition"/.test(source.explorer) && /id="university-max-tuition"/.test(source.explorer));
+check("university filters have accessible names, including the tuition range", /aria-label=\{t\("exCountryAll"\)\}/.test(source.explorer) && /aria-label=\{t\("exSortRank"\)\}/.test(source.explorer) && /htmlFor=\{`\$\{idPrefix\}-max-tuition`\}/.test(source.explorer) && /id=\{`\$\{idPrefix\}-max-tuition`\}/.test(source.explorer) && /renderUniversityFilters\("university"\)/.test(source.explorer) && /renderUniversityFilters\("mobile-university"\)/.test(source.explorer));
 const scholarshipUi = source.scholarship + source.scholarshipFilters;
 check("scholarship search and filters have accessible names", /aria-label=\{t\("searchPlaceholder"\)\}/.test(scholarshipUi) && /aria-label=\{t\("allCountries"\)\}/.test(scholarshipUi) && /aria-label=\{t\("allCoverage"\)\}/.test(scholarshipUi));
 // Seven labelled dropdowns: the five catalogue dimensions plus the two
 // personal ones (chance, fit), which render only for a loaded profile.
-check("scholarship filter dropdowns are labelled, 44px tall and sit in the toolbar (no side panel)", (source.scholarshipFilters.match(/htmlFor="scholarship-filter-/g) ?? []).length === 7 && (source.scholarshipFilters.match(/id="scholarship-filter-/g) ?? []).length === 7 && /min-h-11/.test(source.scholarshipFilters) && !/lg:sticky/.test(source.scholarship));
+check("scholarship filter dropdowns are labelled, 44px tall and sit in the toolbar (no side panel)", (source.scholarshipFilters.match(/htmlFor=\{`\$\{idPrefix\}-/g) ?? []).length === 7 && (source.scholarshipFilters.match(/id=\{`\$\{idPrefix\}-/g) ?? []).length === 7 && /idPrefix = "scholarship-filter"/.test(source.scholarshipFilters) && /idPrefix="mobile-scholarship-filter"/.test(source.scholarship) && /min-h-11/.test(source.scholarshipFilters) && !/lg:sticky/.test(source.scholarship));
 check("the personal scholarship filters stay behind a profile", /hasProfile && \(/.test(source.scholarshipFilters) && /hasProfile=\{Boolean\(activeProfile\)\}/.test(source.scholarship));
 check("scholarship filter options state how many awards they return", /\(\{entry\.count\}\)/.test(source.scholarshipFilters) && /facets\.degrees\[degree\]/.test(source.scholarshipFilters));
 check("scholarship cards reserve one heading box so a row lines up", /line-clamp-3 min-h-\[4\.125rem\]/.test(source.scholarship) && /line-clamp-2 h-9/.test(source.scholarship));
@@ -119,7 +119,7 @@ check("application footer links remain tappable and keyboard focused", (source.h
 check("mobile Applications navigation labels are concise in every locale", mobileAppLabels.en === "Apps" && mobileAppLabels.uz === "Arizalar" && mobileAppLabels.ru === "Заявки");
 check("editing a profile preserves an unanswered financial-aid choice", /needsFinancialAid: boolean \| null/.test(source.profile) && /needsFinancialAid: null/.test(source.profile) && /financialAidUnknown/.test(source.profile));
 check("university catalogue requirements carry a programme-specific verification caveat", /catalogueRequirementsScope/.test(source.university));
-check("key catalogue cards wrap names, majors and descriptions", /break-words font-bold text-base/.test(source.explorer) && /break-words text-xs leading-relaxed/.test(source.explorer));
+check("key catalogue cards wrap names, majors and descriptions", /break-words font-bold text-base/.test(source.explorer) && /break-words text-sm leading-relaxed/.test(source.explorer));
 check("global reduced-motion preference remains respected", /prefers-reduced-motion:\s*reduce/.test(source.globals));
 check("document checklist labels, placeholders and status controls use translations", source.documentChecklist.includes('useTranslations("documentChecklist")') && /placeholder=\{t\("placeholder"\)\}/.test(source.documentChecklist) && /aria-label=\{d\.status/.test(source.documentChecklist));
 check("document checklist actions meet 44px touch targets and wrap without horizontal overflow", /min-h-11 items-center/.test(source.documentChecklist) && /min-h-11 min-w-11/.test(source.documentChecklist) && /flex flex-wrap/.test(source.documentChecklist));

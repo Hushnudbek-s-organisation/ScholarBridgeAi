@@ -37,14 +37,14 @@ export function PublicCatalogHeader() {
           <Link
             href="/universities"
             aria-current={pathname === "/universities" ? "page" : undefined}
-            className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${pathname === "/universities" ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-control px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${pathname === "/universities" ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
           >
             {nav("universities")}
           </Link>
           <Link
             href="/scholarships"
             aria-current={pathname === "/scholarships" ? "page" : undefined}
-            className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${pathname === "/scholarships" ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-control px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${pathname === "/scholarships" ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
           >
             {nav("scholarships")}
           </Link>
@@ -56,7 +56,7 @@ export function PublicCatalogHeader() {
           <Link
             href="/features"
             aria-current={pathname === "/features" ? "page" : undefined}
-            className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${pathname === "/features" ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
+            className={`inline-flex min-h-11 shrink-0 items-center rounded-control px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${pathname === "/features" ? "bg-indigo-50 text-indigo-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}
           >
             {features("navLabel")}
           </Link>

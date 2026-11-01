@@ -26,7 +26,7 @@
     "test:ai-cost": "tsx scripts/check-ai-cost.ts",
     "test:stage3-performance": "tsx scripts/check-stage3-performance.ts",
     "test:groq": "tsx scripts/check-groq.ts",
-    "db:push": "drizzle-kit push  # manual only \u2014 app never runs this automatically",
+    "db:push": "drizzle-kit push  # manual only — app never runs this automatically",
     "test:schema": "tsx scripts/check-supabase-schema.ts",
     "db:verify": "tsx scripts/check-supabase-schema.ts --live",
     "db:gen:full-schema": "tsx scripts/gen-full-schema-sql.ts",
@@ -94,6 +94,7 @@
     "test:journey": "tsx scripts/check-journey.ts",
     "test:differentiators": "tsx scripts/check-differentiators.ts",
     "test:dark": "node scripts/dark-audit.mjs",
+    "audit:ui": "node scripts/check-design-system.mjs",
     "lint:baseline": "tsx scripts/check-lint-baseline.ts",
     "audit:check": "tsx scripts/check-dependency-audit.ts",
     "test:schema-repair": "tsx scripts/check-schema-repair.ts",
@@ -107,6 +108,7 @@
     "test:calculations": "tsx scripts/check-calculations.ts",
     "test:streak": "tsx scripts/check-streak.ts",
     "test:responsive": "node scripts/check-responsive.mjs",
+    "test:ux": "node scripts/check-ux-redesign.mjs",
     "test:e2e": "node scripts/run-e2e.mjs",
     "test:api-security:isolated": "tsx scripts/run-api-security-isolated.ts",
     "test:schema-apply-safety": "node scripts/check-schema-apply-safety.mjs",
@@ -122,6 +124,7 @@
     "test:channel-e2e": "tsx scripts/rehearse-channel.ts"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@google/genai": "^2.24.0",
     "@supabase/supabase-js": "^2.117.0",
     "@types/canvas-confetti": "^1.9.0",

@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
+import { Button } from "@/components/ui/Button";
 
 interface ScholarshipsManagerProps {
   adminProfileId: number;
@@ -122,7 +123,7 @@ const emptyForm: ScholarshipForm = {
 };
 
 const inputCls =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500";
+  "w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps) {
   const [scholarships, setScholarships] = useState<ScholarshipRow[]>([]);
@@ -286,31 +287,31 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-emerald-50 flex items-center justify-center">
           <Award className="h-5 w-5 text-emerald-600" />
         </div>
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Scholarships Manager</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             {scholarships.length} scholarship{scholarships.length === 1 ? "" : "s"} on the platform
           </p>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={fetchScholarships}
-          className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="ml-auto flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </button>
+        </Button>
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+        <div className="rounded-overlay border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+        <div className="rounded-overlay border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
           {success}
         </div>
       )}
@@ -318,7 +319,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
       {/* Add / Edit form */}
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4"
+        className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs space-y-4"
       >
         <div className="flex items-center gap-2">
           {editingId ? (
@@ -334,7 +335,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {textFields.map((f) => (
             <div key={f.key} className={f.full ? "sm:col-span-2 lg:col-span-3" : ""}>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+              <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                 {f.label}
               </label>
               <input
@@ -349,7 +350,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
           ))}
 
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
               Description
             </label>
             <textarea
@@ -360,7 +361,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
             />
           </div>
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
               Requirements
             </label>
             <textarea
@@ -371,7 +372,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
             />
           </div>
 
-          <label className="text-xs font-semibold text-slate-700">
+          <label className="text-sm font-semibold text-slate-700">
             Financial need based
             <select
               value={form.financialNeedBased}
@@ -383,7 +384,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
               <option value="no">No</option>
             </select>
           </label>
-          <label className="text-xs font-semibold text-slate-700">
+          <label className="text-sm font-semibold text-slate-700">
             Merit based
             <select
               value={form.meritBased}
@@ -398,41 +399,41 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
         </div>
 
         <div className="flex items-center gap-2 pt-1">
-          <button
+          <Button variant="unstyled"
             type="submit"
             disabled={saving}
-            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-surface bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {editingId ? "Save Changes" : "Add Scholarship"}
-          </button>
+          </Button>
           {editingId && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={cancelEdit}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
               <X className="h-3.5 w-3.5" /> Cancel
-            </button>
+            </Button>
           )}
         </div>
       </form>
 
       {/* List */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+      <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center gap-2 p-8 text-xs font-semibold text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading scholarships…
           </div>
         ) : scholarships.length === 0 ? (
-          <p className="p-8 text-center text-xs font-semibold text-slate-500">
+          <p className="p-8 text-center text-sm font-semibold text-slate-500">
             No scholarships yet — add the first one above.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-4 py-3 font-bold">Scholarship</th>
                   <th className="px-4 py-3 font-bold">Provider</th>
                   <th className="px-4 py-3 font-bold">Country</th>
@@ -446,7 +447,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
                   <tr key={s.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
                     <td className="px-4 py-3">
                       <div className="font-bold text-slate-800">{s.title}</div>
-                      <div className="text-[11px] text-slate-500">{s.coverageType}</div>
+                      <div className="text-xs text-slate-500">{s.coverageType}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{s.provider}</td>
                     <td className="px-4 py-3 text-slate-600">{s.country}</td>
@@ -458,24 +459,24 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
                           : s.awardBasis === "full_tuition"
                             ? "Full tuition"
                             : formatMoney(s.amountUsdValue, "USD")}
-                      {s.financialNeedBased && <span className="ml-1 text-[10px] text-emerald-600 font-bold">NEED</span>}
-                      {s.meritBased && <span className="ml-1 text-[10px] text-indigo-600 font-bold">MERIT</span>}
+                      {s.financialNeedBased && <span className="ml-1 text-xs text-emerald-600 font-bold">NEED</span>}
+                      {s.meritBased && <span className="ml-1 text-xs text-indigo-600 font-bold">MERIT</span>}
                     </td>
                     <td className="px-4 py-3 text-slate-600">{s.deadline || "Not published"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
+                        <Button variant="unstyled"
                           onClick={() => startEdit(s)}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50"
+                          className="flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50"
                         >
                           <Pencil className="h-3 w-3" /> Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="unstyled"
                           onClick={() => handleDelete(s)}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                          className="flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50"
                         >
                           <Trash2 className="h-3 w-3" /> Delete
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>

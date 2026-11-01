@@ -12,6 +12,7 @@ import {
   XCircle,
   FlaskConical,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface ResearchAgentProps {
   adminProfileId: number;
@@ -133,39 +134,39 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-slate-900 flex items-center justify-center">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-slate-900 flex items-center justify-center">
           <Bot className="h-5 w-5 text-amber-300" />
         </div>
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Research Agent</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             Researches universities from official web sources and enriches the database — safe, evidence-based, never overwrites verified data.
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{error}</div>
+        <div className="rounded-surface border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">{error}</div>
       )}
 
       {/* Controls */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs space-y-4">
         <div>
-          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">University</label>
+          <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1.5">University</label>
           <div className="relative">
-            <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="h-4 w-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               value={query}
               onChange={(e) => searchUnis(e.target.value)}
               placeholder="Search university by name… (e.g. MIT)"
-              className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-surface border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           {results.length > 0 && (
-            <div className="mt-2 rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <div className="mt-2 rounded-surface border border-slate-200 bg-white overflow-hidden">
               {results.map((u) => (
-                <button
+                <Button variant="unstyled"
                   key={u.id}
                   onClick={() => {
                     setSelected(u.id);
@@ -175,72 +176,72 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
                   }}
                   className={`w-full text-left px-4 py-2.5 text-xs hover:bg-indigo-50 transition-colors ${selected === u.id ? "bg-indigo-50 font-bold text-indigo-700" : "text-slate-700"}`}
                 >
-                  {u.name} <span className="text-slate-400">· {u.country}</span>
-                </button>
+                  {u.name} <span className="text-slate-500">· {u.country}</span>
+                </Button>
               ))}
             </div>
           )}
           {selectedName && (
-            <p className="mt-1.5 text-[11px] font-semibold text-emerald-700">
+            <p className="mt-1.5 text-sm font-semibold text-emerald-700">
               <CheckCircle2 className="h-3 w-3 inline mr-1" /> Selected: {selectedName} (id {selected})
             </p>
           )}
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Scopes</label>
+          <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1.5">Scopes</label>
           <div className="flex flex-wrap gap-2">
             {SCOPES.map((s) => (
-              <button
+              <Button variant="unstyled"
                 key={s}
                 onClick={() => toggleScope(s)}
-                className={`rounded-lg px-3 py-1.5 text-[11px] font-bold border transition-colors ${
+                className={`rounded-control px-3 py-1.5 text-xs font-bold border transition-colors ${
                   scopes.includes(s)
                     ? "bg-slate-900 text-white border-slate-900"
                     : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 {s.replace(/_/g, " ")}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
           <input
             type="checkbox"
             checked={dryRun}
             onChange={(e) => setDryRun(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            className="h-4 w-4 rounded-control border-slate-300 text-indigo-600 focus:ring-indigo-500"
           />
           <FlaskConical className="h-3.5 w-3.5 text-indigo-500" />
           Dry run (report only — no database writes)
         </label>
 
-        <button
+        <Button variant="unstyled"
           onClick={runResearch}
           disabled={running || !selected}
-          className="flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-surface bg-slate-900 px-5 py-2.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50"
         >
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
           {running ? "Researching…" : "Run Research"}
-        </button>
+        </Button>
       </div>
 
       {/* Live progress */}
       {run && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 flex items-center gap-2">
+        <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-500 flex items-center gap-2">
             <RefreshCw className={`h-3.5 w-3.5 ${run.state === "running" ? "animate-spin" : ""}`} />
             Live Progress
             {run.state === "complete" && <span className="text-emerald-600">· Complete</span>}
-            {run.state === "error" && <span className="text-red-600">· Error</span>}
+            {run.state === "error" && <span className="text-rose-600">· Error</span>}
           </div>
           <div className="p-4 space-y-1 max-h-56 overflow-y-auto">
             {run.progress.map((p, i) => (
-              <p key={i} className="text-[11px] text-slate-600 flex items-center gap-1.5">
+              <p key={i} className="text-sm text-slate-600 flex items-center gap-1.5">
                 {p.includes("Error") ? (
-                  <XCircle className="h-3 w-3 text-red-500 shrink-0" />
+                  <XCircle className="h-3 w-3 text-rose-500 shrink-0" />
                 ) : p.includes("WARNING") || p.includes("review") ? (
                   <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
                 ) : (
@@ -255,8 +256,8 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
 
       {/* Final report */}
       {report && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-500">
             Audit Report — {report.universityName} {report.dryRun ? "(dry run)" : ""}
           </div>
           <div className="p-4">
@@ -266,28 +267,28 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
                 { label: "Inserted", value: insertedCount, cls: "text-emerald-700" },
                 { label: "Skipped", value: skippedCount, cls: "text-slate-500" },
                 { label: "Review req.", value: reviewCount, cls: "text-amber-700" },
-                { label: "Rejected", value: rejectedCount, cls: "text-red-700" },
-                { label: "Discovery-only", value: discoveryOnlyCount, cls: "text-slate-400" },
-                { label: "Errors", value: errorCount, cls: "text-red-700" },
+                { label: "Rejected", value: rejectedCount, cls: "text-rose-700" },
+                { label: "Discovery-only", value: discoveryOnlyCount, cls: "text-slate-500" },
+                { label: "Errors", value: errorCount, cls: "text-rose-700" },
               ].map((s) => (
-                <div key={s.label} className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-center">
+                <div key={s.label} className="rounded-surface bg-slate-50 border border-slate-100 p-3 text-center">
                   <p className={`text-xl font-extrabold ${s.cls}`}>{s.value}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">{s.label}</p>
+                  <p className="text-sm font-bold text-slate-500 uppercase">{s.label}</p>
                 </div>
               ))}
             </div>
 
             {report.updatedFields.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Updated fields ({report.updatedFields.length})</p>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1">Updated fields ({report.updatedFields.length})</p>
                 <div className="space-y-1.5">
                   {report.updatedFields.map((f: any, i: number) => (
-                    <div key={i} className="rounded-lg border border-indigo-100 bg-indigo-50/50 px-2.5 py-1.5 text-[11px]">
+                    <div key={i} className="rounded-control border border-indigo-100 bg-indigo-50/50 px-2.5 py-1.5 text-xs">
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-indigo-700">{f.entity ? `${f.entity}.` : ""}{f.field}</span>
-                        <span className="text-[9px] font-black uppercase tracking-wide text-indigo-500">{f.action}</span>
+                        <span className="text-xs font-black uppercase tracking-wide text-indigo-500">{f.action}</span>
                         {f.confidence != null && (
-                          <span className="ml-auto text-[10px] text-slate-500">confidence {(Number(f.confidence) * 100).toFixed(0)}%</span>
+                          <span className="ml-auto text-xs text-slate-500">confidence {(Number(f.confidence) * 100).toFixed(0)}%</span>
                         )}
                       </div>
                       <p className="text-slate-600 mt-0.5">
@@ -298,7 +299,7 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
                           {f.sourceTitle || f.sourceUrl}
                         </a>
                       )}
-                      {f.reason && <p className="text-slate-400 mt-0.5">{f.reason}</p>}
+                      {f.reason && <p className="text-slate-500 mt-0.5">{f.reason}</p>}
                     </div>
                   ))}
                 </div>
@@ -306,10 +307,10 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
             )}
             {report.skippedFields.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Skipped / unchanged ({report.skippedFields.length})</p>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1">Skipped / unchanged ({report.skippedFields.length})</p>
                 <div className="space-y-1">
                   {report.skippedFields.map((s: any, i: number) => (
-                    <p key={i} className="text-[11px] text-slate-500">
+                    <p key={i} className="text-sm text-slate-500">
                       {typeof s === "string" ? s : (
                         <>
                           <b className="text-slate-600">{s.entity ? `${s.entity}.` : ""}{s.field}</b>{" "}
@@ -323,25 +324,25 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
             )}
             {report.insertedPrograms.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Programs</p>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1">Programs</p>
                 <div className="flex flex-wrap gap-1.5">
                   {report.insertedPrograms.map((p: string) => (
-                    <span key={p} className="rounded-md bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[10px] font-bold">{p}</span>
+                    <span key={p} className="rounded-control bg-emerald-50 text-emerald-700 px-2 py-0.5 text-xs font-bold">{p}</span>
                   ))}
                 </div>
               </div>
             )}
             {report.insertedEntities?.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Proposed inserts ({report.insertedEntities.length}) — fully explained</p>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1">Proposed inserts ({report.insertedEntities.length}) — fully explained</p>
                 <div className="space-y-1.5">
                   {report.insertedEntities.slice(0, 15).map((e: any, i: number) => (
-                    <div key={i} className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-2.5 py-1.5 text-[11px]">
+                    <div key={i} className="rounded-control border border-emerald-200 bg-emerald-50/50 px-2.5 py-1.5 text-xs">
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-emerald-700">{e.entity}: {e.name}</span>
-                        <span className="text-[9px] font-black uppercase tracking-wide text-emerald-500">INSERT</span>
+                        <span className="text-xs font-black uppercase tracking-wide text-emerald-500">INSERT</span>
                         {e.confidence != null && (
-                          <span className="ml-auto text-[10px] text-slate-500">confidence {(Number(e.confidence) * 100).toFixed(0)}%</span>
+                          <span className="ml-auto text-xs text-slate-500">confidence {(Number(e.confidence) * 100).toFixed(0)}%</span>
                         )}
                       </div>
                       {e.fields?.length > 0 && <p className="text-slate-600 mt-0.5">fields: {e.fields.join(", ")}</p>}
@@ -350,7 +351,7 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
                           {e.sourceTitle || e.sourceUrl}
                         </a>
                       )}
-                      {e.reason && <p className="text-slate-400 mt-0.5">{e.reason}</p>}
+                      {e.reason && <p className="text-slate-500 mt-0.5">{e.reason}</p>}
                     </div>
                   ))}
                 </div>
@@ -358,9 +359,9 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
             )}
             {report.reviewRequired.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Review required</p>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1">Review required</p>
                 {report.reviewRequired.map((r: any, i: number) => (
-                  <p key={i} className="text-[11px] text-amber-700">
+                  <p key={i} className="text-sm text-amber-700">
                     <AlertTriangle className="h-3 w-3 inline mr-1" />
                     {typeof r === "string" ? r : `${r.field} — ${r.reason || "manual check needed"}`}
                   </p>
@@ -369,11 +370,11 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
             )}
             {report.rejectedSources?.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Rejected sources ({report.rejectedSources.length})</p>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1">Rejected sources ({report.rejectedSources.length})</p>
                 <div className="max-h-28 overflow-y-auto space-y-0.5">
                   {report.rejectedSources.slice(0, 30).map((s: any, i: number) => (
-                    <p key={i} className="text-[10px] text-red-500 truncate">
-                      <XCircle className="h-3 w-3 inline mr-1" />{s.url} <span className="text-red-300">({s.reason})</span>
+                    <p key={i} className="text-sm text-rose-500 truncate">
+                      <XCircle className="h-3 w-3 inline mr-1" />{s.url} <span className="text-rose-300">({s.reason})</span>
                     </p>
                   ))}
                 </div>
@@ -381,9 +382,9 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
             )}
             {report.newSources.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Persisted sources ({report.newSources.length})</p>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1">Persisted sources ({report.newSources.length})</p>
                 {report.newSources.slice(0, 15).map((s: any) => (
-                  <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-indigo-600 hover:underline truncate">
+                  <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" className="block text-xs text-indigo-600 hover:underline truncate">
                     {s.title || s.url}
                   </a>
                 ))}
@@ -391,10 +392,10 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
             )}
             {report.discoveryOnly?.length > 0 && (
               <div className="mb-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Discovery-only pages ({report.discoveryOnly.length}) — crawled, NOT persisted</p>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1">Discovery-only pages ({report.discoveryOnly.length}) — crawled, NOT persisted</p>
                 <div className="max-h-24 overflow-y-auto space-y-0.5">
                   {report.discoveryOnly.slice(0, 20).map((s: any, i: number) => (
-                    <p key={i} className="text-[10px] text-slate-400 truncate">
+                    <p key={i} className="text-sm text-slate-500 truncate">
                       {s.url} <span className="text-slate-300">({s.reason})</span>
                     </p>
                   ))}
@@ -404,15 +405,15 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
 
             {/* AI provider status (spec §22) */}
             {report.debug?.ai && (
-              <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <div className="mb-3 rounded-surface border border-amber-200 bg-amber-50 p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`inline-block h-2 w-2 rounded-full ${report.debug.ai.status === "available" ? "bg-emerald-500" : "bg-red-400"}`} />
-                  <p className="text-[10px] font-bold text-slate-600 uppercase">AI Provider: {report.debug.ai.provider}</p>
-                  <p className="text-[10px] text-slate-500">Model: {report.debug.ai.model}</p>
-                  <p className="text-[10px] text-slate-500">Status: {report.debug.ai.status}</p>
-                  <p className="text-[10px] text-slate-500 ml-auto">calls {report.debug.ai.calls} · fallbacks {report.debug.ai.fallbacks}</p>
+                  <span className={`inline-block h-2 w-2 rounded-full ${report.debug.ai.status === "available" ? "bg-emerald-500" : "bg-rose-400"}`} />
+                  <p className="text-sm font-bold text-slate-600 uppercase">AI Provider: {report.debug.ai.provider}</p>
+                  <p className="text-sm text-slate-500">Model: {report.debug.ai.model}</p>
+                  <p className="text-sm text-slate-500">Status: {report.debug.ai.status}</p>
+                  <p className="text-sm text-slate-500 ml-auto">calls {report.debug.ai.calls} · fallbacks {report.debug.ai.fallbacks}</p>
                 </div>
-                <p className="text-[10px] text-amber-700 font-semibold">
+                <p className="text-sm text-amber-700 font-semibold">
                   ⚠ AI-generated extraction is never trusted without source/evidence validation.
                 </p>
               </div>
@@ -420,34 +421,34 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
 
             {/* Extraction pipeline debug (spec §21) */}
             {report.debug && (
-              <div className="mb-3 rounded-xl bg-slate-50 border border-slate-100 p-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5">Extraction pipeline — fetched {report.debug.fetchedPages} pages</p>
+              <div className="mb-3 rounded-surface bg-slate-50 border border-slate-100 p-3">
+                <p className="text-sm font-bold text-slate-500 uppercase mb-1.5">Extraction pipeline — fetched {report.debug.fetchedPages} pages</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
                   {Object.entries(report.debug.classifiedCounts || {}).map(([cat, n]) => (
-                    <span key={cat} className="text-[10px] text-slate-500">
+                    <span key={cat} className="text-xs text-slate-500">
                       <b className="text-slate-700">{cat}</b>: {String(n)}
                     </span>
                   ))}
                 </div>
                 {Object.keys(report.debug.extractionCounts || {}).length > 0 && (
-                  <p className="text-[10px] text-slate-500 mb-1.5">
+                  <p className="text-sm text-slate-500 mb-1.5">
                     Candidates: {Object.entries(report.debug.extractionCounts).map(([f, n]) => `${f} ${n}`).join(" · ")}
                   </p>
                 )}
                 {(report.debug.classifications || []).length > 0 && (
                   <div className="max-h-40 overflow-y-auto space-y-1 mb-2">
                     {report.debug.classifications.slice(0, 20).map((c: any, i: number) => (
-                      <div key={i} className="text-[10px]">
-                        <p className={`truncate ${c.category === "other" ? "text-slate-400" : "text-emerald-700 font-bold"}`}>
+                      <div key={i} className="text-xs">
+                        <p className={`truncate ${c.category === "other" ? "text-slate-500" : "text-emerald-700 font-bold"}`}>
                           [{c.category}] conf={(Number(c.confidence) * 100).toFixed(0)}% {c.url}
-                          <span className="text-slate-400 font-normal">
+                          <span className="text-slate-500 font-normal">
                             {" "}· det: {c.detCategory} {(Number(c.detConfidence ?? 0) * 100).toFixed(0)}%
                             {c.aiCategory ? ` · ai: ${c.aiCategory} ${(Number(c.aiConfidence ?? 0) * 100).toFixed(0)}%` : ""}
                             {c.aiUsed ? " · AI" : ""}
                             {c.fallbackUsed ? " · fallback" : ""}
                           </span>
                         </p>
-                        {c.reason && <p className="text-slate-400 truncate">{c.reason}</p>}
+                        {c.reason && <p className="text-slate-500 truncate">{c.reason}</p>}
                       </div>
                     ))}
                   </div>
@@ -455,7 +456,7 @@ export function ResearchAgent({ adminProfileId }: ResearchAgentProps) {
                 {(report.debug.pageNotes || []).length > 0 && (
                   <div className="max-h-36 overflow-y-auto space-y-0.5">
                     {report.debug.pageNotes.slice(0, 25).map((n: any, i: number) => (
-                      <p key={i} className={`text-[10px] truncate ${n.extracted > 0 ? "text-slate-500" : "text-amber-600"}`}>
+                      <p key={i} className={`text-sm truncate ${n.extracted > 0 ? "text-slate-500" : "text-amber-600"}`}>
                         [{n.category}] {n.url} · {n.textLength} chars · {n.extracted} extracted
                         {n.reason ? ` — ${n.reason}` : ""}
                       </p>

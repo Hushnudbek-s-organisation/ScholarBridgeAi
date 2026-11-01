@@ -37,7 +37,11 @@ import { OnboardingWizard } from "../src/components/OnboardingWizard";
 import { DashboardView } from "../src/components/DashboardView";
 import { RecommendationStudio } from "../src/components/RecommendationStudio";
 import { normalizeDegreeLevel, supportsDegreeLevel } from "../src/lib/degreeLevels";
-import { RecommendedPanel } from "../src/components/journey/JourneyControlCenter";
+import { DashboardFirstSteps, RecommendedPanel } from "../src/components/journey/JourneyControlCenter";
+import { AiSopStudio } from "../src/components/AiSopStudio";
+import { ApplicationTracker } from "../src/components/ApplicationTracker";
+import { BottomSheet } from "../src/components/ui/BottomSheet";
+import { LoadingStages } from "../src/components/ui/LoadingStages";
 import { AiOrbFaceAvatar } from "../src/components/visa/AiOrbFaceAvatar";
 import { DailyStreakCard } from "../src/components/DailyStreakCard";
 import { TaskRoadmap } from "../src/components/TaskRoadmap";
@@ -493,8 +497,8 @@ for (const locale of ["en", "uz", "ru"]) {
   check(`OnboardingWizard choice step renders in ${locale}`, result.error === null, result.error ?? "");
   const onboardingMessages = localeMessages.onboarding;
   const stepCount = onboardingMessages.stepCount
-    .replace("{current}", "3")
-    .replace("{total}", "8");
+    .replace("{current}", "2")
+    .replace("{total}", "3");
   check(
     `onboarding progress, legal note and controls are localized (${locale})`,
     [
@@ -560,6 +564,56 @@ for (const locale of ["en", "uz", "ru"]) {
   );
 }
 
+section("8b. Second-audit UX components render in every locale");
+for (const locale of ["en", "uz", "ru"]) {
+  const messages = loadMessages(locale) as any;
+  const starter = renderLocalized(locale, React.createElement(DashboardFirstSteps, {
+    activity: { savedUniversities: 0, savedScholarships: 0, applications: 0 },
+    onNavigateTab: () => {},
+  }));
+  check(`dashboard starter tasks are localized (${locale})`, starter.error === null && [
+    messages.journey.firstSteps.title,
+    messages.journey.firstSteps.universitiesCta,
+    messages.journey.firstSteps.scholarshipsCta,
+    messages.journey.firstSteps.applicationCta,
+  ].every((label) => text(starter.html).includes(label)), starter.error ?? "missing starter task");
+
+  const sop = renderLocalized(locale, React.createElement(AiSopStudio, { activeProfile: null }));
+  check(`SOP studio inputs and empty state are localized (${locale})`, sop.error === null && [
+    messages.ai.sopStudio.suiteBadge,
+    messages.ai.sopStudio.inputsTitle,
+    messages.ai.sopStudio.draftEmpty,
+  ].every((label) => text(sop.html).includes(label)), sop.error ?? "missing SOP copy");
+
+  const tracker = renderLocalized(locale, React.createElement(ApplicationTracker, {
+    activeProfile: null,
+    savedUniversities: [],
+    savedScholarships: [],
+    onUpdateSavedUniStatus: async () => {},
+    onRemoveSavedUni: async () => {},
+    onUpdateSavedScholarshipStatus: async () => {},
+    onRemoveSavedScholarship: async () => {},
+  }));
+  check(`application tracker empty state is localized (${locale})`, tracker.error === null && text(tracker.html).includes(messages.applications.tracker.title) && !/applications\.tracker\./.test(tracker.html), tracker.error ?? "missing tracker copy");
+
+  // TypeScript's createElement overload does not include rest children in required props.
+  // eslint-disable-next-line react/no-children-prop
+  const sheet = renderLocalized(locale, React.createElement(BottomSheet, {
+    open: true,
+    onClose: () => {},
+    title: messages.university.exFiltersAndSort,
+    children: React.createElement("button", null, messages.common.showResults),
+  }));
+  check(`bottom sheet has localized accessible dialog copy (${locale})`, sheet.error === null && sheet.html.includes('role="dialog"') && sheet.html.includes('aria-modal="true"') && text(sheet.html).includes(messages.common.showResults), sheet.error ?? "missing sheet");
+
+  const loading = renderLocalized(locale, React.createElement(LoadingStages, {
+    title: messages.ai.sopStudio.draftLoadingTitle,
+    description: messages.ai.sopStudio.loadingDescription,
+    stages: [messages.ai.sopStudio.draftStage1, messages.ai.sopStudio.draftStage2, messages.ai.sopStudio.draftStage3],
+  }));
+  check(`AI stages render localized honest activity (${locale})`, loading.error === null && text(loading.html).includes(messages.ai.sopStudio.draftStage1) && !loading.html.includes("progressbar") && !loading.html.includes("%"), loading.error ?? "missing loading stage");
+}
+
 const degreeLabels: Record<string, { Bachelor: string; Master: string; PhD: string; all: string; unspecified: string }> = {
   en: { Bachelor: "Bachelor (undergraduate)", Master: "Master (graduate)", PhD: "PhD (doctoral)", all: "All degree levels", unspecified: "Level: not specified" },
   uz: { Bachelor: "Bakalavr (bakalavriat)", Master: "Magistr (magistratura)", PhD: "PhD (doktorantura)", all: "Barcha darajalar", unspecified: "Daraja: ko'rsatilmagan" },
@@ -610,7 +664,8 @@ for (const locale of ["en", "uz", "ru"]) {
   const recommend = renderLocalized(locale, React.createElement(RecommendationStudio, { activeProfile: null }));
   check(`recommendation studio still renders (${locale})`, recommend.error === null && recommend.html.length > 50, recommend.error ?? "");
   const editor = renderLocalized(locale, React.createElement(ProfileModal, { isOpen: true, isNew: false, profile, onClose: () => {}, onSave: async () => {} }));
-  check(`existing profile editor remains a separate modal (${locale})`, editor.error === null && editor.html.includes("Edit Academic Profile") && editor.html.includes("Save Profile Changes") && editor.html.includes("Extracurriculars"), editor.error ?? "missing editor fields");
+  const editorMessages = (loadMessages(locale) as any).profile.editor;
+  check(`existing profile editor remains a separate modal (${locale})`, editor.error === null && [editorMessages.editTitle, editorMessages.saveChanges, editorMessages.extracurriculars].every((label) => text(editor.html).includes(label)), editor.error ?? "missing editor fields");
 }
 
 for (const [name, condition] of [

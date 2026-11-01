@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useTranslations } from "next-intl";
 import { CheckCircle2, XCircle, Award } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export interface QuizQuestion {
   id: number;
@@ -68,17 +69,17 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4">
+    <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-5 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
           <Award className="h-4 w-4 text-amber-500" />
           {quiz.title}
         </h3>
-        <span className="text-[11px] text-slate-400">{t("score")}: ≥ {quiz.passThreshold}%</span>
+        <span className="text-xs text-slate-500">{t("score")}: ≥ {quiz.passThreshold}%</span>
       </div>
 
       {result && (
-        <div className={`p-4 rounded-xl ${result.passed ? "bg-emerald-50 border border-emerald-200" : "bg-amber-50 border border-amber-200"}`}>
+        <div className={`p-4 rounded-surface ${result.passed ? "bg-emerald-50 border border-emerald-200" : "bg-amber-50 border border-amber-200"}`}>
           <div className="flex items-center gap-3">
             <div className={`h-12 w-12 rounded-full flex items-center justify-center ${result.passed ? "bg-emerald-600" : "bg-amber-500 sb-ink-on-bright"}`}>
               <span className="text-white sb-ink-on-bright font-extrabold text-sm">{result.score}%</span>
@@ -87,7 +88,7 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
               <p className={`font-bold text-sm ${result.passed ? "text-emerald-800" : "text-amber-800"}`}>
                 {result.passed ? t("passed") : `${t("failed")} ${quiz.passThreshold}%`}
               </p>
-              <p className="text-[11px] text-slate-500">{t("score")}: {result.score}%</p>
+              <p className="text-sm text-slate-500">{t("score")}: {result.score}%</p>
             </div>
           </div>
         </div>
@@ -95,7 +96,7 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
 
       {quiz.questions.map((q, qIndex) => (
         <div key={q.id} className="space-y-2">
-          <p className="text-xs font-semibold text-slate-700">
+          <p className="text-sm font-semibold text-slate-700">
             {qIndex + 1}. {q.question}
           </p>
           <div className="space-y-1.5">
@@ -107,23 +108,23 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
               let cls = "border-slate-200 hover:border-indigo-300 hover:bg-indigo-50";
               if (showFeedback) {
                 if (isCorrect) cls = "border-emerald-300 bg-emerald-50";
-                else if (selected) cls = "border-red-300 bg-red-50";
+                else if (selected) cls = "border-rose-300 bg-rose-50";
                 else cls = "border-slate-200 opacity-50";
               } else if (selected) {
                 cls = "border-indigo-400 bg-indigo-50";
               }
 
               return (
-                <button
+                <Button variant="unstyled"
                   key={optIndex}
                   onClick={() => selectAnswer(qIndex, optIndex)}
                   disabled={!!result}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl border text-xs transition-colors flex items-center justify-between gap-2 ${cls}`}
+                  className={`w-full text-left px-3 py-2.5 rounded-surface border text-xs transition-colors flex items-center justify-between gap-2 ${cls}`}
                 >
                   <span className="text-slate-700">{opt}</span>
                   {showFeedback && isCorrect && <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />}
-                  {showFeedback && selected && !isCorrect && <XCircle className="h-4 w-4 text-red-500 shrink-0" />}
-                </button>
+                  {showFeedback && selected && !isCorrect && <XCircle className="h-4 w-4 text-rose-500 shrink-0" />}
+                </Button>
               );
             })}
           </div>
@@ -131,19 +132,19 @@ export function LessonQuiz({ quiz, profileId, onCompleted }: LessonQuizProps) {
       ))}
 
       {error && (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+        <p role="alert" className="rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
           {error}
         </p>
       )}
 
       {!result && (
-        <button
+        <Button variant="unstyled"
           onClick={handleSubmit}
           disabled={!allAnswered || submitting}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs transition-colors disabled:opacity-50"
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-surface text-xs shadow-xs transition-colors disabled:opacity-50"
         >
           {t("submitQuiz")}
-        </button>
+        </Button>
       )}
     </div>
   );

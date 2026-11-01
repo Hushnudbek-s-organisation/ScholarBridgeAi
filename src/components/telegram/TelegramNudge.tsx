@@ -9,6 +9,7 @@ import {
   nudgeDismissKey,
   staleDismissKeys,
 } from "@/lib/telegram/nudge";
+import { Button } from "@/components/ui/Button";
 
 /**
  * "Connect the Telegram bot so you can use the site fully" — the reminder a new
@@ -92,38 +93,38 @@ export function TelegramNudge({
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, height: 0 }}
-          className="mb-3 flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 sm:flex-row sm:items-center"
+          className="mb-3 flex flex-col gap-3 rounded-overlay border border-sky-200 bg-sky-50 px-4 py-3 sm:flex-row sm:items-center"
           role="status"
         >
           <div className="flex min-w-0 flex-1 items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white sb-ink-on-bright">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-surface bg-sky-500 text-white sb-ink-on-bright">
               <Send className="h-4 w-4" aria-hidden />
             </span>
             <div className="min-w-0">
               <p className="text-sm font-extrabold text-slate-900">{t("nudgeTitle")}</p>
-              <p className="text-[12px] leading-relaxed text-slate-600">{t("nudgeBody")}</p>
+              <p className="text-sm leading-relaxed text-slate-600">{t("nudgeBody")}</p>
               {daysLeft > 0 && (
-                <p className="mt-0.5 text-[11px] font-semibold text-sky-800">
+                <p className="mt-0.5 text-sm font-semibold text-sky-800">
                   {t("nudgeDaysLeft", { days: daysLeft })}
                 </p>
               )}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
-            <button
+            <Button variant="unstyled"
               onClick={onConnect}
-              className="min-h-11 rounded-xl bg-sky-500 px-3.5 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
+              className="min-h-11 rounded-surface bg-sky-500 px-3.5 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
             >
               {t("nudgeCta")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               onClick={dismiss}
               aria-label={t("dismiss")}
               title={t("dismiss")}
-              className="min-h-11 min-w-11 rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+              className="min-h-11 min-w-11 rounded-control p-1.5 text-slate-500 hover:bg-white hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
             >
               <X className="h-4 w-4" aria-hidden />
-            </button>
+            </Button>
           </div>
         </motion.div>
       )}

@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
+import { Button } from "@/components/ui/Button";
 
 interface UniversitiesManagerProps {
   adminProfileId: number;
@@ -82,7 +83,7 @@ const emptyForm: UniversityForm = {
 };
 
 const inputCls =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500";
+  "w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500";
 
 export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps) {
   const [universities, setUniversities] = useState<UniversityRow[]>([]);
@@ -217,31 +218,31 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-indigo-50 flex items-center justify-center">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-indigo-50 flex items-center justify-center">
           <Building2 className="h-5 w-5 text-indigo-600" />
         </div>
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Universities Manager</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             {universities.length} universit{universities.length === 1 ? "y" : "ies"} on the platform
           </p>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={fetchUniversities}
-          className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="ml-auto flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </button>
+        </Button>
       </div>
 
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
+        <div className="rounded-overlay border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+        <div className="rounded-overlay border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
           {success}
         </div>
       )}
@@ -249,7 +250,7 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
       {/* Add / Edit form */}
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4"
+        className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs space-y-4"
       >
         <div className="flex items-center gap-2">
           {editingId ? (
@@ -265,7 +266,7 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {fields.map((f) => (
             <div key={f.key} className={f.full ? "sm:col-span-2 lg:col-span-3" : ""}>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+              <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                 {f.label}
               </label>
               <input
@@ -278,7 +279,7 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
             </div>
           ))}
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+            <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
               Description
             </label>
             <textarea
@@ -291,41 +292,41 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
         </div>
 
         <div className="flex items-center gap-2 pt-1">
-          <button
+          <Button variant="unstyled"
             type="submit"
             disabled={saving}
-            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {editingId ? "Save Changes" : "Add University"}
-          </button>
+          </Button>
           {editingId && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={cancelEdit}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
               <X className="h-3.5 w-3.5" /> Cancel
-            </button>
+            </Button>
           )}
         </div>
       </form>
 
       {/* List */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+      <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center gap-2 p-8 text-xs font-semibold text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading universities…
           </div>
         ) : universities.length === 0 ? (
-          <p className="p-8 text-center text-xs font-semibold text-slate-500">
+          <p className="p-8 text-center text-sm font-semibold text-slate-500">
             No universities yet — add the first one above.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-4 py-3 font-bold">University</th>
                   <th className="px-4 py-3 font-bold">Country</th>
                   <th className="px-4 py-3 font-bold">Ranking</th>
@@ -341,7 +342,7 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
                       <div className="font-bold text-slate-800">
                         {u.flagEmoji} {u.name}
                       </div>
-                      <div className="text-[11px] text-slate-500">{u.city} · {u.programMajor}</div>
+                      <div className="text-xs text-slate-500">{u.city} · {u.programMajor}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{u.country}</td>
                     <td className="px-4 py-3 text-slate-600">#{formatNumber(u.worldRanking, { placeholder: "—" })}</td>
@@ -349,18 +350,18 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
                     <td className="px-4 py-3 text-slate-600">{formatPercent(u.acceptanceRate)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
+                        <Button variant="unstyled"
                           onClick={() => startEdit(u)}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50"
+                          className="flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
                         >
                           <Pencil className="h-3 w-3" /> Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="unstyled"
                           onClick={() => handleDelete(u)}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                          className="flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50"
                         >
                           <Trash2 className="h-3 w-3" /> Delete
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>

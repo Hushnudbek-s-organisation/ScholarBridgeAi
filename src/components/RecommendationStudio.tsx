@@ -42,7 +42,7 @@ import { useTranslations } from "next-intl";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
-import { ScrollRegion } from "@/components/hubs/ui";
+import { ScrollRegion } from "@/components/ui/hubs";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { localizeCountry } from "@/lib/catalogLocalizer";
 import CountryFlag from "@/components/CountryFlag";
@@ -58,6 +58,7 @@ import {
 } from "@/lib/studyInterests";
 import type { StudentProfile } from "@/components/Navbar";
 import { AppNote } from "@/components/AppNote";
+import { Button } from "@/components/ui/Button";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors of the API response — src/app/api/programs/recommend)
@@ -248,13 +249,13 @@ function buildPayload(
 function Badge({ tone, children }: { tone: "green" | "red" | "amber" | "slate" | "indigo"; children: React.ReactNode }) {
   const tones: Record<string, string> = {
     green: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
-    red: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-900",
+    red: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-900",
     amber: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
     slate: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
     indigo: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-900",
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tones[tone]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -262,8 +263,8 @@ function Badge({ tone, children }: { tone: "green" | "red" | "amber" | "slate" |
 
 function DimHeading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <h4 className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-      <span className="text-slate-400 dark:text-slate-500">{icon}</span> {children}
+    <h4 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <span className="text-slate-500 dark:text-slate-500">{icon}</span> {children}
     </h4>
   );
 }
@@ -622,13 +623,13 @@ export function RecommendationStudio({
 
   // ---- Render -----------------------------------------------------------------
   const inputCls =
-    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-indigo-900";
+    "w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-indigo-900";
   const labelCls = "mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300";
-  const hintCls = "mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400";
+  const hintCls = "mt-1 text-xs leading-snug text-slate-500 dark:text-slate-400";
   const btnPrimary =
-    "inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex items-center justify-center gap-2 rounded-control bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60";
   const btnGhost =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800";
+    "inline-flex items-center justify-center gap-1.5 rounded-control border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800";
 
   const optionalField = (
     key: keyof FormState,
@@ -657,17 +658,17 @@ export function RecommendationStudio({
 
   return (
     <section aria-label={t("title")} className="mx-auto w-full max-w-5xl">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               <Sparkles className="h-3.5 w-3.5" /> {t("title")}
             </h3>
-            <p className="mt-1 max-w-2xl text-[11px] leading-snug text-slate-500 dark:text-slate-400">{t("subtitle")}</p>
+            <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-500 dark:text-slate-400">{t("subtitle")}</p>
           </div>
-          <button type="button" onClick={clearInputs} className={btnGhost} aria-label={t("clearInputs")}>
+          <Button variant="unstyled" type="button" onClick={clearInputs} className={btnGhost} aria-label={t("clearInputs")}>
             <Trash2 className="h-3.5 w-3.5" /> {t("clearInputs")}
-          </button>
+          </Button>
         </div>
 
         {/* ---- Inputs --------------------------------------------------------- */}
@@ -712,7 +713,7 @@ export function RecommendationStudio({
 
           {/* Collapsible: everything else is skippable ------------------------ */}
           <div>
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setShowOptional((v) => !v)}
               aria-expanded={showOptional}
@@ -721,13 +722,13 @@ export function RecommendationStudio({
               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showOptional ? "rotate-180" : ""}`} />
               {t("whyHeading")}
               <HelpCircle className="h-3.5 w-3.5" />
-            </button>
+            </Button>
 
             {showOptional && (
-              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
-                <p className="mb-3 text-[11px] leading-snug text-slate-600 dark:text-slate-300">{t("whyText")}</p>
+              <div className="mt-3 rounded-surface border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+                <p className="mb-3 text-sm leading-snug text-slate-600 dark:text-slate-300">{t("whyText")}</p>
                 {activeProfile && (
-                  <p className="mb-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200">
+                  <p className="mb-3 rounded-control border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200">
                     {t("prefilledNote")}
                   </p>
                 )}
@@ -771,22 +772,22 @@ export function RecommendationStudio({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={() => void run()} disabled={status === "loading"} className={btnPrimary} aria-label={t("ariaRun")}>
+            <Button variant="unstyled" type="button" onClick={() => void run()} disabled={status === "loading"} className={btnPrimary} aria-label={t("ariaRun")}>
               {status === "loading" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               {status === "loading" ? t("loading") : t("run")}
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* ---- Status region (announced politely) ------------------------------ */}
         <div ref={statusRef} role="status" aria-live="polite">
           {status === "loading" && (
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+            <div className="mt-4 flex items-center gap-3 rounded-surface border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
               <Loader2 className="h-5 w-5 animate-spin text-indigo-500" /> {t("loading")}
             </div>
           )}
           {error && status !== "loading" && (
-            <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+            <div role="alert" className="mt-4 flex items-start gap-2 rounded-surface border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error.message}</span>
             </div>
@@ -797,13 +798,13 @@ export function RecommendationStudio({
         {status === "success" && data && (
           <>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 {t("resultsCount", { n: data.results.length })}
                 <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">{t("scanned", { n: data.totalProgramsScanned })}</span>
               </p>
-              <button type="button" onClick={() => setShowInputs((v) => !v)} className={btnGhost} aria-expanded={showInputs}>
+              <Button variant="unstyled" type="button" onClick={() => setShowInputs((v) => !v)} className={btnGhost} aria-expanded={showInputs}>
                 <ListChecks className="h-3.5 w-3.5" /> {t("inputsUsed")}
-              </button>
+              </Button>
             </div>
 
             {showInputs && (
@@ -812,9 +813,9 @@ export function RecommendationStudio({
               // `overflow-hidden` CLIPPED the hidden columns with no way to
               // reach them. ScrollRegion scrolls and stays keyboard-reachable
               // (the same pattern as the compare tray below).
-              <ScrollRegion label={t("inputsUsed")} className="mt-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+              <ScrollRegion label={t("inputsUsed")} className="mt-3 overflow-x-auto rounded-surface border border-slate-200 dark:border-slate-800">
                 <table className="w-full min-w-[420px] text-left text-xs">
-                  <thead className="bg-slate-100 text-[11px] uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                     <tr>
                       <th scope="col" className="px-3 py-2 font-semibold">
                         {t("inputsUsed")}
@@ -841,8 +842,8 @@ export function RecommendationStudio({
             )}
 
             {data.results.length === 0 ? (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                <Search className="mx-auto mb-2 h-6 w-6 text-slate-400" />
+              <div className="mt-4 rounded-surface border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                <Search className="mx-auto mb-2 h-6 w-6 text-slate-500" />
                 {/* An empty CATALOGUE is not the same as "no match for your
                     interests" — say which one it is (0 programs scanned). */}
                 {data.totalProgramsScanned === 0 ? t("emptyCatalog") : t("empty")}
@@ -851,17 +852,17 @@ export function RecommendationStudio({
               <>
                 {/* Compare tray (client-side, up to 3) */}
                 {compareRows.length > 0 && (
-                  <ScrollRegion label={t("compareTray")} className="mt-4 overflow-x-auto rounded-xl border border-indigo-200 bg-indigo-50/50 dark:border-indigo-900 dark:bg-indigo-950/40">
+                  <ScrollRegion label={t("compareTray")} className="mt-4 overflow-x-auto rounded-surface border border-indigo-200 bg-indigo-50/50 dark:border-indigo-900 dark:bg-indigo-950/40">
                     <div className="flex items-center justify-between px-3 pt-3">
-                      <p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                      <p className="text-sm font-extrabold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
                         {t("compareTray")} ({compareRows.length}/{MAX_COMPARE})
                       </p>
-                      <button type="button" onClick={() => setCompareIds(new Set())} className={btnGhost}>
+                      <Button variant="unstyled" type="button" onClick={() => setCompareIds(new Set())} className={btnGhost}>
                         <X className="h-3 w-3" /> {t("compareClear")}
-                      </button>
+                      </Button>
                     </div>
                     <table className="mt-2 w-full min-w-[560px] text-left text-xs">
-                      <thead className="text-[11px] uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                      <thead className="text-xs uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
                         <tr>
                           <th scope="col" className="px-3 py-2 font-semibold">{t("colProgram")}</th>
                           <th scope="col" className="px-3 py-2 font-semibold">{t("colUniversity")}</th>
@@ -879,7 +880,7 @@ export function RecommendationStudio({
                             <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
                               {r.university.name}
                               {r.university.country ? (
-                                <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                                <span className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-500">
                                   · <CountryFlag country={r.university.country} size="xs" />
                                   {localizeCountry(r.university.country, locale)}
                                 </span>
@@ -900,7 +901,7 @@ export function RecommendationStudio({
                     </table>
                   </ScrollRegion>
                 )}
-                {compareRows.length === 0 && <p className="mt-4 text-[11px] text-slate-500 dark:text-slate-400">{t("compareHint")}</p>}
+                {compareRows.length === 0 && <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{t("compareHint")}</p>}
 
                 <ul className="mt-3 space-y-4">
                   {data.results.map((r) => {
@@ -909,7 +910,7 @@ export function RecommendationStudio({
                     const inCompare = compareIds.has(r.program.id);
                     const officialUrl = r.program.programUrl || r.program.applicationUrl || r.university.websiteUrl;
                     return (
-                      <li key={r.program.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                      <li key={r.program.id} className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                         {/* Header: program + provenance + score */}
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -923,14 +924,14 @@ export function RecommendationStudio({
                                 </Badge>
                               ) : null}
                             </h4>
-                            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                              <button
+                            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                              <Button variant="unstyled"
                                 type="button"
                                 onClick={() => openUniversity(r.university.id)}
                                 className="inline-flex items-center gap-1 font-semibold text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:text-indigo-300 dark:hover:text-indigo-100"
                               >
                                 <MapPin className="h-3 w-3" /> {r.university.name}
-                              </button>
+                              </Button>
                               {r.university.country ? (
                                 <span className="inline-flex items-center gap-1">
                                   · <CountryFlag country={r.university.country} size="xs" />
@@ -963,7 +964,7 @@ export function RecommendationStudio({
                                   href={officialUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:text-indigo-300 dark:hover:text-indigo-100"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 hover:underline focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:text-indigo-300 dark:hover:text-indigo-100"
                                 >
                                   <ExternalLink className="h-3 w-3" /> {t("officialPage")}
                                 </a>
@@ -971,9 +972,9 @@ export function RecommendationStudio({
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("matchScore")}</p>
+                            <p className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("matchScore")}</p>
                             <p className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">{r.matchScore}</p>
-                            <p className="max-w-[180px] text-[10px] leading-tight text-slate-400 dark:text-slate-500">{t("matchScoreHint")}</p>
+                            <p className="max-w-[180px] text-sm leading-tight text-slate-500 dark:text-slate-500">{t("matchScoreHint")}</p>
                           </div>
                         </div>
 
@@ -985,7 +986,7 @@ export function RecommendationStudio({
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               <Badge tone={fitTone(r.subjectFit.level)}>{fitLabel(r.subjectFit.level)}</Badge>
                               {r.subjectFit.matchedInterests.length > 0 ? (
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400">{r.subjectFit.matchedInterests.map(localizeStudyTerm).join(", ")}</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">{r.subjectFit.matchedInterests.map(localizeStudyTerm).join(", ")}</span>
                               ) : null}
                             </div>
                           </div>
@@ -994,15 +995,15 @@ export function RecommendationStudio({
                           <div>
                             <DimHeading icon={<ListChecks className="h-3.5 w-3.5" />}>{t("eligibility")}</DimHeading>
                             {r.eligibility.items.length === 0 && r.eligibility.textRequirements.length === 0 ? (
-                              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                              <p className="mt-1.5 flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
                                 <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {t("noReqs")}
                               </p>
                             ) : (
                               <ul className="mt-1.5 space-y-1">
                                 {r.eligibility.items.map((item) => (
-                                  <li key={item.key} className="flex items-center justify-between gap-2 text-xs">
+                                  <li key={item.key} className="flex items-center justify-between gap-2 text-sm">
                                     <span className="font-medium capitalize text-slate-700 dark:text-slate-200">
-                                      {item.key} <span className="text-slate-400 dark:text-slate-500">≥ {item.required}</span>
+                                      {item.key} <span className="text-slate-500 dark:text-slate-500">≥ {item.required}</span>
                                     </span>
                                     {item.status === "met" ? (
                                       <Badge tone="green">
@@ -1020,12 +1021,12 @@ export function RecommendationStudio({
                                   </li>
                                 ))}
                                 {r.eligibility.textRequirements.map((tr, i) => (
-                                  <li key={`${tr.kind}-${i}`} className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  <li key={`${tr.kind}-${i}`} className="text-sm text-slate-500 dark:text-slate-400">
                                     <span className="font-semibold capitalize">{tr.kind}:</span> {tr.text}
                                   </li>
                                 ))}
                                 {r.eligibility.items.length > 0 ? (
-                                  <li className="pt-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                                  <li className="pt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
                                     {t("eligibilitySummary", { met: r.eligibility.met, unmet: r.eligibility.unmet, unknown: r.eligibility.unknown })}
                                   </li>
                                 ) : null}
@@ -1036,7 +1037,7 @@ export function RecommendationStudio({
                           {/* 3 — Affordability + funding */}
                           <div>
                             <DimHeading icon={<Coins className="h-3.5 w-3.5" />}>{t("affordability")}</DimHeading>
-                            <ul className="mt-1.5 space-y-1 text-xs">
+                            <ul className="mt-1.5 space-y-1 text-sm">
                               <li className="flex items-center justify-between gap-2">
                                 <span className="text-slate-500 dark:text-slate-400">{t("tuition")}</span>
                                 <span className="font-semibold text-slate-800 dark:text-slate-100">
@@ -1068,14 +1069,14 @@ export function RecommendationStudio({
                                   </Badge>
                                 )}
                               </li>
-                              <li className="pt-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{t("funding")}</li>
+                              <li className="pt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{t("funding")}</li>
                               {r.affordability.scholarshipMatches.length === 0 ? (
-                                <li className="text-[11px] text-slate-500 dark:text-slate-400">{t("noFunding")}</li>
+                                <li className="text-sm text-slate-500 dark:text-slate-400">{t("noFunding")}</li>
                               ) : (
                                 r.affordability.scholarshipMatches.slice(0, 5).map((s) => (
-                                  <li key={s.id} className="flex items-center gap-1.5 text-[11px] text-slate-700 dark:text-slate-200">
+                                  <li key={s.id} className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200">
                                     <Coins className="h-3 w-3 shrink-0 text-amber-500" /> {s.title}
-                                    {s.coverageType ? <span className="text-slate-400 dark:text-slate-500">({s.coverageType})</span> : null}
+                                    {s.coverageType ? <span className="text-slate-500 dark:text-slate-500">({s.coverageType})</span> : null}
                                   </li>
                                 ))
                               )}
@@ -1087,9 +1088,9 @@ export function RecommendationStudio({
                               now sits once, quietly, at the page foot). */}
                           <div>
                             <DimHeading icon={<Scale className="h-3.5 w-3.5" />}>{t("positioningLabel")}</DimHeading>
-                            <div className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
+                            <div className="mt-1.5 rounded-control border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
                               {r.positioning ? (
-                                <dl className="space-y-1 text-[11px] leading-snug">
+                                <dl className="space-y-1 text-xs leading-snug">
                                   {r.positioning.qsRank != null && (
                                     <div className="flex items-baseline justify-between gap-2">
                                       <dt className="text-slate-500 dark:text-slate-400">{t("positioningQsRank")}</dt>
@@ -1122,7 +1123,7 @@ export function RecommendationStudio({
                                   )}
                                 </dl>
                               ) : (
-                                <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                                <p className="text-sm leading-snug text-slate-500 dark:text-slate-400">
                                   {t("positioningNotBenchmarked")}
                                 </p>
                               )}
@@ -1132,18 +1133,18 @@ export function RecommendationStudio({
                             <div className="mt-3">
                               <DimHeading icon={<CalendarClock className="h-3.5 w-3.5" />}>{t("nextCycle")}</DimHeading>
                               {r.nextCycle ? (
-                                <p className="mt-1.5 text-xs text-slate-700 dark:text-slate-200">
+                                <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-200">
                                   {r.nextCycle.intake ? `${r.nextCycle.intake}` : null}
                                   {r.nextCycle.academicYear ? ` ${r.nextCycle.academicYear}` : null} — {t("cycleDeadline")}{" "}
                                   <span className="font-semibold">{r.nextCycle.deadline ? fmtDate(r.nextCycle.deadline) : "—"}</span>
                                   {r.nextCycle.isEstimated ? (
-                                    <span className="mt-1 block text-[11px] text-amber-700 dark:text-amber-300">{t("cycleEstimated")}</span>
+                                    <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">{t("cycleEstimated")}</span>
                                   ) : r.cycleStale ? (
-                                    <span className="mt-1 block text-[11px] text-amber-700 dark:text-amber-300">{t("stale")}</span>
+                                    <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">{t("stale")}</span>
                                   ) : null}
                                 </p>
                               ) : (
-                                <p className="mt-1.5 flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                <p className="mt-1.5 flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
                                   <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {t("noCycle")}
                                 </p>
                               )}
@@ -1155,7 +1156,7 @@ export function RecommendationStudio({
                         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
                           <div>
                             <DimHeading icon={<Sparkles className="h-3.5 w-3.5" />}>{t("rankingFactors")}</DimHeading>
-                            <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-[11px] text-slate-600 dark:text-slate-300">
+                            <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-sm text-slate-600 dark:text-slate-300">
                               {r.rankingFactors.map((f, i) => (
                                 <li key={i}>{f}</li>
                               ))}
@@ -1164,7 +1165,7 @@ export function RecommendationStudio({
                           <div>
                             <DimHeading icon={<HelpCircle className="h-3.5 w-3.5" />}>{t("missingInputs")}</DimHeading>
                             {r.missingInputs.length === 0 ? (
-                              <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">—</p>
+                              <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-500">—</p>
                             ) : (
                               <ul className="mt-1.5 flex flex-wrap gap-1">
                                 {r.missingInputs.map((m, i) => (
@@ -1177,7 +1178,7 @@ export function RecommendationStudio({
                           </div>
                           <div>
                             <DimHeading icon={<AlertTriangle className="h-3.5 w-3.5" />}>{t("considerations")}</DimHeading>
-                            <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-[11px] text-slate-600 dark:text-slate-300">
+                            <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-sm text-slate-600 dark:text-slate-300">
                               {r.considerations.map((c, i) => (
                                 <li key={i}>{c}</li>
                               ))}
@@ -1187,11 +1188,11 @@ export function RecommendationStudio({
 
                         {/* Actions */}
                         <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                          <button type="button" onClick={() => void saveProgram(r)} disabled={saved} className={btnGhost}>
+                          <Button variant="unstyled" type="button" onClick={() => void saveProgram(r)} disabled={saved} className={btnGhost}>
                             {saved ? <BookmarkCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : <Bookmark className="h-3.5 w-3.5" />}
                             {saved ? t("saved") : t("save")}
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="unstyled"
                             type="button"
                             onClick={() => toggleCompare(r.program.id)}
                             aria-pressed={inCompare}
@@ -1199,13 +1200,13 @@ export function RecommendationStudio({
                             className={`${btnGhost} ${inCompare ? "!border-indigo-400 !text-indigo-700 dark:!border-indigo-600 dark:!text-indigo-300" : ""}`}
                           >
                             <Scale className="h-3.5 w-3.5" /> {t("compare")}
-                          </button>
-                          <button type="button" onClick={() => openUniversity(r.university.id)} className={btnGhost}>
+                          </Button>
+                          <Button variant="unstyled" type="button" onClick={() => openUniversity(r.university.id)} className={btnGhost}>
                             <MapPin className="h-3.5 w-3.5" /> {t("openUniversity")}
-                          </button>
-                          <button type="button" onClick={() => void makePlan(r)} disabled={planned} className={btnGhost}>
+                          </Button>
+                          <Button variant="unstyled" type="button" onClick={() => void makePlan(r)} disabled={planned} className={btnGhost}>
                             <GraduationCap className="h-3.5 w-3.5" /> {planned ? t("planCreated") : t("makePlan")}
-                          </button>
+                          </Button>
                         </div>
                       </li>
                     );
@@ -1220,7 +1221,7 @@ export function RecommendationStudio({
         One quiet caption for the whole page instead of the same grey box
         repeated inside every card. The wording is unchanged.
       */}
-      <p className="mt-4 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-400 dark:border-slate-800 dark:text-slate-500">
+      <p className="mt-4 border-t border-slate-200 pt-3 text-sm leading-relaxed text-slate-500 dark:border-slate-800 dark:text-slate-500">
         {t("probabilityUnavailable")}
       </p>
       {/* Standing small print: this panel can be wrong — say so where it is read. */}

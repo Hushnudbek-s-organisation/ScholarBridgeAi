@@ -48,13 +48,13 @@ export function SopStructureBar({ text, universityName, programName, className =
         : "border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10";
 
   return (
-    <div className={`rounded-xl border p-3 ${tone} ${className}`} data-sop-blocks={structure.satisfiedCount}>
+    <div className={`rounded-surface border p-3 ${tone} ${className}`} data-sop-blocks={structure.satisfiedCount}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
           <ListChecks className="h-3.5 w-3.5" aria-hidden />
           {t("sopStructureTitle")}
         </h4>
-        <span className="text-[11px] font-bold text-slate-600">
+        <span className="text-xs font-bold text-slate-600">
           {t("sopStructureScore", { met: structure.satisfiedCount, total: structure.total })}
         </span>
       </div>
@@ -70,7 +70,7 @@ export function SopStructureBar({ text, universityName, programName, className =
                 ? t(`sopBlocks.${block.id}.found`, { evidence: block.evidence ?? "" })
                 : t(`sopBlocks.${block.id}.missing`)
             }
-            className={`flex min-w-0 flex-1 basis-[9rem] items-start gap-1.5 rounded-lg border px-2 py-1.5 ${
+            className={`flex min-w-0 flex-1 basis-[9rem] items-start gap-1.5 rounded-control border px-2 py-1.5 ${
               block.satisfied
                 ? "border-emerald-300 bg-white text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100"
                 : "border-slate-300 bg-white text-slate-600 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-300"
@@ -82,11 +82,11 @@ export function SopStructureBar({ text, universityName, programName, className =
               <X className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             )}
             <span className="min-w-0">
-              <span className="block text-[11px] font-bold leading-snug">
+              <span className="block text-xs font-bold leading-snug">
                 {block.order}. {t(`sopBlocks.${block.id}.label`)}
               </span>
               {/* Verbatim proof, so a tick is never a black box. */}
-              <span className="mt-0.5 block break-words text-[10px] leading-snug whitespace-normal opacity-80">
+              <span className="mt-0.5 block break-words text-xs leading-snug whitespace-normal opacity-80">
                 {block.satisfied
                   ? block.evidence
                   : t(`sopBlocks.${block.id}.hint`)}
@@ -97,12 +97,12 @@ export function SopStructureBar({ text, universityName, programName, className =
       </div>
 
       {missing.length > 0 && (
-        <p className="mt-2 break-words text-[11px] font-semibold leading-relaxed text-slate-700">
+        <p className="mt-2 break-words text-sm font-semibold leading-relaxed text-slate-700">
           {t("sopStructureNext", { blocks: missing.map((block) => t(`sopBlocks.${block.id}.label`)).join(" · ") })}
         </p>
       )}
       {missing.length === 0 && (
-        <p className="mt-2 break-words text-[11px] font-semibold leading-relaxed text-emerald-800 dark:text-emerald-100">
+        <p className="mt-2 break-words text-sm font-semibold leading-relaxed text-emerald-800 dark:text-emerald-100">
           {t("sopStructureComplete")}
         </p>
       )}

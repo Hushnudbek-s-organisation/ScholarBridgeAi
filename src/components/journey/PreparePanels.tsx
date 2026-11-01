@@ -14,13 +14,14 @@ import { CalendarPlus, Check, ExternalLink, Link2, Plus, Trash2 } from "lucide-r
 import { getJson, sendJson, useResource } from "./useResource";
 import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
 import { SmartTimelineCalendar } from "@/components/SmartTimelineCalendar";
-import { Button, Empty, ErrorNote, Field, InlineAlert, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "./ui";
+import { Empty, ErrorNote, Field, InlineAlert, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "@/components/ui/journey";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
 import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
 import type { ActivitySample } from "@/lib/samples/exemplars";
 import { isUnmodifiedSample } from "@/lib/samples/text";
+import { Button } from "@/components/ui/Button";
 
 // ===========================================================================
 // DOCUMENT VAULT (spec §7)
@@ -100,7 +101,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
         title={t("dvTitle")}
         subtitle={t("dvSubtitle")}
         action={
-          <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+          <div className="flex flex-wrap gap-2 text-xs font-bold">
             <Pill tone="slate">{t("dvDocumentsPill", { n: data.summary.total })}</Pill>
             {data.summary.expiring > 0 && <Pill tone="warn">{t("dvExpiringPill", { n: data.summary.expiring })}</Pill>}
             {data.summary.expired > 0 && <Pill tone="bad">{t("dvExpiredPill", { n: data.summary.expired })}</Pill>}
@@ -131,7 +132,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
           </Field>
         </div>
         {applicationId != null && (
-          <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">{t("dvNewDocLinksToApplication")}</p>
+          <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">{t("dvNewDocLinksToApplication")}</p>
         )}
         <Button onClick={add} disabled={busy || !form.title.trim()}>
           <Plus className="h-3.5 w-3.5" /> {t("dvAdd")}
@@ -153,12 +154,12 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
         >
           <ul className="space-y-2">
             {data.documents.map((d) => (
-              <li key={d.id} className="sb-card-hover rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              <li key={d.id} className="sb-card-hover rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                 <div className="flex flex-wrap items-start gap-2">
                   <StatusIcon state={d.status} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{d.title}</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       {t(`doc${d.docType[0].toUpperCase()}${d.docType.slice(1)}`)}
                       {d.expiresAt && t("dvExpires", { date: d.expiresAt })}
                       {d.usedBy.length > 0 && t("dvUsedBy", { n: d.usedBy.length })}
@@ -169,7 +170,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
                       </p>
                     )}
                     {d.usedBy.length > 0 && (
-                      <p className="mt-1 text-[11px] text-slate-400">{d.usedBy.map((u) => u.universityName).filter(Boolean).join(", ")}</p>
+                      <p className="mt-1 text-sm text-slate-500">{d.usedBy.map((u) => u.universityName).filter(Boolean).join(", ")}</p>
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-1">
@@ -220,7 +221,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-[11px] text-slate-400">
+          <p className="mt-3 text-sm text-slate-500">
             {t("dvPrivacyNote")}
           </p>
         </JourneyCard>
@@ -355,17 +356,17 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
               return (
                 <div
                   key={r.id}
-                  className="flex flex-col rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+                  className="flex flex-col rounded-surface border border-slate-200 p-3 dark:border-slate-700"
                 >
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
                     {testLabel(r.testType)} · {t("tpRoadmapTarget", { score: r.targetScore })}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                     {t("tpRoadmapMilestones", { count: r.milestones.length })}
                   </p>
                   <ol className="mt-2 flex-1 space-y-0.5">
                     {r.milestones.map((m, i) => (
-                      <li key={i} className="text-[11px] leading-snug text-slate-600 dark:text-slate-300">
+                      <li key={i} className="text-sm leading-snug text-slate-600 dark:text-slate-300">
                         {i + 1}. {m}
                       </li>
                     ))}
@@ -377,7 +378,7 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
                         href={b.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
                       >
                         {b.label}
                         <ExternalLink className="h-2.5 w-2.5" />
@@ -452,29 +453,29 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
                 <div className="min-w-0">
                   <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">{t("tpPracticeTasks")}</h3>
                   {plan.tasks.length === 0 ? (
-                    <p className="text-xs text-slate-500">{t("tpNoTasks")}</p>
+                    <p className="text-sm text-slate-500">{t("tpNoTasks")}</p>
                   ) : (
                     <ul className="space-y-1">
                       {plan.tasks.map((task) => (
                         <li key={task.id}>
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             aria-pressed={task.isCompleted}
                             onClick={() => void patch({ taskId: task.id, isCompleted: !task.isCompleted })}
-                            className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1 text-left text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-slate-800"
+                            className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-control px-2 py-1 text-left text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-slate-800"
                           >
                             <span
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[9px] ${
-                                task.isCompleted ? "border-emerald-600 bg-emerald-600 text-white sb-ink-on-bright" : "border-slate-300 dark:border-slate-600"
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-control border text-xs ${
+                                task.isCompleted ? "border-emerald-600 bg-emerald-700 text-white sb-ink-on-bright" : "border-slate-300 dark:border-slate-600"
                               }`}
                               aria-hidden="true"
                             >
                               {task.isCompleted && <Check className="h-3 w-3" />}
                             </span>
-                            <span className={`min-w-0 break-words ${task.isCompleted ? "text-slate-400 line-through" : "text-slate-700 dark:text-slate-200"}`}>
+                            <span className={`min-w-0 break-words ${task.isCompleted ? "text-slate-500 line-through" : "text-slate-700 dark:text-slate-200"}`}>
                               {task.title}
                             </span>
-                          </button>
+                          </Button>
                         </li>
                       ))}
                     </ul>
@@ -483,7 +484,7 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
                 <div className="min-w-0">
                   <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">{t("tpPreviousAttempts")}</h3>
                   {plan.attempts.length === 0 ? (
-                    <p className="text-xs text-slate-500">{t("tpNoAttempts")}</p>
+                    <p className="text-sm text-slate-500">{t("tpNoAttempts")}</p>
                   ) : (
                     <ul className="space-y-1">
                       {plan.attempts.map((attempt) => (
@@ -500,11 +501,11 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
               </div>
 
               {plan.catalogueFigures.length > 0 && (
-                <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("tpCatalogueFiguresTitle")}</p>
+                <div className="mt-4 rounded-control bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+                  <p className="text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("tpCatalogueFiguresTitle")}</p>
                   <ul className="mt-1 space-y-1">
                     {plan.catalogueFigures.map((figure) => (
-                      <li key={figure.university} className="break-words text-xs text-slate-600 dark:text-slate-300">
+                      <li key={figure.university} className="break-words text-sm text-slate-600 dark:text-slate-300">
                         {t("tpUniversityFigure", { university: figure.university, figure: figure.catalogueFigure })}
                       </li>
                     ))}
@@ -516,7 +517,7 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
         })
       )}
 
-      <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{t("tpHonesty")}</p>
+      <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t("tpHonesty")}</p>
 
       {untrackedSignals.length > 0 && (
         <JourneyCard title={t("tpSignalsTitle")} subtitle={t("tpSignalsSubtitle")}>
@@ -524,7 +525,7 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
             {untrackedSignals.map((signal) => {
               const label = testLabel(signal.testType);
               return (
-                <li key={signal.testType} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-center">
+                <li key={signal.testType} className="flex min-w-0 flex-col gap-2 rounded-control border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-center">
                   <span className="min-w-0 flex-1 break-words font-semibold text-slate-700 dark:text-slate-200">{label}</span>
                   <Pill tone="slate" className="max-w-full whitespace-normal">{t("tpCatalogueReference", { figure: signal.catalogueFigure })}</Pill>
                   <span className="min-w-0 break-words text-xs text-slate-500 sm:flex-1">{signal.universities.join(", ")}</span>
@@ -548,11 +549,11 @@ function RecordAttempt({ planId, onSubmit }: { planId: number; onSubmit: (p: Rec
   const [score, setScore] = useState("");
   return (
     <div className="mt-2 flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-end">
-      <label className="min-w-0 text-xs font-medium text-slate-600 dark:text-slate-300">
+      <label className="min-w-0 text-sm font-medium text-slate-600 dark:text-slate-300">
         <span className="sr-only">{t("tpAttemptDate")}</span>
         <input type="date" aria-label={t("tpAttemptDate")} className={inputClass} value={date} onChange={(event) => setDate(event.target.value)} />
       </label>
-      <label className="min-w-0 text-xs font-medium text-slate-600 dark:text-slate-300 sm:w-28">
+      <label className="min-w-0 text-sm font-medium text-slate-600 dark:text-slate-300 sm:w-28">
         <span className="sr-only">{t("tpScorePlaceholder")}</span>
         <input type="number" step="0.1" placeholder={t("tpScorePlaceholder")} aria-label={t("tpScorePlaceholder")} className={inputClass} value={score} onChange={(event) => setScore(event.target.value)} />
       </label>
@@ -753,7 +754,7 @@ export function StudyPlanPanel({
             <p className="text-2xl font-extrabold text-slate-900 dark:text-white">
               {done}/{data.phases.length}
             </p>
-            <p className="text-[10px] font-bold uppercase text-slate-500">{t("spPhasesDone")}</p>
+            <p className="text-sm font-bold uppercase text-slate-500">{t("spPhasesDone")}</p>
           </div>
         }
       >
@@ -762,27 +763,27 @@ export function StudyPlanPanel({
           {data.phases.map((p, i) => (
             <li
               key={p.key}
-              className={`rounded-xl border p-3 ${
+              className={`rounded-surface border p-3 ${
                 p.status === "done" ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40" : "border-slate-200 dark:border-slate-700"
               }`}
             >
               <div className="flex flex-wrap items-start gap-3">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => void togglePhase(p.key, p.status !== "done")}
                   aria-label={t(p.status === "done" ? "spReopenPhase" : "spCompletePhase", { title: phaseTitle(p.key) })}
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                    p.status === "done" ? "bg-emerald-500 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
+                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    p.status === "done" ? "bg-emerald-700 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
                   }`}
                 >
                   {p.status === "done" ? <Check className="h-3 w-3" /> : i + 1}
-                </button>
+                </Button>
                 <div className="min-w-0 flex-1">
                   <p className="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
                     <span aria-hidden>{p.icon}</span> {phaseTitle(p.key)}
                   </p>
-                  <p className="break-words text-xs leading-relaxed text-slate-600 dark:text-slate-400">{phaseDescription(p.key)}</p>
-                  {p.missing.length > 0 && <p className="mt-1 break-words text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">{phaseMissing(p.missing[0])}</p>}
+                  <p className="break-words text-sm leading-relaxed text-slate-600 dark:text-slate-400">{phaseDescription(p.key)}</p>
+                  {p.missing.length > 0 && <p className="mt-1 break-words text-sm leading-relaxed text-slate-700 dark:text-slate-300">{phaseMissing(p.missing[0])}</p>}
                   <div className="mt-1.5 max-w-xs">
                     <ProgressBar pct={p.pct} size="sm" tone={p.status === "done" ? "good" : "brand"} />
                   </div>
@@ -794,7 +795,7 @@ export function StudyPlanPanel({
             </li>
           ))}
         </ol>
-        <p className="mt-3 text-[11px] text-slate-400">
+        <p className="mt-3 text-sm text-slate-500">
           {t("spProgressFromData")}
         </p>
       </JourneyCard>
@@ -950,7 +951,7 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
           </div>
         </div>
         {loadedActivity && (
-          <p role="status" className={`mt-3 text-xs leading-relaxed ${formHoldsSample ? "font-semibold text-violet-800 dark:text-violet-200" : "text-slate-600"}`}>
+          <p role="status" className={`mt-3 text-sm leading-relaxed ${formHoldsSample ? "font-semibold text-violet-800 dark:text-violet-200" : "text-slate-600"}`}>
             {formHoldsSample ? ts("activityLoaded") : ts("loadedNotice")}
           </p>
         )}
@@ -967,11 +968,11 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           {data.activities.map((a) => (
-            <div key={a.id} className="sb-card-hover rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+            <div key={a.id} className="sb-card-hover rounded-surface border border-slate-200 p-3 dark:border-slate-700">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{a.title}</p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-sm text-slate-500">
                     {a.category}
                     {a.role && ` · ${a.role}`}
                     {a.organization && ` · ${a.organization}`}
@@ -982,8 +983,8 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
-              {a.description && <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{a.description}</p>}
-              {a.achievements && <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">{a.achievements}</p>}
+              {a.description && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{a.description}</p>}
+              {a.achievements && <p className="mt-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">{a.achievements}</p>}
               {a.evidence.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {a.evidence.map((e) => (
@@ -992,7 +993,7 @@ export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
                       href={e.url ?? "#"}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200"
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200"
                     >
                       <Link2 className="h-2.5 w-2.5" /> {e.label}
                     </a>

@@ -33,7 +33,7 @@ export default async function UniversityNotFound() {
         <p className="mt-2 text-sm text-slate-600">{t.notFoundBody}</p>
         <Link
           href="/universities"
-          className="mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
+          className="mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-surface bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
           {t.backToCatalog}

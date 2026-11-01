@@ -87,8 +87,8 @@ export default async function FeaturesPage() {
 
         <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           {/* ------------------------------------------------------------ hero */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">{copy.heroEyebrow}</p>
+          <section className="rounded-overlay border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
+            <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">{copy.heroEyebrow}</p>
             <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
               {copy.heroTitle}
             </h1>
@@ -96,14 +96,14 @@ export default async function FeaturesPage() {
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Link
                 href="/?start=1"
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-surface bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 {copy.heroPrimary}
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
               <Link
                 href="/scholarships"
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-surface border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
                 {copy.heroSecondary}
               </Link>
@@ -112,14 +112,14 @@ export default async function FeaturesPage() {
                   href={bot}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-surface border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   <Bot className="h-4 w-4" aria-hidden />
                   {copy.heroBot}
                 </a>
               )}
             </div>
-            <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900">
+            <p className="mt-4 rounded-surface bg-emerald-50 px-3 py-2 text-sm leading-relaxed text-emerald-900">
               {copy.freeNote}
             </p>
           </section>
@@ -135,12 +135,12 @@ export default async function FeaturesPage() {
                 const Icon = FEATURE_ICONS[key];
                 const entry = copy.features[key];
                 return (
-                  <li key={key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
+                  <li key={key} className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-surface bg-indigo-50 text-indigo-700">
                       <Icon className="h-4.5 w-4.5" aria-hidden />
                     </span>
                     <h3 className="mt-2 text-sm font-bold text-slate-900">{entry.title}</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-600">{entry.body}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{entry.body}</p>
                   </li>
                 );
               })}
@@ -154,30 +154,30 @@ export default async function FeaturesPage() {
             </h2>
             <ol className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               {steps.map((step, index) => (
-                <li key={step.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-                  <p className="text-[11px] font-bold text-indigo-700">{index + 1}</p>
+                <li key={step.title} className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs">
+                  <p className="text-sm font-bold text-indigo-700">{index + 1}</p>
                   <h3 className="mt-1 text-sm font-bold text-slate-900">{step.title}</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-600">{step.body}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{step.body}</p>
                 </li>
               ))}
             </ol>
           </section>
 
           {/* -------------------------------------------------------------- cta */}
-          <section className="mt-8 rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
+          <section className="mt-8 rounded-overlay border border-indigo-200 bg-indigo-50 p-6">
             <h2 className="text-base font-bold text-indigo-950 sm:text-lg">{copy.promoTitle}</h2>
             <p className="mt-1 max-w-3xl text-sm leading-relaxed text-indigo-900">{copy.promoBody}</p>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <Link
                 href="/?start=1"
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-surface bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
               >
                 {copy.heroPrimary}
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
               <Link
                 href="/universities"
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-indigo-300 bg-white px-4 text-sm font-semibold text-indigo-800 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-surface border border-indigo-300 bg-white px-4 text-sm font-semibold text-indigo-800 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
                 <BriefcaseBusiness className="h-4 w-4" aria-hidden />
                 {copy.backToCatalog}
@@ -185,7 +185,7 @@ export default async function FeaturesPage() {
             </div>
           </section>
 
-          <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
+          <p className="mt-6 border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-600">
             {dictionaries[locale].publicCatalog.independentGuide}
           </p>
         </main>

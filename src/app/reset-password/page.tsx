@@ -38,12 +38,12 @@ export default async function ResetPasswordPage() {
       <div className="min-h-screen bg-slate-50">
         <PublicCatalogHeader />
         <main className="mx-auto max-w-lg px-4 py-10 sm:px-6 sm:py-14">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">{copy.resetEyebrow}</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">{copy.resetEyebrow}</p>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{copy.resetTitle}</h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-700">{copy.resetBody}</p>
 
           <div className="mt-6">
-            <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white" />}>
+            <Suspense fallback={<div className="h-64 animate-pulse rounded-overlay border border-slate-200 bg-white" />}>
               <ResetPasswordForm />
             </Suspense>
           </div>

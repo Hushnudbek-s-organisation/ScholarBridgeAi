@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { countriesMatch, countryTranslationKey, resolveCountryCode, withQsTop200Countries } from "@/lib/countries";
 import { collapsePicks, countrySearchMatch, rankCountryPicks } from "@/lib/countryPicker";
 import { CountryFlag } from "@/components/CountryFlag";
-import { ShowMoreToggle } from "@/components/hubs/ui";
+import { ShowMoreToggle } from "@/components/ui/hubs";
 import { StudentProfile } from "./Navbar";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
@@ -24,6 +24,7 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
 import { SmartAutofillBox } from "@/components/samples/SmartAutofillBox";
 import type { ExtractedKey, ExtractedProfileFields } from "@/lib/profileExtract";
+import { Button } from "@/components/ui/Button";
 
 /** Every value the CV auto-fill can read has a field in this editor. */
 const AUTOFILL_FIELDS: ExtractedKey[] = [
@@ -40,6 +41,31 @@ const AUTOFILL_FIELDS: ExtractedKey[] = [
   "researchPublications",
   "degreeLevel",
 ];
+
+const PROFILE_SECTIONS = [
+  { id: "account", icon: User },
+  { id: "academics", icon: BookOpen },
+  { id: "finance", icon: DollarSign },
+  { id: "experience", icon: Trophy },
+] as const;
+type ProfileSectionId = (typeof PROFILE_SECTIONS)[number]["id"];
+
+const EXPERIENCE_FIELD_KEYS = [
+  ["leadership", "leadership", "leadershipPlaceholder"],
+  ["volunteering", "volunteering", "volunteeringPlaceholder"],
+  ["sports", "sports", "sportsPlaceholder"],
+  ["clubs", "clubs", "clubsPlaceholder"],
+  ["researchExperience", "researchExperience", "researchExperiencePlaceholder"],
+  ["projects", "projects", "projectsPlaceholder"],
+] as const;
+
+const ACHIEVEMENT_FIELD_KEYS = [
+  ["olympiads", "olympiads", "olympiadsPlaceholder"],
+  ["awards", "awards", "awardsPlaceholder"],
+  ["competitions", "competitions", "competitionsPlaceholder"],
+  ["certificates", "certificates", "certificatesPlaceholder"],
+] as const;
+
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -77,6 +103,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   // The modal is wrapped in NextIntlClientProvider by its host; the explicit
   // fallback keeps the string out of the UI if a host ever forgets the provider.
   const t = useTranslations("profile");
+  const te = useTranslations("profile.editor");
   const tCountry = useTranslations("countryNames");
   const tStudy = useTranslations("studyInterest");
   const tc = useTranslations("common");
@@ -176,12 +203,12 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [activeSection, setActiveSection] = useState<ProfileSectionId>("account");
   // Preferred-destinations picker: 12 ranked pills + search + Show more —
   // the same pattern as the visa simulator and the compare panel, so no
   // modal is ever a 38-button wall again.
   const [countrySearch, setCountrySearch] = useState("");
   const [showAllCountries, setShowAllCountries] = useState(false);
-  const [studyInterestAttempted, setStudyInterestAttempted] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -310,7 +337,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     void Promise.resolve().then(() => {
       if (!live) return;
       setErrorMsg("");
-      setStudyInterestAttempted(false);
+      setActiveSection("account");
     });
     return () => {
       live = false;
@@ -396,19 +423,34 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    if (!isStudyInterestSelectionValid(formData.studyInterests)) {
-      setStudyInterestAttempted(true);
-      setErrorMsg(tStudy("requiredError"));
+    const showValidationError = (section: ProfileSectionId, message: string, fieldId: string) => {
+      setActiveSection(section);
+      setErrorMsg(message);
+      window.requestAnimationFrame(() => document.getElementById(fieldId)?.focus());
+    };
+    if (!formData.name.trim()) {
+      showValidationError("account", te("nameRequired"), "profile-name");
       return;
     }
-    setStudyInterestAttempted(false);
+    const email = formData.email.trim();
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    if ((!email && !tgOnlyAccount) || (email && !emailValid)) {
+      showValidationError("account", te("emailRequired"), "profile-email");
+      return;
+    }
+    // An empty interest list is a valid "not decided yet" answer. Only a
+    // malformed non-empty selection is rejected; the API validates it too.
+    if (formData.studyInterests.length > 0 && !isStudyInterestSelectionValid(formData.studyInterests)) {
+      showValidationError("academics", tStudy("requiredError"), "profile-modal-study-interests-search");
+      return;
+    }
     const password = formData.password.trim();
     if (isNew && password.length < MIN_PASSWORD_LENGTH) {
-      setErrorMsg(`Parol kiriting (kamida ${MIN_PASSWORD_LENGTH} belgi) — keyin shu email + parol bilan kirish qilasiz.`);
+      showValidationError("account", te("passwordRequiredError", { minimum: MIN_PASSWORD_LENGTH }), "profile-password");
       return;
     }
     if (!isNew && password.length > 0 && password.length < MIN_PASSWORD_LENGTH) {
-      setErrorMsg(`Yangi parol kamida ${MIN_PASSWORD_LENGTH} belgi bo'lishi kerak (o'zgartirmaslik uchun bo'sh qoldiring).`);
+      showValidationError("account", te("passwordChangeError", { minimum: MIN_PASSWORD_LENGTH }), "profile-password");
       return;
     }
     setIsSubmitting(true);
@@ -421,7 +463,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
       await onSave({
         ...rest,
         targetMajor: studyInterestsTouched.current ? compatibilityTargetMajor(studyInterests) : rest.targetMajor,
-        studyInterests: serializeStudyInterestSelections(studyInterests),
+        ...(studyInterests.length > 0
+          ? { studyInterests: serializeStudyInterestSelections(studyInterests) }
+          : {}),
         // Empty fields are saved as null (NULL in DB), never as a default.
         budgetAnnualUsd: rest.budgetAnnualUsd === "" ? null : Number(rest.budgetAnnualUsd),
         gpa: gpa === "" ? null : Number(gpa),
@@ -442,115 +486,165 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
       onClose();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err?.message || "Saqlashda xatolik yuz berdi. Qayta urinib ko'ring.");
+      setErrorMsg(err?.message || te("saveError"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-2 backdrop-blur-xs sm:p-4">
       <div
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}
         aria-modal="true"
         aria-labelledby="profile-modal-title"
-        className="my-8 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        className="my-0 flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-surface sm:my-8 sm:max-h-[calc(100dvh-4rem)]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-indigo-700 via-blue-700 to-indigo-800 px-4 py-4 text-white sm:px-6 sm:py-5">
+        <div className="flex shrink-0 items-center justify-between gap-3 sb-brand-hero px-4 py-4 text-white sm:px-6 sm:py-5">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md">
+            <div className="p-2 bg-white/10 rounded-surface backdrop-blur-md">
               <Sparkles className="h-6 w-6 text-amber-300" />
             </div>
             <div>
-              <h2 id="profile-modal-title" className="text-xl font-bold">{isNew ? "Create Student Profile" : "Edit Academic Profile"}</h2>
-              <p className="text-xs text-indigo-100">ScholarBridgeAI matching engine calculates recommendations using these metrics.</p>
+              <h2 id="profile-modal-title" className="text-xl font-bold">{isNew ? te("createTitle") : te("editTitle")}</h2>
+              <p className="text-sm text-indigo-100">{te("subtitle")}</p>
             </div>
           </div>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onClose}
             aria-label={t("close")}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-white/80 hover:bg-white/10 hover:text-white"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control text-white/80 hover:bg-white/10 hover:text-white"
           >
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="max-h-[75vh] space-y-6 overflow-y-auto p-4 sm:p-6">
-          {errorMsg && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
-              {errorMsg}
+        <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 border-b border-slate-200 bg-slate-50/80 px-2 py-2 dark:border-slate-700 dark:bg-slate-900/60">
+            <div role="tablist" aria-label={isNew ? te("createTitle") : te("editTitle")} className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {PROFILE_SECTIONS.map((section, index) => {
+                const Icon = section.icon;
+                const selected = activeSection === section.id;
+                return (
+                  <Button
+                    key={section.id}
+                    id={`profile-tab-${section.id}`}
+                    variant="unstyled"
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={`profile-panel-${section.id}`}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => {
+                      setActiveSection(section.id);
+                      setErrorMsg("");
+                    }}
+                    onKeyDown={(event) => {
+                      let nextIndex = index;
+                      if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (index + 1) % PROFILE_SECTIONS.length;
+                      else if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (index - 1 + PROFILE_SECTIONS.length) % PROFILE_SECTIONS.length;
+                      else if (event.key === "Home") nextIndex = 0;
+                      else if (event.key === "End") nextIndex = PROFILE_SECTIONS.length - 1;
+                      else return;
+                      event.preventDefault();
+                      const next = PROFILE_SECTIONS[nextIndex];
+                      setActiveSection(next.id);
+                      document.getElementById(`profile-tab-${next.id}`)?.focus();
+                    }}
+                    className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-control px-2 py-2 text-center text-xs font-bold leading-snug transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                      selected
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-600 hover:bg-white hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 break-words">{te(`sections.${section.id}`)}</span>
+                  </Button>
+                );
+              })}
             </div>
-          )}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+          <section
+            id="profile-panel-account"
+            role="tabpanel"
+            aria-labelledby="profile-tab-account"
+            hidden={activeSection !== "account"}
+            className="space-y-6"
+          >
           {/* Basic Info */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
               <BookOpen className="h-3.5 w-3.5 text-indigo-600" />
-              Basic Information
+              {te("basicInformation")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("fullName")}</label>
                 <input
                   type="text"
+                  id="profile-name"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                  placeholder="e.g. Alex Chen"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  placeholder={te("fullNamePlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("emailAddress")}</label>
                 <input
+                  id="profile-email"
                   type="email"
                   required={!tgOnlyAccount}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                  placeholder="alex@university.edu"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  placeholder={te("emailPlaceholder")}
                 />
                 {tgOnlyAccount && (
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    You signed up with Telegram. Add an email + new password here to also sign in without Telegram.
+                  <p className="mt-1 text-sm text-slate-500">
+                    {te("telegramEmailHint")}
                   </p>
                 )}
               </div>
               {isNew && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Password *</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">{te("passwordRequired")}</label>
                   <input
                     type="password"
                     required
                     minLength={8}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                    placeholder="At least 8 characters"
+                    className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                    placeholder={te("passwordPlaceholder")}
                     autoComplete="new-password"
                   />
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    You&apos;ll sign in later with this email + password — from any device.
+                  <p className="mt-1 text-sm text-slate-500">
+                    {te("passwordHelp")}
                   </p>
                 </div>
               )}
               {!isNew && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">New Password (optional)</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">{te("newPasswordOptional")}</label>
                   <input
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                    placeholder="Leave empty to keep the current one"
+                    className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                    placeholder={te("newPasswordPlaceholder")}
                     autoComplete="new-password"
                   />
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    Enter at least 8 characters to change the sign-in password.
+                  <p className="mt-1 text-sm text-slate-500">
+                    {te("newPasswordHelp")}
                   </p>
                 </div>
               )}
@@ -559,53 +653,61 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
           {/* Personal details */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-sky-600" />
-              Personal Details
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-indigo-600" />
+              {te("personalDetails")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Country of Residence</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("countryOfResidence")}</label>
                 <input
                   type="text"
                   value={formData.country}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                  placeholder="Uzbekistan"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  placeholder={te("residencePlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Age</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("age")}</label>
                 <input
                   type="number"
                   min="14"
                   max="99"
                   value={formData.age || ""}
                   onChange={(e) => setFormData({ ...formData, age: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="18"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Graduation Year</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("graduationYear")}</label>
                 <input
                   type="number"
                   min="2020"
                   max="2040"
                   value={formData.graduationYear || ""}
                   onChange={(e) => setFormData({ ...formData, graduationYear: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   placeholder="2027"
                 />
               </div>
             </div>
           </div>
 
+          </section>
+          <section
+            id="profile-panel-academics"
+            role="tabpanel"
+            aria-labelledby="profile-tab-academics"
+            hidden={activeSection !== "academics"}
+            className="space-y-6"
+          >
           {/* Academic Profile */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
               <Award className="h-3.5 w-3.5 text-indigo-600" />
-              Academic Credentials & Standardized Scores
+              {te("academicCredentials")}
             </h3>
             {/* Paste-a-CV preview → fills the fields below; nothing saves until "Save". */}
             <SmartAutofillBox supported={AUTOFILL_FIELDS} onApply={applyAutofill} className="mb-5" />
@@ -620,17 +722,17 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     targetMajor: compatibilityTargetMajor(studyInterests),
                   }));
                 }}
-                showError={studyInterestAttempted}
+                showError={false}
                 idPrefix="profile-modal-study-interests"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Degree</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("targetDegree")}</label>
                 <select
                   value={degreeControlValue}
                   onChange={(e) => setFormData({ ...formData, degreeLevel: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                 >
                   <option value="Bachelor"><DegreeLevelLabel value="Bachelor" /></option>
                   <option value="Master"><DegreeLevelLabel value="Master" /></option>
@@ -644,7 +746,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">GPA & Scale</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("gpaScale")}</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -653,7 +755,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     max="100"
                     value={formData.gpa}
                     onChange={(e) => setFormData({ ...formData, gpa: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
-                    className="sb-field min-h-11 w-2/3 rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                    className="sb-field min-h-11 w-2/3 rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                   />
                   <select
                     value={formData.gpaScale}
@@ -663,7 +765,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                         gpaScale: e.target.value === "" ? "" : parseFloat(e.target.value),
                       })
                     }
-                    className="sb-field min-h-11 w-1/3 rounded-lg border px-2 py-2 text-xs text-slate-900 focus:outline-none"
+                    className="sb-field min-h-11 w-1/3 rounded-control border px-2 py-2 text-sm text-slate-900 focus:outline-none"
                   >
                     <option value="">—</option>
                     <option value={4.0}>/ 4.0</option>
@@ -678,7 +780,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
             {/* Test Scores */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">IELTS Score</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("ieltsScore")}</label>
                 <input
                   type="number"
                   step="0.5"
@@ -686,68 +788,68 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   max="9.0"
                   value={formData.ieltsScore || ""}
                   onChange={(e) => setFormData({ ...formData, ieltsScore: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="e.g. 7.5"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder="7.5"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">TOEFL iBT</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("toeflScore")}</label>
                 <input
                   type="number"
                   min="0"
                   max="120"
                   value={formData.toeflScore || ""}
                   onChange={(e) => setFormData({ ...formData, toeflScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="e.g. 100"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder="100"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">SAT Score</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("satScore")}</label>
                 <input
                   type="number"
                   min="400"
                   max="1600"
                   value={formData.satScore || ""}
                   onChange={(e) => setFormData({ ...formData, satScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="e.g. 1420"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder="1420"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">GRE General</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("greGeneral")}</label>
                 <input
                   type="number"
                   min="260"
                   max="340"
                   value={formData.greScore || ""}
                   onChange={(e) => setFormData({ ...formData, greScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="e.g. 320"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder="320"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">ACT Score</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("actScore")}</label>
                 <input
                   type="number"
                   min="1"
                   max="36"
                   value={formData.actScore || ""}
                   onChange={(e) => setFormData({ ...formData, actScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="e.g. 32"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder="32"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Duolingo English</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("duolingoEnglish")}</label>
                 <input
                   type="number"
                   min="10"
                   max="160"
                   value={formData.duolingoScore || ""}
                   onChange={(e) => setFormData({ ...formData, duolingoScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="e.g. 120"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder="120"
                 />
               </div>
             </div>
@@ -755,51 +857,59 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
             {/* Course rigor */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">AP Courses</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("apCourses")}</label>
                 <input
                   type="text"
                   value={formData.apCourses}
                   onChange={(e) => setFormData({ ...formData, apCourses: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="Calculus AB, Physics C"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder={te("apPlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">IB Courses</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("ibCourses")}</label>
                 <input
                   type="text"
                   value={formData.ibCourses}
                   onChange={(e) => setFormData({ ...formData, ibCourses: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="Math HL, English HL"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder={te("ibPlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">A-Level Subjects</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{te("aLevelSubjects")}</label>
                 <input
                   type="text"
                   value={formData.aLevelSubjects}
                   onChange={(e) => setFormData({ ...formData, aLevelSubjects: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-1.5 text-xs text-slate-900 focus:outline-none sm:text-sm"
-                  placeholder="Maths, Physics"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
+                  placeholder={te("aLevelPlaceholder")}
                 />
               </div>
             </div>
           </div>
 
+          </section>
+          <section
+            id="profile-panel-finance"
+            role="tabpanel"
+            aria-labelledby="profile-tab-finance"
+            hidden={activeSection !== "finance"}
+            className="space-y-6"
+          >
           {/* Financials & Preferences */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
               <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
-              Budget Constraints & Financial Aid
+              {te("budgetFinancialAid")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Annual Budget Limit (Tuition + Living)
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  {te("annualBudget")}
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">$</span>
+                  <span className="absolute left-3 top-2.5 text-slate-500 font-bold text-xs">$</span>
                   <input
                     type="number"
                     step="1000"
@@ -809,27 +919,27 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                       const raw = e.target.value;
                       setFormData({ ...formData, budgetAnnualUsd: raw === "" ? "" : Number(raw) });
                     }}
-                    className="sb-field min-h-11 w-full rounded-lg border py-2 pl-7 pr-3 text-sm text-slate-900 focus:outline-none"
+                    className="sb-field min-h-11 w-full rounded-control border py-2 pl-7 pr-3 text-sm text-slate-900 focus:outline-none"
                   />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-sm text-slate-500 mt-1">
                   {formData.budgetAnnualUsd === ""
                     ? t("budgetNotSet")
-                    : `Current: ${formatNumber(formData.budgetAnnualUsd, { suffix: "/year" })}`}
+                    : te("currentBudget", { value: formatNumber(formData.budgetAnnualUsd, { suffix: "/year" }) })}
                 </p>
               </div>
 
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div className="bg-slate-50 p-3 rounded-surface border border-slate-200">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.needScholarship}
                     onChange={(e) => setFormData({ ...formData, needScholarship: e.target.checked })}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 rounded-control border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   <div>
-                    <span className="text-xs font-semibold text-slate-800">Requires Full/Partial Scholarships</span>
-                    <p className="text-[11px] text-slate-500">Prioritizes universities with financial aid & grant funds</p>
+                    <span className="text-xs font-semibold text-slate-800">{te("needScholarship")}</span>
+                    <p className="text-sm text-slate-500">{te("needScholarshipHint")}</p>
                   </div>
                 </label>
               </div>
@@ -837,34 +947,34 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Family Income (USD / year)</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("familyIncome")}</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">$</span>
+                  <span className="absolute left-3 top-2.5 text-slate-500 font-bold text-xs">$</span>
                   <input
                     type="number"
                     step="500"
                     min="0"
                     value={formData.familyIncomeUsd || ""}
                     onChange={(e) => setFormData({ ...formData, familyIncomeUsd: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
-                    className="sb-field min-h-11 w-full rounded-lg border py-2 pl-7 pr-3 text-sm text-slate-900 focus:outline-none"
+                    className="sb-field min-h-11 w-full rounded-control border py-2 pl-7 pr-3 text-sm text-slate-900 focus:outline-none"
                     placeholder="12000"
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">{t("familyIncomeNotBudget")}</p>
+                <p className="mt-1 text-sm text-slate-500">{t("familyIncomeNotBudget")}</p>
               </div>
 
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center">
+              <div className="bg-slate-50 p-3 rounded-surface border border-slate-200 flex items-center">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.requiresFullScholarship}
                     onChange={(e) => setFormData({ ...formData, requiresFullScholarship: e.target.checked })}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 rounded-control border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="text-xs font-semibold text-slate-800">Require a full scholarship?</span>
+                  <span className="text-xs font-semibold text-slate-800">{te("requireFullScholarship")}</span>
                 </label>
               </div>
-              <fieldset className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-3">
+              <fieldset className="min-w-0 rounded-surface border border-slate-200 bg-slate-50 p-3 sm:col-span-3">
                 <legend className="break-words text-xs font-semibold text-slate-800">{t("financialAidNeedQuestion")}</legend>
                 <div className="mt-1 grid grid-cols-1 gap-1 sm:grid-cols-3">
                   {([
@@ -872,7 +982,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     { value: true, label: t("financialAidYes") },
                     { value: false, label: t("financialAidNo") },
                   ] as const).map((choice) => (
-                    <label key={String(choice.value)} className="flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-white focus-within:ring-2 focus-within:ring-indigo-500">
+                    <label key={String(choice.value)} className="flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-white focus-within:ring-2 focus-within:ring-indigo-500">
                       <input
                         type="radio"
                         name="profile-financial-aid-need"
@@ -891,9 +1001,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
           {/* Preferred Countries */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-              <Globe className="h-3.5 w-3.5 text-blue-600" />
-              Preferred Study Destinations
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5 text-indigo-600" />
+              {te("preferredDestinations")}
             </h3>
             <input
               type="search"
@@ -901,19 +1011,19 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               onChange={(e) => setCountrySearch(e.target.value)}
               placeholder={tc("searchCountry")}
               aria-label={tc("searchCountry")}
-              className="mb-2 min-h-11 w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="mb-2 min-h-11 w-full max-w-xs rounded-surface border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             />
             <div className="flex flex-wrap gap-2">
               {visibleCountryOptions.map((country) => {
                 const selected = formData.preferredCountries.some((value) => countriesMatch(value, country));
                 const countryKey = countryTranslationKey(country);
                 return (
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     key={country}
                     aria-pressed={selected}
                     onClick={() => handleCountryToggle(country)}
-                    className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                    className={`inline-flex min-h-11 items-center gap-1.5 rounded-full sm:min-h-9 border px-3 py-1.5 text-xs font-medium transition-all ${
                       selected
                         ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
                         : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
@@ -922,7 +1032,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                     <CountryFlag country={country} size="xs" />
                     {selected ? "✓" : "+"}{" "}
                     {countryKey ? tCountry(countryKey) : country}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -937,74 +1047,75 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
             )}
           </div>
 
+          </section>
+          <section
+            id="profile-panel-experience"
+            role="tabpanel"
+            aria-labelledby="profile-tab-experience"
+            hidden={activeSection !== "experience"}
+            className="space-y-6"
+          >
           {/* Research & Experience */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Research & Extracurricular Highlights
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
+              {te("researchHighlights")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Work/Internship Experience</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("workExperience")}</label>
                 <select
                   value={formData.workExperienceYears}
                   onChange={(e) => setFormData({ ...formData, workExperienceYears: parseInt(e.target.value, 10) })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                 >
-                  <option value={0}>0 Years (Fresh Graduate)</option>
-                  <option value={1}>1 Year</option>
-                  <option value={2}>2 Years</option>
-                  <option value={3}>3+ Years</option>
-                  <option value={5}>5+ Years Senior</option>
+                  <option value={0}>{te("workYears0")}</option>
+                  <option value={1}>{te("workYears1")}</option>
+                  <option value={2}>{te("workYears2")}</option>
+                  <option value={3}>{te("workYears3")}</option>
+                  <option value={5}>{te("workYears5")}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Research Papers / Publications</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("researchPublications")}</label>
                 <input
                   type="number"
                   min="0"
                   value={formData.researchPublications}
                   onChange={(e) => setFormData({ ...formData, researchPublications: parseInt(e.target.value, 10) || 0 })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Extracurriculars & Achievements</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">{te("extracurricularAchievements")}</label>
               <textarea
                 rows={2}
                 value={formData.extracurriculars}
                 onChange={(e) => setFormData({ ...formData, extracurriculars: e.target.value })}
-                className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                placeholder="e.g. Hackathon winner, Vice President of Tech Club, Peer Tutor in Data Structures..."
+                className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                placeholder={te("extracurricularPlaceholder")}
               />
             </div>
           </div>
 
           {/* Extracurricular detail (from My Profile) */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-teal-600" />
-              Extracurriculars
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-indigo-600" />
+              {te("extracurriculars")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {([
-                ["leadership", "Leadership", "Student Council VP, Club President"],
-                ["volunteering", "Volunteering", "Red Crescent volunteer"],
-                ["sports", "Sports", "Football team captain"],
-                ["clubs", "Clubs", "Debate club, Robotics"],
-                ["researchExperience", "Research", "NLP research assistant"],
-                ["projects", "Projects", "Open-source contributor"],
-              ] as const).map(([key, label, placeholder]) => (
+              {EXPERIENCE_FIELD_KEYS.map(([key, labelKey, placeholderKey]) => (
                 <div key={key}>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">{label}</label>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">{te(labelKey)}</label>
                   <input
                     type="text"
                     value={formData[key]}
                     onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-                    className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                    placeholder={placeholder}
+                    className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                    placeholder={te(placeholderKey)}
                   />
                 </div>
               ))}
@@ -1013,25 +1124,20 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
           {/* Achievements (from My Profile) */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
               <Trophy className="h-3.5 w-3.5 text-amber-600" />
-              Achievements
+              {te("achievements")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {([
-                ["olympiads", "Olympiads", "National Math Olympiad — 2nd place"],
-                ["awards", "Awards", "President's scholarship"],
-                ["competitions", "Competitions", "ACM ICPC regional"],
-                ["certificates", "Certificates", "AWS Certified, Google UX"],
-              ] as const).map(([key, label, placeholder]) => (
+              {ACHIEVEMENT_FIELD_KEYS.map(([key, labelKey, placeholderKey]) => (
                 <div key={key}>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">{label}</label>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">{te(labelKey)}</label>
                   <input
                     type="text"
                     value={formData[key]}
                     onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-                    className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                    placeholder={placeholder}
+                    className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                    placeholder={te(placeholderKey)}
                   />
                 </div>
               ))}
@@ -1040,51 +1146,56 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
 
           {/* Goals (from My Profile) */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
               <Target className="h-3.5 w-3.5 text-indigo-600" />
-              Goals
+              {te("goals")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Target Universities</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("targetUniversities")}</label>
                 <input
                   type="text"
                   value={formData.targetUniversities}
                   onChange={(e) => setFormData({ ...formData, targetUniversities: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                  placeholder="TUM, Purdue"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  placeholder={te("targetUniversitiesPlaceholder")}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Career Goal</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">{te("careerGoal")}</label>
                 <textarea
                   rows={2}
                   value={formData.careerGoal}
                   onChange={(e) => setFormData({ ...formData, careerGoal: e.target.value })}
-                  className="sb-field min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
-                  placeholder="ML engineer working on healthcare AI"
+                  className="sb-field min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                  placeholder={te("careerGoalPlaceholder")}
                 />
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-11 rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-800"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex min-h-11 items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-indigo-200 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {isSubmitting ? "Saving Profile..." : isNew ? "Create Profile" : "Save Profile Changes"}
-            </button>
+          </section>
+          </div>
+
+          {/* Validation and actions never scroll out of reach. */}
+          <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-surface sm:px-6">
+            {errorMsg && (
+              <div role="alert" className="mb-3 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+                {errorMsg}
+              </div>
+            )}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                {te("sectionProgress", { current: PROFILE_SECTIONS.findIndex((section) => section.id === activeSection) + 1, total: PROFILE_SECTIONS.length })}
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="outline" type="button" onClick={onClose}>{tc("cancel")}</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  <Save aria-hidden="true" className="h-4 w-4" />
+                  {isSubmitting ? te("saving") : isNew ? te("createProfile") : te("saveChanges")}
+                </Button>
+              </div>
+            </div>
           </div>
         </form>
       </div>

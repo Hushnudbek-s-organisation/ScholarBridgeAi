@@ -58,6 +58,36 @@
 @theme {
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
   --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.04), 0 1px 2px -1px rgb(15 23 42 / 0.04);
+
+  /* Semantic geometry: controls 8px, surfaces 12px, overlays 16px. */
+  --radius-control: 0.5rem;
+  --radius-surface: 0.75rem;
+  --radius-overlay: 1rem;
+
+  /* Theme-aware colour roles for new UI and migrated arbitrary values. */
+  --color-canvas: var(--sb-canvas);
+  --color-surface: var(--sb-surface);
+  --color-well: var(--sb-well);
+  --color-control: var(--sb-control);
+  --color-ink-display: var(--sb-ink-display);
+  --color-ink-heading: var(--sb-ink-heading);
+  --color-ink-body: var(--sb-ink-body);
+  --color-ink-secondary: var(--sb-ink-secondary);
+  --color-ink-muted: var(--sb-ink-muted);
+  --color-border-subtle: var(--sb-border-subtle);
+  --color-border: var(--sb-border);
+  --color-border-strong: var(--sb-border-strong);
+  --color-field: var(--sb-field-bg);
+  --color-hero-from: var(--sb-hero-from);
+  --color-hero-via: var(--sb-hero-via);
+  --color-hero-to: var(--sb-hero-to);
+  --color-cta-from: var(--sb-cta-from);
+  --color-cta-via: var(--sb-cta-via);
+  --color-cta-to: var(--sb-cta-to);
+}
+
+@theme inline {
+  --font-sans: var(--font-inter-latin), var(--font-inter-cyrillic), ui-sans-serif, system-ui, sans-serif;
 }
 
 /*  Tokens — light ----------------------------------------------------------- */
@@ -66,8 +96,42 @@
   --sb-surface: #ffffff;
   --sb-well: #f1f5f9;
   --sb-control: #e2e8f0;
+  --sb-border-subtle: #e2e8f0;
   --sb-border: rgb(226 232 240 / 0.9);
+  --sb-border-strong: #cbd5e1;
+  --sb-ink-display: #020617;
+  --sb-ink-heading: #0f172a;
+  --sb-ink-body: #1e293b;
+  --sb-ink-secondary: #334155;
+  --sb-ink-muted: #475569;
+  --sb-ink-dim: #475569;
+  --sb-ink-faint: #64748b;
   --sb-focus: #6366f1;
+  --sb-on-accent: #ffffff;
+  --sb-on-warm: #0f172a;
+  --sb-status-neutral: #64748b;
+  --sb-status-info: #2563eb;
+  --sb-status-primary: #4f46e5;
+  --sb-status-success: #047857;
+  --sb-status-warning: #f59e0b;
+  --sb-status-danger: #e11d48;
+  --sb-status-violet: #7c3aed;
+  --sb-status-teal: #0f766e;
+  --sb-status-orange: #c2410c;
+  --sb-switch-knob: #ffffff;
+  --sb-scrim-rgb: 15 23 42;
+  --sb-primary: #4f46e5;
+  --sb-success: #10b981;
+  --sb-warning: #f59e0b;
+  --sb-info: #2563eb;
+  --sb-danger: #f43f5e;
+  --sb-violet: #7c3aed;
+  --sb-hero-from: #12143a;
+  --sb-hero-via: #1b1f5e;
+  --sb-hero-to: #2a3ba8;
+  --sb-cta-from: #161b38;
+  --sb-cta-via: #20205a;
+  --sb-cta-to: #29235b;
   --sb-field-bg: #ffffff;
   --sb-field-border: #cbd5e1;
   --sb-field-border-hover: #94a3b8;
@@ -115,6 +179,18 @@
 
   /* Fields */
   --sb-focus: #6366f1;
+  --sb-primary: #818cf8;
+  --sb-success: #34d399;
+  --sb-warning: #fbbf24;
+  --sb-info: #60a5fa;
+  --sb-danger: #fb7185;
+  --sb-violet: #a78bfa;
+  --sb-hero-from: #0c1324;
+  --sb-hero-via: #151d4b;
+  --sb-hero-to: #243486;
+  --sb-cta-from: #0c1324;
+  --sb-cta-via: #171b47;
+  --sb-cta-to: #241d50;
   --sb-field-bg: #0d1526;
   --sb-field-border: #2a3a5c;
   --sb-field-border-hover: #3b4f78;
@@ -586,6 +662,24 @@
 .sb-journey-eyebrow { color: #4338ca; }
 .dark .sb-journey-eyebrow { color: #93a0f5; }
 
+/* Branded modal/tool heroes share the same tokens instead of inventing a new
+   indigo/blue/slate gradient per module. Solid fallback also keeps contrast
+   auditable when gradients or images are unavailable. */
+.sb-brand-hero {
+  color: #ffffff;
+  background-color: var(--sb-hero-from);
+  background-image: linear-gradient(135deg, var(--sb-hero-from), var(--sb-hero-via), var(--sb-hero-to));
+}
+.sb-ai-hero {
+  color: #ffffff;
+  background-color: #6d28d9;
+  background-image: linear-gradient(135deg, #6d28d9, #4338ca);
+}
+.dark .sb-ai-hero {
+  background-color: #5b21b6;
+  background-image: linear-gradient(135deg, #5b21b6, #3730a3);
+}
+
 /*  Native controls, scrollbars and selection -------------------------------
     `color-scheme` (set above) already darkens form controls and scrollbars;
     these finish the job for custom-styled scroll areas. */
@@ -876,9 +970,26 @@ html.theme-transition *::after {
 }
 
 /*  Focus ring that stays visible on both themes --------------------------- */
-.sb-focus:focus-visible {
-  outline: 2px solid var(--color-indigo-500);
+.sb-focus:focus-visible,
+.sb-button:focus-visible {
+  outline: 2px solid var(--sb-focus);
   outline-offset: 2px;
+}
+
+@layer components {
+  /* Even text-only/unstyled buttons get the control radius for their focus
+     ring. Explicit rounded-* utilities still win in the utilities layer. */
+  .sb-button {
+    border-radius: var(--radius-control);
+  }
+}
+
+.sb-button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sb-button:disabled {
+  cursor: not-allowed;
 }
 
 /*  Scroll-reveal without JavaScript: a graceful degradation path for the
@@ -941,7 +1052,7 @@ html.theme-transition *::after {
   .dark :is(.border-slate-700, .border-slate-800, .border-slate-900, .dark\:border-slate-700, .dark\:border-slate-800) { border-color: #cbd5e1 !important; }
   .dark :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300, .dark\:text-white) { color: #0f172a !important; }
   .print\:hidden, nav, aside, button, .sticky, [role="tablist"], .sb-aurora { display: none !important; }
-  section, article, .rounded-2xl { box-shadow: none !important; break-inside: avoid-page; }
+  section, article, .rounded-overlay { box-shadow: none !important; break-inside: avoid-page; }
   h1, h2, h3 { break-after: avoid-page; }
 }
 
@@ -992,9 +1103,51 @@ html.theme-transition *::after {
 }
 
 /* A single pre-composited glow replaces frame-by-frame blur-radius changes. */
+.sb-kinetic-word {
+  transform-origin: right center;
+  will-change: transform, opacity;
+  opacity: 0;
+}
+
 .sb-kinetic-word[data-state="active"] {
   text-shadow: 0 0 22px rgba(255, 255, 255, 0.75), 0 0 44px rgba(56, 189, 248, 0.45);
 }
+
+.sb-gpu-transform { transform: translate3d(0, 0, 0); will-change: transform; }
+.sb-will-transform { will-change: transform; }
+.sb-kinetic-track { height: 2424px; }
+.sb-contain-strict { contain: strict; }
+.sb-ring-transition { transition: stroke-dashoffset 1.2s ease-out; }
+
+/* Telegram Mini App theme roles. Telegram owns the outer variables; the
+   ScholarBridge semantic tokens are local fallbacks. Classes replace dozens of
+   per-element inline colour styles and keep both themes in one audit trail. */
+.tg-bg { background-color: var(--tg-theme-bg-color, var(--sb-surface)); }
+.tg-text { color: var(--tg-theme-text-color, var(--sb-ink-heading)); }
+.tg-hint { color: var(--tg-theme-hint-color, var(--sb-ink-muted)); }
+.tg-card { background-color: var(--tg-theme-secondary-bg-color, var(--sb-well)); }
+.tg-border-card { border-color: var(--tg-theme-secondary-bg-color, var(--sb-border)); }
+.tg-button {
+  background-color: var(--tg-theme-button-color, var(--sb-status-primary));
+  color: var(--tg-theme-button-text-color, var(--sb-on-accent));
+}
+.tg-button-text { color: var(--tg-theme-button-color, var(--sb-status-primary)); }
+.tg-link { color: var(--tg-theme-link-color, var(--sb-status-primary)); }
+.tg-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.tg-scrim { background-color: rgb(var(--sb-scrim-rgb) / 0.45); animation: sbFadeIn 0.18s ease-out; }
+.sb-switch-knob { background-color: var(--sb-switch-knob); }
+
+/* Status backgrounds include their foreground to prevent an inaccessible
+   white-on-amber/green combination from sneaking back in. */
+.tg-status-neutral { background-color: var(--sb-status-neutral); color: var(--sb-on-accent); }
+.tg-status-info { background-color: var(--sb-status-info); color: var(--sb-on-accent); }
+.tg-status-primary { background-color: var(--sb-status-primary); color: var(--sb-on-accent); }
+.tg-status-success { background-color: var(--sb-status-success); color: var(--sb-on-accent); }
+.tg-status-warning { background-color: var(--sb-status-warning); color: var(--sb-on-warm); }
+.tg-status-danger { background-color: var(--sb-status-danger); color: var(--sb-on-accent); }
+.tg-status-violet { background-color: var(--sb-status-violet); color: var(--sb-on-accent); }
+.tg-status-teal { background-color: var(--sb-status-teal); color: var(--sb-on-accent); }
+.tg-status-orange { background-color: var(--sb-status-orange); color: var(--sb-on-accent); }
 
 /* Telegram Mini App (and other) bottom sheets: a short slide-up + fade.
    Small and purely decorative — reduced motion turns them off. */

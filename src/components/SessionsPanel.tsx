@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Globe2, Send, ShieldCheck, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface SessionRow {
   id: number;
@@ -80,43 +81,43 @@ export function SessionsPanel() {
   };
 
   return (
-    <section aria-labelledby="sessions-heading" className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+    <section aria-labelledby="sessions-heading" className="rounded-overlay border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h3 id="sessions-heading" className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
           <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
           {t("title")}
         </h3>
         {sessions && sessions.some((s) => !s.current) && (
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => revoke({ all: true }, "all")}
             disabled={busy !== null}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-rose-400 hover:text-rose-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-rose-500 dark:hover:text-rose-400"
+            className="inline-flex items-center gap-1.5 rounded-control border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-rose-400 hover:text-rose-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-rose-500 dark:hover:text-rose-400"
           >
             {busy === "all" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />}
             {t("revokeAll")}
-          </button>
+          </Button>
         )}
       </div>
 
-      <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">{t("description")}</p>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">{t("description")}</p>
 
       {error && (
-        <p role="alert" className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+        <p role="alert" className="flex items-center gap-2 rounded-control bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
           <AlertTriangle className="h-4 w-4" aria-hidden="true" />
           {t("loadError")}
         </p>
       )}
 
       {!error && sessions === null && (
-        <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400" role="status">
+        <p className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400" role="status">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           {t("loading")}
         </p>
       )}
 
       {actionError && (
-        <p role="alert" className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+        <p role="alert" className="mb-3 rounded-control bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
           {t("actionError")}
         </p>
       )}
@@ -127,30 +128,30 @@ export function SessionsPanel() {
             <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {s.scope === "telegram" ? <Send className="h-4 w-4 text-sky-500" aria-hidden="true" /> : <Globe2 className="h-4 w-4 text-slate-400" aria-hidden="true" />}
+                  {s.scope === "telegram" ? <Send className="h-4 w-4 text-sky-500" aria-hidden="true" /> : <Globe2 className="h-4 w-4 text-slate-500" aria-hidden="true" />}
                   <span className="break-words">{describe(s)}</span>
                   {s.current && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
                       {t("thisDevice")}
                     </span>
                   )}
                 </p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
                   {t("lastSeen", { when: fmt(s.lastSeenAt) })}
                   {s.ip ? ` · ${s.ip}` : ""}
                 </p>
               </div>
               {!s.current && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => revoke({ sessionId: s.id }, s.id)}
                   disabled={busy !== null}
                   aria-label={t("revokeAria", { device: describe(s) })}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-rose-400 hover:text-rose-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-rose-500 dark:hover:text-rose-400"
+                  className="inline-flex items-center gap-1.5 rounded-control border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-rose-400 hover:text-rose-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-rose-500 dark:hover:text-rose-400"
                 >
                   {busy === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />}
                   {t("revoke")}
-                </button>
+                </Button>
               )}
             </li>
           ))}
@@ -158,7 +159,7 @@ export function SessionsPanel() {
       )}
 
       {sessions && sessions.length === 0 && !error && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">{t("empty")}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t("empty")}</p>
       )}
     </section>
   );

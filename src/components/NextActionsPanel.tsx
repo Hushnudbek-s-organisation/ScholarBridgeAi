@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, Loader2, ListChecks, AlertTriangle } from "lucide-react";
 import { StudentProfile } from "./Navbar";
+import { Button } from "@/components/ui/Button";
 
 /**
  * "What should I do next?" — the dashboard centrepiece (#4).
@@ -26,7 +27,7 @@ interface NextAction {
 }
 
 const URGENCY_STYLE: Record<Urgency, { chip: string; bar: string }> = {
-  critical: { chip: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-200 dark:border-red-800", bar: "bg-red-500" },
+  critical: { chip: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800", bar: "bg-rose-500" },
   high: { chip: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-200 dark:border-orange-800", bar: "bg-orange-500" },
   medium: { chip: "bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-200 dark:border-yellow-800", bar: "bg-yellow-500" },
   low: { chip: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700", bar: "bg-slate-400" },
@@ -101,14 +102,14 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
   const visible = showAll ? [...actions, ...rest] : actions;
 
   return (
-    <div className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-xs dark:border-indigo-900 dark:bg-slate-900">
+    <div className="rounded-overlay border border-indigo-100 bg-white p-5 shadow-xs dark:border-indigo-900 dark:bg-slate-900">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white">
             <ListChecks className="h-5 w-5 text-indigo-600" />
             {t("title")}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{t("subtitle")}</p>
+          <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{t("subtitle")}</p>
         </div>
       </div>
 
@@ -117,12 +118,12 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
           <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> {t("loading")}
         </div>
       ) : loadFailed ? (
-        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+        <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-surface border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
           <span>{t("loadFailed")}</span>
-          <button type="button" onClick={load} className="min-h-11 rounded-lg border border-red-300 px-3 py-2 font-semibold hover:bg-red-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 dark:border-red-700 dark:hover:bg-red-900/50">{t("retry")}</button>
+          <Button variant="unstyled" type="button" onClick={load} className="min-h-11 rounded-control border border-rose-300 px-3 py-2 font-semibold hover:bg-rose-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700 dark:border-rose-700 dark:hover:bg-rose-900/50">{t("retry")}</Button>
         </div>
       ) : visible.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{t("empty")}</p>
+        <p className="mt-4 rounded-surface border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{t("empty")}</p>
       ) : (
         <ol className="mt-4 space-y-2.5">
           {visible.map((action, index) => {
@@ -131,7 +132,7 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
             return (
               <li
                 key={action.id}
-                className="relative overflow-hidden rounded-xl border border-slate-200 bg-white pl-4 transition hover:border-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-700"
+                className="relative overflow-hidden rounded-surface border border-slate-200 bg-white pl-4 transition hover:border-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-700"
               >
                 <span className={`absolute left-0 top-0 h-full w-1 ${style.bar}`} aria-hidden />
                 <div className="flex flex-wrap items-start gap-3 px-3 py-3">
@@ -141,20 +142,20 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 break-words text-sm font-bold text-slate-900 dark:text-white">{copy.title}</span>
-                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${style.chip}`}>
+                      <span className={`rounded-full border px-2 py-0.5 text-xs font-bold ${style.chip}`}>
                         {t(action.urgency === "critical" ? "urgencyCritical" : action.urgency === "high" ? "urgencyHigh" : action.urgency === "medium" ? "urgencyMedium" : "urgencyLow")}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">{copy.why}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{copy.why}</p>
                   </div>
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => onNavigate(action.target)}
                     aria-label={t("openAction", { title: copy.title })}
-                    className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                    className="flex min-h-11 shrink-0 items-center gap-1 rounded-control bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                   >
                     {t("open")}
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
+                  </Button>
                 </div>
               </li>
             );
@@ -163,16 +164,16 @@ export function NextActionsPanel({ activeProfile, onNavigate }: NextActionsPanel
       )}
 
       {rest.length > 0 && (
-        <button
+        <Button variant="unstyled"
           onClick={() => setShowAll((v) => !v)}
-          className="mt-3 min-h-11 rounded-lg px-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:text-indigo-300"
+          className="mt-3 min-h-11 rounded-control px-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:text-indigo-300"
         >
           {showAll ? t("showTop") : t("showMore", { count: rest.length })}
-        </button>
+        </Button>
       )}
 
       {criticalCount > 0 && (
-        <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-red-700 dark:text-red-300">
+        <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-rose-700 dark:text-rose-300">
           <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
           {t(criticalCount === 1 ? "criticalOne" : "criticalMany", { count: criticalCount })}
         </p>

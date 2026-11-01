@@ -21,6 +21,7 @@ import { Check, Copy, Eye, EyeOff, Loader2, RotateCcw, ShieldCheck, Sparkles, Za
 import type { SampleExemplar, SampleGroup, SampleOf, SampleRole } from "@/lib/samples/exemplars";
 import { evidenceCount, placeholderCount, sampleWordCount, segmentSampleText, splitParagraphs } from "@/lib/samples/text";
 import { useSampleLibrary } from "./useSampleLibrary";
+import { Button } from "@/components/ui/Button";
 
 export type SampleVariant = "en" | "uz";
 
@@ -38,9 +39,9 @@ function useSafeSampleT() {
 }
 
 const secondaryButton =
-  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-control border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60";
 const primaryButton =
-  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-control bg-indigo-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
 
 export const sampleButtonClass = { primary: primaryButton, secondary: secondaryButton };
 
@@ -78,13 +79,13 @@ function HighlightedRun({ text }: { text: string }) {
         segment.kind === "text" ? (
           <React.Fragment key={index}>{segment.value}</React.Fragment>
         ) : segment.kind === "evidence" ? (
-          <mark key={index} className="rounded bg-emerald-50 px-0.5 font-semibold text-emerald-800 dark:text-emerald-200">
+          <mark key={index} className="rounded-control bg-emerald-50 px-0.5 font-semibold text-emerald-800 dark:text-emerald-200">
             {segment.value}
           </mark>
         ) : (
           <mark
             key={index}
-            className="rounded bg-violet-50 px-0.5 font-semibold text-violet-800 ring-1 ring-violet-200 dark:text-violet-200 dark:ring-violet-500/30"
+            className="rounded-control bg-violet-50 px-0.5 font-semibold text-violet-800 ring-1 ring-violet-200 dark:text-violet-200 dark:ring-violet-500/30"
           >
             {segment.value}
           </mark>
@@ -105,26 +106,26 @@ export function AnnotatedSample({ text, roles }: { text: string; roles: SampleRo
         return (
           <li
             key={index}
-            className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,15rem)]"
+            className="grid gap-2 rounded-surface border border-slate-200 bg-white p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,15rem)]"
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span
                   aria-hidden
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-bold text-white"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white"
                 >
                   {index + 1}
                 </span>
                 <span className="sr-only">{t("paragraph", { n: index + 1 })}:</span>
-                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-100 dark:text-indigo-200 dark:ring-indigo-500/30">
+                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700 ring-1 ring-indigo-100 dark:text-indigo-200 dark:ring-indigo-500/30">
                   {t(`roles.${role}.label` as never)}
                 </span>
               </div>
-              <p className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-slate-800">
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">
                 <HighlightedText text={paragraph} />
               </p>
             </div>
-            <aside className="rounded-lg bg-slate-50 p-2.5 text-xs leading-relaxed text-slate-600">
+            <aside className="rounded-control bg-slate-50 p-2.5 text-xs leading-relaxed text-slate-600">
               <p className="font-bold text-slate-800">{t("whyTitle")}</p>
               <p className="mt-1">{t(`roles.${role}.why` as never)}</p>
             </aside>
@@ -141,7 +142,7 @@ export function SampleMeta({ text, wordLimit }: { text: string; wordLimit?: numb
   const placeholders = placeholderCount(text);
   const parts = [t("words", { n: sampleWordCount(text) }), t("evidence", { n: evidenceCount(text) })];
   return (
-    <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-slate-500">
+    <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-500">
       <p>{parts.join(" · ")}</p>
       {placeholders > 0 && <p className="font-semibold text-violet-800 dark:text-violet-200">{t("placeholders", { n: placeholders })}</p>}
       {wordLimit ? <p>{t("practiceLimit", { n: wordLimit })}</p> : null}
@@ -239,10 +240,10 @@ export function SampleExemplarBar<G extends SampleGroup>({
   return (
     <section
       aria-label={heading}
-      className={`min-w-0 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3 dark:border-indigo-500/20 dark:bg-indigo-950/20 sm:p-4 ${className}`}
+      className={`min-w-0 rounded-overlay border border-indigo-100 bg-indigo-50/40 p-3 dark:border-indigo-500/20 dark:bg-indigo-950/20 sm:p-4 ${className}`}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-200 dark:text-indigo-200 dark:ring-indigo-500/30">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200 dark:text-indigo-200 dark:ring-indigo-500/30">
           <Sparkles aria-hidden className="h-3.5 w-3.5" />
           {t("eyebrow")}
         </span>
@@ -252,13 +253,13 @@ export function SampleExemplarBar<G extends SampleGroup>({
       {failed ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600" role="alert">
           <span>{t("loadError")}</span>
-          <button type="button" onClick={retry} className={secondaryButton}>
+          <Button variant="unstyled" type="button" onClick={retry} className={secondaryButton}>
             <RotateCcw aria-hidden className="h-3.5 w-3.5" />
             {t("retry")}
-          </button>
+          </Button>
         </div>
       ) : !lib || !sample ? (
-        <p className="mt-3 flex items-center gap-2 text-xs text-slate-500" role="status">
+        <p className="mt-3 flex items-center gap-2 text-sm text-slate-500" role="status">
           <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
           {t("loading")}
         </p>
@@ -268,14 +269,14 @@ export function SampleExemplarBar<G extends SampleGroup>({
               containers from a narrow modal to a full-width studio. */}
           <div className="mt-3 space-y-2">
             <div className="min-w-0">
-              <label htmlFor={selectId} className="block text-[11px] font-semibold text-slate-600">
+              <label htmlFor={selectId} className="block text-sm font-semibold text-slate-600">
                 {t("trackLabel")}
               </label>
               <select
                 id={selectId}
                 value={sample.id}
                 onChange={(event) => choose(event.target.value)}
-                className="sb-field mt-1 min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-slate-900 focus:outline-none"
+                className="sb-field mt-1 min-h-11 w-full rounded-control border px-3 py-2 text-sm text-slate-900 focus:outline-none"
               >
                 {samples.map((candidate, index) => (
                   <option key={candidate.id} value={candidate.id}>
@@ -285,7 +286,7 @@ export function SampleExemplarBar<G extends SampleGroup>({
               </select>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button variant="unstyled"
                 type="button"
                 aria-expanded={open}
                 aria-controls={panelId}
@@ -294,9 +295,9 @@ export function SampleExemplarBar<G extends SampleGroup>({
               >
                 {open ? <EyeOff aria-hidden className="h-3.5 w-3.5" /> : <Eye aria-hidden className="h-3.5 w-3.5" />}
                 {open ? t("hide") : t("view")}
-              </button>
+              </Button>
               {onLoad && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   disabled={loadDisabled}
                   onClick={() => {
@@ -307,24 +308,24 @@ export function SampleExemplarBar<G extends SampleGroup>({
                 >
                   <Zap aria-hidden className="h-3.5 w-3.5" />
                   {loadLabel ?? t("load")}
-                </button>
+                </Button>
               )}
-              <button type="button" onClick={() => void copy(text)} className={secondaryButton}>
+              <Button variant="unstyled" type="button" onClick={() => void copy(text)} className={secondaryButton}>
                 {copyState === "ok" ? (
                   <Check aria-hidden className="h-3.5 w-3.5 text-emerald-600" />
                 ) : (
                   <Copy aria-hidden className="h-3.5 w-3.5" />
                 )}
                 {copyState === "ok" ? t("copied") : t("copy")}
-              </button>
+              </Button>
             </div>
           </div>
 
           {hasUzbek && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label={t("versionLabel")}>
-              <span className="text-[11px] font-semibold text-slate-600">{t("versionLabel")}:</span>
+              <span className="text-xs font-semibold text-slate-600">{t("versionLabel")}:</span>
               {(["en", "uz"] as const).map((option) => (
-                <button
+                <Button variant="unstyled"
                   key={option}
                   type="button"
                   aria-pressed={variant === option}
@@ -332,29 +333,29 @@ export function SampleExemplarBar<G extends SampleGroup>({
                     setVariant(option);
                     reset();
                   }}
-                  className={`inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                  className={`inline-flex min-h-11 items-center rounded-control px-3 py-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                     variant === option
                       ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/20"
                       : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   {option === "en" ? t("versionEnglish") : t("versionUzbek")}
-                </button>
+                </Button>
               ))}
             </div>
           )}
 
-          {sample.origin === "composite" && <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">{t("compositeNotice")}</p>}
-      {sample.sourceChecks && <details className="mt-2 text-[11px] text-slate-600 dark:text-slate-300"><summary className="min-h-11 cursor-pointer py-2 font-semibold">{t("sourceRefs")}</summary><ul className="list-inside list-disc space-y-1">{sample.sourceChecks.map((source) => <li key={source.url}><a className="underline" href={source.url} target="_blank" rel="noopener noreferrer">{source.note}</a> · {source.checkedAt}</li>)}</ul></details>}
-          {sample.sourceChecks && <details className="mt-2 text-[11px] text-slate-600 dark:text-slate-300"><summary className="min-h-11 cursor-pointer py-2 font-semibold">{t("sourceRefs")}</summary><ul className="list-inside list-disc space-y-1">{sample.sourceChecks.map((source) => <li key={source.url}><a className="underline" href={source.url} target="_blank" rel="noopener noreferrer">{source.note}</a> · {source.checkedAt}</li>)}</ul></details>}
-          <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-600">
+          {sample.origin === "composite" && <p className="mt-2 rounded-control border border-amber-300 bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">{t("compositeNotice")}</p>}
+      {sample.sourceChecks && <details className="mt-2 text-xs text-slate-600 dark:text-slate-300"><summary className="min-h-11 cursor-pointer py-2 font-semibold">{t("sourceRefs")}</summary><ul className="list-inside list-disc space-y-1">{sample.sourceChecks.map((source) => <li key={source.url}><a className="underline" href={source.url} target="_blank" rel="noopener noreferrer">{source.note}</a> · {source.checkedAt}</li>)}</ul></details>}
+          {sample.sourceChecks && <details className="mt-2 text-xs text-slate-600 dark:text-slate-300"><summary className="min-h-11 cursor-pointer py-2 font-semibold">{t("sourceRefs")}</summary><ul className="list-inside list-disc space-y-1">{sample.sourceChecks.map((source) => <li key={source.url}><a className="underline" href={source.url} target="_blank" rel="noopener noreferrer">{source.note}</a> · {source.checkedAt}</li>)}</ul></details>}
+          <p className="mt-2 flex items-start gap-1.5 text-sm leading-relaxed text-slate-600">
             <ShieldCheck aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
             <span>{t("honesty")}</span>
           </p>
           <p role="status" aria-live="polite" className="sr-only">
             {copyState === "ok" ? t("copied") : copyState === "fail" ? t("copyFailed") : ""}
           </p>
-          {copyState === "fail" && <p className="mt-1 text-[11px] font-semibold text-rose-700">{t("copyFailed")}</p>}
+          {copyState === "fail" && <p className="mt-1 text-sm font-semibold text-rose-700">{t("copyFailed")}</p>}
 
           <div id={panelId} hidden={!open} className="mt-3">
             {open && (
@@ -391,25 +392,25 @@ export function SampleInlineCard({
   return (
     <section
       aria-label={title}
-      className="min-w-0 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3 dark:border-indigo-500/20 dark:bg-indigo-950/20"
+      className="min-w-0 rounded-overlay border border-indigo-100 bg-indigo-50/40 p-3 dark:border-indigo-500/20 dark:bg-indigo-950/20"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="min-w-0 break-words text-xs font-bold text-slate-900">{title}</h4>
         <div className="flex flex-wrap gap-2">
           {onLoad && (
-            <button type="button" onClick={onLoad} className={primaryButton}>
+            <Button variant="unstyled" type="button" onClick={onLoad} className={primaryButton}>
               <Zap aria-hidden className="h-3.5 w-3.5" />
               {loadLabel ?? t("load")}
-            </button>
+            </Button>
           )}
-          <button type="button" onClick={() => void copy(sample.text)} className={secondaryButton}>
+          <Button variant="unstyled" type="button" onClick={() => void copy(sample.text)} className={secondaryButton}>
             {copyState === "ok" ? (
               <Check aria-hidden className="h-3.5 w-3.5 text-emerald-600" />
             ) : (
               <Copy aria-hidden className="h-3.5 w-3.5" />
             )}
             {copyState === "ok" ? t("copied") : t("copy")}
-          </button>
+          </Button>
         </div>
       </div>
       <p role="status" aria-live="polite" className="sr-only">
@@ -419,8 +420,8 @@ export function SampleInlineCard({
         <AnnotatedSample text={sample.text} roles={sample.roles} />
         <SampleMeta text={sample.text} />
       </div>
-      {sample.origin === "composite" && <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">{t("compositeNotice")}</p>}
-      <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-600">
+      {sample.origin === "composite" && <p className="mt-2 rounded-control border border-amber-300 bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">{t("compositeNotice")}</p>}
+      <p className="mt-2 flex items-start gap-1.5 text-sm leading-relaxed text-slate-600">
         <ShieldCheck aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
         <span>{t("honesty")}</span>
       </p>

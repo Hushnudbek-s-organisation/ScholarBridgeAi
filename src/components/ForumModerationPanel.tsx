@@ -3,6 +3,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { ShieldCheck, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export interface ForumReportItem {
   id: number;
@@ -28,53 +29,53 @@ export function ForumModerationPanel({ reports, onResolve, onDismiss, onDeleteTa
 
   if (reports.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 text-center">
+      <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-6 text-center">
         <ShieldCheck className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
         <p className="text-sm font-semibold text-slate-600">{t("moderation")}</p>
-        <p className="text-xs text-slate-400 mt-1">{t("noThreads")}</p>
+        <p className="text-sm text-slate-500 mt-1">{t("noThreads")}</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-3">
+    <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-5 space-y-3">
       <div className="flex items-center gap-2 text-slate-700 font-bold text-sm">
         <ShieldCheck className="h-5 w-5 text-indigo-600" />
         {t("moderation")} · {t("openReports")} ({reports.length})
       </div>
 
       {reports.map((report) => (
-        <div key={report.id} className="border border-amber-200 bg-amber-50/50 rounded-xl p-3 space-y-2">
+        <div key={report.id} className="border border-amber-200 bg-amber-50/50 rounded-surface p-3 space-y-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="text-[11px] text-slate-500">
+            <div className="text-xs text-slate-500">
               <span className="font-bold text-slate-700">{report.reporterName || `#${report.reporterId}`}</span>
               {" "}→ {report.targetType} #{report.targetId}
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
               {t("reportStatusOpen")}
             </span>
           </div>
-          <p className="text-xs text-slate-700">{`\u201C${report.reason}\u201D`}</p>
-          <p className="text-[10px] text-slate-400">{new Date(report.createdAt).toLocaleString()}</p>
+          <p className="text-sm text-slate-700">{`\u201C${report.reason}\u201D`}</p>
+          <p className="text-sm text-slate-500">{new Date(report.createdAt).toLocaleString()}</p>
           <div className="flex gap-2 pt-1">
-            <button
+            <Button variant="unstyled"
               onClick={() => onDeleteTarget(report.targetType, report.targetId)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-control text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700"
             >
               <Trash2 className="h-3.5 w-3.5" /> {t("delete")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               onClick={() => onResolve(report.id)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-control text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800"
             >
               <CheckCircle2 className="h-3.5 w-3.5" /> {t("resolveReport")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               onClick={() => onDismiss(report.id)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-control text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200"
             >
               <XCircle className="h-3.5 w-3.5" /> {t("reportStatusDismissed")}
-            </button>
+            </Button>
           </div>
         </div>
       ))}

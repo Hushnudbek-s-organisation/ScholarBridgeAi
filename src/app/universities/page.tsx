@@ -184,7 +184,7 @@ export default async function UniversitiesPage({
       <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
         <PublicCatalogHeader />
         <main className="mx-auto max-w-7xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
-          <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
+          <p role="alert" className="rounded-overlay border border-rose-200 bg-rose-50 p-8 text-center text-sm text-rose-700">
             {copy.universitiesLoadError}
           </p>
         </main>
@@ -218,7 +218,7 @@ export default async function UniversitiesPage({
         </header>
 
         {universities.length === 0 ? (
-          <p className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
+          <p className="rounded-overlay border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
             {copy.noUniversities}
           </p>
         ) : (
@@ -252,12 +252,12 @@ export default async function UniversitiesPage({
               return (
                 <article
                   key={university.id}
-                  className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
+                  className="flex h-full flex-col rounded-overlay border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-2xl" aria-hidden>{university.flag_emoji}</span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                      <MapPin className="h-3 w-3 shrink-0 text-slate-400" aria-hidden />
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                      <MapPin className="h-3 w-3 shrink-0 text-slate-500" aria-hidden />
                       <span className="break-words">{localizeCountry(university.country, locale)}</span>
                     </span>
                   </div>
@@ -270,7 +270,7 @@ export default async function UniversitiesPage({
                       {university.name}
                     </Link>
                   </h2>
-                  <p className="mt-1 break-words text-xs text-slate-600">
+                  <p className="mt-1 break-words text-sm text-slate-600">
                     {localizeCity(university.city, locale) || localizeCountry(university.country, locale)}
                   </p>
 
@@ -279,7 +279,7 @@ export default async function UniversitiesPage({
                       {visibleBadges.map((badge) => (
                         <li
                           key={badge.key}
-                          className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-sm font-semibold ${
                             badge.strong
                               ? "bg-blue-50 text-blue-800 ring-1 ring-inset ring-blue-200"
                               : "bg-slate-100 text-slate-700"
@@ -290,7 +290,7 @@ export default async function UniversitiesPage({
                         </li>
                       ))}
                       {hiddenBadges > 0 && (
-                        <li className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                        <li className="rounded-full bg-slate-100 px-2 py-0.5 text-sm font-bold text-slate-600">
                           +{number.format(hiddenBadges)}
                         </li>
                       )}
@@ -306,7 +306,7 @@ export default async function UniversitiesPage({
                   <div className="mt-auto flex items-center gap-1.5 pt-4">
                     <Link
                       href={`/universities/${university.id}`}
-                      className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
+                      className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-surface bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
                     >
                       {copy.viewDetails}
                     </Link>
@@ -317,7 +317,7 @@ export default async function UniversitiesPage({
                         rel="noopener noreferrer"
                         title={copy.website}
                         aria-label={copy.website}
-                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:text-blue-700"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-surface border border-slate-200 text-slate-600 hover:text-blue-700"
                       >
                         <ExternalLink className="h-4 w-4" aria-hidden />
                       </a>
@@ -333,7 +333,7 @@ export default async function UniversitiesPage({
 
         <PublicFeaturePromo className="mt-6" />
 
-        <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
+        <p className="mt-6 border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-600">
           {copy.independentGuide}
         </p>
       </main>

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Loader2, RotateCcw, Save } from "lucide-react";
 import { invalidateSectionHelp } from "../../SectionIntro";
 import { navLabelKey } from "@/lib/navSections";
+import { Button } from "@/components/ui/Button";
 
 interface Step {
   id: string;
@@ -15,7 +16,7 @@ interface Step {
 }
 type Help = Record<string, { enabled?: boolean; text?: string }>;
 
-const inputCls = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400";
+const inputCls = "w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400";
 
 /**
  * Admin → Growth tools → Guide & help.
@@ -87,7 +88,7 @@ export function GuideManager() {
 
   if (!steps) {
     return (
-      <p className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-6 text-xs text-slate-500">
+      <p className="flex items-center gap-2 rounded-surface border border-slate-200 bg-white p-6 text-sm text-slate-500">
         <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
       </p>
     );
@@ -96,54 +97,54 @@ export function GuideManager() {
   return (
     <div className="space-y-5">
       {msg && (
-        <p className={`rounded-xl border px-3 py-2 text-xs font-semibold ${msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{msg.text}</p>
+        <p className={`rounded-surface border px-3 py-2 text-sm font-semibold ${msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{msg.text}</p>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="rounded-overlay border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-extrabold text-slate-900">{t("journeyTitle")}</h3>
-            <p className="text-[11px] text-slate-500">{t("journeyIntro")}</p>
+            <p className="text-sm text-slate-500">{t("journeyIntro")}</p>
           </div>
           <div className="flex gap-2">
-            <button
+            <Button variant="unstyled"
               onClick={() => {
                 if (window.confirm(t("confirmReset"))) void save("journey", { journey: [] });
               }}
-              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              className="inline-flex items-center gap-1 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
               <RotateCcw className="h-3.5 w-3.5" /> {t("reset")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               disabled={saving === "journey"}
               onClick={() =>
                 void save("journey", {
                   journey: steps.map((s) => ({ id: s.id, enabled: s.enabled, title: s.title ?? "", description: s.description ?? "" })),
                 })
               }
-              className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {saving === "journey" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
-            </button>
+            </Button>
           </div>
         </div>
         <ol className="mt-3 space-y-2">
           {steps.map((s, i) => (
-            <li key={s.id} className={`rounded-xl border p-3 ${s.enabled ? "border-slate-200" : "border-dashed border-slate-300 opacity-60"}`}>
+            <li key={s.id} className={`rounded-surface border p-3 ${s.enabled ? "border-slate-200" : "border-dashed border-slate-300 opacity-60"}`}>
               <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">{i + 1}</span>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-800">
-                  {s.title || tj(`steps.${s.id}.title`)} <span className="font-normal text-slate-400">→ {navLabel(s.tab)}</span>
+                  {s.title || tj(`steps.${s.id}.title`)} <span className="font-normal text-slate-500">→ {navLabel(s.tab)}</span>
                 </span>
-                <button onClick={() => move(i, -1)} disabled={i === 0} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30" aria-label={t("up")}>
+                <Button variant="unstyled" onClick={() => move(i, -1)} disabled={i === 0} className="rounded-control p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30" aria-label={t("up")}>
                   <ArrowUp className="h-4 w-4" />
-                </button>
-                <button onClick={() => move(i, 1)} disabled={i === steps.length - 1} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30" aria-label={t("down")}>
+                </Button>
+                <Button variant="unstyled" onClick={() => move(i, 1)} disabled={i === steps.length - 1} className="rounded-control p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30" aria-label={t("down")}>
                   <ArrowDown className="h-4 w-4" />
-                </button>
-                <button onClick={() => setStep(i, { enabled: !s.enabled })} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label={s.enabled ? t("hide") : t("show")}>
+                </Button>
+                <Button variant="unstyled" onClick={() => setStep(i, { enabled: !s.enabled })} className="rounded-control p-1 text-slate-500 hover:bg-slate-100" aria-label={s.enabled ? t("hide") : t("show")}>
                   {s.enabled ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                </button>
+                </Button>
               </div>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <input value={s.title ?? ""} maxLength={80} onChange={(e) => setStep(i, { title: e.target.value })} placeholder={tj(`steps.${s.id}.title`)} className={inputCls} aria-label={t("customTitle")} />
@@ -154,29 +155,29 @@ export function GuideManager() {
         </ol>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="rounded-overlay border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-extrabold text-slate-900">{t("helpTitle")}</h3>
-            <p className="text-[11px] text-slate-500">{t("helpIntro")}</p>
+            <p className="text-sm text-slate-500">{t("helpIntro")}</p>
           </div>
-          <button
+          <Button variant="unstyled"
             disabled={saving === "help"}
             onClick={() => void save("help", { help })}
-            className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {saving === "help" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} {t("save")}
-          </button>
+          </Button>
         </div>
         <ul className="mt-3 grid gap-2 lg:grid-cols-2">
           {sections.map((sec) => {
             const o = help[sec] ?? {};
             const on = o.enabled !== false;
             return (
-              <li key={sec} className={`rounded-xl border p-3 ${on ? "border-slate-200" : "border-dashed border-slate-300 opacity-60"}`}>
+              <li key={sec} className={`rounded-surface border p-3 ${on ? "border-slate-200" : "border-dashed border-slate-300 opacity-60"}`}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-bold text-slate-800">{navLabel(sec)}</span>
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-600">
                     <input type="checkbox" checked={on} onChange={(e) => setHelp((h) => ({ ...h, [sec]: { ...o, enabled: e.target.checked } }))} className="h-3.5 w-3.5 accent-indigo-600" />
                     {t("showBanner")}
                   </label>

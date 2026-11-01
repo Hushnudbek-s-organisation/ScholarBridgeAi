@@ -216,7 +216,6 @@ check("isUnmodifiedSample ignores whitespace differences", isUnmodifiedSample("A
 check("isUnmodifiedSample is false once a word changes, or for empty values", !isUnmodifiedSample("A b d", "A b c") && !isUnmodifiedSample("", "A") && !isUnmodifiedSample("A", undefined));
 
 const surfaces: [string, string, RegExp[]][] = [
-  ["1 Onboarding", "src/components/OnboardingWizard.tsx", [/<SmartAutofillBox supported=\{AUTOFILL_FIELDS\} onApply=\{applyAutofill\}/]],
   ["1 Profile editor", "src/components/ProfileModal.tsx", [/<SmartAutofillBox supported=\{AUTOFILL_FIELDS\} onApply=\{applyAutofill\}/]],
   ["2 CV builder", "src/components/PlanningStudio.tsx", [/group="cvBuilder"/, /setCompareCv\(sample\)/]],
   ["3 SOP studio", "src/components/AiSopStudio.tsx", [/group="sop" onLoad=\{loadSopSample\}/, /drafterHoldsSample/]],
@@ -234,6 +233,7 @@ for (const [label, file, patterns] of surfaces) {
   const src = read(file);
   check(`${label}: wired in ${file}`, patterns.every((re) => re.test(src)), patterns.filter((re) => !re.test(src)).map(String).join(" "));
 }
+check("1 Onboarding defers CV auto-fill to the profile editor", !read("src/components/OnboardingWizard.tsx").includes("SmartAutofillBox") && read("src/components/ProfileModal.tsx").includes("SmartAutofillBox"));
 check("the auto-fill box refuses to apply an unchanged sample CV", /disabled=\{holdsSample \|\| applicable\.length === 0\}/.test(read("src/components/samples/SmartAutofillBox.tsx")));
 
 function walk(dir: string): string[] {

@@ -20,11 +20,10 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { formatMoney } from "@/lib/format";
 import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
 import type { MatchBreakdown } from "@/lib/matching";
-import { ArrowRight, CalendarClock, ChevronDown, Compass, Printer, RefreshCw, Sparkles } from "lucide-react";
-import { ShowMoreToggle } from "@/components/hubs/ui";
+import { ArrowRight, Award, CalendarClock, CheckCircle2, ChevronDown, Compass, FileCheck2, GraduationCap, Printer, RefreshCw, Sparkles } from "lucide-react";
+import { ShowMoreToggle } from "@/components/ui/hubs";
 import { AnimatedNumber as CountUp, RevealGroup, RevealItem, SectionTransition } from "@/components/motion";
 import {
-  Button,
   Empty,
   JourneyCard,
   Loading,
@@ -35,7 +34,9 @@ import {
   StatTile,
   daysLabel,
   toneForDays,
-} from "./ui";
+} from "@/components/ui/journey";
+import { Button } from "@/components/ui/Button";
+import { MotionButton } from "@/components/ui/MotionButton";
 
 export interface JourneyDashboard {
   profile: { id: number; name: string; plan: string };
@@ -63,6 +64,8 @@ export interface JourneyDashboard {
   }[];
   deadlines: { id: string; kind: string; title: string; dueDate: string; daysRemaining: number | null; tab: string }[];
   applications: { total: number; preparing: number; submitted: number; decision: number };
+  /** Optional for older cached/test payloads; live API returns full counts. */
+  activity?: { savedUniversities: number; savedScholarships: number; applications: number };
   readiness: {
     /** Application checklist: what is filled in and linked (documents, applications, funding). */
     categories: { key: string; label: string; pct: number; precise?: number; state: string; gaps: string[]; tab: string; unknown?: boolean }[];
@@ -287,17 +290,17 @@ export function RecommendedPanel({
       action={
         <div className="flex items-center gap-2">
           {/* Says what the order IS, so "why is this first?" is never a mystery. */}
-          <span className="hidden rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-500 sm:inline-block dark:border-slate-700 dark:text-slate-400">
+          <span className="hidden rounded-full border border-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-500 sm:inline-block dark:border-slate-700 dark:text-slate-400">
             {t("ccRecSortPill")}
           </span>
-          <Compass className="h-4 w-4 text-slate-400" aria-hidden />
+          <Compass className="h-4 w-4 text-slate-500" aria-hidden />
         </div>
       }
     >
       <div className="space-y-4">
-        {saveError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200">{saveError}</p>}
+        {saveError && <p role="alert" className="rounded-control border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200">{saveError}</p>}
         {!recommended.personalised && (
-          <div className="rounded-xl border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-3 text-xs text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
+          <div className="rounded-surface border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-3 text-xs text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
             <p className="font-semibold">{t("ccRecNoBasis")}</p>
             {recommended.missing.length > 0 && (
               <p className="mt-1">
@@ -307,7 +310,7 @@ export function RecommendedPanel({
           </div>
         )}
         {recommended.personalised && recommended.missing.length > 0 && (
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             {t("ccRecMissing", { fields: recommended.missing.map(recFieldLabel(t)).join(", ") })}
           </p>
         )}
@@ -315,21 +318,21 @@ export function RecommendedPanel({
         <div>
           <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("ccUnisHeading")}</h3>
           {recommended.universities.length === 0 ? (
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
               {recommended.personalised ? t("ccNoUnis") : t("ccRecNoBasisUnis")}
             </p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(showAllRecUnis ? recommended.universities : recommended.universities.slice(0, 3)).map((u) => (
-                <div key={u.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <div key={u.id} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
                     <CountryFlag country={u.country} flagEmoji={u.flagEmoji} size="xs" />
                     <span className="min-w-0 break-words">{u.name}</span>
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
                     {u.city ? `${u.city} · ` : ""}{u.country} · {u.worldRanking != null ? `QS #${u.worldRanking}` : t("ccRankingUnavailable")}
                   </p>
-                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm">
                     <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
                       {t("ccRecFitChip", { score: u.matchScore })}
                     </span>
@@ -361,10 +364,10 @@ export function RecommendedPanel({
                   {u.matchReasons.length > 0 && (
                     <ul className="mt-1.5 space-y-0.5">
                       {u.matchReasons.slice(0, 2).map((r, i) => (
-                        <li key={i} className="text-xs text-emerald-800 dark:text-emerald-300">+ {r}</li>
+                        <li key={i} className="text-sm text-emerald-800 dark:text-emerald-300">+ {r}</li>
                       ))}
                       {u.matchIssues.slice(0, 2).map((r, i) => (
-                        <li key={i} className="text-xs text-amber-800 dark:text-amber-300">− {r}</li>
+                        <li key={i} className="text-sm text-amber-800 dark:text-amber-300">− {r}</li>
                       ))}
                     </ul>
                   )}
@@ -398,13 +401,13 @@ export function RecommendedPanel({
             <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("ccScholarshipsHeading")}</h3>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(showAllRecSchols ? recommended.scholarships : recommended.scholarships.slice(0, 3)).map((s) => (
-                <div key={s.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <div key={s.id} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                   {/* Module 1 — this award applies to a university the student
                       SAVED, and 100%-full ones lead the list. The names come
                       straight from the coverage rules; nothing is claimed. */}
                   {(s.coveredUniversities?.length ?? 0) > 0 && (
                     <p className="mb-1.5">
-                      <span className="inline-flex max-w-full items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                      <span className="inline-flex max-w-full items-center rounded-control border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
                         <span className="min-w-0 break-words">
                           {s.isFullForSavedUni
                             ? t("ccCoversUniFull", { unis: (s.coveredUniversities ?? []).slice(0, 2).join(", ") })
@@ -414,12 +417,12 @@ export function RecommendedPanel({
                     </p>
                   )}
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{s.title}</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-300">{s.provider}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{s.provider}</p>
                   <p className="mt-1 text-sm font-bold text-emerald-700 dark:text-emerald-300">
                     {awardLabel(s)}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
                       {t("ccRecFitChip", { score: s.matchScore })}
                     </span>
                     <MatchEvidenceBadge
@@ -430,25 +433,25 @@ export function RecommendedPanel({
                     />
                   </div>
                   {s.deadlineDate && (
-                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
                       {t("ccScholarshipDeadline", { date: new Date(`${s.deadlineDate}T00:00:00`).toLocaleDateString() })}
                     </p>
                   )}
                   {s.matchReasons.length > 0 && (
                     <ul className="mt-1 space-y-0.5">
                       {s.matchReasons.slice(0, 2).map((r, i) => (
-                        <li key={i} className="text-xs text-emerald-800 dark:text-emerald-300">+ {r}</li>
+                        <li key={i} className="text-sm text-emerald-800 dark:text-emerald-300">+ {r}</li>
                       ))}
                       {s.matchIssues.slice(0, 1).map((r, i) => (
-                        <li key={i} className="text-xs text-amber-800 dark:text-amber-300">− {r}</li>
+                        <li key={i} className="text-sm text-amber-800 dark:text-amber-300">− {r}</li>
                       ))}
                     </ul>
                   )}
-                  <p className={`text-xs ${s.gpaOk ? "text-slate-600 dark:text-slate-300" : "font-semibold text-amber-700 dark:text-amber-300"}`}>
+                  <p className={`text-sm ${s.gpaOk ? "text-slate-600 dark:text-slate-300" : "font-semibold text-amber-700 dark:text-amber-300"}`}>
                     {s.minGpa == null ? t("ccGpaNotSpecified") : !s.gpaProvided ? t("ccGpaAdd", { gpa: s.minGpa }) : s.gpaOk ? t("ccGpaMeets", { gpa: s.minGpa }) : t("ccGpaBelow", { gpa: s.minGpa })}
                   </p>
                   {/* Citizenship rule: stated when it is known, never assumed. */}
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
                     {s.countryEligibility === "open-to-all"
                       ? t("ccRecCitOpen")
                       : s.countryEligibility === "citizenship-match"
@@ -471,7 +474,7 @@ export function RecommendedPanel({
             />
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          <div className="rounded-surface border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
             {t("ccNoScholarships")}
           </div>
         )}
@@ -485,8 +488,8 @@ export function RecommendedPanel({
                   <Sparkles className="h-3.5 w-3.5 text-amber-500" aria-hidden />
                   <span className="min-w-0 flex-1 break-words whitespace-normal text-slate-700 dark:text-slate-200">
                     {o.title}
-                    {o.provider && <span className="text-slate-400"> · {o.provider}</span>}
-                    <span className="text-slate-400">
+                    {o.provider && <span className="text-slate-500"> · {o.provider}</span>}
+                    <span className="text-slate-500">
                       {o.deadlineDate ? ` · ${t("ccScholarshipDeadline", { date: new Date(`${o.deadlineDate}T00:00:00`).toLocaleDateString() })}` : ` · ${t("ccRecNoDeadline")}`}
                     </span>
                   </span>
@@ -512,11 +515,94 @@ export function RecommendedPanel({
             />
           </div>
         )}
-        <p className="border-t border-slate-200 pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+        <p className="border-t border-slate-200 pt-3 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
           {t("ccRecNote")}
         </p>
       </div>
     </JourneyCard>
+  );
+}
+
+type StarterActivity = NonNullable<JourneyDashboard["activity"]>;
+
+/** Three concrete actions for a new account, completed from real saved rows. */
+export function DashboardFirstSteps({
+  activity,
+  onNavigateTab,
+}: {
+  activity: StarterActivity;
+  onNavigateTab: (tab: string) => void;
+}) {
+  const t = useTranslations("journey");
+  const tasks = [
+    {
+      id: "universities",
+      icon: GraduationCap,
+      current: activity.savedUniversities,
+      target: 3,
+      tab: "universities",
+    },
+    {
+      id: "scholarships",
+      icon: Award,
+      current: activity.savedScholarships,
+      target: 1,
+      tab: "scholarships",
+    },
+    {
+      id: "application",
+      icon: FileCheck2,
+      current: activity.applications,
+      target: 1,
+      tab: "applications",
+    },
+  ] as const;
+
+  return (
+    <section aria-labelledby="dashboard-first-steps" className="rounded-overlay border border-indigo-200 bg-indigo-50/60 p-4 shadow-xs dark:border-indigo-500/30 dark:bg-indigo-950/20 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface bg-indigo-600 text-white">
+          <Compass aria-hidden="true" className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 id="dashboard-first-steps" className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{t("firstSteps.title")}</h2>
+          <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{t("firstSteps.subtitle")}</p>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        {tasks.map((task) => {
+          const Icon = task.icon;
+          const done = task.current >= task.target;
+          return (
+            <article key={task.id} className="flex h-full flex-col rounded-surface border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-surface">
+              <div className="flex items-start justify-between gap-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                  <Icon aria-hidden="true" className="h-4 w-4" />
+                </span>
+                {done ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
+                    <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" /> {t("firstSteps.done")}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {Math.min(task.current, task.target)}/{task.target}
+                  </span>
+                )}
+              </div>
+              <h3 className="mt-3 text-sm font-extrabold leading-snug text-slate-900 dark:text-slate-100">{t(`firstSteps.${task.id}Title`)}</h3>
+              <p className="mt-1 flex-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{t(`firstSteps.${task.id}Body`)}</p>
+              <Button
+                variant={done ? "outline" : "primary"}
+                className="mt-4 w-full"
+                onClick={() => onNavigateTab(task.tab)}
+              >
+                {t(`firstSteps.${task.id}Cta`)} <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </Button>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -574,6 +660,15 @@ export function JourneyControlCenter({
   if (!data) return null;
 
   const { journey, nextSteps, deadlines, applications, readiness, recommended } = data;
+  const starterActivity: StarterActivity = data.activity ?? {
+    savedUniversities: recommended.universities.filter((university) => university.saved).length,
+    savedScholarships: recommended.scholarships.filter((scholarship) => scholarship.saved).length,
+    applications: applications.total,
+  };
+  const starterComplete =
+    starterActivity.savedUniversities >= 3 &&
+    starterActivity.savedScholarships >= 1 &&
+    starterActivity.applications > 0;
   const translatedStageLabel = (id: string, fallback: string) => {
     switch (id) {
       case "discover": return t("stageDiscover");
@@ -649,18 +744,22 @@ export function JourneyControlCenter({
 
   return (
     <div className="space-y-4">
+      {!starterComplete && (
+        <DashboardFirstSteps activity={starterActivity} onNavigateTab={onNavigateTab} />
+      )}
+
       {/* ---- 1. The journey bar ------------------------------------------ */}
       <JourneyCard tone="hero">
         <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-5">
           <div className="min-w-0">
-            <p className="sb-journey-eyebrow text-[11px] font-bold uppercase tracking-wider">{t("ccEyebrow")}</p>
+            <p className="sb-journey-eyebrow text-sm font-bold uppercase tracking-wider">{t("ccEyebrow")}</p>
             <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
               <motion.span
                 aria-hidden
                 initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 18 }}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 shadow-sm ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-400/30"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-overlay bg-white/70 shadow-sm ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-400/30"
               >
                 {journey.currentIcon}
               </motion.span>
@@ -670,7 +769,7 @@ export function JourneyControlCenter({
               {currentDescription}
             </p>
             {nextStageLabel && (
-              <p className="mt-3 inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl bg-white/70 px-3 py-2 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-slate-700">
+              <p className="mt-3 inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 rounded-surface bg-white/70 px-3 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-slate-700">
                 <span className="font-bold">{t("ccNextUp")}</span>
                 <ArrowRight className="h-3 w-3 shrink-0" aria-hidden />
                 <span className="min-w-0 break-words">{nextStageLabel}</span>
@@ -689,15 +788,15 @@ export function JourneyControlCenter({
             {/* Print is a utility, not a journey step: it sits as a quiet
                 icon next to the ring so the CTA row below is only ever
                 "Continue" + "See study plan". */}
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => window.print()}
               aria-label={t("printSummaryHint")}
               title={t("printSummary")}
-              className="print:hidden mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/70 bg-white/60 text-slate-500 transition-colors hover:text-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-700/70 dark:bg-white/10 dark:text-slate-300 dark:hover:text-indigo-200"
+              className="print:hidden mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-surface border border-slate-200/70 bg-white/60 text-slate-500 transition-colors hover:text-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-700/70 dark:bg-white/10 dark:text-slate-300 dark:hover:text-indigo-200"
             >
               <Printer className="h-4 w-4" aria-hidden />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -745,28 +844,28 @@ export function JourneyControlCenter({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: reduceMotion ? 0 : i * 0.05, duration: reduceMotion ? 0 : 0.32 }}
               >
-                <motion.button
+                <MotionButton variant="unstyled"
                   type="button"
                   onClick={() => onNavigateTab(s.tab)}
                   title={translatedStageDone(s.id)}
                   aria-current={s.current ? "step" : undefined}
                   whileHover={reduceMotion ? undefined : { y: -1, scale: 1.02 }}
                   whileTap={reduceMotion ? undefined : { scale: 0.98 }}
-                  className={`group flex min-h-14 w-full min-w-0 flex-col items-start justify-center rounded-xl border px-2.5 py-2 text-left text-[11px] font-bold leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${stageClass}`}
+                  className={`group flex min-h-14 w-full min-w-0 flex-col items-start justify-center rounded-surface border px-2.5 py-2 text-left text-xs font-bold leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${stageClass}`}
                 >
                   <span className="flex w-full min-w-0 items-start gap-1.5">
                     <span aria-hidden className="shrink-0 leading-none">{s.icon}</span>
                     <span className="min-w-0 break-words">{stageLabel}</span>
                   </span>
-                  <span className={`mt-1.5 text-[10px] font-semibold leading-tight ${statusClass}`}>{stageStatus}</span>
-                </motion.button>
+                  <span className={`mt-1.5 text-xs font-semibold leading-tight ${statusClass}`}>{stageStatus}</span>
+                </MotionButton>
               </motion.li>
             );
           })}
         </ol>
 
-        <details className="group mt-3 min-w-0 rounded-xl border border-slate-200/70 bg-white/40 text-slate-600 dark:border-slate-700 dark:bg-slate-900/20 dark:text-slate-300 sm:hidden">
-          <summary className="group flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 [&::-webkit-details-marker]:hidden">
+        <details className="group mt-3 min-w-0 rounded-surface border border-slate-200/70 bg-white/40 text-slate-600 dark:border-slate-700 dark:bg-slate-900/20 dark:text-slate-300 sm:hidden">
+          <summary className="group flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-surface px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 [&::-webkit-details-marker]:hidden">
             <span>{t("ccAboutJourney")}</span>
             <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
           </summary>
@@ -775,10 +874,10 @@ export function JourneyControlCenter({
             {completedBeforeOpen && <p>{t("ccOverlapNote")}</p>}
           </div>
         </details>
-        <div className="mt-2 hidden space-y-1 text-[11px] text-slate-500 dark:text-slate-400 sm:block">
+        <div className="mt-2 hidden space-y-1 text-xs text-slate-500 dark:text-slate-400 sm:block">
           <p>{t("ccEightStagesNote")}</p>
           {completedBeforeOpen && (
-            <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+            <p className="rounded-control bg-indigo-50 px-3 py-2 text-sm text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
               {t("ccOverlapNote")}
             </p>
           )}
@@ -801,14 +900,14 @@ export function JourneyControlCenter({
                 viewport={{ once: true, margin: "-40px 0px" }}
                 transition={{ delay: reduceMotion ? 0 : i * 0.06, duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
                 whileHover={reduceMotion ? undefined : { x: 2 }}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-700"
+                className="flex flex-wrap items-center gap-3 rounded-surface border border-slate-200 px-3 py-2.5 dark:border-slate-700"
               >
                 <span className="text-lg leading-none" aria-hidden>
                   {s.dot}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="break-words text-sm font-semibold text-slate-900 dark:text-white">{nextStepTitle(s)}</p>
-                  <p className="break-words text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                  <p className="break-words text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                     {nextStepDetail(s)}
                     {s.dueInDays != null && s.dueInDays >= 0 && (
                       <span className="ml-1 font-semibold text-slate-600 dark:text-slate-300">· {daysLabel(s.dueInDays)}</span>
@@ -837,7 +936,7 @@ export function JourneyControlCenter({
         <JourneyCard
           title={t("ccDeadlinesTitle")}
           subtitle={t("ccDeadlinesSubtitle")}
-          action={<CalendarClock className="h-4 w-4 text-slate-400" aria-hidden />}
+          action={<CalendarClock className="h-4 w-4 text-slate-500" aria-hidden />}
         >
           {deadlines.length === 0 ? (
             <Empty
@@ -860,7 +959,7 @@ export function JourneyControlCenter({
                   <Pill tone={toneForDays(d.daysRemaining)}>{daysLabel(d.daysRemaining)}</Pill>
                   <div className="min-w-0 flex-1">
                     <p className="break-words text-sm font-medium text-slate-800 dark:text-slate-100">{d.title || t("ccApplicationFallback")}</p>
-                    <p className="break-words text-[11px] uppercase tracking-wide text-slate-400">
+                    <p className="break-words text-sm uppercase tracking-wide text-slate-500">
                       {t(`ccDeadlineKinds.${["application", "university", "scholarship", "test", "document", "visa", "other"].includes(d.kind) ? d.kind : "other"}` as never)}
                     </p>
                   </div>
@@ -907,12 +1006,12 @@ export function JourneyControlCenter({
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
                     viewport={{ once: true, margin: "-30px 0px" }}
                     transition={{ delay: reduceMotion ? 0 : i * 0.06, type: "spring", stiffness: 320, damping: 26 }}
-                    className="min-w-0 rounded-xl bg-slate-50 px-2 py-3 dark:bg-slate-800/60"
+                    className="min-w-0 rounded-surface bg-slate-50 px-2 py-3 dark:bg-slate-800/60"
                   >
                     <p className={`text-2xl font-extrabold tabular-nums ${s.tone}`}>
                       <CountUp value={s.value} />
                     </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
+                    <p className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
                   </motion.div>
                 ))}
               </div>
@@ -1027,13 +1126,13 @@ export function JourneyControlCenter({
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {(showAllReadiness ? readiness.categories : readiness.categories.slice(0, 3)).map((c) => (
-            <motion.button
+            <MotionButton variant="unstyled"
               key={c.key}
               type="button"
               onClick={() => onNavigateTab(c.tab)}
               whileHover={reduceMotion ? undefined : { y: -2 }}
               whileTap={reduceMotion ? undefined : { scale: 0.99 }}
-              className="min-h-16 rounded-xl border border-slate-200 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/30"
+              className="min-h-16 rounded-surface border border-slate-200 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/30"
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="min-w-0 break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -1051,7 +1150,7 @@ export function JourneyControlCenter({
                   label={c.gaps[0] ? t(`ccReadinessGap.${c.gaps[0]}` as never) : t("ccLookingGood")}
                 />
               </div>
-            </motion.button>
+            </MotionButton>
           ))}
         </div>
         <ShowMoreToggle
@@ -1077,7 +1176,7 @@ export function JourneyControlCenter({
                     ? t("tpGapAtOrAboveFigure", { test: label, current: gap.current ?? "—", figure: gap.catalogueFigure ?? "—" })
                     : t("tpGapNoFigure", { test: label });
               return (
-                <li key={gap.testType} className="flex min-w-0 flex-col items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-center">
+                <li key={gap.testType} className="flex min-w-0 flex-col items-start gap-2 rounded-control border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-center">
                   <Pill tone="slate">{label}</Pill>
                   <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">{message}</span>
                   <Button size="sm" variant="ghost" className="min-h-11 shrink-0" onClick={() => onNavigateTab("tests")}>
@@ -1115,13 +1214,13 @@ export function JourneyControlCenter({
         <JourneyCard title={t("ccFundingTitle")} subtitle={t("ccFundingSubtitle")}>
           <div className="flex flex-wrap items-center gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("ccEstimatedAnnualCost") : t("ccAnnualCost")}</p>
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("ccEstimatedAnnualCost") : t("ccAnnualCost")}</p>
               <p className="text-xl font-extrabold text-slate-900 dark:text-white">
                 {data.funding.calculated && data.funding.annualCost != null ? formatMoney(data.funding.annualCost, "USD") : t("ccNotCalculatedShort")}
               </p>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("ccEstimatedGap") : t("ccRemainingGap")}</p>
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{data.funding.estimated ? t("ccEstimatedGap") : t("ccRemainingGap")}</p>
               <p
                 className={`text-xl font-extrabold ${
                   !data.funding.calculated || data.funding.fundingGap == null ? "text-slate-600 dark:text-slate-300" : data.funding.fundingGap > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
@@ -1131,9 +1230,9 @@ export function JourneyControlCenter({
               </p>
             </div>
             {!data.funding.calculated ? (
-              <p className="basis-full break-words text-xs text-slate-600 dark:text-slate-300">{t("ccAddAnnualCostsToCalculateGap")}</p>
+              <p className="basis-full break-words text-sm text-slate-600 dark:text-slate-300">{t("ccAddAnnualCostsToCalculateGap")}</p>
             ) : data.funding.estimated ? (
-              <p className="basis-full break-words text-xs text-slate-600 dark:text-slate-300">{t("ccEstimatedCostNote")}</p>
+              <p className="basis-full break-words text-sm text-slate-600 dark:text-slate-300">{t("ccEstimatedCostNote")}</p>
             ) : null}
             <Button variant="outline" className="min-h-11" onClick={() => onNavigateTab("funding")}>
               {t("ccOpenFinancialPlan")}
@@ -1155,10 +1254,10 @@ export function JourneyControlCenter({
               .slice(0, 3)
           ).map((p) => (
             <li key={p.key}>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => onNavigateTab(p.tab)}
-                className={`min-h-24 h-full w-full rounded-xl border p-3 text-left transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                className={`min-h-24 h-full w-full rounded-surface border p-3 text-left transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                   p.status === "done"
                     ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
                     : p.status === "in_progress"
@@ -1169,20 +1268,20 @@ export function JourneyControlCenter({
                 <p className="text-base" aria-hidden>
                   {p.icon}
                 </p>
-                <p className="mt-1 break-words text-xs font-bold text-slate-800 dark:text-slate-100">
+                <p className="mt-1 break-words text-sm font-bold text-slate-800 dark:text-slate-100">
                   {t(`spPhase.${p.key}.title` as never)}
                 </p>
                 <div className="mt-1.5">
                   <ProgressBar pct={p.pct} size="sm" tone={p.status === "done" ? "good" : "brand"} />
                 </div>
-                <p className="mt-1 break-words text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                <p className="mt-1 break-words text-sm leading-snug text-slate-600 dark:text-slate-400">
                   {p.status === "done"
                     ? t("spStatus.done")
                     : p.missing[0]
                       ? t(`spPhaseMissing.${p.missing[0]}` as never)
                       : t(`spStatus.${p.status}` as never)}
                 </p>
-              </button>
+              </Button>
             </li>
           ))}
         </ol>

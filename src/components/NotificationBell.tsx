@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Bell, CheckCheck, Loader2, Settings2 } from "lucide-react";
 import { computePanelGeometry } from "@/lib/panelPlacement";
+import { Button } from "@/components/ui/Button";
 
 interface NotificationItem {
   id: number;
@@ -118,19 +119,19 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
 
   return (
     <div className="relative" ref={ref}>
-      <button
+      <Button variant="unstyled"
         onClick={toggle}
-        className="relative grid min-h-11 min-w-11 place-items-center text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
+        className="relative grid min-h-11 min-w-11 place-items-center text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-control transition-colors"
         title={t("title")}
         aria-label={t("title")}
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-0.5 rounded-full bg-rose-600 text-white text-xs font-bold flex items-center justify-center">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -142,28 +143,28 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
           // bell's viewport position, so the panel stays fully on screen.
           className={`absolute ${
             openUp ? "bottom-full mb-2" : "top-full mt-1"
-          } ${anchor === "left" ? "left-0" : "right-0"} w-80 max-h-96 overflow-y-auto bg-white rounded-2xl border border-slate-200 shadow-xl z-50`}
+          } ${anchor === "left" ? "left-0" : "right-0"} w-80 max-h-96 overflow-y-auto bg-white rounded-overlay border border-slate-200 shadow-xl z-50`}
           style={{
             ...(panelWidth ? { width: panelWidth } : null),
             ...(maxHeight ? { maxHeight: maxHeight } : null),
           }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <p className="text-xs font-extrabold text-slate-800">{t("title")}</p>
+            <p className="text-sm font-extrabold text-slate-800">{t("title")}</p>
             <div className="flex items-center gap-3">
               {unreadCount > 0 && (
-                <button
+                <Button variant="unstyled"
                   onClick={markAllRead}
-                  className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800"
+                  className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800"
                 >
                   <CheckCheck className="h-3 w-3" /> {t("markAll")}
-                </button>
+                </Button>
               )}
               {/* Telegram & notification settings (hash deep-link → tab) */}
               <a
                 href="#notifications"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-1 text-[10px] font-bold text-sky-600 hover:text-sky-800"
+                className="flex items-center gap-1 text-xs font-bold text-sky-600 hover:text-sky-800"
                 title={t("settings")}
               >
                 <Settings2 className="h-3 w-3" /> {t("settings")}
@@ -172,13 +173,13 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center gap-2 p-6 text-xs text-slate-400">
+            <div className="flex items-center justify-center gap-2 p-6 text-xs text-slate-500">
               <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
             </div>
           ) : items.length === 0 ? (
             <div className="p-6 text-center">
-              <p className="text-xs text-slate-400">{t("empty")}</p>
-              <a href="#notifications" onClick={() => setOpen(false)} className="mt-2 inline-block text-[11px] font-bold text-sky-600 hover:text-sky-800">
+              <p className="text-sm text-slate-500">{t("empty")}</p>
+              <a href="#notifications" onClick={() => setOpen(false)} className="mt-2 inline-block text-xs font-bold text-sky-600 hover:text-sky-800">
                 {t("emptyTelegram")}
               </a>
             </div>
@@ -188,9 +189,9 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
                 <div key={n.id} className={`px-4 py-3 ${n.isRead ? "" : "bg-indigo-50"}`}>
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-slate-800">{n.title}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{n.body}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">
+                      <p className="text-sm font-bold text-slate-800">{n.title}</p>
+                      <p className="text-sm text-slate-500 mt-0.5 leading-relaxed">{n.body}</p>
+                      <p className="text-sm text-slate-500 mt-1">
                         {new Date(n.createdAt).toLocaleString()}
                       </p>
                     </div>

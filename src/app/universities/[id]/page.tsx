@@ -267,25 +267,25 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           {t.backToCatalog}
         </Link>
 
-        <header className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
+        <header className="mt-3 rounded-overlay border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-600">
+              <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate-600">
                 <span className="text-base leading-none" aria-hidden>{u.flagEmoji}</span>
-                <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
                 <span className="break-words">{place || country}</span>
               </p>
               <h1 className="mt-1.5 line-clamp-3 break-words text-xl font-extrabold leading-snug text-slate-900 sm:text-2xl">
                 {u.name}
               </h1>
               {(type || degree) && (
-                <p className="mt-1 break-words text-xs text-slate-600">
+                <p className="mt-1 break-words text-sm text-slate-600">
                   {[type, degree].filter(Boolean).join(" · ")}
                 </p>
               )}
             </div>
             <span
-              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${
                 verified
                   ? "bg-emerald-50 text-emerald-800 ring-emerald-200"
                   : "bg-amber-50 text-amber-800 ring-amber-200"
@@ -300,19 +300,19 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
               the eight the card used to stack. */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {verifiedValue(qsPosition?.rank ?? null) && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800 ring-1 ring-inset ring-blue-200">
                 <Trophy className="h-3 w-3" aria-hidden />
                 {t.rankLabel}: #{verifiedValue(qsPosition?.rank ?? null)}
               </span>
             )}
             {(tuitionLocal ?? tuitionUsd) && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-inset ring-slate-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-inset ring-slate-200">
                 <Wallet className="h-3 w-3" aria-hidden />
                 {tuitionLocal ?? tuitionUsd}
               </span>
             )}
             {verifiedValue(u.minIelts, 1) && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-800 ring-1 ring-inset ring-slate-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-inset ring-slate-200">
                 <Languages className="h-3 w-3" aria-hidden />
                 IELTS {verifiedValue(u.minIelts, 1)}+
               </span>
@@ -320,7 +320,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           </div>
 
           {!verified && (
-            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+            <p className="mt-3 rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-900">
               {t.unverifiedNote}
             </p>
           )}
@@ -346,19 +346,19 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                     {highlights.slice(0, 8).map((highlight) => (
                       <li
                         key={highlight}
-                        className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700"
+                        className="rounded-control bg-slate-100 px-2 py-1 text-sm font-medium text-slate-700"
                       >
                         {highlight}
                       </li>
                     ))}
                     {highlights.length > 8 && (
-                      <li className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600">
+                      <li className="rounded-control bg-slate-100 px-2 py-1 text-sm font-bold text-slate-600">
                         +{highlights.length - 8}
                       </li>
                     )}
                   </ul>
                   {highlightsInSource && (
-                    <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset">
+                    <p className="mt-1.5 inline-flex items-center gap-1 rounded-control bg-slate-100 px-1.5 py-0.5 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 ring-inset">
                       <Languages className="h-3 w-3 shrink-0" aria-hidden />
                       <span>{t.sourceLanguageLabel}</span>
                     </p>
@@ -374,7 +374,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                 ))}
               </dl>
               {tuitionLocal && tuitionUsd && (
-                <p className="mt-3 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+                <p className="mt-3 border-t border-slate-100 pt-3 text-sm text-slate-500">
                   {formatMessage(t.usdComparison, { amount: tuitionUsd })}
                 </p>
               )}
@@ -392,7 +392,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
               {fields.length > 0 ? (
                 <ul className="flex flex-wrap gap-1.5">
                   {fields.map((field) => (
-                    <li key={field} className="rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-bold text-indigo-800">
+                    <li key={field} className="rounded-control border border-indigo-200 bg-indigo-50 px-2 py-1 text-sm font-bold text-indigo-800">
                       {field}
                     </li>
                   ))}
@@ -405,8 +405,8 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
 
           {/* ------------------------------------------------------ aside */}
           <aside className="space-y-4">
-            <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t.officialPages}</p>
+            <section className="rounded-overlay border border-slate-200 bg-white p-4">
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t.officialPages}</p>
               <div className="mt-2 space-y-2">
                 {officialLinks.length > 0 ? (
                   officialLinks.map((link) => (
@@ -415,21 +415,21 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                       href={link.href ?? undefined}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      className="inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-surface border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
                       <span className="min-w-0 break-words">{link.label}</span>
                       <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     </a>
                   ))
                 ) : (
-                  <p className="text-xs text-slate-500">{t.sourcePending}</p>
+                  <p className="text-sm text-slate-500">{t.sourcePending}</p>
                 )}
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t.source}</p>
-              <p className="mt-2 text-xs leading-relaxed text-slate-600">
+            <section className="rounded-overlay border border-slate-200 bg-white p-4">
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t.source}</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
                 {source?.sourceUrl ? (
                   <a
                     href={source.sourceUrl}
@@ -444,26 +444,26 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                   t.sourcePending
                 )}
               </p>
-              <p className="mt-1 text-[11px] text-slate-500">
+              <p className="mt-1 text-sm text-slate-500">
                 {t.lastVerified}: {lastVerified ?? catalog.notPublished}
               </p>
             </section>
 
             {similar.length > 0 && (
-              <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              <section className="rounded-overlay border border-slate-200 bg-white p-4">
+                <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
                   {formatMessage(t.similarTitle, { country })}
                 </p>
-                <ul className="mt-2 space-y-1 text-xs">
+                <ul className="mt-2 space-y-1 text-sm">
                   {similar.map((other) => (
                     <li key={other.id}>
                       <Link
                         href={`/universities/${other.id}`}
-                        className="flex min-h-11 items-center justify-between gap-2 rounded px-1 text-slate-700 hover:text-blue-700"
+                        className="flex min-h-11 items-center justify-between gap-2 rounded-control px-1 text-slate-700 hover:text-blue-700"
                       >
                         <span className="min-w-0 break-words">{other.name}</span>
                         {other.verificationStatus === "verified" && other.worldRanking != null && (
-                          <span className="shrink-0 text-[11px] font-semibold text-slate-500">
+                          <span className="shrink-0 text-xs font-semibold text-slate-500">
                             #{formatNumber(other.worldRanking)}
                           </span>
                         )}
@@ -473,7 +473,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                 </ul>
                 <Link
                   href="/universities"
-                  className="mt-2 inline-flex min-h-11 items-center text-[11px] font-semibold text-blue-700 hover:text-blue-900"
+                  className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 hover:text-blue-900"
                 >
                   {t.seeAll}
                 </Link>
@@ -484,7 +484,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
 
 
         <PublicFeaturePromo className="mt-6" />
-        <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
+        <p className="mt-6 border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-600">
           {catalog.independentGuide}
         </p>
       </main>
@@ -504,7 +504,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
+    <section id={id} className="scroll-mt-20 rounded-overlay border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
       <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 sm:text-base">
         <span className="text-slate-500">{icon}</span>
         {title}
@@ -517,9 +517,9 @@ function Section({
 function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="mt-0.5 text-slate-400">{icon}</span>
+      <span className="mt-0.5 text-slate-500">{icon}</span>
       <div className="min-w-0 flex-1">
-        <dt className="text-[10px] uppercase tracking-wide text-slate-500">{label}</dt>
+        <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
         <dd className="break-words font-semibold text-slate-800">{value}</dd>
       </div>
     </div>

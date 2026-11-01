@@ -10,6 +10,8 @@ import {
   courseTrackOf,
   type CourseTrack,
 } from "@/lib/courseTracks";
+import { Button } from "@/components/ui/Button";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 export interface CourseItem {
   id: number;
@@ -73,7 +75,7 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
 
   if (courses.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-10 text-center dark:border-slate-700 dark:bg-[#111a2e]">
+      <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-10 text-center dark:border-slate-700 dark:bg-surface">
         <BookOpen className="h-10 w-10 text-indigo-400 mx-auto mb-3" />
         <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">{t("noCourses")}</p>
       </div>
@@ -83,26 +85,26 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
   return (
     <div className="space-y-4">
       {/* Track filter + instant search */}
-      <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-[#111a2e]">
+      <div className="space-y-3 rounded-overlay border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-surface">
         <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("searchCourses")}
             aria-label={t("searchCourses")}
-            className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-9 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:text-sm"
+            className="min-h-11 w-full rounded-surface border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:text-sm"
           />
           {query && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setQuery("")}
               aria-label={t("clearSearch")}
-              className="absolute right-2 top-2.5 rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="absolute right-2 top-2.5 rounded-control p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -110,29 +112,29 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
           {COURSE_TRACKS.map((key) => {
             const active = track === key;
             return (
-              <button
+              <Button variant="unstyled"
                 key={key}
                 type="button"
                 onClick={() => setTrack(key)}
                 aria-pressed={active}
-                className={`min-h-9 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors ${
+                className={`min-h-9 rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
                   active
                     ? "border-indigo-500 bg-indigo-600 text-white"
                     : "border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 }`}
               >
                 {t(COURSE_TRACK_LABEL_KEYS[key])}
-                <span className={`ml-1.5 ${active ? "text-indigo-100" : "text-slate-400"}`}>
+                <span className={`ml-1.5 ${active ? "text-indigo-100" : "text-slate-500"}`}>
                   {trackCounts.get(key) ?? 0}
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>
       </div>
 
       {visible.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+        <div className="rounded-overlay border border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
           {t("noTrackMatches")}
         </div>
       ) : (
@@ -146,9 +148,9 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
             return (
               <div
                 key={course.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden hover:shadow-lg hover:border-indigo-300 transition-all flex flex-col dark:border-slate-700 dark:bg-[#111a2e]"
+                className="bg-white rounded-overlay border border-slate-200 shadow-xs overflow-hidden hover:shadow-lg hover:border-indigo-300 transition-all flex flex-col dark:border-slate-700 dark:bg-surface"
               >
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => onOpen(course.id)}
                   className="relative block h-40 w-full bg-gradient-to-br from-indigo-500 via-blue-600 to-violet-600 text-left"
@@ -162,11 +164,11 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
                       <BookOpen className="h-12 w-12 text-white/60" />
                     </div>
                   )}
-                  <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-black/50 backdrop-blur text-white text-[10px] font-bold">
+                  <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-black/50 backdrop-blur text-white text-xs font-bold">
                     {course.level}
                   </div>
                   {(course.hasVideo ?? true) && (
-                    <div className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-rose-600/90 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">
+                    <div className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-rose-600/90 px-2 py-1 text-xs font-bold text-white backdrop-blur">
                       <Video className="h-3 w-3" /> {t("videoGuideBadge")}
                     </div>
                   )}
@@ -175,13 +177,13 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
                       <span className="text-white font-extrabold text-lg">✓ {t("certificate")}</span>
                     </div>
                   )}
-                </button>
+                </Button>
 
                 <div className="p-4 flex flex-col flex-1">
                   <h3 className="font-bold text-slate-900 text-sm leading-snug dark:text-slate-100">{course.title}</h3>
-                  <p className="mt-1 break-words text-[11px] text-slate-400">{course.description}</p>
+                  <p className="mt-1 break-words text-sm text-slate-500">{course.description}</p>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                     <span className="inline-flex items-center gap-1">
                       <Layers className="h-3.5 w-3.5" /> {course.moduleCount ?? 0} {t("modules")}
                     </span>
@@ -200,21 +202,21 @@ export function CourseCatalog({ courses, onOpen }: CourseCatalogProps) {
 
                   <div className="mt-3">
                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden dark:bg-slate-800">
-                      <div className="h-full bg-indigo-600 rounded-full transition-all" style={{ width: `${course.progressPct}%` }} />
+                      <ProgressFill value={course.progressPct} className="h-full bg-indigo-600 rounded-full transition-all" />
                     </div>
                   </div>
 
                   <div className="mt-auto pt-3">
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       onClick={() => onOpen(course.id)}
-                      className={`w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                        inProgress ? "bg-amber-500 text-white sb-ink-on-warm hover:bg-amber-600" : done ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-indigo-600 text-white hover:bg-indigo-700"
+                      className={`w-full py-2 rounded-surface text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                        inProgress ? "bg-amber-500 text-white sb-ink-on-warm hover:bg-amber-600" : done ? "bg-emerald-700 text-white hover:bg-emerald-800" : "bg-indigo-600 text-white hover:bg-indigo-700"
                       }`}
                     >
                       <PlayCircle className="h-4 w-4" />
                       {done ? t("viewCertificate") : inProgress ? t("continueCourse") : t("startCourse")}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 interface LevelProgressBarProps {
   levelName: string;
@@ -25,12 +26,12 @@ export function LevelProgressBar({
   const remaining = Math.max(0, pointsForLevel - pointsIntoLevel);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5">
+    <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-5">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-2xl">{levelIcon}</span>
           <div>
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">{t("currentLevel")}</p>
+            <p className="text-sm text-slate-500 font-semibold uppercase tracking-wide">{t("currentLevel")}</p>
             <p className="text-sm font-extrabold text-slate-900">{levelName}</p>
           </div>
         </div>
@@ -38,18 +39,15 @@ export function LevelProgressBar({
       </div>
 
       <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full transition-all"
-          style={{ width: `${pct}%` }}
-        />
+        <ProgressFill value={pct} className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full transition-all" />
       </div>
 
       {nextLevelName && pointsForLevel > 0 ? (
-        <p className="text-[11px] text-slate-500 mt-2">
+        <p className="text-sm text-slate-500 mt-2">
           {remaining.toLocaleString()} {t("pointsToNextLevel")} · {nextLevelName}
         </p>
       ) : (
-        <p className="text-[11px] text-slate-500 mt-2">★ Max level</p>
+        <p className="text-sm text-slate-500 mt-2">★ Max level</p>
       )}
     </div>
   );

@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { UI_COLORS } from "@/components/ui/tokens";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 /**
  * Tiny dependency-free chart primitives for the admin Analytics dashboard.
@@ -54,8 +56,8 @@ function Grid({ max }: { max: number }) {
         const y = PAD.top + PLOT_H - f * PLOT_H;
         return (
           <g key={f}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke="#e2e8f0" strokeWidth={1} strokeDasharray={f === 0 ? "0" : "3 4"} />
-            <text x={PAD.left + 2} y={y - 4} fontSize={10} fill="#94a3b8" fontWeight={600}>
+            <line x1={PAD.left} x2={W - PAD.right} y1={y} y2={y} stroke={UI_COLORS.border} strokeWidth={1} strokeDasharray={f === 0 ? "0" : "3 4"} />
+            <text x={PAD.left + 2} y={y - 4} fontSize={12} fill={UI_COLORS.muted} fontWeight={600}>
               {compactNumber(max * f)}
             </text>
           </g>
@@ -71,7 +73,7 @@ function XLabels({ points }: { points: ChartPoint[] }) {
     <g>
       {points.map((p, i) =>
         i % step === 0 || i === points.length - 1 ? (
-          <text key={`${p.label}-${i}`} x={xAt(i, points.length)} y={H - 8} fontSize={10} fill="#94a3b8" fontWeight={600} textAnchor="middle">
+          <text key={`${p.label}-${i}`} x={xAt(i, points.length)} y={H - 8} fontSize={12} fill={UI_COLORS.muted} fontWeight={600} textAnchor="middle">
             {p.label}
           </text>
         ) : null
@@ -82,7 +84,7 @@ function XLabels({ points }: { points: ChartPoint[] }) {
 
 export function ChartEmpty({ label }: { label: string }) {
   return (
-    <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-400">
+    <div className="flex h-40 items-center justify-center rounded-surface border border-dashed border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500">
       {label}
     </div>
   );
@@ -94,8 +96,8 @@ export function ChartEmpty({ label }: { label: string }) {
  */
 export function BarLineChart({
   points,
-  barColor = "#6366f1",
-  lineColor = "#10b981",
+  barColor = UI_COLORS.primary,
+  lineColor = UI_COLORS.success,
   barName = "Views",
   lineName = "Visitors",
   emptyLabel = "No data yet",
@@ -149,7 +151,7 @@ export function BarLineChart({
 /** Smooth-ish area chart for a single series (e.g. signups per day). */
 export function AreaChart({
   points,
-  color = "#f59e0b",
+  color = UI_COLORS.warning,
   name = "Signups",
   emptyLabel = "No data yet",
 }: {
@@ -201,7 +203,7 @@ export function HBarList({
 }) {
   if (!items.length) {
     return (
-      <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-[11px] font-semibold text-slate-400">
+      <p className="rounded-surface border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm font-semibold text-slate-500">
         {emptyLabel}
       </p>
     );
@@ -212,16 +214,16 @@ export function HBarList({
       {items.map((item) => (
         <li key={item.label}>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="truncate text-[11px] font-bold text-slate-700" title={item.label}>
+            <span className="truncate text-xs font-bold text-slate-700" title={item.label}>
               {item.label}
             </span>
-            <span className="shrink-0 text-[11px] font-extrabold text-slate-900">
+            <span className="shrink-0 text-xs font-extrabold text-slate-900">
               {formatNumber(item.value)}
-              <span className="ml-1 font-semibold text-slate-400">{item.hint ?? valueLabel}</span>
+              <span className="ml-1 font-semibold text-slate-500">{item.hint ?? valueLabel}</span>
             </span>
           </div>
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-            <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.max(3, (item.value / max) * 100)}%` }} />
+            <ProgressFill value={Math.max(3, (item.value / max) * 100)} className={`h-full rounded-full ${color}`} />
           </div>
         </li>
       ))}
@@ -251,15 +253,15 @@ export function MiniStat({
     violet: "text-violet-600",
   };
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+    <div className="rounded-surface border border-slate-200 bg-slate-50/60 px-3 py-2.5">
       <p className={`text-lg font-extrabold leading-none ${tones[tone]}`}>{value}</p>
-      <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      {hint ? <p className="mt-0.5 text-[10px] text-slate-400">{hint}</p> : null}
+      <p className="mt-1.5 text-sm font-bold uppercase tracking-wide text-slate-500">{label}</p>
+      {hint ? <p className="mt-0.5 text-sm text-slate-500">{hint}</p> : null}
     </div>
   );
 }
 
-/** White rounded panel with a title row (matches the rest of the admin UI). */
+/** White rounded-control panel with a title row (matches the rest of the admin UI). */
 export function Panel({
   title,
   subtitle,
@@ -274,11 +276,11 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-xs ${className}`}>
+    <section className={`rounded-overlay border border-slate-200 bg-white p-4 shadow-xs ${className}`}>
       <header className="mb-3 flex items-start gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-extrabold text-slate-800">{title}</h3>
-          {subtitle ? <p className="mt-0.5 text-[11px] text-slate-500">{subtitle}</p> : null}
+          {subtitle ? <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p> : null}
         </div>
         {action ? <div className="ml-auto shrink-0">{action}</div> : null}
       </header>
@@ -290,12 +292,12 @@ export function Panel({
 /** Green/red pill showing the change vs. the previous period. */
 export function DeltaBadge({ value, suffix = "%" }: { value: number | null | undefined; suffix?: string }) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
-    return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400">—</span>;
+    return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">—</span>;
   }
   const up = value >= 0;
   return (
     <span
-      className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+      className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-extrabold ${
         up ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
       }`}
       title="Oldingi davrga nisbatan o'zgarish"

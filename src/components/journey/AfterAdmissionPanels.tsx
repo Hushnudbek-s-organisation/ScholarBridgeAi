@@ -18,7 +18,6 @@ import { useTranslations } from "next-intl";
 import { Check, Copy, Mail, Plus, Printer, ShieldCheck, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
 import {
-  Button,
   Empty,
   ErrorNote,
   InlineAlert,
@@ -29,7 +28,7 @@ import {
   ProgressBar,
   SourceTag,
   inputClass,
-} from "./ui";
+} from "@/components/ui/journey";
 import { AppNote } from "@/components/AppNote";
 import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { formatMoney, formatNumber } from "@/lib/format";
@@ -38,6 +37,7 @@ import {
   CURRENCY_RATES_TO_USD,
   formatCurrencyAmount,
 } from "@/lib/countryCostBenchmarks";
+import { Button } from "@/components/ui/Button";
 
 // ===========================================================================
 // OFFERS & DECISIONS (spec §23) + POST-ADMISSION FUNDING (spec §24)
@@ -153,18 +153,18 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
       >
         {error && <ErrorNote message={error} />}
         <InlineAlert message={actionError} onDismiss={() => setActionError("")} className="mb-3" />
-        <p className="text-xs text-slate-500 dark:text-slate-400">{t("opCreatedNote")}</p>
-        <details className="mt-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t("opCreatedNote")}</p>
+        <details className="mt-3 rounded-surface border border-slate-200 p-3 dark:border-slate-700">
           <summary className="cursor-pointer text-sm font-bold text-indigo-700 dark:text-indigo-300">{t("opRecordOffer")}</summary>
           <form onSubmit={createOffer} className="mt-3 grid gap-2 sm:grid-cols-2">
-            <label className="text-xs font-semibold">{t("opApplication")}<select required className={`${inputClass} mt-1`} value={offerForm.applicationId} onChange={(e) => setOfferForm({ ...offerForm, applicationId: e.target.value })}><option value="">{t("opChooseApplication")}</option>{applications.map((a) => <option key={a.id} value={a.id}>{a.universityName}{a.programName ? ` · ${a.programName}` : ""}</option>)}</select></label>
-            <label className="text-xs font-semibold">{t("opStatus")}<select className={`${inputClass} mt-1`} value={offerForm.status} onChange={(e) => setOfferForm({ ...offerForm, status: e.target.value })}>{OFFER_STATUSES.map((s) => <option key={s} value={s}>{t(`opStatus_${s}` as never)}</option>)}</select></label>
-            <label className="text-xs font-semibold">{t("opDecidedOn")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.decidedAt} onChange={(e) => setOfferForm({ ...offerForm, decidedAt: e.target.value })} /></label>
-            <label className="text-xs font-semibold">{t("opRespondBy")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.responseDeadline} onChange={(e) => setOfferForm({ ...offerForm, responseDeadline: e.target.value })} /></label>
-            <label className="text-xs font-semibold">{t("opDepositAmount")}<input type="number" min="0" step="1" className={`${inputClass} mt-1`} value={offerForm.depositAmount} onChange={(e) => setOfferForm({ ...offerForm, depositAmount: e.target.value })} /></label>
-            <label className="text-xs font-semibold">{t("opDepositDue")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.depositDueDate} onChange={(e) => setOfferForm({ ...offerForm, depositDueDate: e.target.value })} /></label>
-            <label className="text-xs font-semibold sm:col-span-2">{t("opTuitionCommitment")}<input type="number" min="0" step="1" className={`${inputClass} mt-1`} value={offerForm.tuitionCommitment} onChange={(e) => setOfferForm({ ...offerForm, tuitionCommitment: e.target.value })} /></label>
-            <button type="submit" disabled={busy || !applications.length} className="min-h-11 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2">{t("opSaveOffer")}</button>
+            <label className="text-sm font-semibold">{t("opApplication")}<select required className={`${inputClass} mt-1`} value={offerForm.applicationId} onChange={(e) => setOfferForm({ ...offerForm, applicationId: e.target.value })}><option value="">{t("opChooseApplication")}</option>{applications.map((a) => <option key={a.id} value={a.id}>{a.universityName}{a.programName ? ` · ${a.programName}` : ""}</option>)}</select></label>
+            <label className="text-sm font-semibold">{t("opStatus")}<select className={`${inputClass} mt-1`} value={offerForm.status} onChange={(e) => setOfferForm({ ...offerForm, status: e.target.value })}>{OFFER_STATUSES.map((s) => <option key={s} value={s}>{t(`opStatus_${s}` as never)}</option>)}</select></label>
+            <label className="text-sm font-semibold">{t("opDecidedOn")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.decidedAt} onChange={(e) => setOfferForm({ ...offerForm, decidedAt: e.target.value })} /></label>
+            <label className="text-sm font-semibold">{t("opRespondBy")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.responseDeadline} onChange={(e) => setOfferForm({ ...offerForm, responseDeadline: e.target.value })} /></label>
+            <label className="text-sm font-semibold">{t("opDepositAmount")}<input type="number" min="0" step="1" className={`${inputClass} mt-1`} value={offerForm.depositAmount} onChange={(e) => setOfferForm({ ...offerForm, depositAmount: e.target.value })} /></label>
+            <label className="text-sm font-semibold">{t("opDepositDue")}<input type="date" className={`${inputClass} mt-1`} value={offerForm.depositDueDate} onChange={(e) => setOfferForm({ ...offerForm, depositDueDate: e.target.value })} /></label>
+            <label className="text-sm font-semibold sm:col-span-2">{t("opTuitionCommitment")}<input type="number" min="0" step="1" className={`${inputClass} mt-1`} value={offerForm.tuitionCommitment} onChange={(e) => setOfferForm({ ...offerForm, tuitionCommitment: e.target.value })} /></label>
+            <Button variant="unstyled" type="submit" disabled={busy || !applications.length} className="min-h-11 rounded-surface bg-indigo-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2">{t("opSaveOffer")}</Button>
           </form>
         </details>
       </JourneyCard>
@@ -253,7 +253,7 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
               </div>
 
               {/* SPEC §24: explicit, itemised funding — never "full funding". */}
-              <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+              <div className="rounded-surface bg-slate-50 p-3 dark:bg-slate-800/60">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("opFundingTitle")}</h3>
                 <dl className="mt-2 space-y-1 text-sm">
                   <Line label={t("lineTuition")} value={o.funding.tuition} />
@@ -262,8 +262,8 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                   <Line label={t("opOtherConfirmed")} value={o.funding.otherConfirmed} tone="good" />
                   <Line label={t("lineDepositNow")} value={o.funding.payableNow.amount} tone="warn" />
                 </dl>
-                {o.funding.payableNow.dueDate && <p className="mt-1 text-xs text-slate-500">{t("opDuePayee", { date: o.funding.payableNow.dueDate, payee: o.funding.payableNow.payee })}</p>}
-                <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-slate-500 dark:text-slate-400">
+                {o.funding.payableNow.dueDate && <p className="mt-1 text-sm text-slate-500">{t("opDuePayee", { date: o.funding.payableNow.dueDate, payee: o.funding.payableNow.payee })}</p>}
+                <ul className="mt-2 list-disc space-y-0.5 pl-4 text-sm text-slate-500 dark:text-slate-400">
                   {o.funding.explanation.map((line) => (
                     <li key={line}>{line}</li>
                   ))}
@@ -274,7 +274,7 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
                     <Button size="sm" variant="outline" onClick={() => onNavigateTab("visa")}>{t("opStartVisa")}</Button>
                   </div>
                 ) : (
-                  <p className="mt-3 text-[11px] text-slate-400">{t("opFundingLocked")}</p>
+                  <p className="mt-3 text-sm text-slate-500">{t("opFundingLocked")}</p>
                 )}
               </div>
             </div>
@@ -341,8 +341,8 @@ export function PostAdmissionOfferMatrix({
           />
         ) : (
           <>
-            <p className="mb-3 text-xs leading-relaxed text-slate-600 dark:text-slate-300">{t("pamMethodNote")}</p>
-            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <p className="mb-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{t("pamMethodNote")}</p>
+            <div className="overflow-x-auto rounded-surface border border-slate-200 dark:border-slate-700">
               <table className="min-w-[920px] w-full border-collapse text-left text-xs">
                 <caption className="sr-only">{t("pamCaption")}</caption>
                 <thead className="bg-slate-50 dark:bg-slate-800">
@@ -515,7 +515,7 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
         <InlineAlert message={actionError} onDismiss={() => setActionError("")} className="mb-3" />
 
         {adding && (
-          <div className="mb-4 grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-5 dark:border-slate-700">
+          <div className="mb-4 grid gap-2 rounded-surface border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-5 dark:border-slate-700">
             <Field label={t("secApplication")}>
               <select className={inputClass} value={form.applicationId} onChange={(e) => setForm({ ...form, applicationId: e.target.value })}>
                 <option value="">{t("rmChoose")}</option>
@@ -544,7 +544,7 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
           </div>
         )}
 
-        <p className="flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+        <p className="flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           SPEC §19 — recommendation content stays private. Nobody, including a parent, can read these rows without your explicit
           permission, and you can withdraw it at any time.
@@ -552,14 +552,14 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
       </JourneyCard>
 
       {/* Copyable request e-mail first, then complete letters to show a recommender. */}
-      <details className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 sm:px-5">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 dark:ring-indigo-500/25">
+      <details className="rounded-overlay border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 sm:px-5">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control text-sm font-bold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 dark:ring-indigo-500/25">
             <Mail aria-hidden className="h-4 w-4" />
           </span>
           <span className="min-w-0 break-words">{ts("lorDrawerTitle")}</span>
         </summary>
-        <p className="mt-2 text-xs leading-relaxed text-slate-600">{ts("lorDrawerHint")}</p>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">{ts("lorDrawerHint")}</p>
         <SampleExemplarBar
           group="lor"
           className="mt-3"
@@ -573,11 +573,11 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
       ) : (
         <div className="grid gap-2 lg:grid-cols-2">
           {data.requests.map((r) => (
-            <div key={r.id} className="sb-card-hover rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+            <div key={r.id} className="sb-card-hover rounded-surface border border-slate-200 p-3 dark:border-slate-700">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{r.recommenderName}</p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-sm text-slate-500">
                     {r.application?.universityName ?? t("secApplication")}
                     {r.relationship && ` · ${r.relationship}`}
                   </p>
@@ -613,7 +613,7 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
                   >
                     <Mail className="h-3.5 w-3.5" />{t("rmEmailDraft")}</a>
                 )}
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => {
                     void navigator.clipboard?.writeText(r.instructions ?? data.instructionsTemplate);
@@ -623,14 +623,14 @@ export function RecommendationManagerPanel({ profileId, applicationId, universit
                   className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:underline"
                 >
                   <Copy className="h-3.5 w-3.5" /> {copied === r.id ? t("rmCopied") : t("rmCopyMessage")}
-                </button>
+                </Button>
                 <Button size="sm" variant="ghost" onClick={() => void patch({ id: r.id, status: "submitted" })}>
                   <Check className="h-3 w-3" />{t("rmMarkSubmitted")}</Button>
               </div>
 
               <Field label={t("rmWhatToAsk")} hint={t("rmWhatToAskHint")}>
                 <textarea
-                  className={`${inputClass} mt-1 h-20 text-xs`}
+                  className={`${inputClass} mt-1 h-20 text-sm`}
                   defaultValue={r.instructions ?? ""}
                   placeholder={data.instructionsTemplate}
                   onBlur={(e) => void patch({ id: r.id, instructions: e.target.value })}
@@ -803,7 +803,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
               <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">
                 {data.annualCost == null ? t("fpAmountUnknown") : formatCurrencyAmount(data.annualCost, displayCurrency)}
               </p>
-              <p className="text-[10px] font-bold uppercase text-slate-500">
+              <p className="text-sm font-bold uppercase text-slate-500">
                 {displayCurrency !== "USD" && data.annualCost != null
                   ? `$${data.annualCost.toLocaleString()} · ${t("fpPerYear")}`
                   : t("fpPerYear")}
@@ -826,7 +826,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
 
         <div className="mb-3 grid gap-2 sm:grid-cols-2">
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+            <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
               {t("fpBenchmarkCountry")}
             </label>
             <select
@@ -843,7 +843,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+            <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
               {t("fpDisplayCurrency")}
             </label>
             <select
@@ -862,32 +862,32 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
         </div>
 
         {data.university && (
-          <p className="mb-3 text-[11px] text-slate-500">
+          <p className="mb-3 text-sm text-slate-500">
             {t("fpPublishedCosts", { university: data.university.name, city: data.university.city, country: data.university.country })} ·{" "}
             <SourceTag url={data.university.sourceUrl} name={t("fpUnivSource")} lastVerified={data.university.lastVerifiedAt} />
           </p>
         )}
         {data.benchmarkSource && (
-          <p className="mb-3 text-[11px] text-slate-500">
+          <p className="mb-3 text-sm text-slate-500">
             {t("fpOfficialBenchmark", { country: data.benchmarkSource.country })}{" "}
             <SourceTag url={data.benchmarkSource.url} name={data.benchmarkSource.name} lastVerified="2026-10-01" />{" "}
             — {data.benchmarkSource.notes}
           </p>
         )}
         {data.estimatedLines.length > 0 && (
-          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+          <p className="mb-3 rounded-control bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
             {t("fpBenchmarkDisclaimer", { lines: data.estimatedLines.join(", ") })}
           </p>
         )}
         {data.unknownLines.length > 0 && (
-          <p className="mb-3 rounded-lg bg-slate-100 px-3 py-2 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          <p className="mb-3 rounded-control bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
             {t("fpUnknownCostsMessage", { lines: data.unknownLines.join(", ") })}
           </p>
         )}
 
         <div className="mb-3">
           {pct == null ? (
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{t("fpGapUnavailable")}</p>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{t("fpGapUnavailable")}</p>
           ) : (
             <ProgressBar
               pct={pct}
@@ -921,7 +921,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-700 dark:text-slate-200">
                   {l.label}
-                  {data.estimatedLines.includes(l.label) && <span className="ml-1 font-normal text-slate-400">{t("fpEstimated")}</span>}
+                  {data.estimatedLines.includes(l.label) && <span className="ml-1 font-normal text-slate-500">{t("fpEstimated")}</span>}
                 </span>
                 <span className="tabular-nums text-slate-500">
                   {l.covered == null ? t("fpAmountUnknown") : `$${l.covered.toLocaleString()}`}
@@ -932,7 +932,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
               </div>
               <div className="mt-1">
                 {l.cost == null || l.covered == null ? (
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("fpGapUnavailable")}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{t("fpGapUnavailable")}</p>
                 ) : (
                   <ProgressBar
                     pct={l.cost > 0 ? (l.covered / l.cost) * 100 : 0}
@@ -995,10 +995,10 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
         <JourneyCard title={t("fpItemsTitle")}>
           <ul className="space-y-2">
             {data.items.map((i) => (
-              <li key={i.id} className="sb-card-hover flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              <li key={i.id} className="sb-card-hover flex flex-wrap items-center gap-2 rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{i.name}</p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-sm text-slate-500">
                     {i.kindLabel} · ${i.amountUsd.toLocaleString()} · {t(`fpStatus_${i.status}` as never)}
                   </p>
                 </div>
@@ -1032,7 +1032,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
                 <>
                   <ul className="mt-2 space-y-1">
                     {data.gapActions.scholarships.map((s) => (
-                      <li key={s.id} className="flex flex-wrap items-center gap-2 text-xs">
+                      <li key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
                         <input
                           type="checkbox"
                           className="h-3.5 w-3.5 accent-indigo-600"
@@ -1045,15 +1045,15 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
                         {s.coversGap && <Pill tone="good">{t("fpGapCloses")}</Pill>}
                         <Pill tone="slate">{t("fpTuitionCoverage", { coverage: s.tuitionCoverage })}</Pill>
                         {s.deadlineDate && (
-                          <span className="text-slate-400">{t("fpCloses", { date: s.deadlineDate })}</span>
+                          <span className="text-slate-500">{t("fpCloses", { date: s.deadlineDate })}</span>
                         )}
                         {data.items.some((item) => item.kind === "scholarship" && item.name === s.title) ? <Pill tone="good">{t("fpAlreadyAdded")}</Pill> : <Button size="sm" variant="outline" disabled={busy} onClick={() => void addGapScholarship(s)}>{t("fpAddToPlan")}</Button>}
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-[11px] text-slate-500">{t("fpGapCheckHint")}</p>
+                  <p className="mt-2 text-sm text-slate-500">{t("fpGapCheckHint")}</p>
                   {chosen.length > 0 && (
-                    <p className="mt-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
                       {remaining === 0
                         ? t("fpGapClosed")
                         : t("fpGapRemaining", { amount: `$${remaining.toLocaleString()}` })}
@@ -1061,7 +1061,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
                   )}
                 </>
               ) : (
-                <p className="mt-1 text-xs text-slate-500">{t("fpNoScholarshipCloses")}</p>
+                <p className="mt-1 text-sm text-slate-500">{t("fpNoScholarshipCloses")}</p>
               )}
               <Button size="sm" className="mt-3" onClick={() => onNavigateTab(data.gapActions.tab)}>
                 {data.gapActions.cta}
@@ -1085,10 +1085,10 @@ function Metric({ label, value, hint, tone }: { label: string; value: number | s
   } as const;
   const formattedValue = typeof value === "number" ? `$${value.toLocaleString()}` : value;
   return (
-    <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
+      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`text-lg font-extrabold tabular-nums ${tones[tone]}`}>{formattedValue}</p>
-      {hint && <p className="text-[10px] text-slate-400">{hint}</p>}
+      {hint && <p className="text-sm text-slate-500">{hint}</p>}
     </div>
   );
 }
@@ -1135,13 +1135,13 @@ export function LearningProvidersPanel({ profileId }: { profileId: number }) {
           <Loading label={t("lpLoading")} />
         ) : (
           <>
-            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+            <p className="rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
               {data.notice}
             </p>
             {data.providers.length > 0 ? (
               <ul className="mt-3 space-y-2">
                 {data.providers.map((p) => (
-                  <li key={p.providerKey} className="sb-card-hover rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <li key={p.providerKey} className="sb-card-hover rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{p.name}</p>
                       <div className="flex items-center gap-1.5">
@@ -1150,7 +1150,7 @@ export function LearningProvidersPanel({ profileId }: { profileId: number }) {
                       </div>
                     </div>
                     {p.meta?.description && (
-                      <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{p.meta.description}</p>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{p.meta.description}</p>
                     )}
                     {p.meta?.url && (
                       <div className="mt-1.5">
@@ -1158,7 +1158,7 @@ export function LearningProvidersPanel({ profileId }: { profileId: number }) {
                       </div>
                     )}
                     {p.metrics.length > 0 && (
-                      <ul className="mt-1 space-y-0.5 text-xs text-slate-500">
+                      <ul className="mt-1 space-y-0.5 text-sm text-slate-500">
                         {p.metrics.map((m) => (
                           <li key={`${p.providerKey}-${m.metric}-${m.measuredAt ?? ""}`}>
                             {m.metric}: {m.value ?? t("uiNotSpecified")} {m.measuredAt ? `· ${m.measuredAt}` : ""} · source: {m.sourceName}

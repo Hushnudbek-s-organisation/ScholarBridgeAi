@@ -13,7 +13,7 @@ export default function PrivacyPage() {
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center overflow-hidden shadow-sm border border-slate-200">
+            <div className="h-8 w-8 rounded-control bg-white flex items-center justify-center overflow-hidden shadow-sm border border-slate-200">
               <BrandingImage alt="ScholarBridgeAI Logo" className="h-8 w-8 object-cover" />
             </div>
             <span className="font-extrabold text-slate-900 tracking-tight">ScholarBridgeAI</span>
@@ -25,9 +25,9 @@ export default function PrivacyPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10">
+        <div className="bg-white rounded-overlay border border-slate-200 shadow-sm p-6 sm:p-10">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Privacy Policy</h1>
-          <p className="mt-2 text-xs text-slate-500">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • ScholarBridgeAI respects your privacy</p>
+          <p className="mt-2 text-sm text-slate-500">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • ScholarBridgeAI respects your privacy</p>
 
           <div className="mt-8 space-y-8 text-sm text-slate-700 leading-relaxed">
             <section>
@@ -137,7 +137,7 @@ export default function PrivacyPage() {
             </section>
 
             <section className="pt-6 border-t border-slate-200">
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-slate-500">
                 This Privacy Policy may be updated as ScholarBridgeAI evolves from prototype to production. We will update the &quot;Last updated&quot; date and notify users via in-app notice for material changes. By using ScholarBridgeAI, you agree to this Privacy Policy and our Terms of Service.
               </p>
             </section>

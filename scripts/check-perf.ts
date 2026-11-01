@@ -87,7 +87,7 @@ check("the hub panes are code-split, not one chunk", () => {
     .map((m) => m[2])
     // Shared, tiny primitives that every hub needs are allowed to stay static:
     // a gate wrapper rendered three times, and the shell's own UI kit.
-    .filter((from) => !["@/components/PremiumGate", "@/components/journey/ui"].includes(from));
+    .filter((from) => !["@/components/PremiumGate", "@/components/ui/journey", "@/components/ui/hubs", "@/components/ui/Button"].includes(from));
   assert.deepEqual(staticImports, [], `hub panes must be lazy: ${staticImports.join(", ")}`);
   const lazy = [...hubs.matchAll(/dynamic\(\(\) => import\("@\/components\/([^"]+)"\)/g)].map((m) => m[1]);
   assert.ok(lazy.length >= 30, `only ${lazy.length} lazy panes — the split was lost`);

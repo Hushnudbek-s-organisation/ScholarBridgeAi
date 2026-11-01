@@ -12,6 +12,7 @@ import {
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { RecLetterPanel } from "./RecLetterPanel";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Universal application tracker (#12) and private outcome history.
@@ -276,7 +277,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
 
   if (!activeProfile) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+      <div className="rounded-overlay border border-slate-200 bg-white p-6 text-sm text-slate-500">
         Sign in to track your applications.
       </div>
     );
@@ -287,33 +288,33 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       {/* 2.5 — one-click "start application" from the shortlist, so the
           explorer's ⭐ and the tracker never live on different planets. */}
       {!loading && startableSaved.length > 0 && (
-        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/40 dark:bg-indigo-950/30">
-          <p className="min-w-0 break-words text-xs font-extrabold text-indigo-800 dark:text-indigo-200">
+        <div className="rounded-overlay border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/40 dark:bg-indigo-950/30">
+          <p className="min-w-0 break-words text-sm font-extrabold text-indigo-800 dark:text-indigo-200">
             {t("savedStripTitle")}
           </p>
           <ul className="mt-2 flex flex-wrap gap-2">
             {startableSaved.slice(0, 6).map((saved) => (
               <li
                 key={saved.id}
-                className="flex max-w-full flex-wrap items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-2.5 py-1.5 dark:border-indigo-500/40 dark:bg-slate-900"
+                className="flex max-w-full flex-wrap items-center gap-1.5 rounded-surface border border-indigo-200 bg-white px-2.5 py-1.5 dark:border-indigo-500/40 dark:bg-slate-900"
               >
-                <span className="min-w-0 break-words text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                <span className="min-w-0 break-words text-xs font-bold text-slate-800 dark:text-slate-100">
                   {saved.university?.name ?? ""}
                   {saved.university?.country ? (
                     <span className="font-medium text-slate-500"> · {saved.university.country}</span>
                   ) : null}
                 </span>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   disabled={startingAppId !== null}
                   onClick={() => void startFromSaved(saved)}
-                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 text-[11px] font-bold text-white transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:opacity-50"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-control bg-indigo-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:opacity-50"
                 >
                   {startingAppId === saved.universityId ? (
                     <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
                   ) : null}
                   {t("startApplicationShort")}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -332,11 +333,11 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
           { label: t("statScholarships"), value: scholarshipMatchCount },
           { label: t("statDeadlines"), value: deadlineCount },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
+          <div key={stat.label} className="rounded-overlay border border-slate-200 bg-white p-4 text-center">
             <div className="text-2xl font-extrabold text-slate-900">
               {stat.value === null || stat.value === undefined ? "—" : stat.value}
             </div>
-            <div className="break-words text-[10px] font-bold uppercase leading-tight tracking-wide text-slate-400">{stat.label}</div>
+            <div className="break-words text-xs font-bold uppercase leading-tight tracking-wide text-slate-500">{stat.label}</div>
           </div>
         ))}
       </div>
@@ -346,20 +347,20 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
           <Target className="h-5 w-5 text-indigo-600" />
           {t("title")}
         </h2>
-        <button
+        <Button variant="unstyled"
           onClick={() => setAdding((v) => !v)}
-          className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
+          className="flex items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
         >
           <Plus className="h-4 w-4" /> {t("add")}
-        </button>
+        </Button>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>
+        <div className="rounded-surface border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>
       )}
 
       {adding && (
-        <div className="grid gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 sm:grid-cols-4">
+        <div className="grid gap-3 rounded-overlay border border-indigo-200 bg-indigo-50/50 p-4 sm:grid-cols-4">
           <div>
             <label htmlFor="app-university" className={srLabel}>
               {t("formUniversity")}
@@ -368,7 +369,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
               id="app-university"
               required
               aria-required="true"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
               placeholder={t("formUniversity")}
               value={draft.universityName}
               onChange={(e) => setDraft({ ...draft, universityName: e.target.value })}
@@ -380,7 +381,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
             </label>
             <input
               id="app-program"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
               placeholder={t("formProgram")}
               value={draft.programName}
               onChange={(e) => setDraft({ ...draft, programName: e.target.value })}
@@ -392,7 +393,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
             </label>
             <input
               id="app-deadline"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
               type="date"
               value={draft.deadline}
               onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
@@ -404,7 +405,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
             </label>
             <select
               id="app-round"
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="flex-1 rounded-control border border-slate-200 px-3 py-2 text-sm"
               value={draft.applicationRound}
               onChange={(e) => setDraft({ ...draft, applicationRound: e.target.value })}
             >
@@ -414,25 +415,25 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
                 </option>
               ))}
             </select>
-            <button
+            <Button variant="unstyled"
               onClick={() => void addApplication()}
               disabled={busy}
-              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+              className="rounded-control bg-indigo-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("addSubmit")}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {loading && !rows.length && (
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+        <div className="flex items-center gap-2 rounded-surface border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
         </div>
       )}
 
       {!loading && !rows.length && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+        <div className="rounded-surface border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
           {t("empty")}
         </div>
       )}
@@ -441,23 +442,23 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
         {rows.map((row) => {
           const status = STATUSES.find((s) => s.value === row.status) ?? STATUSES[0];
           return (
-            <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div key={row.id} className="rounded-overlay border border-slate-200 bg-white p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="font-bold text-slate-900">{row.universityName}</h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm text-slate-500">
                     {[row.programName, row.applicationRound, row.intakeTerm].filter(Boolean).join(" · ") ||
                       t("noProgram")}
                     {row.deadline ? ` · ${t("deadlineOn", { date: row.deadline })}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${status.chip}`}>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.chip}`}>
                     {t(`status.${status.value}`)}
                   </span>
                   {row.outcome && (
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                      className={`rounded-full px-2.5 py-1 text-xs font-bold ${
                         RESULT_STYLE[row.outcome.result] ?? "bg-slate-100 text-slate-700"
                       }`}
                     >
@@ -469,17 +470,17 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {onOpenWorkspace && (
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => onOpenWorkspace(row.id)}
-                    className="flex min-h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
+                    className="flex min-h-9 items-center gap-1.5 rounded-control bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
                   >
                     <Target className="h-3.5 w-3.5" /> {t("openWorkspace")}
-                  </button>
+                  </Button>
                 )}
 
                 <select
                   aria-label={t("statusLabelFor", { name: row.universityName })}
-                  className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                  className="rounded-control border border-slate-200 px-2 py-1.5 text-sm"
                   value={row.status}
                   onChange={(e) => void setStatus(row.id, e.target.value)}
                 >
@@ -491,25 +492,25 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
                 </select>
 
                 {!row.outcome && (row.status === "submitted" || row.status === "decision") && (
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => {
                       setReporting(row.id);
                       setResult("accepted");
                       setConsent(false);
                     }}
-                    className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+                    className="flex items-center gap-1.5 rounded-control bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-800"
                   >
                     <Trophy className="h-3.5 w-3.5" /> {t("reportResult")}
-                  </button>
+                  </Button>
                 )}
 
-                <button
+                <Button variant="unstyled"
                   aria-label={t("deleteLabel")}
                   onClick={() => void remove(row.id)}
-                  className="ml-auto rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                  className="ml-auto rounded-control p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
                 >
                   <Trash2 className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
           );
@@ -517,20 +518,20 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       </div>
 
       {reporting && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+        <div className="rounded-overlay border border-emerald-200 bg-emerald-50/60 p-4">
           <h3 className="font-bold text-slate-900">{t("resultsQuestion")}</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {RESULTS.map((r) => (
-              <button
+              <Button variant="unstyled"
                 key={r}
                 aria-pressed={result === r}
                 onClick={() => setResult(r)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                  result === r ? "bg-emerald-600 text-white" : "bg-white text-slate-700 border border-slate-200"
+                className={`rounded-control px-3 py-1.5 text-xs font-bold ${
+                  result === r ? "bg-emerald-700 text-white" : "bg-white text-slate-700 border border-slate-200"
                 }`}
               >
                 {t(`result.${r}`)}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -539,14 +540,14 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
           </label>
           <input
             id="app-scholarship"
-            className="mt-3 w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="mt-3 w-full max-w-xs rounded-control border border-slate-200 px-3 py-2 text-sm"
             placeholder={t("formScholarship")}
             type="number"
             value={scholarship}
             onChange={(e) => setScholarship(e.target.value)}
           />
 
-          <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-2 text-xs leading-relaxed text-slate-700">
+          <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-2 text-sm leading-relaxed text-slate-700">
             <input
               type="checkbox"
               checked={consent}
@@ -557,20 +558,20 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
           </label>
 
           <div className="mt-3 flex gap-2">
-            <button
+            <Button variant="unstyled"
               onClick={() => void reportResult()}
               disabled={busy}
-              className="flex min-h-11 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              className="flex min-h-11 items-center gap-1.5 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {t("saveResult")}
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               onClick={() => setReporting(null)}
-              className="min-h-11 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+              className="min-h-11 rounded-control border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
             >
               {t("cancel")}
-            </button>
+            </Button>
           </div>
         </div>
       )}

@@ -6,10 +6,11 @@ import { Archive, Check, ChevronDown, Copy, Lightbulb, Loader2, Save } from "luc
 import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
 import { useSeedText } from "./useSeedText";
-import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Segmented, Toast, useToast } from "./ui";
+import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Segmented, Toast, useToast } from "@/components/ui/growth";
 import { SampleInlineCard } from "../samples/SampleExemplarBar";
 import { useSampleLibrary } from "../samples/useSampleLibrary";
 import { isUnmodifiedSample } from "@/lib/samples/text";
+import { Button } from "@/components/ui/Button";
 
 interface VaultItem {
   promptId: number;
@@ -126,7 +127,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
 
       {items && items.length > 0 && (
         <>
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+          <div className="rounded-overlay border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
             <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
               <span>{t("progress", { done: answered, total })}</span>
               <span className="font-black text-sky-600">{total ? Math.round((answered / total) * 100) : 0}%</span>
@@ -134,7 +135,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
             <div className="mt-2">
               <AnimatedBar value={total ? (answered / total) * 100 : 0} barClassName="bg-sky-500" />
             </div>
-            <p className="mt-2 text-[11px] text-slate-500">{t("tip")}</p>
+            <p className="mt-2 text-sm text-slate-500">{t("tip")}</p>
           </div>
 
           {categories.length > 1 && (
@@ -157,45 +158,45 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                 ?? null;
               const holdsExample = isUnmodifiedSample(draft, loadedExample[i.promptId]);
               return (
-                <li key={i.promptId} className={`overflow-hidden rounded-2xl border bg-white dark:bg-slate-900 ${isOpen ? "border-sky-300 shadow-sm" : "border-slate-200 dark:border-slate-700"}`}>
-                  <button
+                <li key={i.promptId} className={`overflow-hidden rounded-overlay border bg-white dark:bg-slate-900 ${isOpen ? "border-sky-300 shadow-sm" : "border-slate-200 dark:border-slate-700"}`}>
+                  <Button variant="unstyled"
                     onClick={() => setOpen(isOpen ? null : i.promptId)}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left"
                     aria-expanded={isOpen}
                   >
                     <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-emerald-500 text-white sb-ink-on-bright" : "border-2 border-slate-200 dark:border-slate-700"}`}
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "bg-emerald-700 text-white sb-ink-on-bright" : "border-2 border-slate-200 dark:border-slate-700"}`}
                     >
                       {done && <Check className="h-3.5 w-3.5" />}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">{tr(i.question)}</span>
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-xs text-slate-500">
                         {catLabel(i.category)}
                         {i.wordLimit ? ` · ${t("limit", { n: i.wordLimit })}` : ""}
                         {done ? ` · ${t("words", { n: words })}` : ""}
                       </span>
                     </span>
-                    <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                  </button>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </Button>
                   {isOpen && (
                     <div className="border-t border-slate-100 px-4 pb-4 pt-3">
                       {i.hint && (
-                        <p className="mb-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-800">
+                        <p className="mb-2 flex items-start gap-1.5 rounded-control bg-amber-50 px-2.5 py-2 text-sm leading-relaxed text-amber-800">
                           <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {tr(i.hint)}
                         </p>
                       )}
                       {example && (
                         <div className="mb-2">
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             aria-expanded={Boolean(exampleOpen[i.promptId])}
                             onClick={() => setExampleOpen((o) => ({ ...o, [i.promptId]: !o[i.promptId] }))}
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-sky-200 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-500/30 dark:text-sky-200"
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-sky-200 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-500/30 dark:text-sky-200"
                           >
                             <Lightbulb className="h-3.5 w-3.5" aria-hidden />
                             {exampleOpen[i.promptId] ? ts("answerHide") : ts("answerShow")}
-                          </button>
+                          </Button>
                           {exampleOpen[i.promptId] && (
                             <div className="mt-2">
                               <SampleInlineCard
@@ -218,39 +219,39 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                         rows={7}
                         maxLength={6000}
                         placeholder={t("placeholder")}
-                        className="w-full resize-y rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        className="w-full resize-y rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                       />
                       {holdsExample && (
-                        <p className="mt-2 text-[11px] leading-relaxed text-violet-800 dark:text-violet-200">{ts("unmodified")}</p>
+                        <p className="mt-2 text-sm leading-relaxed text-violet-800 dark:text-violet-200">{ts("unmodified")}</p>
                       )}
                       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                        <span className={`text-[11px] font-semibold ${over ? "text-rose-600" : "text-slate-500"}`}>
+                        <span className={`text-xs font-semibold ${over ? "text-rose-600" : "text-slate-500"}`}>
                           {i.wordLimit ? t("wordsOf", { n: words, max: i.wordLimit }) : t("words", { n: words })}
                           {over ? ` · ${t("tooLong")}` : ""}
                         </span>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-xs text-slate-500">
                             {saving === i.promptId ? (
                               <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> {t("saving")}</span>
                             ) : savedAt[i.promptId] ? (
                               t("savedAuto")
                             ) : null}
                           </span>
-                          <button
+                          <Button variant="unstyled"
                             onClick={() => void persist(i.promptId, draft)}
                             disabled={holdsExample}
                             title={holdsExample ? ts("unmodified") : undefined}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-control border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                           >
                             <Save className="h-3.5 w-3.5" /> {t("save")}
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="unstyled"
                             disabled={!draft.trim()}
                             onClick={() => void copy(draft)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-sky-700 disabled:opacity-40"
+                            className="inline-flex items-center gap-1 rounded-control bg-sky-700 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-40"
                           >
                             <Copy className="h-3.5 w-3.5" /> {t("copy")}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>

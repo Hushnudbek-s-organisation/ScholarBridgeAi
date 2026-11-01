@@ -101,7 +101,7 @@ export function DecisionPillStrip({ university, profile, compact = false, classN
             key={pill.id}
             title={hint(pill)}
             className={`inline-flex max-w-full items-center gap-1 rounded-full border font-bold leading-snug ${
-              compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
+              compact ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-xs"
             } ${DECISION_PILL_CLASS[pill.tone]}`}
           >
             <Icon className={compact ? "h-3 w-3 shrink-0" : "h-3.5 w-3.5 shrink-0"} aria-hidden />

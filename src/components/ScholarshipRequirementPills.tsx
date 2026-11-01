@@ -113,7 +113,7 @@ export function ScholarshipRequirementPills({
           <span
             key={check.id}
             title={hint(check)}
-            className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold leading-snug ${
+            className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold leading-snug ${
               DECISION_PILL_CLASS[STATE_TONE[check.state]]
             }`}
           >

@@ -45,19 +45,19 @@ export function FaqSection() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema).replace(/</g, "\\u003c") }}
       />
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900 sm:p-7">
+      <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900 sm:p-7">
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/50">
+          <div className="flex h-9 w-9 items-center justify-center rounded-surface bg-indigo-50 dark:bg-indigo-950/50">
             <HelpCircle className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
           </div>
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">{faq.title}</h2>
-            <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{faq.intro}</p>
+            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{faq.intro}</p>
           </div>
         </div>
         <div className="space-y-2.5">
           {faq.items.map((item, idx) => (
-            <details key={item.question} className="group rounded-xl border border-slate-200 bg-slate-50/50 transition-colors open:border-indigo-200 open:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:open:border-indigo-700 dark:open:bg-slate-900">
+            <details key={item.question} className="group rounded-surface border border-slate-200 bg-slate-50/50 transition-colors open:border-indigo-200 open:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:open:border-indigo-700 dark:open:bg-slate-900">
               <summary className="flex min-h-11 cursor-pointer list-none select-none items-center gap-3 px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                 <span className="w-6 shrink-0 text-xs font-extrabold text-indigo-700 dark:text-indigo-300">{String(idx + 1).padStart(2, "0")}</span>
                 <h3 className="flex-1 text-sm font-bold text-slate-900 dark:text-white">{item.question}</h3>

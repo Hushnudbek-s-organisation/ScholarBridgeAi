@@ -14,6 +14,7 @@ import type { VisaSample } from "@/lib/samples/exemplars";
 import type { VisaRubric } from "@/lib/visaScoring";
 import { VISA_RUBRIC_CEILING, VISA_SAMPLE_ID_BY_COUNTRY, visaSampleCountryFor } from "@/lib/samples/visa";
 import { SampleExemplarBar } from "./SampleExemplarBar";
+import { ProgressFill } from "@/components/ui/ProgressBar";
 
 const GROUNDS = ["purposeOfStudy", "funding", "homeTies", "nonImmigrantIntent", "specificity", "languageClarity"] as const;
 
@@ -34,22 +35,22 @@ function RubricPanel({ rubric }: { rubric: VisaRubric }) {
   const t = useSafeSampleT();
   const risks = rubric.risks.length;
   return (
-    <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+    <div className="mt-3 rounded-surface border border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("visaScoreTitle")}</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("visaScoreTitle")}</p>
           <p className="text-2xl font-extrabold text-slate-900">
             {rubric.scores.total}
-            <span className="text-sm font-bold text-slate-400">/100</span>
+            <span className="text-sm font-bold text-slate-500">/100</span>
           </p>
         </div>
         {risks === 0 ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:text-emerald-200">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:text-emerald-200">
             <CheckCircle2 aria-hidden className="h-3.5 w-3.5" />
             {t("visaNoRisks")}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-800 dark:text-rose-200">
+          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-800 dark:text-rose-200">
             <TriangleAlert aria-hidden className="h-3.5 w-3.5" />
             {t("visaRisks", { n: risks })}
           </span>
@@ -58,7 +59,7 @@ function RubricPanel({ rubric }: { rubric: VisaRubric }) {
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {GROUNDS.map((key) => (
           <div key={key}>
-            <div className="flex justify-between gap-2 text-[11px] font-semibold text-slate-600">
+            <div className="flex justify-between gap-2 text-xs font-semibold text-slate-600">
               <span className="min-w-0 break-words">{t(`visaGrounds.${key}` as never)}</span>
               <span>{rubric.scores[key]}</span>
             </div>
@@ -70,17 +71,17 @@ function RubricPanel({ rubric }: { rubric: VisaRubric }) {
               aria-valuenow={rubric.scores[key]}
               aria-label={t(`visaGrounds.${key}` as never)}
             >
-              <div className="h-full rounded-full bg-indigo-500" style={{ width: `${rubric.scores[key]}%` }} />
+              <ProgressFill value={rubric.scores[key]} className="h-full rounded-full bg-indigo-500" />
             </div>
           </div>
         ))}
       </div>
-      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{t("visaCeiling", { ceiling: VISA_RUBRIC_CEILING })}</p>
+      <p className="mt-2 text-sm leading-relaxed text-slate-500">{t("visaCeiling", { ceiling: VISA_RUBRIC_CEILING })}</p>
       <div className="mt-3">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("visaTurnEvidence")}</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("visaTurnEvidence")}</p>
         <ol className="mt-1.5 space-y-1">
           {rubric.turnFeedback.map((turn) => (
-            <li key={turn.turnNumber} className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">
+            <li key={turn.turnNumber} className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600">
               <span className="font-bold text-slate-800">{t("answerN", { n: turn.turnNumber })}:</span>
               {turn.evidence.map((item) => (
                 <span key={item} className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
@@ -150,14 +151,14 @@ export function VisaModelAnswers({
       onLoad={(sample) => void score(sample)}
       renderExtra={(sample) => (
         <>
-          <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-600">
+          <p className="mt-2 flex items-start gap-1.5 text-sm leading-relaxed text-slate-600">
             <Globe aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" />
             <span>
               {t("visaHint")} {t("visaLanguageNote")}
             </span>
           </p>
           {scoring && (
-            <p className="mt-2 flex items-center gap-2 text-xs text-slate-500" role="status">
+            <p className="mt-2 flex items-center gap-2 text-sm text-slate-500" role="status">
               <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
               {t("visaScoring")}
             </p>

@@ -21,7 +21,8 @@ import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowRight, ChevronDown, ChevronRight, ChevronUp, TriangleAlert } from "lucide-react";
-import { JourneyCard } from "@/components/journey/ui";
+import { JourneyCard } from "@/components/ui/journey";
+import { Button } from "@/components/ui/Button";
 
 export interface HubPaneDef {
   id: string;
@@ -75,7 +76,7 @@ export function HubTabs({
       {list.map((pane) => {
         const isActive = pane.id === active;
         return (
-          <button
+          <Button variant="unstyled"
             key={pane.id}
             ref={(el) => {
               refs.current[pane.id] = el;
@@ -87,7 +88,7 @@ export function HubTabs({
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(pane.id)}
             onKeyDown={(e) => onKeyDown(e, pane.id)}
-            className={`inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-colors sm:text-[13px] ${
+            className={`inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-surface px-3.5 py-2 text-xs font-bold transition-colors sm:text-sm ${
               // Active = royal indigo in BOTH themes, so the selected tab reads
               // as part of the indigo hero instead of a dead-black pill (light)
               // or a washed-out grey one (dark).
@@ -99,14 +100,14 @@ export function HubTabs({
             {pane.label}
             {pane.premium && (
               <span
-                className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                className={`rounded-full px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide ${
                   isActive ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                 }`}
               >
                 {tn("proBadge")}
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -143,15 +144,15 @@ export function ShowMoreToggle({
   if (hiddenCount <= 0 && !expanded) return null;
   return (
     <div className={`flex justify-center ${className}`}>
-      <button
+      <Button variant="unstyled"
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
       >
         {expanded ? tc("showLess") : tc("showMoreCount", { count: hiddenCount })}
         {expanded ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -226,15 +227,15 @@ export function HubPage({
     <ErrorBoundary
       key={`pane-${activePane ?? "single"}-${paneAttempt}`}
       fallback={
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center dark:border-amber-500/40 dark:bg-amber-500/10">
+        <div className="rounded-overlay border border-amber-200 bg-amber-50 p-6 text-center dark:border-amber-500/40 dark:bg-amber-500/10">
           <p className="text-sm font-bold text-amber-800 dark:text-amber-200">{t("sectionFailed")}</p>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => setPaneAttempt((n) => n + 1)}
-            className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
+            className="mt-3 inline-flex min-h-11 items-center rounded-surface bg-amber-700 px-4 py-2 text-xs font-bold text-white hover:bg-amber-800"
           >
             {t("sectionRetry")}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -252,13 +253,13 @@ export function HubPage({
   return (
     <div className="space-y-4">
       <nav aria-label={t("breadcrumbLabel")} className="print:hidden px-1">
-        <ol className="flex min-w-0 flex-wrap items-center gap-1 text-xs">
+        <ol className="flex min-w-0 flex-wrap items-center gap-1 text-sm">
           <li>
-            <Link href="/" className="rounded-md font-semibold text-slate-600 underline-offset-2 hover:text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:text-indigo-300">
+            <Link href="/" className="rounded-control font-semibold text-slate-600 underline-offset-2 hover:text-indigo-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:text-indigo-300">
               {nav("dashboard")}
             </Link>
           </li>
-          <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5 text-slate-400" /></li>
+          <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5 text-slate-500" /></li>
           <li aria-current="page" className="min-w-0 break-words font-bold text-slate-900 dark:text-white">{title}</li>
         </ol>
       </nav>
@@ -266,17 +267,17 @@ export function HubPage({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">{title}</h1>
-            <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 sm:text-sm">{intro}</p>
+            <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:text-sm">{intro}</p>
           </div>
           {primaryLabel && onPrimary && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={onPrimary}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 sm:w-auto"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-surface bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 sm:w-auto"
             >
               {primaryLabel}
               <ArrowRight className="h-4 w-4" aria-hidden />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -304,7 +305,7 @@ export function HubPage({
           stacked above the explorer — three of these on one screen). */}
       {note && (
         <div
-          className={`mt-6 flex items-start gap-1.5 rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${
+          className={`mt-6 flex items-start gap-1.5 rounded-surface border px-3 py-2 text-xs leading-relaxed ${
             note.tone === "warn"
               ? "border-amber-200/70 bg-amber-50/60 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-300"
               : "border-slate-200/70 bg-slate-50/70 text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
@@ -336,14 +337,14 @@ export function ApplicationContextBar({
   const t = useTranslations("hubs");
   const selected = applications.find((a) => a.id === selectedId) ?? null;
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("selectedApplication")}</span>
+    <div className="flex flex-wrap items-center gap-2 rounded-overlay border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900">
+      <span className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("selectedApplication")}</span>
       {applications.length > 0 ? (
         <select
           value={selectedId ?? ""}
           onChange={(e) => onSelect(e.target.value ? Number(e.target.value) : null)}
           aria-label={t("changeApplication")}
-          className="min-h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 sm:max-w-md"
+          className="min-h-10 min-w-0 flex-1 rounded-control border border-slate-200 bg-white px-2 py-1.5 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 sm:max-w-md"
         >
           <option value="">{t("noApplication")}</option>
           {applications.map((a) => (
@@ -369,9 +370,9 @@ export function ApplicationContextBar({
 /** Shared empty state for a hub pane that has nothing to show yet. */
 export function HubEmpty({ title, hint, action }: { title: string; hint?: string; action?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-8 text-center dark:border-slate-700 dark:bg-slate-900">
+    <div className="rounded-overlay border border-dashed border-slate-300 bg-white px-5 py-8 text-center dark:border-slate-700 dark:bg-slate-900">
       <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{title}</p>
-      {hint && <p className="mx-auto mt-1.5 max-w-xl text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">{hint}</p>}
+      {hint && <p className="mx-auto mt-1.5 max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">{hint}</p>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
   );
@@ -458,11 +459,11 @@ export function PanelSkeleton({
 }) {
   return (
     <div className={`space-y-3 ${className}`} aria-hidden="true">
-      <div className="h-5 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+      <div className="h-5 w-1/3 animate-pulse rounded-control bg-slate-200 dark:bg-slate-700" />
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="h-20 w-full animate-pulse rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#111a2e]"
+          className="h-20 w-full animate-pulse rounded-overlay border border-slate-200 bg-white dark:border-slate-700 dark:bg-surface"
         />
       ))}
     </div>

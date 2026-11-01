@@ -26,6 +26,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface AiSettingsManagerProps {
   adminProfileId: number;
@@ -236,7 +237,7 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
 
   if (loading && !data) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs font-semibold text-slate-400">
+      <div className="rounded-overlay border border-slate-200 bg-white p-8 text-center text-xs font-semibold text-slate-500">
         <Loader2 className="h-5 w-5 animate-spin inline mr-2" /> Loading AI settings…
       </div>
     );
@@ -248,38 +249,38 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
   const labelOf = (id: string) => providerList.find((p) => p.provider === id)?.label ?? id;
   const needsReencrypt = providerList.some((p) => p.needsReencrypt);
   const undecryptable = providerList.filter((p) => p.undecryptable);
-  const selectCls = "rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200";
+  const selectCls = "rounded-surface border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200";
   const msgLine = (k: string) =>
-    messages[k] ? <p className={`text-[11px] font-semibold ${messages[k].ok ? "text-emerald-600" : "text-red-600"}`}>{messages[k].text}</p> : null;
+    messages[k] ? <p className={`text-sm font-semibold ${messages[k].ok ? "text-emerald-600" : "text-rose-600"}`}>{messages[k].text}</p> : null;
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-slate-900 flex items-center justify-center">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-slate-900 flex items-center justify-center">
           <KeyRound className="h-5 w-5 text-amber-300" />
         </div>
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">AI Settings (Providers &amp; API Keys)</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             One AI layer for the website, the Telegram bot and the Mini App. Pick a provider, paste its key, test it.
           </p>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={() => void load()}
-          className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="ml-auto flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </button>
+        </Button>
       </div>
 
       {error && (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-700">
+        <div role="alert" className="rounded-overlay border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">
           {error}
         </div>
       )}
 
       {undecryptable.length > 0 && (
-        <div role="alert" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
+        <div role="alert" className="flex items-start gap-2 rounded-overlay border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
           <p>
             Stored keys for <b>{undecryptable.map((p) => p.label).join(", ")}</b> cannot be decrypted with the current
@@ -290,47 +291,47 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
       )}
 
       {/* --- Routing: default + explicit fallback --- */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs space-y-3">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+          <div className="h-8 w-8 rounded-control bg-indigo-50 flex items-center justify-center">
             <Zap className="h-4 w-4 text-indigo-600" />
           </div>
           <h3 className="text-sm font-extrabold text-slate-800">Routing</h3>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="space-y-1.5">
-            <label htmlFor="ai-default" className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Default provider</label>
+            <label htmlFor="ai-default" className="block text-sm font-bold uppercase tracking-wide text-slate-500">Default provider</label>
             <div className="flex gap-2">
               <select id="ai-default" value={defaultDraft} onChange={(e) => setDefaultDraft(e.target.value)} className={`${selectCls} flex-1`}>
                 <option value="auto">Auto — first provider with a key{data?.defaults.envDefaultProvider ? ` (env: ${data.defaults.envDefaultProvider})` : ""}</option>
                 {chatProviders.map((p) => <option key={p.provider} value={p.provider}>{p.label}</option>)}
               </select>
-              <button
+              <Button variant="unstyled"
                 onClick={() => void run("default", () => send("PUT", { defaultProvider: defaultDraft }), "Default saved")}
                 disabled={busy.default}
-                className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-surface bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50"
               >
                 {busy.default ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save
-              </button>
+              </Button>
             </div>
             {msgLine("default")}
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="ai-fallback" className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Fallback provider (explicit)</label>
+            <label htmlFor="ai-fallback" className="block text-sm font-bold uppercase tracking-wide text-slate-500">Fallback provider (explicit)</label>
             <div className="flex gap-2">
               <select id="ai-fallback" value={fallbackDraft} onChange={(e) => setFallbackDraft(e.target.value)} className={`${selectCls} flex-1`}>
                 <option value="none">None — never switch providers automatically</option>
                 {chatProviders.map((p) => <option key={p.provider} value={p.provider}>{p.label}</option>)}
               </select>
-              <button
+              <Button variant="unstyled"
                 onClick={() => void run("fallback", () => send("PUT", { fallbackProvider: fallbackDraft }), "Fallback saved")}
                 disabled={busy.fallback}
-                className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-surface bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50"
               >
                 {busy.fallback ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save
-              </button>
+              </Button>
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-sm text-slate-500">
               Used only when the main provider fails; it may cost differently. Answers are logged as “provider:fallback”.
               {data?.defaults.fallbackSource === "env" ? " Currently set from AI_PROVIDER_FALLBACK." : ""}
             </p>
@@ -358,40 +359,40 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
             : p.capabilities ?? [];
 
           return (
-            <div key={p.provider} className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3 ${enabled ? "" : "opacity-75"}`}>
+            <div key={p.provider} className={`rounded-overlay border border-slate-200 bg-white p-4 shadow-xs space-y-3 ${enabled ? "" : "opacity-75"}`}>
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-control bg-indigo-50 flex items-center justify-center">
                   <Bot className="h-4 w-4 text-indigo-600" />
                 </div>
                 <div className="font-extrabold text-sm text-slate-800">{p.label}</div>
-                <span className={`ml-auto rounded-full border px-2 py-0.5 text-[10px] font-bold ${status.cls}`}>{status.label}</span>
-                <button
+                <span className={`ml-auto rounded-full border px-2 py-0.5 text-xs font-bold ${status.cls}`}>{status.label}</span>
+                <Button variant="unstyled"
                   onClick={() => toggleProvider(p.provider, !enabled)}
                   disabled={busy[p.provider]}
                   aria-pressed={enabled}
                   aria-label={enabled ? `Disable ${p.label}` : `Enable ${p.label}`}
                   title={enabled ? "Disable provider" : "Enable provider"}
-                  className={`flex h-7 w-7 items-center justify-center rounded-lg border ${enabled ? "border-emerald-200 text-emerald-600 hover:bg-emerald-50" : "border-slate-200 text-slate-400 hover:bg-slate-50"}`}
+                  className={`flex h-7 w-7 items-center justify-center rounded-control border ${enabled ? "border-emerald-200 text-emerald-600 hover:bg-emerald-50" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
                 >
                   <Power className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
 
               {capabilityBadges.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {capabilityBadges.map((c) => (
-                    <span key={c} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{c}</span>
+                    <span key={c} className="rounded-control bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600">{c}</span>
                   ))}
-                  {p.protocol === "live" && <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">voice interview only</span>}
+                  {p.protocol === "live" && <span className="rounded-control bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700">voice interview only</span>}
                 </div>
               )}
               {p.provider === "openrouter" && (
-                <section className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3" aria-label="OpenRouter model candidates and endpoint capabilities">
-                  <p className="text-[11px] font-extrabold text-indigo-950">OpenRouter model candidates · one credential, separate task endpoints</p>
-                  <p className="mt-1 text-[10px] leading-relaxed text-indigo-900">A key check does not verify these models or their specialized endpoints. Full check tests only the configured chat model and structured output where supported. Free-tier availability and terms can change.</p>
+                <section className="rounded-surface border border-indigo-100 bg-indigo-50/60 p-3" aria-label="OpenRouter model candidates and endpoint capabilities">
+                  <p className="text-sm font-extrabold text-indigo-950">OpenRouter model candidates · one credential, separate task endpoints</p>
+                  <p className="mt-1 text-sm leading-relaxed text-indigo-900">A key check does not verify these models or their specialized endpoints. Full check tests only the configured chat model and structured output where supported. Free-tier availability and terms can change.</p>
                   <ul className="mt-2 space-y-2">
                     {OPENROUTER_MODEL_STACK.map((item) => (
-                      <li key={item.modelId} className="text-[10px] leading-relaxed">
+                      <li key={item.modelId} className="text-sm leading-relaxed">
                         <span className="font-bold text-slate-700">{item.task}:</span>{" "}
                         <code className="break-all text-indigo-800">{item.modelId}</code>
                         <span className="block text-slate-600">{item.endpoint} · {item.modality} · official docs confirm pairing; this account/route is not tested here.</span>
@@ -402,17 +403,17 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
                 </section>
               )}
               {p.baseUrlConfigured === false && (
-                <p className="text-[11px] font-semibold text-amber-700">Set AI_CUSTOM_BASE_URL on the server to use this provider (the base URL is deployment configuration, not editable here).</p>
+                <p className="text-sm font-semibold text-amber-700">Set AI_CUSTOM_BASE_URL on the server to use this provider (the base URL is deployment configuration, not editable here).</p>
               )}
-              {p.needsReencrypt && <p className="text-[11px] font-semibold text-amber-700">Encrypted with a previous secret — use “Re-encrypt keys” below.</p>}
+              {p.needsReencrypt && <p className="text-sm font-semibold text-amber-700">Encrypted with a previous secret — use “Re-encrypt keys” below.</p>}
 
               <div className="space-y-2">
                 <div>
-                  <label htmlFor={keyId} className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                  <label htmlFor={keyId} className="block text-sm font-bold uppercase tracking-wide text-slate-500 mb-1">
                     API key
                   </label>
                   {p.hasKey && (
-                    <div className="mb-2 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-800">
+                    <div className="mb-2 inline-flex rounded-control border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800">
                       ✓ Active key saved ({p.keyHint} · source: {p.keySource === "db" ? "Admin Panel DB" : "Server Environment"})
                     </div>
                   )}
@@ -424,11 +425,11 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
                     placeholder={p.hasKey ? `✓ Key saved (${p.keyHint}) — paste a new key here only if you want to replace it` : "Enter API key"}
                     autoComplete="off"
                     spellCheck={false}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    className="w-full rounded-surface border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   />
                 </div>
                 <div>
-                  <label htmlFor={modelId} className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Model</label>
+                  <label htmlFor={modelId} className="block text-sm font-bold uppercase tracking-wide text-slate-500 mb-1">Model</label>
                   <input
                     id={modelId}
                     type="text"
@@ -436,56 +437,56 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
                     onChange={(e) => setModelDrafts((d) => ({ ...d, [p.provider]: e.target.value }))}
                     placeholder="model id"
                     spellCheck={false}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    className="w-full rounded-surface border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   />
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
+                <Button variant="unstyled"
                   onClick={() => saveProvider(p.provider)}
                   disabled={busy[p.provider]}
-                  className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-surface bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50"
                 >
                   {busy[p.provider] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   onClick={() => void testProvider(p.provider, false)}
                   disabled={busy[`test:${p.provider}`]}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                 >
                   {busy[`test:${p.provider}`] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />} Test
-                </button>
+                </Button>
                 {p.protocol !== "live" && (
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => void testProvider(p.provider, true)}
                     disabled={busy[`test:${p.provider}`]}
                     title="Also sends a tiny chat request and, if supported, a JSON-mode request (uses a few tokens)"
-                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                   >
                     <Stethoscope className="h-3.5 w-3.5" /> Full check
-                  </button>
+                  </Button>
                 )}
                 {p.keySource === "db" && (
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => clearProviderKey(p.provider)}
                     disabled={busy[p.provider]}
-                    className="flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-surface border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Clear
-                  </button>
+                  </Button>
                 )}
               </div>
 
               {msgLine(p.provider)}
               {test && (
                 <div aria-live="polite" className="space-y-1">
-                  <p className={`text-[11px] font-semibold ${test.ok ? "text-emerald-600" : "text-red-600"}`}>{test.text}</p>
+                  <p className={`text-sm font-semibold ${test.ok ? "text-emerald-600" : "text-rose-600"}`}>{test.text}</p>
                   {test.steps && test.steps.length > 0 && (
                     <ul className="space-y-0.5">
                       {test.steps.map((s) => (
-                        <li key={s.name} className="text-[10px] text-slate-500">
-                          <span className={s.status === "ok" ? "text-emerald-600" : s.status === "failed" ? "text-red-600" : "text-slate-400"}>
+                        <li key={s.name} className="text-sm text-slate-500">
+                          <span className={s.status === "ok" ? "text-emerald-600" : s.status === "failed" ? "text-rose-600" : "text-slate-500"}>
                             {s.status === "ok" ? "✓" : s.status === "failed" ? "✗" : "–"}
                           </span>{" "}
                           <b>{s.name}</b>: {s.detail}
@@ -495,30 +496,30 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
                   )}
                 </div>
               )}
-              {p.updatedAt && <p className="text-[10px] text-slate-400">Last updated: {new Date(p.updatedAt).toLocaleString()}</p>}
+              {p.updatedAt && <p className="text-sm text-slate-500">Last updated: {new Date(p.updatedAt).toLocaleString()}</p>}
             </div>
           );
         })}
       </div>
 
       {/* --- Task → provider mapping --- */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center">
+          <div className="h-8 w-8 rounded-control bg-amber-50 flex items-center justify-center">
             <Zap className="h-4 w-4 text-amber-600" />
           </div>
           <h3 className="text-sm font-extrabold text-slate-800">Task → Provider mapping</h3>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={routeAllToOpenRouter}
             disabled={busy["route-all"] || !providerList.some((provider) => provider.provider === "openrouter")}
-            className="ml-auto rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="ml-auto rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {busy["route-all"] ? "Routing…" : "Route All Tasks to OpenRouter"}
-          </button>
+          </Button>
           {msgLine("route-all")}
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-sm text-slate-500">
           “Auto” follows the configured default. Visa follows the same routing policy; when OpenRouter is active it is preferred, with Groq available as a transient-failure fallback.
         </p>
 
@@ -527,8 +528,8 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
             <div key={t.id} className="flex flex-col sm:flex-row sm:items-center gap-2 py-2.5">
               <div className="flex-1">
                 <div className="text-xs font-bold text-slate-700">{t.label}</div>
-                <div className="text-[11px] text-slate-400">{t.description}</div>
-                <div className={`text-[11px] font-semibold ${t.ready ? "text-emerald-600" : "text-amber-700"}`}>
+                <div className="text-xs text-slate-500">{t.description}</div>
+                <div className={`text-xs font-semibold ${t.ready ? "text-emerald-600" : "text-amber-700"}`}>
                   Now: {labelOf(t.effectiveProvider)} · {SELECTION_LABEL[t.selection]}{t.ready ? "" : " · not ready (no key or disabled)"}
                 </div>
               </div>
@@ -542,13 +543,13 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
                   <option value="auto">Auto</option>
                   {chatProviders.map((p) => <option key={p.provider} value={p.provider}>{p.label}</option>)}
                 </select>
-                <button
+                <Button variant="unstyled"
                   onClick={() => void run(`task:${t.id}`, () => send("PUT", { task: t.id, providerForTask: taskDrafts[t.id] ?? t.provider }), "Mapping saved")}
                   disabled={busy[`task:${t.id}`]}
-                  className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-surface bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50"
                 >
                   {busy[`task:${t.id}`] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save
-                </button>
+                </Button>
               </div>
               {msgLine(`task:${t.id}`)}
             </div>
@@ -557,9 +558,9 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
       </div>
 
       {/* --- Security --- */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-start gap-3">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-start gap-3">
         <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-        <div className="flex-1 text-[11px] text-slate-500 leading-relaxed space-y-2">
+        <div className="flex-1 text-xs text-slate-500 leading-relaxed space-y-2">
           <p className="font-bold text-slate-600">Security</p>
           <p>
             API keys are encrypted at rest (AES-256-GCM) and never returned to the browser — only the last 4 characters
@@ -571,13 +572,13 @@ export function AiSettingsManager({ adminProfileId }: AiSettingsManagerProps) {
           </p>
           {(needsReencrypt || (data?.defaults?.encryption?.previousSecrets ?? 0) > 0) && (
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button variant="unstyled"
                 onClick={() => void run("reencrypt", () => send("POST", { action: "reencrypt" }), "Keys re-encrypted with the current secret")}
                 disabled={busy.reencrypt}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
               >
                 {busy.reencrypt ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />} Re-encrypt keys
-              </button>
+              </Button>
               {msgLine("reencrypt")}
             </div>
           )}

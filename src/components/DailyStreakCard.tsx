@@ -87,7 +87,7 @@ export function DailyStreakCard({
   const streakLapsed = !activeToday && current === 0;
   const statusPill = (
     <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
         activeToday
           ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200"
           : "bg-white text-orange-700 ring-1 ring-orange-200 dark:bg-slate-900 dark:text-orange-200 dark:ring-orange-500/40"
@@ -121,7 +121,7 @@ export function DailyStreakCard({
               {day.active ? (
                 <Check className={size === "sm" ? "h-2 w-2" : "h-3.5 w-3.5"} aria-hidden />
               ) : (
-                <span aria-hidden className={size === "sm" ? "text-[8px]" : "text-[10px]"}>
+                <span aria-hidden className={size === "sm" ? "text-xs" : "text-xs"}>
                   ·
                 </span>
               )}
@@ -132,8 +132,8 @@ export function DailyStreakCard({
             </span>
             {size === "md" && (
               <span
-                className={`mt-0.5 text-[9px] font-semibold ${
-                  isToday ? "text-orange-700 dark:text-orange-200" : "text-slate-400"
+                className={`mt-0.5 text-xs font-semibold ${
+                  isToday ? "text-orange-700 dark:text-orange-200" : "text-slate-500"
                 }`}
                 aria-hidden
               >
@@ -152,10 +152,10 @@ export function DailyStreakCard({
       <section
         aria-label={t("streakTitle")}
         title={t("streakHonestNote")}
-        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-orange-200/80 bg-gradient-to-r from-orange-50 via-amber-50 to-white px-3 py-2 dark:border-orange-500/30 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900"
+        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-overlay border border-orange-200/80 bg-gradient-to-r from-orange-50 via-amber-50 to-white px-3 py-2 dark:border-orange-500/30 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900"
       >
         <span
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-600 to-amber-700 text-white shadow-sm"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-surface bg-gradient-to-br from-orange-600 to-amber-700 text-white shadow-sm"
           aria-hidden
         >
           <Flame className="h-4 w-4" />
@@ -165,7 +165,7 @@ export function DailyStreakCard({
           <span className="text-lg font-black leading-none text-slate-900 tabular-nums dark:text-white">
             {current}
           </span>
-          <span className="break-words text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+          <span className="break-words text-xs font-semibold text-slate-600 dark:text-slate-300">
             {t("streakDays", { count: current })} · {t("streakBest", { count: longest })}
           </span>
         </div>
@@ -182,7 +182,7 @@ export function DailyStreakCard({
                 duration={0.7}
               />
             </div>
-            <span className="shrink-0 text-[10px] font-semibold text-orange-800 dark:text-orange-200 tabular-nums">
+            <span className="shrink-0 text-xs font-semibold text-orange-800 dark:text-orange-200 tabular-nums">
               {t("streakMilestoneShort", { days: daysToMilestone, milestone: nextMilestone })}
             </span>
           </div>
@@ -197,18 +197,18 @@ export function DailyStreakCard({
   return (
     <section
       aria-label={t("streakTitle")}
-      className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-4 dark:border-orange-500/30 dark:from-slate-900 dark:to-slate-900"
+      className="rounded-overlay border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-4 dark:border-orange-500/30 dark:from-slate-900 dark:to-slate-900"
     >
       <div className="flex items-center gap-3">
         <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-600 to-amber-700 text-white shadow-sm"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-surface bg-gradient-to-br from-orange-600 to-amber-700 text-white shadow-sm"
           aria-hidden
         >
           <Flame className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">{t("streakTitle")}</h2>
-          <p className="text-[11px] text-slate-600 dark:text-slate-300">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
             {t("streakDays", { count: current })} · {t("streakBest", { count: longest })}
           </p>
         </div>
@@ -221,11 +221,11 @@ export function DailyStreakCard({
             <span className="text-3xl font-black leading-none text-slate-900 tabular-nums dark:text-white">
               {current}
             </span>
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               {nextMilestone != null ? t("streakMilestoneShort", { days: daysToMilestone, milestone: nextMilestone }) : ""}
             </span>
           </div>
-          <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {streak.lastActiveDate
               ? t("streakLastCounted", { date: dateFormat.format(toDate(streak.lastActiveDate)) })
               : t("streakStart")}
@@ -241,14 +241,14 @@ export function DailyStreakCard({
             barClassName="bg-gradient-to-r from-orange-500 to-amber-500"
             trackClassName="h-2 w-full overflow-hidden rounded-full bg-white ring-1 ring-orange-100 dark:bg-slate-800 dark:ring-slate-700"
           />
-          <p className="mt-1 text-[10px] font-semibold text-orange-800 dark:text-orange-200">
+          <p className="mt-1 text-sm font-semibold text-orange-800 dark:text-orange-200">
             {t("streakMilestoneProgress", { current, milestone: nextMilestone })}
           </p>
         </div>
       )}
 
-      <p className="mt-3 flex items-start gap-1.5 border-t border-orange-200/70 pt-2 text-[10px] leading-relaxed text-slate-500 dark:border-slate-700 dark:text-slate-400">
-        <Info className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" aria-hidden />
+      <p className="mt-3 flex items-start gap-1.5 border-t border-orange-200/70 pt-2 text-sm leading-relaxed text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <Info className="mt-0.5 h-3 w-3 shrink-0 text-slate-500" aria-hidden />
         {t("streakHonestNote")}
       </p>
     </section>

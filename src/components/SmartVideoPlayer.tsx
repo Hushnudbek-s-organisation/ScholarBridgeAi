@@ -165,7 +165,7 @@ export function SmartVideoPlayer({
   if (embed.kind === "none") {
     return (
       <div
-        className={`flex items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-xs font-medium text-slate-500 dark:border-slate-600 dark:bg-slate-800/40 dark:text-slate-400 ${frame} ${className}`}
+        className={`flex items-center justify-center rounded-overlay border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-xs font-medium text-slate-500 dark:border-slate-600 dark:bg-slate-800/40 dark:text-slate-400 ${frame} ${className}`}
       >
         {emptyLabel ?? t("noVideoYet")}
       </div>
@@ -185,7 +185,7 @@ export function SmartVideoPlayer({
           referrerPolicy="strict-origin-when-cross-origin"
           className={`${frame} border-0 bg-black`}
         />
-        <p className="flex items-center justify-end gap-1 px-1 pt-1 text-[10px] font-semibold text-slate-400">
+        <p className="flex items-center justify-end gap-1 px-1 pt-1 text-sm font-semibold text-slate-500">
           {embed.provider === "Embed" ? t("externalVideoPlayer") : embed.provider}
           <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </p>

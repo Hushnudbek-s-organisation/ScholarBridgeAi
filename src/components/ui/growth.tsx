@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 /** fetch → JSON with a readable error (API `error` field or HTTP status). */
 export async function api<T = unknown>(url: string, init?: RequestInit): Promise<T> {
@@ -58,9 +59,9 @@ export function PageHeader({
   };
   const Heading = level;
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 shadow-xs dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-overlay border border-slate-200 bg-white px-4 py-3.5 shadow-xs dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ${tone[accent]}`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-surface ring-1 ${tone[accent]}`}>
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0">
@@ -101,9 +102,9 @@ export function StatCard({
     violet: "text-violet-600",
   };
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+    <div className="rounded-overlay border border-slate-200 bg-white p-3 sm:p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</span>
+        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
         {Icon && <Icon className="h-4 w-4 text-slate-300" />}
       </div>
       <div className={`mt-1 text-2xl font-black ${color[tone]}`}>{value}</div>
@@ -127,12 +128,12 @@ export function Segmented<T extends string>({
       {options.map((o) => {
         const active = o.id === value;
         return (
-          <button
+          <Button variant="unstyled"
             key={o.id}
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.id)}
-            className={`inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-xl px-3.5 py-2 text-left text-xs font-bold transition-colors ${
+            className={`inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-surface px-3.5 py-2 text-left text-xs font-bold transition-colors ${
               active
                 ? "border border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-600/20"
                 : "border border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"
@@ -140,11 +141,11 @@ export function Segmented<T extends string>({
           >
             {o.label}
             {o.count != null && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300"}`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-xs ${active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300"}`}>
                 {o.count}
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -163,12 +164,12 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+    <div className="flex flex-col items-center rounded-overlay border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-overlay bg-slate-100 text-slate-500">
         <Icon className="h-6 w-6" />
       </span>
       <p className="mt-3 text-sm font-bold text-slate-800">{title}</p>
-      {body && <p className="mt-1 max-w-md text-xs leading-relaxed text-slate-500">{body}</p>}
+      {body && <p className="mt-1 max-w-md text-sm leading-relaxed text-slate-500">{body}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -176,7 +177,7 @@ export function EmptyState({
 
 export function LoadingBlock({ label }: { label: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-10 text-sm text-slate-500">
+    <div className="flex items-center justify-center gap-2 rounded-overlay border border-slate-200 bg-white px-4 py-10 text-sm text-slate-500">
       <Loader2 className="h-4 w-4 animate-spin" /> {label}
     </div>
   );
@@ -184,28 +185,28 @@ export function LoadingBlock({ label }: { label: string }) {
 
 export function ErrorNote({ message, onRetry, retryLabel }: { message: string; onRetry?: () => void; retryLabel?: string }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700" role="alert">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-surface border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700" role="alert">
       <span>{message}</span>
       {onRetry && (
-        <button onClick={onRetry} className="rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100">
+        <Button variant="unstyled" onClick={onRetry} className="rounded-control border border-rose-200 bg-white px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100">
           {retryLabel ?? "Retry"}
-        </button>
+        </Button>
       )}
     </div>
   );
 }
 
 /** Field colours, hover and focus halo come from `.sb-field` (globals.css). */
-export const inputCls = "sb-field w-full rounded-xl border px-3 py-2.5 text-sm text-slate-900 focus:outline-none";
+export const inputCls = "sb-field w-full rounded-surface border px-3 py-2.5 text-sm text-slate-900 focus:outline-none";
 
-export const labelCls = "mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500";
+export const labelCls = "mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500";
 
 export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <label className="block">
       <span className={labelCls}>{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-[11px] text-slate-400">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
     </label>
   );
 }
@@ -215,7 +216,7 @@ export function Toast({ message }: { message: string | null }) {
   if (!message) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[80] flex justify-center px-4 lg:bottom-6" role="status" aria-live="polite">
-      <div className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-lg">{message}</div>
+      <div className="rounded-surface bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-lg">{message}</div>
     </div>
   );
 }

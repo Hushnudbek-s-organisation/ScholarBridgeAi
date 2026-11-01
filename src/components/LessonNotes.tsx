@@ -56,7 +56,7 @@ function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex max-w-full items-center gap-1 break-all rounded-lg border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300"
+        className="inline-flex max-w-full items-center gap-1 break-all rounded-control border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300"
       >
         <ExternalLink className="h-3 w-3 shrink-0" />
         {href.replace(/^https?:\/\//, "")}
@@ -80,8 +80,8 @@ export function LessonNotes({ content, className = "" }: { content: string; clas
       list.ordered ? (
         <ol key={`l${blocks.length}`} className="space-y-1.5">
           {items.map((item, i) => (
-            <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-slate-700 dark:text-slate-300">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-extrabold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+            <li key={i} className="flex gap-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-extrabold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
                 {i + 1}
               </span>
               <span className="min-w-0">{renderInline(item, `i${i}`)}</span>
@@ -91,7 +91,7 @@ export function LessonNotes({ content, className = "" }: { content: string; clas
       ) : (
         <ul key={`l${blocks.length}`} className="space-y-1.5">
           {items.map((item, i) => (
-            <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-slate-700 dark:text-slate-300">
+            <li key={i} className="flex gap-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />
               <span className="min-w-0">{renderInline(item, `i${i}`)}</span>
             </li>
@@ -115,7 +115,7 @@ export function LessonNotes({ content, className = "" }: { content: string; clas
       blocks.push(
         <h4
           key={`h${idx}`}
-          className="mt-1 flex items-center gap-2 text-[13px] font-extrabold uppercase tracking-wide text-slate-900 dark:text-white"
+          className="mt-1 flex items-center gap-2 text-sm font-extrabold uppercase tracking-wide text-slate-900 dark:text-white"
         >
           <span className="h-3.5 w-1 rounded-full bg-indigo-500" />
           {renderInline(heading[2], `h${idx}`)}
@@ -142,7 +142,7 @@ export function LessonNotes({ content, className = "" }: { content: string; clas
 
     flushList();
     blocks.push(
-      <p key={`p${idx}`} className="text-[13px] leading-relaxed text-slate-700 dark:text-slate-300">
+      <p key={`p${idx}`} className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
         {renderInline(line, `p${idx}`)}
       </p>,
     );

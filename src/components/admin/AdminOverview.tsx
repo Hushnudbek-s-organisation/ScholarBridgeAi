@@ -20,6 +20,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface Overview {
   people: { users: number | null; newUsers: number | null; premium: number | null };
@@ -59,17 +60,17 @@ export function AdminOverview({ onOpen }: { onOpen: (section: string) => void })
 
   if (error) {
     return (
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+      <div className="flex items-center justify-between gap-2 rounded-overlay border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
         {error}
-        <button onClick={() => void load()} className="rounded-lg border border-rose-200 bg-white px-2.5 py-1 font-bold">
+        <Button variant="unstyled" onClick={() => void load()} className="rounded-control border border-rose-200 bg-white px-2.5 py-1 font-bold">
           {t("retry")}
-        </button>
+        </Button>
       </div>
     );
   }
   if (!data) {
     return (
-      <p className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-8 text-xs text-slate-500">
+      <p className="flex items-center gap-2 rounded-overlay border border-slate-200 bg-white p-8 text-sm text-slate-500">
         <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
       </p>
     );
@@ -84,18 +85,18 @@ export function AdminOverview({ onOpen }: { onOpen: (section: string) => void })
   const pending = attention.filter((a) => (a.n ?? 0) > 0);
 
   const tile = (label: string, value: number | null, Icon: React.ComponentType<{ className?: string }>, section?: string, tone = "text-slate-900") => (
-    <button
+    <Button variant="unstyled"
       key={label}
       onClick={section ? () => onOpen(section) : undefined}
       disabled={!section}
-      className="group rounded-2xl border border-slate-200 bg-white p-3 text-left transition-colors enabled:hover:border-indigo-200 enabled:hover:bg-indigo-50/40 sm:p-4"
+      className="group rounded-overlay border border-slate-200 bg-white p-3 text-left transition-colors enabled:hover:border-indigo-200 enabled:hover:bg-indigo-50/40 sm:p-4"
     >
       <span className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</span>
+        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
         <Icon className="h-4 w-4 text-slate-300 group-enabled:group-hover:text-indigo-400" />
       </span>
       <span className={`mt-1 block text-2xl font-black ${tone}`}>{fmt(value)}</span>
-    </button>
+    </Button>
   );
 
   return (
@@ -105,12 +106,12 @@ export function AdminOverview({ onOpen }: { onOpen: (section: string) => void })
           <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900">
             <AlertTriangle className="h-4 w-4 text-amber-500" /> {t("needsAttention")}
           </h3>
-          <button onClick={() => void load()} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-100">
+          <Button variant="unstyled" onClick={() => void load()} className="inline-flex items-center gap-1 rounded-control px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100">
             <RefreshCw className="h-3.5 w-3.5" /> {t("refresh")}
-          </button>
+          </Button>
         </div>
         {pending.length === 0 ? (
-          <p className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+          <p className="flex items-center gap-2 rounded-overlay border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
             <CheckCircle2 className="h-4 w-4" /> {t("allClear")}
           </p>
         ) : (
@@ -119,18 +120,18 @@ export function AdminOverview({ onOpen }: { onOpen: (section: string) => void })
               const Icon = a.icon;
               return (
                 <li key={a.id}>
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => onOpen(a.id)}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left hover:bg-amber-50"
+                    className="flex w-full items-center gap-3 rounded-overlay border border-amber-200 bg-amber-50 px-4 py-3 text-left hover:bg-amber-50"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-surface bg-white text-amber-600">
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1 text-xs font-semibold text-amber-900">
                       <b className="text-lg font-black">{fmt(a.n)}</b> {a.label}
                     </span>
                     <ArrowRight className="h-4 w-4 shrink-0 text-amber-500" />
-                  </button>
+                  </Button>
                 </li>
               );
             })}

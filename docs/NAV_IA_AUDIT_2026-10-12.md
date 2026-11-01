@@ -82,7 +82,7 @@ Public katalog route’lari `/universities` va `/scholarships` saqlangan. API ro
 ## 5. Ushbu iteratsiyada qilingan minimal o‘zgarishlar
 
 - `src/app/HomeClient.tsx`: skip-link uchun `id="main-content"` va programmatik fokus targeti.
-- `src/components/hubs/ui.tsx`: NEW/PRO badge matnlari `next-intl` orqali en/uz/ru.
+- `src/components/ui/hubs.tsx`: NEW/PRO badge matnlari `next-intl` orqali en/uz/ru.
 - `src/components/CommandPalette.tsx`: qidiruv loading va PRO/NEW matnlari i18n orqali; search holati yolg‘on natija ko‘rsatmaydi.
 - `src/i18n/messages/{en,uz,ru}.json`: `nav.searchLoading` pariteti.
 

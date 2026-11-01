@@ -7,8 +7,9 @@ import { ArrowRight, Banknote, Check, FileCheck2, Home, Luggage, MapPin, PartyPo
 import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
 import { useSeedText } from "./useSeedText";
-import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Toast, useToast } from "./ui";
+import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Toast, useToast } from "@/components/ui/growth";
 import { AppNote } from "@/components/AppNote";
+import { Button } from "@/components/ui/Button";
 
 interface CheckItem {
   id: number;
@@ -93,7 +94,7 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
 
       {phases && phases.length > 0 && (
         <>
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+          <div className="rounded-overlay border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-600">{t("progress", { done, total })}</span>
               <span className="text-lg font-black text-emerald-600">{pct}%</span>
@@ -121,14 +122,14 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
                     e.preventDefault();
                     document.getElementById(`phase-${p.phase}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
-                  className={`flex min-w-[120px] shrink-0 items-center gap-2 rounded-xl border px-3 py-2 ${
+                  className={`flex min-w-[120px] shrink-0 items-center gap-2 rounded-surface border px-3 py-2 ${
                     complete ? "border-emerald-200 bg-emerald-50" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${complete ? "text-emerald-600" : "text-slate-400"}`} />
+                  <Icon className={`h-4 w-4 ${complete ? "text-emerald-600" : "text-slate-500"}`} />
                   <span className="min-w-0">
-                    <span className="block break-words text-[11px] font-bold text-slate-800">{knownPhase(p.phase) ? t(`phase.${p.phase}`) : p.phase}</span>
-                    <span className="text-[10px] text-slate-500">
+                    <span className="block break-words text-xs font-bold text-slate-800">{knownPhase(p.phase) ? t(`phase.${p.phase}`) : p.phase}</span>
+                    <span className="text-xs text-slate-500">
                       {p.done}/{p.total}
                     </span>
                   </span>
@@ -147,44 +148,44 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: pi * 0.04 }}
-                  className="scroll-mt-20 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4"
+                  className="scroll-mt-20 rounded-overlay border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4"
                 >
                   <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-control bg-emerald-50 text-emerald-600">
                       <Icon className="h-4 w-4" />
                     </span>
-                    <span className="text-slate-400">{pi + 1}.</span> {knownPhase(p.phase) ? t(`phase.${p.phase}`) : p.phase}
-                    <span className="ml-auto text-[11px] font-semibold text-slate-400">
+                    <span className="text-slate-500">{pi + 1}.</span> {knownPhase(p.phase) ? t(`phase.${p.phase}`) : p.phase}
+                    <span className="ml-auto text-xs font-semibold text-slate-500">
                       {p.done}/{p.total}
                     </span>
                   </h2>
                   <ul className="mt-2 space-y-1">
                     {p.items.map((i) => (
-                      <li key={i.id} className="flex items-start gap-2 rounded-xl px-1.5 py-1.5 hover:bg-slate-50">
-                        <button
+                      <li key={i.id} className="flex items-start gap-2 rounded-surface px-1.5 py-1.5 hover:bg-slate-50">
+                        <Button variant="unstyled"
                           onClick={() => void toggle(i)}
                           role="checkbox"
                           aria-checked={i.done}
                           aria-label={tr(i.title)}
-                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors ${
-                            i.done ? "bg-emerald-500 text-white sb-ink-on-bright" : "border-2 border-slate-300 hover:border-emerald-400"
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-control transition-colors ${
+                            i.done ? "bg-emerald-700 text-white sb-ink-on-bright" : "border-2 border-slate-300 hover:border-emerald-400"
                           }`}
                         >
                           {i.done && <Check className="h-3.5 w-3.5" />}
-                        </button>
+                        </Button>
                         <div className="min-w-0 flex-1">
-                          <button onClick={() => void toggle(i)} className={`text-left text-sm font-semibold ${i.done ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                          <Button variant="unstyled" onClick={() => void toggle(i)} className={`text-left text-sm font-semibold ${i.done ? "text-slate-500 line-through" : "text-slate-800"}`}>
                             {tr(i.title)}
-                          </button>
-                          {i.description && <p className="text-[11px] leading-snug text-slate-500">{tr(i.description)}</p>}
+                          </Button>
+                          {i.description && <p className="text-sm leading-snug text-slate-500">{tr(i.description)}</p>}
                         </div>
                         {i.linkTab && onNavigate && (
-                          <button
+                          <Button variant="unstyled"
                             onClick={() => onNavigate(i.linkTab!)}
-                            className="inline-flex shrink-0 items-center gap-0.5 rounded-lg px-1.5 py-1 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50"
+                            className="inline-flex shrink-0 items-center gap-0.5 rounded-control px-1.5 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50"
                           >
                             {t("open")} <ArrowRight className="h-3 w-3" />
-                          </button>
+                          </Button>
                         )}
                       </li>
                     ))}

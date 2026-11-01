@@ -17,7 +17,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, GraduationCap, Search } from "lucide-react";
 import { CAREER_PATHS } from "@/lib/journey/careers";
 import { CareerDiscoveryFlow } from "@/components/journey/CareerDiscoveryFlow";
-import { Button, Empty, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "./ui";
+import { Empty, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "@/components/ui/journey";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
 import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
@@ -28,6 +28,7 @@ import { Mic } from "lucide-react";
 import { cachedFetchJson } from "@/lib/clientCache";
 import { localizeCity, localizeCountry } from "@/lib/catalogLocalizer";
 import CountryFlag from "@/components/CountryFlag";
+import { Button } from "@/components/ui/Button";
 
 // ===========================================================================
 // CAREER & MAJOR EXPLORER (spec §15)
@@ -201,32 +202,32 @@ export function CareerExplorerPanel({
     <div className="space-y-4">
       {/* Mode switch — discovery first for the undecided, catalog for everyone. */}
       <div className="flex flex-wrap gap-2" role="tablist" aria-label={tDisc("modeSwitchAria")}>
-        <button
+        <Button variant="unstyled"
           type="button"
           role="tab"
           aria-selected={mode === "discover"}
           onClick={() => setMode("discover")}
-          className={`rounded-xl border-2 px-4 py-2 text-sm font-bold transition ${
+          className={`rounded-surface border-2 px-4 py-2 text-sm font-bold transition ${
             mode === "discover"
               ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-200"
               : "border-slate-200 text-slate-600 hover:border-indigo-300 dark:border-slate-700 dark:text-slate-300"
           }`}
         >
           {tDisc("modeDiscover")}
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           type="button"
           role="tab"
           aria-selected={mode === "catalog"}
           onClick={() => setMode("catalog")}
-          className={`rounded-xl border-2 px-4 py-2 text-sm font-bold transition ${
+          className={`rounded-surface border-2 px-4 py-2 text-sm font-bold transition ${
             mode === "catalog"
               ? "border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-200"
               : "border-slate-200 text-slate-600 hover:border-indigo-300 dark:border-slate-700 dark:text-slate-300"
           }`}
         >
           {tDisc("modeCatalog")}
-        </button>
+        </Button>
       </div>
 
       {mode === "discover" && (
@@ -248,19 +249,19 @@ export function CareerExplorerPanel({
       >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CAREER_PATHS.map((c) => (
-            <button
+            <Button variant="unstyled"
               key={c.id}
               type="button"
               onClick={() => pickCareer(c.id)}
-              className={`rounded-xl border p-3 text-left transition ${
+              className={`rounded-surface border p-3 text-left transition ${
                 career === c.id
                   ? "border-indigo-500 bg-indigo-50 dark:border-indigo-600 dark:bg-indigo-950/40"
                   : "border-slate-200 hover:border-indigo-300 dark:border-slate-700"
               }`}
             >
               <p className="text-sm font-bold text-slate-900 dark:text-white">{careerTitle(c.id)}</p>
-              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{careerBlurb(c.id)}</p>
-            </button>
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{careerBlurb(c.id)}</p>
+            </Button>
           ))}
         </div>
       </JourneyCard>
@@ -268,7 +269,7 @@ export function CareerExplorerPanel({
       <JourneyCard title={t("ceMajorsTitle")} subtitle={t("ceMajorsSubtitle", { title: careerTitle(path.id) })}>
         <div className="flex flex-wrap gap-2">
           {path.majors.map((m) => (
-            <button
+            <Button variant="unstyled"
               key={m}
               type="button"
               onClick={() => setMajor(m)}
@@ -279,11 +280,11 @@ export function CareerExplorerPanel({
               }`}
             >
               {m}
-            </button>
+            </Button>
           ))}
         </div>
         {path.countries.length > 0 && (
-          <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+          <p className="mt-3 flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
             <span className="font-semibold">{t("ceDestinations")}</span>
             {path.countries.map((c) => (
               <Pill key={c} tone="info">
@@ -297,7 +298,7 @@ export function CareerExplorerPanel({
       <JourneyCard
         title={t("ceUnisTitle", { major })}
         subtitle={t("ceUnisSubtitle")}
-        action={<Search className="h-4 w-4 text-slate-400" aria-hidden />}
+        action={<Search className="h-4 w-4 text-slate-500" aria-hidden />}
       >
         {loading ? (
           <Loading />
@@ -306,17 +307,17 @@ export function CareerExplorerPanel({
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {unis.map((u) => (
-              <div key={u.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              <div key={u.id} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                 <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
                   <CountryFlag country={u.country} flagEmoji={u.flagEmoji} size="xs" />
                   <span className="min-w-0 break-words">{u.name}</span>
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-sm text-slate-500">
                   {localizeCity(u.city, locale)}, {localizeCountry(u.country, locale)} · #{u.worldRanking}
                 </p>
                 {/* Show matched field(s) so the student sees WHY this university appears for the chosen major */}
                 {(u.programMajor || (Array.isArray(u.programFields) && u.programFields.length > 0)) && (
-                  <p className="mt-1 break-words text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
+                  <p className="mt-1 break-words text-sm font-medium text-indigo-600 dark:text-indigo-400">
                     {(() => {
                       const fields: string[] = Array.isArray(u.programFields) && u.programFields.length > 0
                         ? u.programFields
@@ -332,7 +333,7 @@ export function CareerExplorerPanel({
                     })()}
                   </p>
                 )}
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="mt-1 text-sm text-slate-500">
                   {u.minGpa != null && `GPA ≥ ${u.minGpa} · `}
                   {u.minIelts != null && `IELTS ≥ ${u.minIelts} · `}
                   {u.minSat != null && `SAT ≥ ${u.minSat}`}
@@ -418,7 +419,7 @@ export function VisaCenterPanel({
       >
         <div className="flex flex-wrap items-end gap-2">
           <div className="w-full sm:w-64">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("vcCountry")}</span>
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">{t("vcCountry")}</span>
             <input
               className={inputClass}
               value={country}
@@ -452,30 +453,30 @@ export function VisaCenterPanel({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-40px 0px" }}
                 transition={{ delay: reduceMotion ? 0 : Math.min(i, 6) * 0.05, duration: 0.32 }}
-                className="sb-card-hover rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+                className="sb-card-hover rounded-surface border border-slate-200 p-3 dark:border-slate-700"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{r.title}</p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-sm text-slate-500">
                       {r.visaType}
                       {r.lastVerifiedAt ? t("vcVerified", { date: String(r.lastVerifiedAt).slice(0, 10) }) : ""}
                     </p>
                   </div>
                   {r.isRequired ? <Pill tone="warn">{t("vcRequired")}</Pill> : <Pill tone="slate">{t("vcOptional")}</Pill>}
                 </div>
-                {r.instructions && <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{r.instructions}</p>}
+                {r.instructions && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{r.instructions}</p>}
                 {r.sourceUrl ? (
                   <a
                     href={r.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 inline-block text-[11px] font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                    className="mt-1 inline-block text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
                   >
                     {r.sourceName ?? t("uiOfficialSource")} →
                   </a>
                 ) : (
-                  <p className="mt-1 text-[11px] text-slate-400">{t("uiNotSpecified")}</p>
+                  <p className="mt-1 text-sm text-slate-500">{t("uiNotSpecified")}</p>
                 )}
               </motion.li>
             ))}
@@ -577,14 +578,14 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
         }
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400">{t("icStudioIntro")}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{t("icStudioIntro")}</p>
 
           {/* Track picker */}
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label={t("icTracksLabel")}>
             {INTERVIEW_TRACKS.map((tr) => {
               const active = tr.id === track.id;
               return (
-                <button
+                <Button variant="unstyled"
                   key={tr.id}
                   type="button"
                   role="tab"
@@ -594,7 +595,7 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
                     setPhase("idle");
                     setQuestionIndex(0);
                   }}
-                  className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                  className={`shrink-0 rounded-surface border px-3 py-2 text-left text-xs font-semibold transition-colors ${
                     active
                       ? "border-indigo-400 bg-indigo-50 text-indigo-900 dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-100"
                       : "border-slate-200 text-slate-600 hover:border-indigo-300 dark:border-slate-700 dark:text-slate-300"
@@ -602,13 +603,13 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
                 >
                   <span aria-hidden className="mr-1.5">{tr.emoji}</span>
                   {tx(tr.title)}
-                </button>
+                </Button>
               );
             })}
           </div>
 
           {/* Selected track header */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div className="rounded-surface border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/40">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
                 <span aria-hidden className="mr-1.5">{track.emoji}</span>
@@ -617,14 +618,14 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
               <Pill>{t("icQuestionsCount", { count: track.questions.length })}</Pill>
               {track.timed && <Pill>{t("icTimedBadge")}</Pill>}
             </div>
-            <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300">{tx(track.audience)}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{tx(track.format)}</p>
+            <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300">{tx(track.audience)}</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{tx(track.format)}</p>
             {track.institutions.length > 0 && (
               <p className="mt-2 flex flex-wrap gap-1.5">
                 {track.institutions.map((i) => (
                   <span
                     key={i}
-                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                   >
                     {i}
                   </span>
@@ -635,19 +636,19 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
 
           {/* Built-in countdown for the timed-video track */}
           {track.timed && (
-            <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-800/60 dark:bg-indigo-950/30">
+            <div className="rounded-surface border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-800/60 dark:bg-indigo-950/30">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wide text-indigo-900 dark:text-indigo-200">
                     {t("icTimerTitle")}
                   </h4>
-                  <p className="mt-0.5 text-[11px] text-indigo-800/80 dark:text-indigo-200/70">
+                  <p className="mt-0.5 text-sm text-indigo-800/80 dark:text-indigo-200/70">
                     {t("icTimerHint", { prep: prepSec, record: recSec })}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded-xl px-3 py-2 font-mono text-lg font-black tabular-nums ${
+                    className={`rounded-surface px-3 py-2 font-mono text-lg font-black tabular-nums ${
                       phase === "record"
                         ? "bg-rose-600 text-white"
                         : phase === "prep"
@@ -685,12 +686,12 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
               )}
               {phase === "idle" && track.rubric && (
                 <div className="mt-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-900 dark:text-indigo-200">
+                  <p className="text-sm font-bold uppercase tracking-wide text-indigo-900 dark:text-indigo-200">
                     {t("icSelfCheck")}
                   </p>
                   <ul className="mt-1 space-y-0.5">
                     {track.rubric.map((r, i) => (
-                      <li key={i} className="text-[11px] text-indigo-900/90 dark:text-indigo-200/80">
+                      <li key={i} className="text-sm text-indigo-900/90 dark:text-indigo-200/80">
                         ☐ {tx(r)}
                       </li>
                     ))}
@@ -705,27 +706,27 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
             {track.questions.map((q, qi) => (
               <li
                 key={q.id}
-                className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"
+                className="rounded-surface border border-slate-200 p-4 dark:border-slate-700"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    <span className="mr-1.5 text-slate-400">{qi + 1}.</span>
+                    <span className="mr-1.5 text-slate-500">{qi + 1}.</span>
                     {tx(q.question)}
                   </p>
                   {q.responseSeconds && (
                     <Pill>{t("icSecondsChip", { seconds: q.responseSeconds })}</Pill>
                   )}
                 </div>
-                <p className="mt-1.5 text-[11px] italic text-slate-500 dark:text-slate-400">
+                <p className="mt-1.5 text-sm italic text-slate-500 dark:text-slate-400">
                   {t("icWhy")} {tx(q.why)}
                 </p>
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-[11px] font-semibold text-indigo-700 hover:underline dark:text-indigo-300">
+                  <summary className="cursor-pointer text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300">
                     {t("icShowModel")}
                   </summary>
                   <ul className="mt-1.5 space-y-1">
                     {q.modelAnswer.map((a, ai) => (
-                      <li key={ai} className="flex gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                      <li key={ai} className="flex gap-1.5 text-sm text-slate-600 dark:text-slate-300">
                         <span aria-hidden className="text-emerald-600 dark:text-emerald-400">✓</span>
                         <span>{tx(a)}</span>
                       </li>
@@ -737,18 +738,18 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
           </ol>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sb-card-hover rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+            <div className="sb-card-hover rounded-surface border border-slate-200 p-4 dark:border-slate-700">
               <p className="text-base" aria-hidden>🎓</p>
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icUniTitle")}</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("icUniText")}</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("icUniText")}</p>
               <Button className="mt-3" onClick={() => onNavigateTab("visa/speaking")}>
                 {t("icUniBtn")}
               </Button>
             </div>
-            <div className="sb-card-hover rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+            <div className="sb-card-hover rounded-surface border border-slate-200 p-4 dark:border-slate-700">
               <p className="text-base" aria-hidden>🛂</p>
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icVisaTitle")}</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("icVisaText")}</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("icVisaText")}</p>
               <Button className="mt-3" variant="outline" onClick={() => onNavigateTab("visa/speaking")}>
                 {t("icVisaBtn")}
               </Button>

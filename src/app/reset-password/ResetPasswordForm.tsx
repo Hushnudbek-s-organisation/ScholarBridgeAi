@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
+import { Button } from "@/components/ui/Button";
 
 /**
  * The second half of password reset: spend the emailed token.
@@ -90,7 +91,7 @@ export function ResetPasswordForm() {
 
   if (done) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
+      <div className="rounded-overlay border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
             <CheckCircle2 className="h-5 w-5" aria-hidden />
@@ -102,7 +103,7 @@ export function ResetPasswordForm() {
         </div>
         <Link
           href="/"
-          className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-surface bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
         >
           <KeyRound className="h-4 w-4" aria-hidden />
           {t("doneAction")}
@@ -121,7 +122,7 @@ export function ResetPasswordForm() {
             ? t("usedLink")
             : t("invalidLink");
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-xs sm:p-8">
+      <div className="rounded-overlay border border-amber-200 bg-amber-50 p-6 shadow-xs sm:p-8">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
             <AlertCircle className="h-5 w-5" aria-hidden />
@@ -136,13 +137,13 @@ export function ResetPasswordForm() {
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           <Link
             href="/forgot-password"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 items-center justify-center rounded-surface bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
           >
             {t("requestNewLink")}
           </Link>
           <Link
             href="/"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="inline-flex min-h-11 items-center justify-center rounded-surface border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             {t("backToSignIn")}
           </Link>
@@ -152,7 +153,7 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
+    <form onSubmit={submit} className="rounded-overlay border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
       <label htmlFor="reset-password" className="block text-sm font-bold text-slate-800">
         {t("newPassword")}
       </label>
@@ -167,7 +168,7 @@ export function ResetPasswordForm() {
           setPassword(e.target.value);
           if (error) setError("");
         }}
-        className="mt-2 w-full min-h-11 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="mt-2 w-full min-h-11 rounded-surface border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
       />
 
       <label htmlFor="reset-password-confirm" className="mt-4 block text-sm font-bold text-slate-800">
@@ -184,31 +185,31 @@ export function ResetPasswordForm() {
           setConfirm(e.target.value);
           if (error) setError("");
         }}
-        className="mt-2 w-full min-h-11 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="mt-2 w-full min-h-11 rounded-surface border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
       />
 
-      <p className="mt-2 text-xs text-slate-500">{t("passwordHint")}</p>
+      <p className="mt-2 text-sm text-slate-500">{t("passwordHint")}</p>
 
       {error && (
         <div
           role="alert"
-          className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+          className="mt-3 flex items-start gap-2 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
         >
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           <span>{error}</span>
         </div>
       )}
 
-      <button
+      <Button variant="unstyled"
         type="submit"
         disabled={busy}
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-60"
+        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-surface bg-indigo-600 px-4 text-sm font-bold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-60"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <ShieldCheck className="h-4 w-4" aria-hidden />}
         {busy ? t("updating") : t("updatePassword")}
-      </button>
+      </Button>
 
-      <p className="mt-4 text-center text-xs text-slate-500">
+      <p className="mt-4 text-center text-sm text-slate-500">
         <Link href="/forgot-password" className="font-semibold text-indigo-700 hover:text-indigo-900">
           {t("requestNewLink")}
         </Link>

@@ -17,7 +17,7 @@ export function PointsBadge({ points, levelName, levelIcon }: PointsBadgeProps) 
       <Star className="h-4 w-4 text-amber-500 fill-amber-400" aria-hidden="true" />
       <span className="text-xs font-extrabold text-amber-700">{points.toLocaleString()} {t("points")}</span>
       {levelName && (
-        <span className="text-[11px] font-semibold text-slate-500">
+        <span className="text-xs font-semibold text-slate-500">
           {levelIcon} {levelName}
         </span>
       )}

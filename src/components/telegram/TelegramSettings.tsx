@@ -5,9 +5,10 @@ import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { AlertTriangle, BellRing, CheckCircle2, KeyRound, Loader2, Send, ShieldAlert, Unlink, Zap } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
-import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Toast, useToast } from "../growth/ui";
+import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Toast, useToast } from "@/components/ui/growth";
 import { TelegramCodeFlow } from "./TelegramCodeFlow";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
+import { Button } from "@/components/ui/Button";
 
 interface MeResponse {
   bot: { configured: boolean; botUsername: string | null; notificationsEnabled: boolean; loginEnabled: boolean };
@@ -122,9 +123,9 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
           body={activeProfile.isAdmin ? t("notConfiguredAdmin") : t("notConfiguredBody")}
           action={
             activeProfile.isAdmin && onNavigate ? (
-              <button onClick={() => onNavigate("admin")} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800">
+              <Button variant="unstyled" onClick={() => onNavigate("admin")} className="rounded-surface bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800">
                 {t("openAdmin")}
-              </button>
+              </Button>
             ) : undefined
           }
         />
@@ -141,7 +142,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
       <Toast message={toast} />
 
       {placeholderEmail && (
-        <div className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-900">
+        <div className="flex items-start gap-2.5 rounded-overlay border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
           <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <p>{t("placeholderEmailNote")}</p>
         </div>
@@ -149,26 +150,26 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         {/* ---- Connection card ---- */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+        <section className="rounded-overlay border border-slate-200 bg-white p-4 sm:p-5">
           {link ? (
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-500 text-white sb-ink-on-bright">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-overlay bg-sky-500 text-white sb-ink-on-bright">
                   <Send className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900">
                     <CheckCircle2 className="h-4 w-4 text-emerald-600" /> {t("connected")}
                   </p>
-                  <p className="break-words text-[13px] text-slate-600">
+                  <p className="break-words text-sm text-slate-600">
                     {[link.firstName, link.username ? `@${link.username}` : null].filter(Boolean).join(" · ") || "Telegram"}
                   </p>
-                  <p className="text-[11px] text-slate-400">{t("connectedSince", { date: new Date(link.linkedAt).toLocaleDateString() })}</p>
+                  <p className="text-sm text-slate-500">{t("connectedSince", { date: new Date(link.linkedAt).toLocaleDateString() })}</p>
                 </div>
               </div>
 
               {link.blocked && (
-                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-[12px] text-red-700">
+                <div className="flex items-start gap-2 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-700">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{t("blockedWarning", { bot: `@${data.bot.botUsername}` })}</span>
                 </div>
@@ -179,47 +180,47 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
                   href={`https://t.me/${data.bot.botUsername}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600"
+                  className="inline-flex items-center gap-1.5 rounded-surface bg-sky-500 px-3 py-2 text-xs font-bold text-white sb-ink-on-bright hover:bg-sky-600"
                 >
                   <Send className="h-3.5 w-3.5" /> {t("openChat")}
                 </a>
-                <button
+                <Button variant="unstyled"
                   onClick={sendTest}
                   disabled={busy === "test"}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 rounded-surface border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                 >
                   {busy === "test" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />} {t("sendTest")}
-                </button>
+                </Button>
                 {!confirmUnlink ? (
-                  <button
+                  <Button variant="unstyled"
                     onClick={() => setConfirmUnlink(true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50"
+                    className="inline-flex items-center gap-1.5 rounded-surface border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
                   >
                     <Unlink className="h-3.5 w-3.5" /> {t("disconnect")}
-                  </button>
+                  </Button>
                 ) : (
-                  <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
-                    <span className="flex-1 text-[12px] font-semibold text-red-700">{placeholderEmail ? t("disconnectWarnTelegramOnly") : t("disconnectConfirm")}</span>
-                    <button onClick={unlink} disabled={busy === "unlink"} className="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700 disabled:opacity-60">
+                  <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex w-full flex-wrap items-center gap-2 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2">
+                    <span className="flex-1 text-xs font-semibold text-rose-700">{placeholderEmail ? t("disconnectWarnTelegramOnly") : t("disconnectConfirm")}</span>
+                    <Button variant="unstyled" onClick={unlink} disabled={busy === "unlink"} className="rounded-control bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-60">
                       {busy === "unlink" ? <Loader2 className="h-3 w-3 animate-spin" /> : t("disconnectYes")}
-                    </button>
-                    <button onClick={() => setConfirmUnlink(false)} className="rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100">
+                    </Button>
+                    <Button variant="unstyled" onClick={() => setConfirmUnlink(false)} className="rounded-control bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">
                       {t("cancel")}
-                    </button>
+                    </Button>
                   </motion.div>
                 )}
               </div>
 
               <div className="border-t border-slate-100 pt-4">
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t("activeTitle")}</p>
+                <p className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">{t("activeTitle")}</p>
                 <ul className="space-y-2">
                   {[
                     { icon: BellRing, text: t("benefitAlerts"), on: link.notifyEnabled && data.bot.notificationsEnabled },
                     { icon: KeyRound, text: t("benefitLogin"), on: data.bot.loginEnabled },
                     { icon: ShieldAlert, text: t("benefitSecurity"), on: link.notifyEnabled && !link.mutedTypes.includes("login_alert") },
                   ].map(({ icon: Icon, text, on }) => (
-                    <li key={text} className={`flex items-start gap-2.5 text-[13px] ${on ? "text-slate-700" : "text-slate-400 line-through"}`}>
-                      <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${on ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
+                    <li key={text} className={`flex items-start gap-2.5 text-sm ${on ? "text-slate-700" : "text-slate-500 line-through"}`}>
+                      <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-control ${on ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"}`}>
                         <Icon className="h-3.5 w-3.5" />
                       </span>
                       {text}
@@ -227,22 +228,22 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
                   ))}
                 </ul>
                 {data.bot.loginEnabled && (
-                  <p className="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-800">{t("loginTip")}</p>
+                  <p className="mt-3 rounded-surface bg-sky-50 px-3 py-2 text-sm text-sky-800">{t("loginTip")}</p>
                 )}
               </div>
             </div>
           ) : (
             <div>
               <p className="text-base font-extrabold text-slate-900">{t("linkTitle")}</p>
-              <p className="mb-4 mt-0.5 text-[13px] text-slate-500">{t("linkSubtitle")}</p>
+              <p className="mb-4 mt-0.5 text-sm text-slate-500">{t("linkSubtitle")}</p>
               <ul className="mb-4 space-y-2">
                 {[
                   { icon: BellRing, text: t("benefitAlerts") },
                   { icon: KeyRound, text: t("benefitLogin") },
                   { icon: ShieldAlert, text: t("benefitSecurity") },
                 ].map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex items-start gap-2.5 text-[13px] text-slate-600">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
+                  <li key={text} className="flex items-start gap-2.5 text-sm text-slate-600">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-control bg-sky-50 text-sky-600">
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                     {text}
@@ -262,11 +263,11 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
         </section>
 
         {/* ---- What to receive ---- */}
-        <section className={`rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 ${link ? "" : "opacity-60"}`}>
+        <section className={`rounded-overlay border border-slate-200 bg-white p-4 sm:p-5 ${link ? "" : "opacity-60"}`}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-extrabold text-slate-900">{t("notifyToggle")}</p>
-              <p className="mt-0.5 text-[12px] text-slate-500">{data.bot.notificationsEnabled ? t("notifyToggleHint") : t("notificationsOffByAdmin")}</p>
+              <p className="mt-0.5 text-sm text-slate-500">{data.bot.notificationsEnabled ? t("notifyToggleHint") : t("notificationsOffByAdmin")}</p>
             </div>
             <Switch
               checked={!!link?.notifyEnabled && data.bot.notificationsEnabled}
@@ -276,42 +277,42 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
             />
           </div>
 
-          <p className="mb-1 mt-5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t("remindersTitle")}</p>
-          <p className="mb-2 text-[11px] text-slate-500">{t("remindersHint")}</p>
+          <p className="mb-1 mt-5 text-sm font-bold uppercase tracking-wide text-slate-500">{t("remindersTitle")}</p>
+          <p className="mb-2 text-sm text-slate-500">{t("remindersHint")}</p>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("remindersTitle")}>
             {REMINDER_PRESETS.map((preset) => {
               const current = (link?.reminderDays ?? data.defaultReminderDays).join(",");
               const active = current === preset.days.join(",");
               return (
-                <button
+                <Button variant="unstyled"
                   key={preset.id}
                   type="button"
                   role="radio"
                   aria-checked={active}
                   disabled={!link || !link.notifyEnabled || !data.bot.notificationsEnabled}
                   onClick={() => !active && void save({ reminderDays: [...preset.days] })}
-                  className={`rounded-xl border px-3 py-2 text-left text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  className={`rounded-surface border px-3 py-2 text-left text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     active ? "border-sky-500 bg-sky-500 text-white sb-ink-on-bright" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   {t(`preset.${preset.id}`)}
-                  <span className={`block text-[10px] font-normal ${active ? "text-sky-50" : "text-slate-400"}`}>
+                  <span className={`block text-xs font-normal ${active ? "text-sky-50" : "text-slate-500"}`}>
                     {preset.days.length ? t("presetDays", { days: preset.days.join(" · ") }) : t("presetNone")}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>
 
-          <p className="mb-2 mt-5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t("typesTitle")}</p>
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100">
+          <p className="mb-2 mt-5 text-sm font-bold uppercase tracking-wide text-slate-500">{t("typesTitle")}</p>
+          <ul className="divide-y divide-slate-100 rounded-surface border border-slate-100">
             {visibleTypes.map((type) => {
               const muted = link?.mutedTypes.includes(type) ?? false;
               return (
                 <li key={type} className="flex items-center justify-between gap-3 px-3 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-slate-800">{t(`types.${type}`)}</p>
-                    <p className="text-[11px] text-slate-400">{t(`typeHints.${type}`)}</p>
+                    <p className="text-sm font-semibold text-slate-800">{t(`types.${type}`)}</p>
+                    <p className="text-sm text-slate-500">{t(`typeHints.${type}`)}</p>
                   </div>
                   <Switch
                     checked={!muted}
@@ -329,12 +330,12 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
             })}
           </ul>
 
-          <div className="mt-5 rounded-xl bg-slate-50 px-3 py-3">
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{t("commandsTitle")}</p>
-            <ul className="grid gap-1 text-[12px] text-slate-600 sm:grid-cols-2">
+          <div className="mt-5 rounded-surface bg-slate-50 px-3 py-3">
+            <p className="mb-1.5 text-sm font-bold uppercase tracking-wide text-slate-500">{t("commandsTitle")}</p>
+            <ul className="grid gap-1 text-sm text-slate-600 sm:grid-cols-2">
               {(["status", "stop", "on", "unlink"] as const).map((c) => (
                 <li key={c}>
-                  <code className="rounded bg-white px-1 py-0.5 font-mono text-[11px] font-bold text-sky-700">/{c}</code> — {t(`commands.${c}`)}
+                  <code className="rounded-control bg-white px-1 py-0.5 font-mono text-xs font-bold text-sky-700">/{c}</code> — {t(`commands.${c}`)}
                 </li>
               ))}
             </ul>
@@ -359,7 +360,7 @@ function Switch({
   small?: boolean;
 }) {
   return (
-    <button
+    <Button variant="unstyled"
       type="button"
       role="switch"
       aria-checked={checked}
@@ -370,13 +371,12 @@ function Switch({
         small ? "h-5 w-9" : "h-6 w-11"
       } ${checked ? "bg-sky-500" : "bg-slate-300"}`}
     >
-      {/* Knob colour is inline: the dark theme remaps `bg-white` to the card colour. */}
+      {/* Keep the knob white: the dark theme remaps ordinary `bg-white` to a card. */}
       <span
-        style={{ backgroundColor: "#ffffff" }}
-        className={`absolute top-0.5 rounded-full shadow transition-transform ${small ? "h-4 w-4" : "h-5 w-5"} ${
+        className={`sb-switch-knob absolute top-0.5 rounded-full shadow transition-transform ${small ? "h-4 w-4" : "h-5 w-5"} ${
           checked ? (small ? "translate-x-4" : "translate-x-5") : "translate-x-0.5"
         } left-0`}
       />
-    </button>
+    </Button>
   );
 }

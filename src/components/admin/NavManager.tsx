@@ -11,6 +11,7 @@ import {
   navLabelKey,
   parseHiddenNav,
 } from "@/lib/navSections";
+import { Button } from "@/components/ui/Button";
 
 const GROUP_KEY: Record<string, string> = {
   home: "groupHome",
@@ -112,38 +113,38 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-slate-900 flex items-center justify-center">
+      <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs flex items-center gap-3">
+        <div className="h-9 w-9 rounded-surface bg-slate-900 flex items-center justify-center">
           <Menu className="h-5 w-5 text-amber-300" />
         </div>
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Sidebar navigation</h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             {visibleCount} of {NAV_SECTIONS.length} sections visible to users. Changes apply
             immediately — no deploy needed.
           </p>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={load}
-          className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+          className="ml-auto flex items-center gap-1.5 rounded-surface border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </button>
+        </Button>
       </div>
 
       {message && (
         <div
-          className={`rounded-xl px-4 py-3 text-xs font-semibold ${
+          className={`rounded-surface px-4 py-3 text-xs font-semibold ${
             message.ok
               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              : "bg-red-50 text-red-700 border border-red-200"
+              : "bg-rose-50 text-rose-700 border border-rose-200"
           }`}
         >
           {message.text}
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+      <div className="rounded-overlay border border-slate-200 bg-white shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center gap-2 p-8 text-xs font-semibold text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
@@ -152,7 +153,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
           <div>
           {NAV_GROUPS.map((group) => (
           <div key={group}>
-          <p className="border-b border-slate-100 bg-slate-50 px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <p className="border-b border-slate-100 bg-slate-50 px-4 py-1.5 text-sm font-bold uppercase tracking-wider text-slate-500">
             {tn(GROUP_KEY[group])}
           </p>
           <ul className="divide-y divide-slate-100">
@@ -169,29 +170,29 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
                       <span className="text-xs font-extrabold text-slate-800">
                         {tn(navLabelKey(section.id))}
                       </span>
-                      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                      <code className="rounded-control bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-500">
                         {section.id}
                       </code>
                       {section.locked && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-600">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-slate-600">
                           <Lock className="h-2.5 w-2.5" /> Always on
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                    <p className="mt-0.5 truncate text-sm text-slate-500">
                       {section.description}
                     </p>
                   </div>
 
                   {section.locked ? (
-                    <span className="shrink-0 text-[11px] font-bold text-emerald-600">
+                    <span className="shrink-0 text-xs font-bold text-emerald-600">
                       Visible
                     </span>
                   ) : (
-                    <button
+                    <Button variant="unstyled"
                       onClick={() => toggle(section.id)}
                       disabled={saving || savingId !== ""}
-                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-surface border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-60 ${
                         visible
                           ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                           : "border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200"
@@ -206,7 +207,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
                         <EyeOff className="h-3 w-3" />
                       )}
                       {visible ? "Visible" : "Hidden"}
-                    </button>
+                    </Button>
                   )}
                 </li>
               );
@@ -222,7 +223,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
           hiding one removes that tab (or that utility row) for everyone, which
           is how "Country compare", "Mentors" and "Parents" are off by default. */}
       {!loading && (
-        <details className="rounded-2xl border border-slate-200 bg-white shadow-xs">
+        <details className="rounded-overlay border border-slate-200 bg-white shadow-xs">
           <summary className="cursor-pointer px-4 py-3 text-xs font-extrabold text-slate-700">
             Tabs and account screens ({NAV_SECTIONS.reduce((n, s) => n + s.panes.length, 0) + NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).length})
           </summary>
@@ -245,14 +246,14 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-700">{row.label}</span>
-                        <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{row.id}</code>
+                        <code className="rounded-control bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-500">{row.id}</code>
                       </div>
-                      <p className="mt-0.5 truncate text-[11px] text-slate-500">{row.description}</p>
+                      <p className="mt-0.5 truncate text-sm text-slate-500">{row.description}</p>
                     </div>
-                    <button
+                    <Button variant="unstyled"
                       onClick={() => toggle(row.id)}
                       disabled={saving || savingId !== ""}
-                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-surface border px-3 py-2 text-xs font-bold transition-colors disabled:opacity-60 ${
                         visible
                           ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                           : "border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200"
@@ -261,7 +262,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
                     >
                       {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                       {visible ? "Visible" : "Hidden"}
-                    </button>
+                    </Button>
                   </li>
                 );
               })}
@@ -270,10 +271,10 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
       )}
 
       {!loading && (
-        <button
+        <Button variant="unstyled"
           onClick={() => void persist([...DEFAULT_HIDDEN_NAV_ITEMS], "defaults")}
           disabled={savingId !== ""}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-surface border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
         >
           {savingId === "defaults" ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -281,7 +282,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
             <RotateCcw className="h-3.5 w-3.5" />
           )}
           Restore default visibility
-        </button>
+        </Button>
       )}
     </div>
   );

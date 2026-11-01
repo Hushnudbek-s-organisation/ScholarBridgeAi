@@ -17,6 +17,7 @@ import {
 import { AiFormattedText } from "./AiFormattedText";
 import { AnimatePresence, motion } from "framer-motion";
 import { AppNote } from "@/components/AppNote";
+import { Button } from "@/components/ui/Button";
 
 interface AiChatMentorProps {
   activeProfile: StudentProfile | null;
@@ -119,22 +120,22 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col h-[700px]">
+    <div className="bg-white dark:bg-slate-900 rounded-overlay border border-slate-200 dark:border-slate-700 shadow-xs overflow-hidden flex flex-col h-[700px]">
       {/* Chat Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 text-white p-4 flex items-center justify-between">
+      <div className="sb-brand-hero text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-400/30">
+          <div className="p-2 bg-indigo-500/20 rounded-surface border border-indigo-400/30">
             <Bot className="h-6 w-6 text-amber-300" />
           </div>
           <div>
             {/* h2 — the hosting hub already renders the screen's <h1>. */}
             <h2 className="font-bold text-base flex items-center gap-2">
               {t("chatCounselorTitle")}
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-semibold">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-semibold">
                 {t("chatOnline")}
               </span>
             </h2>
-            <p className="text-xs text-slate-300">
+            <p className="text-sm text-slate-300">
               {t("chatPersonalized", { name: activeProfile?.name ?? "", major: activeProfile?.targetMajor ?? "" })}
             </p>
           </div>
@@ -164,16 +165,16 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
             </div>
 
             <div
-              className={`min-w-0 p-4 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+              className={`min-w-0 p-4 rounded-overlay text-xs sm:text-sm leading-relaxed ${
                 m.sender === "user"
                   ? "whitespace-pre-wrap bg-indigo-600 text-white rounded-tr-none shadow-xs"
                   : m.error
-                  ? "bg-red-50 text-red-700 rounded-tl-none border border-red-200"
+                  ? "bg-rose-50 text-rose-700 rounded-tl-none border border-rose-200"
                   : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-xs"
               }`}
             >
               {m.offline && (
-                <span className="mb-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                <span className="mb-2 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">
                   {t("chatOfflineBadge")}
                 </span>
               )}
@@ -209,13 +210,13 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
       {/* Prompt Suggestions */}
       <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-white dark:bg-slate-900 p-3">
         {samplePrompts.map((prompt, i) => (
-          <button
+          <Button variant="unstyled"
             key={i}
             onClick={() => handleSend(prompt)}
             className="min-h-11 max-w-full rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 px-3 py-2 text-left text-xs text-slate-600 dark:text-slate-300 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
           >
             💡 {prompt}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -232,16 +233,16 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
           placeholder={t("inputPlaceholder")}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          className="flex-1 px-4 py-2.5 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          className="flex-1 px-4 py-2.5 text-sm sm:text-sm border border-slate-200 dark:border-slate-700 rounded-surface focus:ring-2 focus:ring-indigo-500 focus:outline-none"
         />
-        <button
+        <Button variant="unstyled"
           type="submit"
           disabled={loading || !input.trim()}
-          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition-colors disabled:opacity-50"
+          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-surface text-xs flex items-center gap-1.5 shadow-xs transition-colors disabled:opacity-50"
         >
           <Send className="h-4 w-4" />
           {t("send")}
-        </button>
+        </Button>
       </form>
 
       {/*

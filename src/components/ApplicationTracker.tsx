@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useTranslations } from "next-intl";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
 import confetti from "canvas-confetti";
 import { StudentProfile } from "./Navbar";
 import { University } from "./UniversityExplorer";
@@ -19,6 +20,15 @@ import {
   Clock
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
+import { Button } from "@/components/ui/Button";
+import {
+  localizeCity,
+  localizeCountry,
+  localizeCoverageType,
+  localizeMajorOrField,
+  localizeScholarshipProvider,
+  localizeScholarshipTitle,
+} from "@/lib/catalogLocalizer";
 
 export interface SavedUniversityItem {
   id: number;
@@ -59,12 +69,14 @@ export function ApplicationTracker({
   onRemoveSavedScholarship,
 }: ApplicationTrackerProps) {
   const tUniversity = useTranslations("university");
+  const t = useTranslations("applications.tracker");
+  const { locale } = useLocaleContext();
   const [activeSubTab, setActiveTab] = useState<"universities" | "scholarships">("universities");
   const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
   const [tempNotes, setTempNotes] = useState("");
 
-  const uniStatuses = ["Shortlisted", "Preparing Application", "Submitted", "Accepted", "Enrolled", "Rejected"];
-  const scholarshipStatuses = ["Saved", "Drafting Essay", "Docs Submitted", "Awarded", "Declined"];
+  const uniStatuses = ["Shortlisted", "Preparing Application", "Submitted", "Accepted", "Enrolled", "Rejected"] as const;
+  const scholarshipStatuses = ["Saved", "Drafting Essay", "Docs Submitted", "Awarded", "Declined"] as const;
 
   const fireCelebration = () => {
     try {
@@ -95,39 +107,39 @@ export function ApplicationTracker({
   return (
     <div className="space-y-6">
       {/* Sub Tab Picker */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+      <div className="bg-white rounded-overlay p-4 border border-slate-200 shadow-xs space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-lg sm:text-xl font-extrabold text-slate-900">
-            My Applications
+            {t("title")}
           </h1>
-          <p className="text-xs text-slate-500 hidden md:block">
-            Track stage milestones & notes for {activeProfile?.name}
+          <p className="text-sm text-slate-500 hidden md:block">
+            {t("subtitle", { name: activeProfile?.name || tUniversity("exProfileFallback") })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Button variant="unstyled"
             onClick={() => setActiveTab("universities")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            className={`flex min-h-11 items-center justify-center gap-2 px-4 py-2 rounded-surface text-sm font-bold transition-all ${
               activeSubTab === "universities"
                 ? "bg-indigo-600 text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
             <GraduationCap className="h-4 w-4" />
-            University Applications ({savedUniversities.length})
-          </button>
+            {t("universityTab", { count: savedUniversities.length })}
+          </Button>
 
-          <button
+          <Button variant="unstyled"
             onClick={() => setActiveTab("scholarships")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            className={`flex min-h-11 items-center justify-center gap-2 px-4 py-2 rounded-surface text-sm font-bold transition-all ${
               activeSubTab === "scholarships"
-                ? "bg-amber-500 text-slate-900 sb-ink-on-warm shadow-xs"
+                ? "bg-indigo-600 text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
             <Award className="h-4 w-4" />
-            Scholarship Applications ({savedScholarships.length})
-          </button>
+            {t("scholarshipTab", { count: savedScholarships.length })}
+          </Button>
         </div>
       </div>
 
@@ -135,8 +147,8 @@ export function ApplicationTracker({
       {activeSubTab === "universities" && (
         <div className="space-y-4">
           {savedUniversities.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
-              No universities shortlisted yet. Go to the <strong>University Explorer</strong> tab to search and save target programs.
+            <div className="p-12 text-center text-slate-500 bg-white rounded-overlay border border-slate-200">
+              {t.rich("emptyUniversities", { explorer: (chunks) => <strong>{chunks}</strong> })}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -149,38 +161,38 @@ export function ApplicationTracker({
                 return (
                   <div
                     key={item.id}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 hover:border-indigo-300 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+                    className="bg-white rounded-overlay border border-slate-200 shadow-xs p-5 hover:border-indigo-300 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
                   >
                     {/* Left Info */}
                     <div className="space-y-2 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{u.flagEmoji}</span>
                         <h3 className="font-bold text-base text-slate-900">{u.name}</h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <span className="px-2 py-0.5 rounded-control text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                           {tUniversity("exMatchPct", { score: item.matchScore })}
                         </span>
                       </div>
 
                       <div className="text-xs text-slate-600 flex flex-wrap items-center gap-3">
-                        <span>🎓 {u.programMajor}</span>
-                        <span>💵 Tuition: {formatMoney(u.annualTuitionUsd, "USD", { suffix: "/yr" })}</span>
-                        <span>📍 {u.city}, {u.country}</span>
+                        <span>🎓 {localizeMajorOrField(u.programMajor, locale)}</span>
+                        <span>💵 {t("tuition")}: {formatMoney(u.annualTuitionUsd, "USD", { suffix: "/yr" })}</span>
+                        <span>📍 {localizeCity(u.city, locale)}, {localizeCountry(u.country, locale)}</span>
                       </div>
 
                       {/* Notes Box */}
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 mt-2">
+                      <div className="bg-slate-50 p-3 rounded-surface border border-slate-100 text-xs text-slate-700 mt-2">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-slate-500 text-[10px] uppercase">My Application Notes:</span>
+                          <span className="font-bold text-slate-500 text-xs uppercase">{t("universityNotes")}</span>
                           {!isEditingThisNotes && (
-                            <button
+                            <Button variant="unstyled"
                               onClick={() => {
                                 setEditingNotesId(item.id);
                                 setTempNotes(item.notes || "");
                               }}
-                              className="text-[11px] text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
+                              className="flex min-h-11 items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
                             >
-                              <Edit3 className="h-3 w-3" /> Edit Notes
-                            </button>
+                              <Edit3 className="h-3 w-3" /> {t("editNotes")}
+                            </Button>
                           )}
                         </div>
 
@@ -190,21 +202,21 @@ export function ApplicationTracker({
                               rows={2}
                               value={tempNotes}
                               onChange={(e) => setTempNotes(e.target.value)}
-                              className="w-full p-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                              className="w-full p-2 border border-slate-300 rounded-control text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             />
-                            <button
+                            <Button variant="unstyled"
                               onClick={async () => {
                                 await onUpdateSavedUniStatus(item.id, item.status, tempNotes);
                                 setEditingNotesId(null);
                               }}
-                              className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1"
+                              className="flex min-h-11 items-center gap-1 rounded-control bg-indigo-600 px-3 py-1 text-xs font-semibold text-white"
                             >
-                              <Save className="h-3 w-3" /> Save Notes
-                            </button>
+                              <Save className="h-3 w-3" /> {t("saveNotes")}
+                            </Button>
                           </div>
                         ) : (
                           <p className="italic text-slate-600">
-                            {item.notes ? item.notes : "No custom notes written. Click Edit Notes to add reminders."}
+                            {item.notes ? item.notes : t("noNotes")}
                           </p>
                         )}
                       </div>
@@ -213,21 +225,21 @@ export function ApplicationTracker({
                     {/* Right Controls */}
                     <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end gap-3 w-full md:w-auto shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Status</label>
+                        <label className="block text-sm font-bold text-slate-500 uppercase mb-1">{t("status")}</label>
                         <select
                           value={item.status}
                           onChange={(e) => handleUniStatusChange(item.id, e.target.value)}
-                          className={`px-3 py-1.5 text-xs font-extrabold rounded-xl border focus:outline-none cursor-pointer ${
+                          className={`min-h-11 rounded-surface px-3 py-1.5 text-sm font-extrabold border focus:outline-none cursor-pointer ${
                             item.status === "Accepted" || item.status === "Enrolled"
                               ? "bg-emerald-100 text-emerald-900 border-emerald-300"
                               : item.status === "Submitted"
-                              ? "bg-blue-100 text-blue-900 border-blue-300"
+                              ? "bg-sky-100 text-sky-900 border-sky-300"
                               : "bg-slate-100 text-slate-800 border-slate-300"
                           }`}
                         >
                           {uniStatuses.map((st) => (
                             <option key={st} value={st}>
-                              {st}
+                              {t(`uniStatus.${st}`)}
                             </option>
                           ))}
                         </select>
@@ -238,18 +250,18 @@ export function ApplicationTracker({
                           href={u.websiteUrl ?? undefined}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-2 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-xl"
-                          title="Portal"
+                          className="flex min-h-11 min-w-11 items-center justify-center rounded-surface bg-slate-100 p-2 text-slate-500 hover:text-slate-600"
+                          title={t("portal")}
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
-                        <button
+                        <Button variant="unstyled"
                           onClick={() => onRemoveSavedUni(item.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                          title="Remove from list"
+                          className="flex min-h-11 min-w-11 items-center justify-center rounded-surface p-2 text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                          title={t("remove")}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -264,8 +276,8 @@ export function ApplicationTracker({
       {activeSubTab === "scholarships" && (
         <div className="space-y-4">
           {savedScholarships.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
-              No scholarships tracked yet. Explore the <strong>Scholarship Hub</strong> tab to discover and track eligible grants.
+            <div className="p-12 text-center text-slate-500 bg-white rounded-overlay border border-slate-200">
+              {t.rich("emptyScholarships", { hub: (chunks) => <strong>{chunks}</strong> })}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -278,38 +290,38 @@ export function ApplicationTracker({
                 return (
                   <div
                     key={item.id}
-                    className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 hover:border-amber-300 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+                    className="bg-white rounded-overlay border border-slate-200 shadow-xs p-5 hover:border-indigo-300 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
                   >
                     {/* Left Info */}
                     <div className="space-y-2 flex-1">
                       <div className="flex items-center gap-2">
                         <Award className="h-5 w-5 text-amber-500" />
-                        <h3 className="font-bold text-base text-slate-900">{s.title}</h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                          {s.provider}
+                        <h3 className="font-bold text-base text-slate-900">{localizeScholarshipTitle(s.title, locale)}</h3>
+                        <span className="px-2 py-0.5 rounded-control text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200">
+                          {localizeScholarshipProvider(s.provider, locale)}
                         </span>
                       </div>
 
                       <div className="text-xs text-slate-600 flex flex-wrap items-center gap-3">
-                        <span>💰 Value: {formatMoney(s.amountUsdValue, "USD", { suffix: "/yr" })}</span>
-                        <span>💵 Type: {s.coverageType}</span>
-                        <span>📅 Deadline: {s.deadline}</span>
+                        <span>💰 {t("value")}: {formatMoney(s.amountUsdValue, "USD", { suffix: "/yr" })}</span>
+                        <span>💵 {t("type")}: {localizeCoverageType(s.coverageType, locale)}</span>
+                        <span>📅 {t("deadline")}: {s.deadline}</span>
                       </div>
 
                       {/* Notes Box */}
-                      <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 text-xs text-amber-900 mt-2">
+                      <div className="bg-slate-50 p-3 rounded-surface border border-slate-100 text-xs text-slate-700 mt-2">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-amber-800 text-[10px] uppercase">Scholarship Checklist & Notes:</span>
+                          <span className="font-bold text-slate-500 text-xs uppercase">{t("scholarshipNotes")}</span>
                           {!isEditingThisNotes && (
-                            <button
+                            <Button variant="unstyled"
                               onClick={() => {
                                 setEditingNotesId(item.id);
                                 setTempNotes(item.notes || "");
                               }}
-                              className="text-[11px] text-amber-800 hover:underline flex items-center gap-1 font-semibold"
+                              className="min-h-11 text-xs text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
                             >
-                              <Edit3 className="h-3 w-3" /> Edit Notes
-                            </button>
+                              <Edit3 className="h-3 w-3" /> {t("editNotes")}
+                            </Button>
                           )}
                         </div>
 
@@ -319,21 +331,21 @@ export function ApplicationTracker({
                               rows={2}
                               value={tempNotes}
                               onChange={(e) => setTempNotes(e.target.value)}
-                              className="w-full p-2 border border-amber-300 rounded-lg text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                              className="w-full p-2 border border-slate-300 rounded-control text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             />
-                            <button
+                            <Button variant="unstyled"
                               onClick={async () => {
                                 await onUpdateSavedScholarshipStatus(item.id, item.status, tempNotes);
                                 setEditingNotesId(null);
                               }}
-                              className="px-3 py-1 bg-amber-500 text-slate-900 sb-ink-on-warm rounded-lg text-xs font-bold flex items-center gap-1"
+                              className="px-3 py-1 bg-indigo-600 text-white rounded-control text-xs font-bold flex items-center gap-1"
                             >
-                              <Save className="h-3 w-3" /> Save Notes
-                            </button>
+                              <Save className="h-3 w-3" /> {t("saveNotes")}
+                            </Button>
                           </div>
                         ) : (
                           <p className="italic text-slate-700">
-                            {item.notes ? item.notes : "No custom notes written yet."}
+                            {item.notes ? item.notes : t("noScholarshipNotes")}
                           </p>
                         )}
                       </div>
@@ -342,21 +354,21 @@ export function ApplicationTracker({
                     {/* Right Controls */}
                     <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end gap-3 w-full md:w-auto shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Status</label>
+                        <label className="block text-sm font-bold text-slate-500 uppercase mb-1">{t("status")}</label>
                         <select
                           value={item.status}
                           onChange={(e) => handleScholarshipStatusChange(item.id, e.target.value)}
-                          className={`px-3 py-1.5 text-xs font-extrabold rounded-xl border focus:outline-none cursor-pointer ${
+                          className={`min-h-11 rounded-surface px-3 py-1.5 text-sm font-extrabold border focus:outline-none cursor-pointer ${
                             item.status === "Awarded"
                               ? "bg-emerald-100 text-emerald-900 border-emerald-300"
                               : item.status === "Docs Submitted"
-                              ? "bg-amber-100 text-amber-900 border-amber-300"
+                              ? "bg-sky-100 text-sky-900 border-sky-300"
                               : "bg-slate-100 text-slate-800 border-slate-300"
                           }`}
                         >
                           {scholarshipStatuses.map((st) => (
                             <option key={st} value={st}>
-                              {st}
+                              {t(`scholarshipStatus.${st}`)}
                             </option>
                           ))}
                         </select>
@@ -367,18 +379,18 @@ export function ApplicationTracker({
                           href={s.websiteUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-2 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-xl"
-                          title="Portal"
+                          className="flex min-h-11 min-w-11 items-center justify-center rounded-surface bg-slate-100 p-2 text-slate-500 hover:text-slate-600"
+                          title={t("portal")}
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>
-                        <button
+                        <Button variant="unstyled"
                           onClick={() => onRemoveSavedScholarship(item.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                          title="Remove from list"
+                          className="flex min-h-11 min-w-11 items-center justify-center rounded-surface p-2 text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                          title={t("remove")}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>

@@ -46,6 +46,7 @@ import {
   type TimelineDeadline,
   type TimelineTest,
 } from "@/lib/smartTimeline";
+import { Button } from "@/components/ui/Button";
 
 /** One row of `GET /api/deadlines` — applications, scholarships, tasks, tests. */
 export interface DeadlineRow {
@@ -375,14 +376,14 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
   };
 
   return (
-    <section className={`rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 ${className}`} aria-labelledby="smart-timeline-title">
+    <section className={`rounded-overlay border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-5 ${className}`} aria-labelledby="smart-timeline-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 id="smart-timeline-title" className="flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
             <CalendarClock className="h-4 w-4 text-indigo-600" aria-hidden />
             {t("title")}
           </h3>
-          <p className="mt-1 max-w-2xl break-words text-[11px] leading-relaxed text-slate-500">
+          <p className="mt-1 max-w-2xl break-words text-sm leading-relaxed text-slate-500">
             {t("subtitle", {
               examLead: MIN_EXAM_LEAD_DAYS,
               tight: TIGHT_DEADLINE_DAYS,
@@ -390,22 +391,22 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-1.5">
-          <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+          <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
             {t("counts.deadlines", { count: timeline.counts.deadlines })}
           </span>
-          <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+          <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
             {t("counts.steps", { count: timeline.counts.milestones })}
           </span>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => setDetailedSteps((v) => !v)}
             aria-pressed={detailedSteps}
-            className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200"
+            className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200"
           >
             {t(detailedSteps ? "modeEssential" : "modeDetailed")}
-          </button>
+          </Button>
           {timeline.counts.overdue > 0 && (
-            <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+            <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
               {t("counts.overdue", { count: timeline.counts.overdue })}
             </span>
           )}
@@ -413,14 +414,14 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
       </div>
 
       {loading && (
-        <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+        <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-500">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
           {t("loading")}
         </p>
       )}
 
       {!loading && error && (
-        <p role="alert" className="mt-3 break-words rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+        <p role="alert" className="mt-3 break-words rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
           {error}
         </p>
       )}
@@ -436,7 +437,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                   <p
                     key={`${conflict.id}-${index}`}
                     role={conflict.severity === "critical" ? "alert" : "status"}
-                    className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold leading-relaxed ${SEVERITY_TONE[conflict.severity]}`}
+                    className={`flex items-start gap-2 rounded-surface border px-3 py-2 text-sm font-semibold leading-relaxed ${SEVERITY_TONE[conflict.severity]}`}
                   >
                     <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
                     <span className="min-w-0 break-words whitespace-normal">
@@ -459,7 +460,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
           )}
 
           {timeline.conflicts.length === 0 && datedPlans.length > 0 && (
-            <p className="mt-3 flex items-start gap-2 break-words rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+            <p className="mt-3 flex items-start gap-2 break-words rounded-surface border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold leading-relaxed text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
               {t("noConflicts", { count: datedPlans.length })}
             </p>
@@ -467,7 +468,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
 
           {/* ---- one backwards plan per dated deadline ---- */}
           {visiblePlans.length === 0 && !loading && (
-            <p className="mt-3 break-words rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-3 py-3 text-[11px] leading-relaxed text-slate-500">
+            <p className="mt-3 break-words rounded-surface border border-dashed border-slate-200 dark:border-slate-700 px-3 py-3 text-sm leading-relaxed text-slate-500">
               {timeline.counts.undatedDeadlines > 0 ? t("emptyUndated", { count: timeline.counts.undatedDeadlines }) : t("empty")}
             </p>
           )}
@@ -484,11 +485,11 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
               const syncCount = synced[key];
 
               return (
-                <article key={key} className="rounded-xl border border-slate-200 dark:border-slate-700">
+                <article key={key} className="rounded-surface border border-slate-200 dark:border-slate-700">
                   <div className="flex flex-wrap items-start justify-between gap-2 p-3">
                     <div className="min-w-0">
-                      <p className="break-words text-xs font-extrabold text-slate-900 dark:text-slate-100">{plan.deadline.label}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-600">
+                      <p className="break-words text-sm font-extrabold text-slate-900 dark:text-slate-100">{plan.deadline.label}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-600">
                         <span className="inline-flex items-center gap-1 font-semibold">
                           <Clock className="h-3 w-3" aria-hidden />
                           {formatDate(plan.date)}
@@ -517,7 +518,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                             tooltip. Suggestions are labelled as such. */}
                         {typeof meta?.chanceScore === "number" && (
                           <span
-                            className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-1.5 py-0.5 text-[10px] font-extrabold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200"
+                            className="inline-flex items-center gap-1 rounded-control bg-violet-100 px-1.5 py-0.5 text-xs font-extrabold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200"
                             title={typeof meta.matchScore === "number" ? t("planFitBadge", { score: meta.matchScore }) : undefined}
                           >
                             🎯 {t("planChanceBadge", { score: meta.chanceScore })}
@@ -527,25 +528,25 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                           </span>
                         )}
                         {!meta?.saved && meta?.recommended && (
-                          <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
+                          <span className="rounded-control bg-indigo-100 px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wide text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200">
                             {t("recommendedTag")}
                           </span>
                         )}
                       </p>
                       {plan.overdue.length > 0 && (
-                        <p className="mt-1 break-words text-[11px] font-bold text-rose-700 dark:text-rose-300">
+                        <p className="mt-1 break-words text-sm font-bold text-rose-700 dark:text-rose-300">
                           {t("overdueSteps", { count: plan.overdue.length })}
                         </p>
                       )}
                     </div>
 
                     <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                      <button
+                      <Button variant="unstyled"
                         type="button"
                         onClick={() => void syncPlan(plan)}
                         disabled={syncing != null}
                         title={t("syncHint")}
-                        className="flex min-h-11 items-center gap-1 rounded-xl bg-indigo-600 px-3 py-2 text-[11px] font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:opacity-60"
+                        className="flex min-h-11 items-center gap-1 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-700 disabled:opacity-60"
                       >
                         {syncing === key ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -559,16 +560,16 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                             ? t("synced", { count: syncCount })
                             : t("syncedNone")
                           : t("sync")}
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="unstyled"
                         type="button"
                         onClick={() => togglePlan(key)}
                         aria-expanded={open}
-                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-slate-200 dark:border-slate-700 px-2 py-2 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+                        className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-surface border border-slate-200 dark:border-slate-700 px-2 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
                       >
                         {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
                         {t(open ? "hideSteps" : "showSteps", { count: applicable.length })}
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -580,14 +581,14 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                           return (
                             <li
                               key={milestone.id}
-                              className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 ${
+                              className={`flex items-start gap-2 rounded-control border px-2.5 py-1.5 ${
                                 overdue
                                   ? "border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10"
                                   : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                               }`}
                             >
                               <span
-                                className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${
+                                className={`mt-0.5 shrink-0 rounded-control px-1.5 py-0.5 text-xs font-extrabold ${
                                   overdue
                                     ? "bg-rose-600 text-white"
                                     : "bg-slate-100 text-slate-700"
@@ -596,14 +597,14 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                                 D−{milestone.offsetDays}
                               </span>
                               <span className="min-w-0 flex-1">
-                                <span className="block break-words text-[11px] font-bold text-slate-800">
+                                <span className="block break-words text-xs font-bold text-slate-800">
                                   {t(`milestones.${milestone.id}.label`)}
                                 </span>
-                                <span className="block break-words text-[10px] leading-relaxed text-slate-600 whitespace-normal">
+                                <span className="block break-words text-xs leading-relaxed text-slate-600 whitespace-normal">
                                   {t(`milestones.${milestone.id}.why`)}
                                 </span>
                               </span>
-                              <span className={`shrink-0 text-right text-[10px] font-bold ${overdue ? "text-rose-700 dark:text-rose-200" : "text-slate-600"}`}>
+                              <span className={`shrink-0 text-right text-xs font-bold ${overdue ? "text-rose-700 dark:text-rose-200" : "text-slate-600"}`}>
                                 {formatDate(milestone.dueDate)}
                                 {overdue && (
                                   <span className="block font-semibold">
@@ -617,7 +618,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                       </ol>
 
                       {skipped.length > 0 && (
-                        <p className="mt-2 break-words text-[10px] leading-relaxed text-slate-500">
+                        <p className="mt-2 break-words text-sm leading-relaxed text-slate-500">
                           {skipped
                             .map((milestone) =>
                               t(`milestones.${milestone.id as MilestoneId}.skipped.${milestone.notApplicableReason ?? "country_unknown"}`)
@@ -634,20 +635,20 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
 
           <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
             {prioritizedPlans.plans.length > 3 && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
                 aria-expanded={showAll}
-                className="flex min-h-11 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-indigo-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-indigo-300"
+                className="flex min-h-11 items-center gap-1 rounded-control px-2 text-xs font-bold text-indigo-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-indigo-300"
               >
                 {showAll ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
                 {showAll
                   ? t("showLessPlans")
                   : t("showAllPlans", { count: prioritizedPlans.plans.length - visiblePlans.length })}
-              </button>
+              </Button>
             )}
             {prioritizedPlans.expiredCount > 0 && (
-              <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+              <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2 py-0.5 text-xs font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
                 {t("expiredPlans", { count: prioritizedPlans.expiredCount })}
               </span>
             )}
@@ -655,11 +656,11 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
 
           {/* ---- the flat, nearest-first list: what to do this week ---- */}
           {nextUpEntries.length > 0 && (
-            <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{t("nextUpTitle")}</p>
+            <div className="mt-4 rounded-surface border border-slate-200 dark:border-slate-700 bg-slate-50 p-3">
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("nextUpTitle")}</p>
               <ul className="mt-2 space-y-1">
                 {(showAllSteps ? nextUpEntries : nextUpEntries.slice(0, 4)).map((entry, index) => (
-                  <li key={`${entry.deadlineId ?? entry.deadlineLabel}-${entry.milestone.id}-${index}`} className="flex flex-wrap items-baseline gap-x-2 text-[11px]">
+                  <li key={`${entry.deadlineId ?? entry.deadlineLabel}-${entry.milestone.id}-${index}`} className="flex flex-wrap items-baseline gap-x-2 text-sm">
                     <span className="font-extrabold text-slate-800">{formatDate(entry.milestone.dueDate)}</span>
                     <span className="min-w-0 break-words font-semibold text-slate-700 whitespace-normal">
                       {t(`milestones.${entry.milestone.id}.label`)}
@@ -675,30 +676,30 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                 ))}
               </ul>
               {nextUpEntries.length > 4 && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => setShowAllSteps((v) => !v)}
                   aria-expanded={showAllSteps}
-                  className="mt-1.5 flex min-h-11 items-center gap-1 text-[11px] font-bold text-indigo-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                  className="mt-1.5 flex min-h-11 items-center gap-1 text-xs font-bold text-indigo-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
                 >
                   {showAllSteps ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
                   {showAllSteps ? t("showLessSteps") : t("showMoreSteps", { count: nextUpEntries.length - 4 })}
-                </button>
+                </Button>
               )}
               {onNavigateTab && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => onNavigateTab("tasks")}
-                  className="mt-2 flex min-h-11 items-center gap-1 text-[11px] font-bold text-indigo-700 hover:underline"
+                  className="mt-2 flex min-h-11 items-center gap-1 text-xs font-bold text-indigo-700 hover:underline"
                 >
                   {t("openTasks")}
-                </button>
+                </Button>
               )}
             </div>
           )}
 
           {syncError && (
-            <p role="alert" className="mt-3 break-words rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+            <p role="alert" className="mt-3 break-words rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
               {syncError}
             </p>
           )}

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { X, CreditCard, ArrowRight } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
 import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
+import { Button } from "@/components/ui/Button";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -76,21 +77,21 @@ export function CheckoutModal({
         tabIndex={-1}
         aria-modal="true"
         aria-labelledby="checkout-modal-title"
-        className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4 dark:border-slate-700"
+        className="bg-white rounded-overlay border border-slate-200 p-6 max-w-md w-full shadow-xl space-y-4 dark:border-slate-700"
       >
         <div className="flex items-center justify-between">
           <h3 id="checkout-modal-title" className="font-bold text-slate-900 text-lg">{t("checkout")}</h3>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onClose}
             aria-label={t("cancel")}
-            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+            className="p-1.5 rounded-control text-slate-500 hover:bg-slate-100"
           >
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
-        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+        <div className="bg-indigo-50 border border-indigo-100 rounded-surface p-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-indigo-700">
               {t("planLabel")}: {label}
@@ -99,20 +100,20 @@ export function CheckoutModal({
               {price === null ? "—" : `${price.toLocaleString("uz-UZ")} UZS`}
             </span>
           </div>
-          <p className="text-[11px] text-indigo-600 mt-1">/ {days ?? "—"} days</p>
+          <p className="text-sm text-indigo-600 mt-1">/ {days ?? "—"} days</p>
         </div>
 
-        <p className="text-xs font-semibold text-slate-600">{t("chooseProvider")}</p>
+        <p className="text-sm font-semibold text-slate-600">{t("chooseProvider")}</p>
 
         <div className="space-y-2">
           {(["payme", "click"] as const).map((provider) => (
-            <button
+            <Button variant="unstyled"
               key={provider}
               onClick={() => startCheckout(provider)}
               disabled={loading || price === null}
               // Solid, theme-safe fills (no inline gradient that ignores the
               // theme). sky-700 / indigo-600 keep white copy above 4.5:1.
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-white font-bold text-sm shadow-sm hover:shadow-md transition-all disabled:opacity-50 ${
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-surface text-white font-bold text-sm shadow-sm hover:shadow-md transition-all disabled:opacity-50 ${
                 provider === "payme" ? "bg-sky-700 hover:bg-sky-800" : "bg-indigo-600 hover:bg-indigo-700"
               }`}
             >
@@ -123,19 +124,19 @@ export function CheckoutModal({
               <span className="text-xs opacity-80">
                 {t("payWith")} {provider === "payme" ? "Payme" : "Click"}
               </span>
-            </button>
+            </Button>
           ))}
         </div>
 
-        {loading && <p className="text-xs text-slate-500 text-center">{t("redirecting")}...</p>}
-        {error && <p className="text-xs text-red-600 text-center">{error}</p>}
+        {loading && <p className="text-sm text-slate-500 text-center">{t("redirecting")}...</p>}
+        {error && <p className="text-sm text-rose-600 text-center">{error}</p>}
 
-        <button
+        <Button variant="unstyled"
           onClick={onClose}
-          className="w-full py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 flex items-center justify-center gap-1"
+          className="w-full py-2.5 rounded-surface text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 flex items-center justify-center gap-1"
         >
           {t("cancel")} <ArrowRight className="h-3.5 w-3.5 rotate-180" />
-        </button>
+        </Button>
       </div>
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
       <AppNote kind="thirdParty" className="mt-2" />

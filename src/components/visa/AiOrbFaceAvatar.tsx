@@ -23,6 +23,7 @@
  */
 
 import React, { useEffect, useState, useSyncExternalStore } from "react";
+import { SVG_COLORS } from "@/components/ui/tokens";
 
 export type AiOrbFaceState = "LISTENING" | "THINKING" | "SPEAKING" | "IDLE";
 
@@ -242,12 +243,12 @@ export function AiOrbFaceAvatar({
           role="img"
           aria-label={countryName ? `${roleLabel} — ${countryName}` : roleLabel}
         >
-          <circle cx="110" cy="110" r="108" fill="#ffffff" />
+          <circle cx="110" cy="110" r="108" fill={SVG_COLORS.white} />
           <g transform={eyeTransform(64)}>
-            <ellipse cx="64" cy="110" rx="17" ry="22" fill="#000000" />
+            <ellipse cx="64" cy="110" rx="17" ry="22" fill={SVG_COLORS.black} />
           </g>
           <g transform={eyeTransform(156)}>
-            <ellipse cx="156" cy="110" rx="17" ry="22" fill="#000000" />
+            <ellipse cx="156" cy="110" rx="17" ry="22" fill={SVG_COLORS.black} />
           </g>
 
           {/* Keep lip-sync, but use the same solid black as the resting mouth. */}
@@ -259,10 +260,10 @@ export function AiOrbFaceAvatar({
               height={mouthH}
               rx={mouthW / 2}
               ry={mouthW / 2}
-              fill="#000000"
+              fill={SVG_COLORS.black}
             />
           ) : (
-            <path d="M 90 128 C 90 120, 130 120, 130 128 C 130 139, 90 139, 90 128 Z" fill="#000000" />
+            <path d="M 90 128 C 90 120, 130 120, 130 128 C 130 139, 90 139, 90 128 Z" fill={SVG_COLORS.black} />
           )}
         </svg>
 
@@ -283,7 +284,7 @@ export function AiOrbFaceAvatar({
       {/* One clean status pill — this is where "THINKING" and a vendor name
           used to be printed side by side. */}
       <span
-        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold ${PILL_RING[state]} bg-white/85 text-slate-700 dark:bg-[#131f38]/90 dark:text-slate-200`}
+        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${PILL_RING[state]} bg-white/85 text-slate-700 dark:bg-surface/90 dark:text-slate-200`}
         role="status"
         aria-live="polite"
       >

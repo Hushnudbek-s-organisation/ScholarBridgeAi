@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Component, ReactNode } from "react";
+import { Button } from "@/components/ui/Button";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -34,15 +35,15 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.hasError) {
       return (
         this.props.fallback ?? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
-            <p className="text-xs font-bold text-amber-800">This section failed to load.</p>
-            <p className="text-[11px] text-amber-600 mt-1 break-all">{this.state.message}</p>
-            <button
+          <div className="rounded-overlay border border-amber-200 bg-amber-50 p-6 text-center">
+            <p className="text-sm font-bold text-amber-800">This section failed to load.</p>
+            <p className="text-sm text-amber-600 mt-1 break-all">{this.state.message}</p>
+            <Button variant="unstyled"
               onClick={() => this.setState({ hasError: false, message: "" })}
-              className="mt-3 rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-slate-800"
+              className="mt-3 rounded-control bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
             >
               Try again
-            </button>
+            </Button>
           </div>
         )
       );

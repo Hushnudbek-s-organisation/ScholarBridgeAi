@@ -190,9 +190,9 @@ export default async function ScholarshipsPage({
       <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
         <PublicCatalogHeader />
         <main className="mx-auto max-w-7xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
-          <div role="alert" className="mx-auto max-w-xl rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
-            <h1 className="text-lg font-bold text-red-900">{copy.scholarshipHeading}</h1>
-            <p className="mt-2 text-sm text-red-700">{copy.scholarshipsLoadError}</p>
+          <div role="alert" className="mx-auto max-w-xl rounded-overlay border border-rose-200 bg-rose-50 p-8 text-center">
+            <h1 className="text-lg font-bold text-rose-900">{copy.scholarshipHeading}</h1>
+            <p className="mt-2 text-sm text-rose-700">{copy.scholarshipsLoadError}</p>
           </div>
         </main>
       </LocaleProvider>
@@ -232,7 +232,7 @@ export default async function ScholarshipsPage({
         </header>
 
         {scholarships.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
+          <div className="rounded-overlay border border-slate-200 bg-white p-12 text-center">
             <p className="text-sm font-medium text-slate-600">{copy.noScholarships}</p>
           </div>
         ) : (
@@ -240,16 +240,16 @@ export default async function ScholarshipsPage({
             {scholarships.map((scholarship) => (
               <article
                 key={scholarship.id}
-                className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
+                className="flex flex-col rounded-overlay border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
               >
-                <span className="inline-flex min-h-7 w-fit max-w-full items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200 ring-inset">
+                <span className="inline-flex min-h-7 w-fit max-w-full items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 ring-inset">
                   <span className="break-words">{localizeCoverageType(scholarship.coverage_type, locale) || copy.coverageNotSpecified}</span>
                 </span>
                 {/* A passed date is stated, not hidden: the award stays in the
                     catalogue (its next round is usually the same page) but the
                     card must not look like something to apply to today. */}
                 {scholarship.state === "passed" && (
-                  <span className="mt-2 inline-flex w-fit items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-300 ring-inset">
+                  <span className="mt-2 inline-flex w-fit items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 ring-inset">
                     {copy.deadlinePassed}
                   </span>
                 )}
@@ -257,7 +257,7 @@ export default async function ScholarshipsPage({
                 <h2 className="mt-2 break-words text-sm font-bold text-slate-900 sm:text-base">
                   {localizeScholarshipTitle(scholarship.title, locale)}
                 </h2>
-                <p className="mt-0.5 break-words text-xs text-slate-600 sm:text-sm">
+                <p className="mt-0.5 break-words text-sm text-slate-600 sm:text-sm">
                   {localizeScholarshipProvider(scholarship.provider, locale)}
                 </p>
 
@@ -275,7 +275,7 @@ export default async function ScholarshipsPage({
                     </p>
                   )}
                   {scholarship.state === "passed" && (
-                    <p className="text-[11px] leading-relaxed text-slate-500">{copy.deadlinePassedHint}</p>
+                    <p className="text-sm leading-relaxed text-slate-500">{copy.deadlinePassedHint}</p>
                   )}
                   {/* A stored 0 means "the provider publishes no cash value" —
                       rendering "$0" would read as a real, zero-dollar award. */}
@@ -294,7 +294,7 @@ export default async function ScholarshipsPage({
                 <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4">
                   <Link
                     href={`/scholarships/${scholarship.id}`}
-                    className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-blue-700 px-3 text-xs font-semibold text-white hover:bg-blue-800 sm:text-sm"
+                    className="inline-flex min-h-11 items-center gap-1 rounded-surface bg-blue-700 px-3 text-xs font-semibold text-white hover:bg-blue-800 sm:text-sm"
                   >
                     {copy.viewDetails}
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -320,7 +320,7 @@ export default async function ScholarshipsPage({
 
         <PublicFeaturePromo className="mt-6" />
 
-        <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-600">
+        <p className="mt-6 border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-600">
           {copy.independentGuide}
         </p>
       </main>

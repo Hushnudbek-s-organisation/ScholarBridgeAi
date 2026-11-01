@@ -16,6 +16,7 @@
  */
 import React, { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Save, Zap } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface ConfigRow {
   key: string;
@@ -235,7 +236,7 @@ export function AiCostPanel() {
 
   if (loading && !Object.keys(config).length) {
     return (
-      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-xs font-semibold text-slate-500">
+      <div className="flex items-center gap-2 rounded-overlay border border-slate-200 bg-white p-6 text-xs font-semibold text-slate-500">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading AI cost settings…
       </div>
     );
@@ -244,14 +245,14 @@ export function AiCostPanel() {
   const budgetLine = (label: string, b: { spendUsd: number; limitUsd: number | null; percent: number | null }) => {
     const over = b.limitUsd !== null && b.spendUsd >= b.limitUsd;
     const warn = !over && b.percent !== null && b.percent >= (report?.budget.limits.warnPercent ?? 80);
-    const tone = over ? "text-red-700 bg-red-50 border-red-200" : warn ? "text-amber-800 bg-amber-50 border-amber-200" : "text-slate-700 bg-slate-50 border-slate-200";
+    const tone = over ? "text-rose-700 bg-rose-50 border-rose-200" : warn ? "text-amber-800 bg-amber-50 border-amber-200" : "text-slate-700 bg-slate-50 border-slate-200";
     return (
-      <div className={`rounded-xl border p-3 ${tone}`}>
-        <p className="text-[10px] font-extrabold uppercase tracking-wide opacity-70">{label}</p>
+      <div className={`rounded-surface border p-3 ${tone}`}>
+        <p className="text-sm font-extrabold uppercase tracking-wide opacity-70">{label}</p>
         <p className="mt-1 text-sm font-extrabold">
           {fmtUsd(b.spendUsd)} <span className="text-xs font-semibold opacity-70">/ {b.limitUsd === null ? "no limit" : fmtUsd(b.limitUsd)}</span>
         </p>
-        <p className="text-[11px] font-semibold">
+        <p className="text-sm font-semibold">
           {over ? "Paid AI is blocked in this window." : warn ? "Near the limit — warning." : b.percent === null ? "Not limited." : `${b.percent}% used`}
         </p>
       </div>
@@ -260,7 +261,7 @@ export function AiCostPanel() {
 
   const msg = (group: string) =>
     messages[group]?.text ? (
-      <p role="status" className={`mt-2 flex items-start gap-1.5 text-xs font-semibold ${messages[group].ok ? "text-emerald-700" : "text-red-700"}`}>
+      <p role="status" className={`mt-2 flex items-start gap-1.5 text-sm font-semibold ${messages[group].ok ? "text-emerald-700" : "text-rose-700"}`}>
         {messages[group].ok ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
         <span>{messages[group].text}</span>
       </p>
@@ -269,11 +270,11 @@ export function AiCostPanel() {
   return (
     <div className="space-y-6">
       {/* ---------------- Spend report ---------------- */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <section className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-extrabold text-slate-900">Spend & budgets</h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
               USD is shown only for requests whose cost is known (provider-reported or priced). Requests without a price are counted separately.
             </p>
           </div>
@@ -282,7 +283,7 @@ export function AiCostPanel() {
               aria-label="Report window"
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-              className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold"
+              className="rounded-control border border-slate-200 px-2 py-1.5 text-sm font-semibold"
             >
               {[7, 30, 90].map((d) => (
                 <option key={d} value={d}>
@@ -290,44 +291,44 @@ export function AiCostPanel() {
                 </option>
               ))}
             </select>
-            <button type="button" onClick={() => void load()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
+            <Button variant="unstyled" type="button" onClick={() => void load()} className="inline-flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
               <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </button>
+            </Button>
           </div>
         </div>
 
-        {loadError && <p className="mb-3 text-xs font-semibold text-red-700">{loadError}</p>}
+        {loadError && <p className="mb-3 text-sm font-semibold text-rose-700">{loadError}</p>}
 
         {report ? (
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {budgetLine("Today (UTC)", report.budget.usage.daily)}
               {budgetLine("This month (UTC)", report.budget.usage.monthly)}
-              <div className="rounded-xl border border-slate-200 p-3">
-                <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Known cost, {report.windowDays}d</p>
+              <div className="rounded-surface border border-slate-200 p-3">
+                <p className="text-sm font-extrabold uppercase tracking-wide text-slate-500">Known cost, {report.windowDays}d</p>
                 <p className="mt-1 text-sm font-extrabold text-slate-900">{fmtUsd(report.totals.knownCostUsd)}</p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-sm text-slate-500">
                   Coverage {report.totals.knownCostCoveragePct === null ? "—" : `${report.totals.knownCostCoveragePct}%`} of successful requests
                 </p>
               </div>
-              <div className="rounded-xl border border-slate-200 p-3">
-                <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Requests, {report.windowDays}d</p>
+              <div className="rounded-surface border border-slate-200 p-3">
+                <p className="text-sm font-extrabold uppercase tracking-wide text-slate-500">Requests, {report.windowDays}d</p>
                 <p className="mt-1 text-sm font-extrabold text-slate-900">{fmtInt(report.totals.requests)}</p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-sm text-slate-500">
                   {fmtInt(report.totals.failed)} failed · {fmtInt(report.totals.fallbacks)} fallback · {fmtInt(report.totals.retried)} retried
                 </p>
               </div>
             </div>
 
             {report.totals.unknownCostRequests > 0 && (
-              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+              <p className="mt-3 rounded-surface border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
                 {fmtInt(report.totals.unknownCostRequests)} successful request(s) have no known cost. Add a price for each model below to include them in the USD total.
               </p>
             )}
 
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <div>
-                <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">By provider</p>
+                <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">By provider</p>
                 <table className="w-full text-left text-xs">
                   <thead className="text-slate-500">
                     <tr>
@@ -341,7 +342,7 @@ export function AiCostPanel() {
                   <tbody>
                     {report.byProvider.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-2 text-slate-400">No AI requests in this window.</td>
+                        <td colSpan={5} className="py-2 text-slate-500">No AI requests in this window.</td>
                       </tr>
                     )}
                     {report.byProvider.map((r) => (
@@ -357,11 +358,11 @@ export function AiCostPanel() {
                 </table>
               </div>
               <div>
-                <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Models in use with no price</p>
+                <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-slate-500">Models in use with no price</p>
                 {report.unpricedModels.length === 0 ? (
-                  <p className="text-xs text-slate-400">Every model in use has a price (or no successful requests).</p>
+                  <p className="text-sm text-slate-500">Every model in use has a price (or no successful requests).</p>
                 ) : (
-                  <ul className="space-y-1 text-xs">
+                  <ul className="space-y-1 text-sm">
                     {report.unpricedModels.map((m) => (
                       <li key={`${m.provider}/${m.model}`} className="flex justify-between gap-2 border-t border-slate-100 pt-1">
                         <span className="truncate font-mono text-slate-700">
@@ -374,8 +375,8 @@ export function AiCostPanel() {
                 )}
                 {report.errors.length > 0 && (
                   <>
-                    <p className="mb-1 mt-4 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Failure categories</p>
-                    <ul className="space-y-1 text-xs">
+                    <p className="mb-1 mt-4 text-sm font-extrabold uppercase tracking-wide text-slate-500">Failure categories</p>
+                    <ul className="space-y-1 text-sm">
                       {report.errors.map((e) => (
                         <li key={e.category} className="flex justify-between border-t border-slate-100 pt-1">
                           <span className="font-mono text-slate-700">{e.category}</span>
@@ -392,9 +393,9 @@ export function AiCostPanel() {
       </section>
 
       {/* ---------------- Budgets ---------------- */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <section className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h3 className="text-sm font-extrabold text-slate-900">Platform budgets</h3>
-        <p className="mb-4 text-xs text-slate-500">
+        <p className="mb-4 text-sm text-slate-500">
           Checked on the server before every paid AI call — including retries and fallbacks. When a limit is reached, students see a neutral &quot;temporarily paused&quot; message and no provider is called. The default values are placeholders: set your own before launch.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -405,10 +406,10 @@ export function AiCostPanel() {
                 value={drafts[f.key] ?? ""}
                 onChange={(e) => setDraft(f.key, e.target.value)}
                 inputMode="decimal"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
                 aria-describedby={`${f.key}-hint`}
               />
-              <span id={`${f.key}-hint`} className="mt-1 block text-[11px] text-slate-500">{f.hint}</span>
+              <span id={`${f.key}-hint`} className="mt-1 block text-xs text-slate-500">{f.hint}</span>
             </label>
           ))}
         </div>
@@ -418,13 +419,13 @@ export function AiCostPanel() {
             value={drafts["ai_budget_provider_daily_usd"] ?? ""}
             onChange={(e) => setDraft("ai_budget_provider_daily_usd", e.target.value)}
             rows={2}
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"
+            className="mt-1 w-full rounded-control border border-slate-200 px-3 py-2 font-mono text-sm"
             placeholder='{"groq": 3, "openrouter": 5}'
           />
-          <span className="mt-1 block text-[11px] text-slate-500">Empty = none. A provider at its cap is skipped; its requests fail with the neutral message.</span>
+          <span className="mt-1 block text-xs text-slate-500">Empty = none. A provider at its cap is skipped; its requests fail with the neutral message.</span>
         </label>
         <div className="mt-3 flex items-center gap-3">
-          <button
+          <Button variant="unstyled"
             type="button"
             disabled={busy !== null}
             onClick={() =>
@@ -438,18 +439,18 @@ export function AiCostPanel() {
                 },
               )
             }
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
             {busy === "budgets" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save budgets
-          </button>
+          </Button>
           {msg("budgets")}
         </div>
       </section>
 
       {/* ---------------- Model prices ---------------- */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <section className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h3 className="text-sm font-extrabold text-slate-900">Model prices (USD per 1M tokens)</h3>
-        <p className="mb-3 text-xs text-slate-500">
+        <p className="mb-3 text-sm text-slate-500">
           Enter the prices from your provider&apos;s current price list. No price is built into the app, so until you add one the cost of that model is shown as <em>no price configured</em>. Cached-input price is optional (defaults to the input price). OpenRouter reports its billed cost itself, so those requests need no price here.
         </p>
         <textarea
@@ -457,42 +458,42 @@ export function AiCostPanel() {
           onChange={(e) => setDraft("ai_model_pricing", e.target.value)}
           rows={8}
           spellCheck={false}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"
+          className="w-full rounded-control border border-slate-200 px-3 py-2 font-mono text-sm"
           placeholder={PRICING_TEMPLATE}
           aria-label="Model price table (JSON)"
         />
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
+          <Button variant="unstyled"
             type="button"
             disabled={busy !== null}
             onClick={() => setDraft("ai_model_pricing", PRICING_2026_PRESET)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-surface border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
           >
             <Zap className="h-3.5 w-3.5" />
             Load official 2026 model price table (GPT-6 Luna / Gemini 2.5 / Groq)
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             disabled={busy !== null}
             onClick={() =>
               void save(["ai_model_pricing"], "pricing", () => localPricingError(drafts["ai_model_pricing"] ?? ""))
             }
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
             {busy === "pricing" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save prices
-          </button>
+          </Button>
           {msg("pricing")}
         </div>
-        <p className="mt-2 text-[11px] text-slate-500">
+        <p className="mt-2 text-sm text-slate-500">
           The preset fills the editor only — nothing is saved until you press <em>Save prices</em>. Verify each figure against your
           provider&apos;s current price list first.
         </p>
       </section>
 
       {/* ---------------- Quotas & voice ---------------- */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+      <section className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
         <h3 className="text-sm font-extrabold text-slate-900">Quotas & voice</h3>
-        <p className="mb-4 text-xs text-slate-500">
+        <p className="mb-4 text-sm text-slate-500">
           Per account, rolling 24 hours. Request quotas are enforced race-safely; token quotas count finished requests. Free and Premium limits are separate.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -503,14 +504,14 @@ export function AiCostPanel() {
                 value={drafts[f.key] ?? ""}
                 onChange={(e) => setDraft(f.key, e.target.value)}
                 inputMode="numeric"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
                 aria-describedby={`${f.key}-hint`}
               />
-              <span id={`${f.key}-hint`} className="mt-1 block text-[11px] text-slate-500">{f.hint} · max {f.max.toLocaleString("en-US")}</span>
+              <span id={`${f.key}-hint`} className="mt-1 block text-xs text-slate-500">{f.hint} · max {f.max.toLocaleString("en-US")}</span>
             </label>
           ))}
         </div>
-        <label className="mt-4 flex items-center gap-2 text-xs font-extrabold text-slate-700">
+        <label className="mt-4 flex items-center gap-2 text-sm font-extrabold text-slate-700">
           <input
             type="checkbox"
             checked={(drafts["ai_live_voice_enabled"] ?? "true") === "true"}
@@ -519,7 +520,7 @@ export function AiCostPanel() {
           Gemini Live voice practice enabled (off = students use browser speech and text)
         </label>
         <div className="mt-3 flex items-center gap-3">
-          <button
+          <Button variant="unstyled"
             type="button"
             disabled={busy !== null}
             onClick={() =>
@@ -536,10 +537,10 @@ export function AiCostPanel() {
                 },
               )
             }
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
             {busy === "quotas" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save quotas & voice
-          </button>
+          </Button>
           {msg("quotas")}
         </div>
       </section>
@@ -619,34 +620,34 @@ export function PremiumPricePanel() {
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+    <section className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
       <h3 className="text-sm font-extrabold text-slate-900">Premium prices</h3>
-      <p className="mb-4 text-xs text-slate-500">
+      <p className="mb-4 text-sm text-slate-500">
         Currency: <strong>UZS</strong> (Payme and Click settle in UZS only). Changing a price does not charge anyone and does not change existing subscriptions.
       </p>
       {loading ? (
-        <p className="text-xs text-slate-500">Loading…</p>
+        <p className="text-sm text-slate-500">Loading…</p>
       ) : (
         <div className="space-y-3">
           {PRICE_FIELDS.map((p) => (
             <div key={p.price} className="grid items-end gap-3 sm:grid-cols-[1fr_9rem_7rem]">
-              <p className="text-xs font-extrabold text-slate-700 sm:pb-2">{p.label}</p>
+              <p className="text-sm font-extrabold text-slate-700 sm:pb-2">{p.label}</p>
               <label className="block">
-                <span className="text-[11px] font-semibold text-slate-500">Price (UZS)</span>
+                <span className="text-xs font-semibold text-slate-500">Price (UZS)</span>
                 <input
                   value={drafts[p.price] ?? ""}
                   onChange={(e) => setDrafts((d) => ({ ...d, [p.price]: e.target.value }))}
                   inputMode="numeric"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
                 />
               </label>
               <label className="block">
-                <span className="text-[11px] font-semibold text-slate-500">Days</span>
+                <span className="text-xs font-semibold text-slate-500">Days</span>
                 <input
                   value={drafts[p.days] ?? ""}
                   onChange={(e) => setDrafts((d) => ({ ...d, [p.days]: e.target.value }))}
                   inputMode="numeric"
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
                 />
               </label>
             </div>
@@ -654,16 +655,16 @@ export function PremiumPricePanel() {
         </div>
       )}
       <div className="mt-4 flex items-center gap-3">
-        <button
+        <Button variant="unstyled"
           type="button"
           disabled={busy || loading}
           onClick={() => void save()}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-surface bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save prices
-        </button>
+        </Button>
         {message && (
-          <p role="status" className={`text-xs font-semibold ${message.ok ? "text-emerald-700" : "text-red-700"}`}>
+          <p role="status" className={`text-sm font-semibold ${message.ok ? "text-emerald-700" : "text-rose-700"}`}>
             {message.text}
           </p>
         )}
