@@ -9,6 +9,17 @@ export const studentProfiles = pgTable("student_profiles", {
   // NULL for legacy profiles until a password is set (or ADMIN_PASSWORD seeds
   // one for the admin account).
   passwordHash: text("password_hash"),
+  /**
+   * When the password was last SET (by the student, a reset link, or an admin
+   * handing over a temporary one). Never when it was last *seen* — the hash is
+   * one-way and nothing in the app can read it.
+   *
+   * Exists for support: "I cannot sign in" is answered differently when the
+   * password changed five minutes ago (someone else may have reset it) and when
+   * it was never changed since sign-up. NULL = set before this column existed,
+   * so the honest answer is "unknown", never "never".
+   */
+  passwordChangedAt: timestamp("password_changed_at"),
   // NULL = the student has not said yet. The app must never invent academic
   // data (spec §19): a default of "Master"/"Computer Science" made every
   // recommendation look personalised for a profile the student never filled in.

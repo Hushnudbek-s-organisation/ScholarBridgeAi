@@ -197,7 +197,7 @@ async function runSeedDatabase(force = false) {
               .set({
                 ...(needsRename ? { name: adminNameEnv } : {}),
                 ...(needsPromotion ? { isAdmin: true, onboardingCompleted: true, onboardingStep: 8 } : {}),
-                ...(needsPassword ? { passwordHash: hashPassword(adminPassword) } : {}),
+                ...(needsPassword ? { passwordHash: hashPassword(adminPassword), passwordChangedAt: new Date() } : {}),
               })
               .where(eq(studentProfiles.id, adminProfile.id));
             console.log(
@@ -221,7 +221,7 @@ async function runSeedDatabase(force = false) {
               isAdmin: true,
               onboardingCompleted: true,
               onboardingStep: 8,
-              ...(adminHasPassword ? { passwordHash: hashPassword(adminPassword) } : {}),
+              ...(adminHasPassword ? { passwordHash: hashPassword(adminPassword), passwordChangedAt: new Date() } : {}),
             })
             .returning();
           console.log(`Created bootstrap admin account (profile ${created.id}).`);

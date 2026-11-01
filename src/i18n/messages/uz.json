@@ -2686,7 +2686,8 @@
       "audit": "O'zgarishlar jurnali",
       "telegram": "Telegram bot",
       "ownership": "Egalik",
-      "channel": "Telegram kanal"
+      "channel": "Telegram kanal",
+      "accounts": "Hisoblar"
     },
     "desc": {
       "overview": "Bugun e'tibor talab qiladigan ishlar va asosiy raqamlar.",
@@ -2712,7 +2713,8 @@
       "audit": "Kim, nimani va qachon o'zgartirgani.",
       "telegram": "Botni ulash, kod bilan kirish, bildirishnomalar, hammaga xabar va yuborish jurnali.",
       "ownership": "Platforma egasi, egalikni xavfsiz o'tkazish va adminlar.",
-      "channel": "Kanalni ulang, qanday post chiqishini ko'ring va barcha havola, davlat va qisqa havolalarni boshqaring."
+      "channel": "Kanalni ulang, qanday post chiqishini ko'ring va barcha havola, davlat va qisqa havolalarni boshqaring.",
+      "accounts": "Hisobni toping va kirishga yordam bering: tiklash havolasi va vaqtinchalik parol."
     },
     "refTitle": "Referal mukofotlari",
     "refSubtitle": "Talaba referal bo‘yicha ko‘radigan hamma narsa shu raqamlardan olinadi — hisoblash, jarayon ko‘rsatkichi va mukofot matni.",
@@ -7405,5 +7407,38 @@
     "missingTokenBody": "Tiklash havolasida kalit yoʻq. Pochtadagi toʻliq havolani oching yoki yangisini soʻrang.",
     "requestNewLink": "Yangi havola soʻrash",
     "privacyLink": "Maʼlumotlaringiz qanday saqlanadi"
+  },
+  "adminAccounts": {
+    "searchPlaceholder": "Ism yoki email bo'yicha qidirish",
+    "loading": "Hisoblar yuklanmoqda…",
+    "empty": "Bu qidiruvga mos hisob topilmadi.",
+    "loadFailed": "Hisoblar ro'yxatini yuklab bo'lmadi.",
+    "failed": "Amal bajarilmadi. Hech narsa o'zgartirilmadi.",
+    "unknown": "Qayd etilmagan",
+    "adminBadge": "Admin",
+    "hasPassword": "Parol o'rnatilgan",
+    "noPassword": "Parol yo'q",
+    "passwordSetAt": "Parol o'rnatilgan vaqt",
+    "sessions": "Kirgan qurilmalar",
+    "lastSeen": "Oxirgi faollik",
+    "createdAt": "Hisob ochilgan",
+    "yourPassword": "Sizning parolingiz",
+    "yourPasswordHint": "Bu sahifadagi har bir o'zgarish uchun talab qilinadi",
+    "linkTitle": "Tiklash havolasini yaratish",
+    "linkBody": "Talaba yangi parolni o'zi qo'yadi — siz uni ko'rmaysiz. Havola bir marta, 60 daqiqa ishlaydi va pochta orqali yuborilmaydi: nusxalab, Telegram yoki WhatsApp orqali yuboring. Pochta umuman ishlamasa ham shu yo'l ishlaydi.",
+    "linkBtn": "Havola yaratish",
+    "linkReady": "Tiklash havolasi tayyor. Uni talabaga hoziroq yuboring:",
+    "linkExpiry": "{when} gacha amal qiladi. Yangi havola yaratilsa, bu bekor bo'ladi.",
+    "passwordTitle": "Vaqtinchalik parol o'rnatish",
+    "passwordBody": "Faqat talaba havolani ocha olmasa ishlatiladi. Eski parolni tiklab bo'lmaydi — faqat almashtirish mumkin. Bu hisobda ochiq turgan barcha qurilmalar darhol chiqariladi.",
+    "newPasswordPlaceholder": "Yangi parol (kamida 8 belgi)",
+    "setBtn": "O'rnatish",
+    "generateBtn": "Generatsiya",
+    "passwordReady": "{email} uchun parol o'zgartirildi. U hech kimga pochta orqali yuborilmaydi — talabaning o'ziga o'zingiz bering.",
+    "passwordShownOnce": "Faqat bir marta ko'rsatiladi. Hech qayerda o'qiladigan shaklda saqlanmaydi — kerak bo'lsa hozir nusxalab oling.",
+    "copy": "Nusxalash",
+    "copied": "Nusxalandi",
+    "copyFailed": "Nusxalab bo'lmadi. Matnni belgilab, qo'lda nusxalang.",
+    "whyNoPassword": "Hech bir sahifa hisob parolini ko'rsata olmaydi: u bir tomonlama scrypt hash sifatida saqlanadi, bazada ham kodlab bo'ladigan narsa yo'q. Admin qila oladigan ish — shu sahifadagi ikkitasi: parolni yangisiga almashtirish yoki talaba o'zi yangi parol qo'yadigan havola berish. Ikkalasi ham audit jurnalida admin ismi bilan qayd etiladi."
   }
 }

@@ -4,7 +4,7 @@ import { studentProfiles } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { hashPassword, passwordPolicyProblem, sanitizeProfile } from "@/lib/password";
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
-import { requireAdmin, requireProfileAccess, sessionCookieHeader, invalidateAuthCacheForProfile } from "@/lib/auth";
+import { requireAdmin, requireProfileAccess, sessionCookieHeader, invalidateAuthCacheForProfile, revokeAllSessionsForProfile } from "@/lib/auth";
 import { clampString, optionalNumber, optionalScore, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { currentOwnerId } from "@/lib/ownership/service";
@@ -211,6 +211,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
     const newPasswordHash = newPasswordPlain ? hashPassword(newPasswordPlain) : undefined;
+    // Changing a password rotates the session fingerprint, so every OPEN session
+    // for that account stops verifying. That is the point when an admin resets
+    // someone else's password — and the reason the cookie below is only for the
+    // owner changing their OWN password.
+    const actorIsTarget = access.targetId === profileId && access.session.profile.id === profileId;
 
     const [updatedProfile] = await db.update(studentProfiles)
       .set({
@@ -218,6 +223,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         // An empty email would break sign-in — leave the stored one untouched.
         email: body.email !== undefined ? clampString(body.email, 320) || undefined : undefined,
         passwordHash: newPasswordHash,
+        passwordChangedAt: newPasswordHash ? new Date() : undefined,
         // Text fields can now be cleared to NULL ("not chosen yet").
         degreeLevel: patchText(body.degreeLevel, 60),
         // Keep legacy callers' blank value as a no-op, except an explicit
@@ -318,10 +324,24 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       invalidateAuthCacheForProfile(profileId);
       invalidateDashboardRecommendationsForProfile(profileId);
     }
+    // An admin-changed password must also close the account's open sessions in
+    // `user_sessions`, not only invalidate them by fingerprint: the student may
+    // be signed in on a phone that will never present a new cookie again.
+    if (newPasswordHash && !actorIsTarget) {
+      await revokeAllSessionsForProfile(profileId);
+    }
     const response = privateNoStoreJson({ profile: sanitizeProfile(updatedProfile) });
-    // Changing the password rotates the session fingerprint — hand back a
-    // freshly signed cookie so the owner is not logged out by their own edit.
-    if (newPasswordHash && updatedProfile) {
+    /**
+     * Re-issue the cookie ONLY for the account that changed its own password.
+     *
+     * This used to fire on every password write. When an admin edited another
+     * account — a support reset — the response carried a session cookie signed
+     * for THAT STUDENT, so the admin's browser was silently switched into the
+     * student's account: the admin lost their own session, and every later
+     * action was recorded against the student instead. A password reset must
+     * never hand the actor a session on someone else's account.
+     */
+    if (newPasswordHash && updatedProfile && actorIsTarget) {
       response.headers.set(
         "Set-Cookie",
         sessionCookieHeader({ id: updatedProfile.id, passwordHash: newPasswordHash }, req)

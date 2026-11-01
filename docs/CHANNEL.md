@@ -2282,6 +2282,129 @@ answers correctly, and **nothing is delivered** — the only trace is one server
 log line naming the missing variables. Configuring mail is the remaining step for
 this flow to be usable in production.
 
+## 11r. The administrator can replace a password, never read one (2026-10-31)
+
+Phase AG shipped the emailed reset flow. It works — and it delivered nothing on
+the deployment that needed it, because **Render's free tier blocks outbound SMTP
+on ports 25, 465 and 587** (since 2026-09-26). Every send ended as
+`SMTP connect timeout` in the log while the student stayed locked out. A reset
+flow that depends on a mail server the host will not let you reach is, in
+practice, no reset flow.
+
+So the recovery path moved to where it cannot be blocked: **the administrator**.
+
+### What the administrator can now do
+
+Admin → **Accounts** (new section, `system` group) — search an account, see its
+state, and take one of two actions. Both require the administrator to re-enter
+**their own password**: an admin cookie on its own can never take over a
+student account.
+
+| action | what happens | who learns the new password |
+| --- | --- | --- |
+| **Create a reset link** | The same token the emailed flow uses — same table, same 60-minute single-use rule, same `/reset-password?token=…` page — returned once to copy. Nothing is emailed. | The student, who chooses it. The admin never sees it. |
+| **Set a temporary password** | The admin types one, or asks the server to generate a readable one (`abcdefgh-…`, no `0/O`, `1/l/I`, `5/S`). Old sessions die, old links are retired, `password_changed_at` is stamped. | The admin, who hands it over. |
+
+The link is the recommended path: it keeps the administrator out of the
+student's credential entirely, and it works with SMTP unconfigured, misconfigured
+or blocked.
+
+### What no permission can do
+
+An administrator cannot *see* a password, and no amount of "give admin all
+rights" changes that: `password_hash` is `scrypt:<salt>:<hash>`. The salt is
+random per account, scrypt is deliberately slow and one-way, and nothing in the
+system — or in any SQL query, or in this repository — can invert it. The only
+honest operations are **replace** and **re-issue**. The panel says this in place,
+in all three languages, instead of leaving an administrator hunting for a button
+that cannot exist.
+
+What *is* visible is the account's state, which is what support actually needs:
+
+- `has_password` — whether a password exists at all;
+- `password_changed_at` — when it was last **set** (new column; `NULL` means set
+  before it was recorded, never "never");
+- live session rows, last-seen, Telegram link, premium, admin flag.
+
+### The bug this found
+
+`PUT /api/profiles/:id` already allowed an admin to change another account's
+password. It then did two wrong things:
+
+1. **it never revoked that account's sessions**, so a stolen phone stayed signed
+   in with the password the admin had just replaced;
+2. **it set a session cookie for the TARGET account on the ADMIN's response** —
+   the administrator's browser was silently switched into the student's account.
+   The admin lost their own session, and every later action was recorded against
+   the student.
+
+Both are fixed: the cookie is only re-issued when `actor === target`, and an
+admin reset now calls `revokeAllSessionsForProfile()`.
+
+### What changed
+
+* **`src/db/schema.ts`** — `student_profiles.password_changed_at` (nullable,
+  additive; the core-DDL repair adds it on deploy). Stamped by every write path:
+  sign-up, self-service profile edit, reset link, admin reset, bootstrap seed.
+* **`src/lib/adminAccountRules.ts`** (new, DB-free) — the temporary-password
+  generator and the public row type.
+* **`src/lib/adminAccounts.ts`** (new) — the list query (the hash is reduced to a
+  boolean and never returned), account lookup, link retirement, admin
+  re-authentication (shared rate limit, constant-time scrypt compare) and the
+  audit writer.
+* **`GET /api/admin/accounts`**, **`POST /api/admin/accounts/:id/password`**,
+  **`POST /api/admin/accounts/:id/reset-link`** (new).
+* **`src/components/admin/AccountsManager.tsx`** (new) + the `accounts` tab in
+  `AdminPanel`.
+* **`src/app/api/profiles/[id]/route.ts`** — the two fixes above.
+* **i18n** — `adminAccounts` namespace (35 keys) and `admin.tab.accounts` /
+  `admin.desc.accounts` in en / uz / ru.
+
+### Verified
+
+`npm run test:admin-accounts` — **22/22** (new): 200 generated passwords all pass
+the shared policy, are 16 characters in four groups, contain no `0/O/o`, `1/l/I`
+or `5/S`, and are all distinct; the public row type has no hash field; no admin
+route returns a hash; both actions re-authenticate and are rate limited through
+the shared counter; self-target is refused; a request cannot carry both a typed
+password and `generate`; a reset revokes sessions and retires links; the link
+comes from the same `createResetToken`/`resetLinkFor` pipeline with no `sendMail`
+anywhere in the route; `APP_URL` missing is a refusal, not a relative link; audit
+entries name the administrator and carry no credential; the tab is mounted and
+translated in three languages.
+
+**Integration (374 → 397, +23):** a real admin and a real locked-out student — the
+list reports `hasPassword`/`passwordChangedAt`/session count with no `scrypt`
+substring anywhere in the payload; a student gets **403**; a missing or wrong
+admin password is refused and **nothing changes**; `12345678` is refused by the
+same policy as everywhere else; a reset link is issued **with SMTP unconfigured**
+and only its hash is stored; the student spends it and their own password
+verifies; a second link retires the first; a generated temporary password is
+returned once, verifies, and is stored only as `scrypt:<salt>:<hash>`; the
+change stamps `password_changed_at`; the student's open session goes `ok` →
+**revoked** with the row stamped; the reset response carries **no session
+cookie**; self-target is refused; and the audit rows name the admin and contain
+neither the password nor the token.
+
+`test:security` **98 → 104** (6 new): admin-only on all three routes, re-auth on
+both mutating routes, no hash in any response, sessions and links killed on
+reset, no session cookie for a non-self target, and the panel never binds a
+stored password to an input.
+
+`test:password-reset` 38/0 · `test:render` 354/0 · `test:portability` 57/0 ·
+`test:localization` 16/0 · `test:channel` 196/0 · `test:dataset` 50/0 · the
+catalogue/rank gates unchanged · `check:i18n` passed · `lint:baseline` passed ·
+`test:schema` PASSED (113 tables / 1228 columns) · `tsc --noEmit` clean ·
+`next build` OK.
+
+### Still true
+
+The emailed flow remains the default for students and needs real SMTP. Until the
+deployment can reach a mail server (a paid Render instance, a provider's
+alternate port such as Brevo 2525 or Resend 2587, or an HTTPS mail API), the
+administrator's reset link is the working recovery path — and it is the one that
+teaches nobody a password.
+
 ## 12. Short links
 
 `/go/<code>` is the only redirect: the destination is read from

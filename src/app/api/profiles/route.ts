@@ -212,6 +212,7 @@ export async function POST(req: Request) {
         onboardingStep: Math.min(Math.max(Number(body.onboardingStep) || 0, 0), 7),
       // Sign-up password: stored ONLY as a scrypt hash (never plain text).
         passwordHash: plainPassword ? hashPassword(plainPassword) : null,
+        passwordChangedAt: plainPassword ? new Date() : null,
       }).returning();
     } catch (err) {
       // Two sign-ups for the same address at the same moment: the earlier

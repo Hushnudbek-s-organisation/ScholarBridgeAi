@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS "student_profiles" (
   "name" text NOT NULL,
   "email" text CONSTRAINT "uq_student_profiles_email" UNIQUE NOT NULL,
   "password_hash" text,
+  "password_changed_at" timestamp,
   "degree_level" text,
   "target_major" text,
   "study_interests" text,
@@ -1507,6 +1508,7 @@ CREATE TABLE IF NOT EXISTS "visa_requirements" (
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "name" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "email" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "password_hash" text;
+ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "password_changed_at" timestamp;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "degree_level" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "target_major" text;
 ALTER TABLE "student_profiles" ADD COLUMN IF NOT EXISTS "study_interests" text;
