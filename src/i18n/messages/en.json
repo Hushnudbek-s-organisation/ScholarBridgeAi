@@ -7631,6 +7631,23 @@
     "copy": "Copy",
     "copied": "Copied",
     "copyFailed": "Could not copy. Select the text and copy it manually.",
-    "whyNoPassword": "No screen can show an account's password: it is stored as a one-way scrypt hash, so even the database has nothing to decode. What an administrator can do is what this page does — replace it with a new one, or issue a link the student uses to choose their own. Both are recorded in the audit log under the administrator's name."
+    "whyNoPassword": "No screen can show an account's password: it is stored as a one-way scrypt hash, so even the database has nothing to decode. What an administrator can do is what this page does — replace it with a new one, or issue a link the student uses to choose their own. Both are recorded in the audit log under the administrator's name.",
+    "yourPasswordWhose": "This is the password for {email} — last set {when}. It is YOURS, not the student's.",
+    "viewerNoPasswordTitle": "Your admin account has no password yet",
+    "viewerNoPasswordBody": "An account created through Telegram can have no password at all, so there is nothing to confirm with. Open Edit Profile and set one, then type it here.",
+    "viewerLegacyTitle": "This password cannot be verified by this build",
+    "viewerLegacyBody": "The stored value is in an older format that this version cannot check, so every attempt would look like a wrong password. Set a new password in Edit Profile and type that here.",
+    "reauthMismatchTitle": "That was not the password of this admin account",
+    "reauthMismatchBody": "The field wants the password you sign in with as {email} — not the student's, and not an old one. If you do not remember it, open Edit Profile, set a new one, and type that here.",
+    "openProfile": "Open Edit Profile",
+    "errInvalidPassword": "That is not the password for {email}. This field asks for YOUR OWN password — not the student's.",
+    "errPasswordNotSet": "Your admin account has no password yet. Set one in Edit Profile first, then come back.",
+    "errPasswordFormatLegacy": "Your account's stored password is in an old format that cannot be checked. Set a new password in Edit Profile, then try again.",
+    "errRateLimited": "Too many attempts. Wait a few minutes and try again.",
+    "errAppUrlMissing": "The server has no APP_URL configured, so a full reset link cannot be built. Set APP_URL on the deployment and retry.",
+    "errSelfTarget": "You cannot reset your own password from here — use Edit Profile.",
+    "errWeakPassword": "That password does not meet the rules: at least 8 characters, and not an easily guessed one.",
+    "errAmbiguousRequest": "The request carried two passwords at once. Send either a typed password or \"generate\", not both.",
+    "errNotFound": "That account no longer exists."
   }
 }

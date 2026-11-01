@@ -45,3 +45,41 @@ export function generateTemporaryPassword(): string {
   );
   return groups.join("-");
 }
+
+/**
+ * The administrator who is looking at the panel.
+ *
+ * The screen has to name this account, because the re-authentication field asks
+ * for ITS password — not the student's, not an old one. `passwordFormat` tells
+ * the panel whether the stored hash is something this build can actually check:
+ * an account whose password was written by a different scheme would otherwise
+ * fail as "Incorrect password" no matter what the operator typed, and that is a
+ * dead end, not an error message.
+ */
+export interface AdminViewerRow {
+  id: number;
+  name: string;
+  email: string;
+  hasPassword: boolean;
+  passwordChangedAt: string | null;
+  passwordFormat: PasswordHashFormat;
+}
+
+/** `none` = no password, `verifiable` = scrypt triplet, `legacy` = anything else. */
+export type PasswordHashFormat = "none" | "verifiable" | "legacy";
+
+/**
+ * Classify a stored password hash WITHOUT trying to verify anything.
+ *
+ * `verifyPassword` returns false for a malformed hash exactly as it does for a
+ * wrong password. Collapsing those two into one answer is what turns a
+ * configuration problem into "your password is wrong" — the operator retries,
+ * gets the same message, and has no way forward. This distinguishes them, so
+ * the refusal can say what is actually wrong.
+ */
+export function passwordHashFormat(hash: string | null | undefined): PasswordHashFormat {
+  if (!hash || typeof hash !== "string") return "none";
+  const parts = hash.split(":");
+  if (parts.length === 3 && parts[0] === "scrypt" && parts[1] && parts[2]) return "verifiable";
+  return "legacy";
+}

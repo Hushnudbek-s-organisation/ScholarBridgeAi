@@ -37,12 +37,17 @@ import { auditLogs, passwordResetTokens, studentProfiles, telegramLinks, userSes
 import { verifyPassword } from "@/lib/password";
 import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { LIMITS } from "@/lib/rate-limit";
-import { ADMIN_ACCOUNT_PAGE, type AdminAccountRow } from "@/lib/adminAccountRules";
+import {
+  ADMIN_ACCOUNT_PAGE,
+  passwordHashFormat,
+  type AdminAccountRow,
+  type AdminViewerRow,
+} from "@/lib/adminAccountRules";
 
 // Re-exported so route handlers import one module; the rules themselves live in
 // a DB-free file (`adminAccountRules.ts`) so the gate can test them offline.
-export { ADMIN_ACCOUNT_PAGE, generateTemporaryPassword } from "@/lib/adminAccountRules";
-export type { AdminAccountRow } from "@/lib/adminAccountRules";
+export { ADMIN_ACCOUNT_PAGE, generateTemporaryPassword, passwordHashFormat } from "@/lib/adminAccountRules";
+export type { AdminAccountRow, AdminViewerRow } from "@/lib/adminAccountRules";
 
 /** Columns read for one page of accounts. `passwordHash` is read, then dropped. */
 const ACCOUNT_COLUMNS = {
@@ -177,7 +182,9 @@ export async function verifyAdminReauth(
     .from(studentProfiles)
     .where(eq(studentProfiles.id, adminId))
     .limit(1);
-  if (!row?.hash) {
+  const storedHash = row?.hash ?? null;
+  const format = passwordHashFormat(storedHash);
+  if (format === "none" || !storedHash) {
     return {
       ok: false,
       status: 400,
@@ -185,10 +192,54 @@ export async function verifyAdminReauth(
       error: "Your admin account has no password. Set one in Edit Profile first.",
     };
   }
-  if (!verifyPassword(password, row.hash)) {
+  // A hash this build cannot check must NOT be reported as a wrong password:
+  // every retry would produce the same message and the operator would be stuck
+  // with no way to tell a typo from a stored format that cannot be verified.
+  if (format === "legacy") {
+    return {
+      ok: false,
+      status: 409,
+      code: "password_format_legacy",
+      error:
+        "This account's stored password is in an old format that cannot be verified. Set a new password in Edit Profile, then try again.",
+    };
+  }
+  if (!verifyPassword(password, storedHash)) {
     return { ok: false, status: 403, code: "invalid_password", error: "Incorrect password." };
   }
   return { ok: true };
+}
+
+/**
+ * The administrator the panel is acting as.
+ *
+ * Support screens need to say WHO the confirmation field belongs to: the
+ * single most common failure on this page was an operator typing a student's
+ * password (or an old one) into a field that only accepts their own. Naming the
+ * account, its password state and when it was last set turns a silent refusal
+ * into something the operator can act on.
+ */
+export async function adminViewer(adminId: number): Promise<AdminViewerRow | null> {
+  const [row] = await db
+    .select({
+      id: studentProfiles.id,
+      name: studentProfiles.name,
+      email: studentProfiles.email,
+      passwordHash: studentProfiles.passwordHash,
+      passwordChangedAt: studentProfiles.passwordChangedAt,
+    })
+    .from(studentProfiles)
+    .where(eq(studentProfiles.id, adminId))
+    .limit(1);
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    hasPassword: Boolean(row.passwordHash),
+    passwordChangedAt: row.passwordChangedAt ? row.passwordChangedAt.toISOString() : null,
+    passwordFormat: passwordHashFormat(row.passwordHash),
+  };
 }
 
 /**

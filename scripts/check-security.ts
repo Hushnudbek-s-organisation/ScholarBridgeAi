@@ -1469,9 +1469,39 @@ async function main() {
     ] as const) {
       assert.doesNotMatch(body, /passwordHash\s*[,}]/, `${name} returns a password hash`);
     }
-    // The row type the list uses carries the hash only to compute a boolean.
+    // The row types the list uses carry the hash only to compute a boolean.
     assert.match(adminRules, /hasPassword: boolean/, "the public row has no password state field");
-    assert.doesNotMatch(adminRules, /passwordHash/, "the public row type mentions a hash");
+    // Only the interface bodies matter here: the file legitimately names the
+    // classifier `passwordHashFormat` and takes a hash as its ARGUMENT.
+    const publicShapes = [adminRules.slice(0, adminRules.indexOf("export type PasswordHashFormat"))];
+    const viewerAt = adminRules.indexOf("export interface AdminViewerRow");
+    const accountAt = adminRules.indexOf("export interface AdminAccountRow");
+    publicShapes.push(adminRules.slice(accountAt, viewerAt), adminRules.slice(viewerAt, adminRules.indexOf("export type PasswordHashFormat")));
+    for (const shape of publicShapes) {
+      assert.doesNotMatch(shape, /passwordHash:/, "a public row type carries a hash field");
+    }
+  });
+
+  check("an unverifiable stored hash can never stand in for a password", () => {
+    const lib = readFileSync(join(ROOT, "src/lib/adminAccounts.ts"), "utf8");
+    // The format is decided BEFORE the comparison, and neither a missing nor an
+    // old-format hash falls through to `ok: true`.
+    const formatAt = lib.indexOf("passwordHashFormat(storedHash)");
+    const verifyAt = lib.indexOf("verifyPassword(password, storedHash)");
+    assert.ok(formatAt > 0 && verifyAt > formatAt, "verifyPassword runs before the format is classified");
+    assert.match(lib, /code: "password_format_legacy"/, "an old hash is indistinguishable from a typo");
+    assert.match(lib, /code: "password_not_set"/, "a missing password is indistinguishable from a typo");
+    // The response never echoes what was submitted.
+    assert.doesNotMatch(lib, /error: `[^`]*\$\{password/, "the refusal echoes the submitted password");
+  });
+
+  check("the panel asks for the signed-in admin's own password, by name", () => {
+    const panel = readFileSync(join(ROOT, "src/components/admin/AccountsManager.tsx"), "utf8");
+    assert.match(panel, /yourPasswordWhose/, "the confirmation field never says whose password it wants");
+    assert.match(panel, /viewer\?\.email/, "the panel does not name the signed-in account");
+    // A dead end is a bug: every refusal must offer the profile editor.
+    assert.match(panel, /openProfile/, "a failed re-auth gives the operator no way out");
+    assert.doesNotMatch(panel, /localStorage|sessionStorage|document\.cookie/, "the panel persists a credential");
   });
 
   check("an admin reset revokes the target's sessions and old links", () => {

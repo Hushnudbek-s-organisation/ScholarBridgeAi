@@ -52,6 +52,13 @@ const ResearchAgent = dynamic(
 
 interface AdminPanelProps {
   activeProfile: StudentProfile | null;
+  /**
+   * Opens the profile editor (the modal the account menu opens). Accounts →
+   * "your password" needs it: an admin who cannot reproduce their own password
+   * has no way forward inside this screen, and the editor is where a signed-in
+   * account sets a new one.
+   */
+  onOpenProfileEditor?: () => void;
 }
 
 type AdminTab =
@@ -131,7 +138,7 @@ function initialTab(): AdminTab {
   return "overview";
 }
 
-export function AdminPanel({ activeProfile }: AdminPanelProps) {
+export function AdminPanel({ activeProfile, onOpenProfileEditor }: AdminPanelProps) {
   const t = useTranslations("admin");
   const tg = useTranslations("adminGrowth");
   const tn = useTranslations("nav");
@@ -255,7 +262,7 @@ export function AdminPanel({ activeProfile }: AdminPanelProps) {
       case "channel":
         return <ChannelManager />;
       case "accounts":
-        return <AccountsManager />;
+        return <AccountsManager onOpenProfileEditor={onOpenProfileEditor} />;
       case "ownership":
         return <OwnershipManager />;
       case "goalLibrary":

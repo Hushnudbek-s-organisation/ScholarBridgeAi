@@ -23,7 +23,10 @@
  *   6. the audit entry names the administrator and never contains a credential;
  *   7. the admin panel mounted the tab in all three languages, and an admin
  *      editing someone else's password no longer receives that student's
- *      session cookie.
+ *      session cookie;
+ *   8. a refusal is never a dead end: the panel names the account whose password
+ *      it wants, and "wrong password", "no password yet" and "old hash format"
+ *      are three different, translated answers with the same way out.
  *
  * Run: npm run test:admin-accounts
  */
@@ -31,7 +34,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 // Pure module on purpose: this gate must run with no database.
-import { ADMIN_ACCOUNT_PAGE, generateTemporaryPassword } from "../src/lib/adminAccountRules";
+import { ADMIN_ACCOUNT_PAGE, generateTemporaryPassword, passwordHashFormat } from "../src/lib/adminAccountRules";
 import { passwordPolicyError } from "../src/lib/password";
 import { RESET_TOKEN_PATTERN } from "../src/lib/passwordReset";
 
@@ -120,6 +123,75 @@ check("the panel states why a password cannot be shown, instead of hiding it", (
   }
 });
 
+/* ------------------- 2b. a refusal must say what is actually wrong */
+
+check("a stored hash is classified before it is compared", () => {
+  assert.equal(passwordHashFormat(null), "none");
+  assert.equal(passwordHashFormat(undefined), "none");
+  assert.equal(passwordHashFormat(""), "none");
+  // The format every path in this app writes.
+  assert.equal(passwordHashFormat("scrypt:abc123:deadbeef"), "verifiable");
+  // Something this build cannot check must NOT be reported as a wrong password.
+  for (const legacy of ["pbkdf2:1000:aa:bb", "sha256$deadbeef", "plaintext", "scrypt:onlysalthash", "scrypt::"]) {
+    assert.equal(passwordHashFormat(legacy), "legacy", `misread as verifiable: ${legacy}`);
+  }
+});
+
+check("re-authentication distinguishes a typo from an uncheckable hash", () => {
+  const lib = code("src/lib/adminAccounts.ts");
+  assert.match(lib, /passwordHashFormat\(storedHash\)/, "the re-auth path skips the format check");
+  assert.match(lib, /code: "password_format_legacy"/, "an old hash is reported as a wrong password");
+  assert.match(lib, /code: "password_not_set"/, "a missing password is reported as a wrong password");
+  assert.match(lib, /code: "invalid_password"/, "a real mismatch must still say so");
+  // The three outcomes are ordered: none and legacy return BEFORE verifyPassword.
+  const legacyAt = lib.indexOf('code: "password_format_legacy"');
+  const verifyAt = lib.indexOf("verifyPassword(password, storedHash)");
+  assert.ok(legacyAt > 0 && verifyAt > legacyAt, "verifyPassword runs before the format is known");
+});
+
+check("the list tells the panel WHO is signed in", () => {
+  const route = code("src/app/api/admin/accounts/route.ts");
+  assert.match(route, /adminViewer\(access\.session\.profile\.id\)/, "the list does not identify the acting admin");
+  assert.match(route, /viewer/, "the viewer is not in the response");
+  const lib = code("src/lib/adminAccounts.ts");
+  assert.match(lib, /export async function adminViewer/, "adminViewer is missing");
+  const rules = code("src/lib/adminAccountRules.ts");
+  const shape = rules.slice(rules.indexOf("export interface AdminViewerRow"), rules.indexOf("export type PasswordHashFormat"));
+  assert.doesNotMatch(shape, /passwordHash/, "AdminViewerRow exposes a hash field");
+  assert.doesNotMatch(shape, /\bhash\b/i, "AdminViewerRow exposes a hash-like field");
+});
+
+check("the panel names the account and localizes every refusal", () => {
+  const panel = code("src/components/admin/AccountsManager.tsx");
+  // The field must say whose password it wants.
+  assert.match(panel, /yourPasswordWhose/, "the field never says whose password it wants");
+  assert.match(panel, /viewer\?\.email/, "the panel does not show the signed-in account");
+  assert.match(panel, /openProfile/, "there is no way out for an admin who cannot reproduce their password");
+  const messages = JSON.parse(source("src/i18n/messages/en.json"));
+  for (const code of [
+    "invalid_password",
+    "password_not_set",
+    "password_format_legacy",
+    "rate_limited",
+    "app_url_missing",
+    "self_target",
+    "weak_password",
+    "ambiguous_request",
+    "not_found",
+  ]) {
+    // Each server code maps to a translated next step, not to a raw English string.
+    const camel = code.replace(/_(.)/g, (_m, c: string) => c.toUpperCase());
+    const key = `err${camel[0].toUpperCase()}${camel.slice(1)}`;
+    assert.ok(panel.includes(`case "${code}"`), `the panel does not handle ${code}`);
+    assert.ok(panel.includes(`t("${key}"`), `no translated message for ${code}`);
+    for (const locale of ["en", "uz", "ru"]) {
+      const ns = JSON.parse(source(`src/i18n/messages/${locale}.json`)).adminAccounts;
+      assert.equal(typeof ns[key], "string", `${locale} is missing ${key}`);
+      assert.ok(ns[key].length > 20, `${locale}.${key} is a stub`);
+    }
+  }
+});
+
 /* ------------------------------------- 3. the administrator is re-proven */
 
 check("both actions re-authenticate the acting admin, not just the cookie", () => {
@@ -138,11 +210,11 @@ check("re-authentication is rate limited and compares against a real hash", () =
   const lib = source("src/lib/adminAccounts.ts");
   assert.match(lib, /checkSharedRateLimit\(`admin-account-pw:\$\{adminId\}`/, "the attempt counter is not shared");
   assert.match(lib, /LIMITS\.signIn/, "the attempt budget is not the sign-in budget");
-  assert.match(lib, /verifyPassword\(password, row\.hash\)/, "the password is not verified against the stored hash");
+  assert.match(lib, /verifyPassword\(password, storedHash\)/, "the password is not verified against the stored hash");
   assert.match(lib, /code: "invalid_password"/);
   // A missing password on the ADMIN's own account is refused, not treated as ok.
   assert.match(lib, /code: "password_not_set"/);
-  assert.match(lib, /if \(!row\?\.hash\)/);
+  assert.match(lib, /if \(format === "none" \|\| !storedHash\)/, "the missing-password guard disappeared");
 });
 
 check("an admin cannot reset their own password through this screen", () => {
@@ -260,7 +332,7 @@ check("the list reports state, never a credential", () => {
 check("the panel is mounted and translated in all three languages", () => {
   const panel = source("src/components/AdminPanel.tsx");
   assert.match(panel, /import \{ AccountsManager \}/, "the section is not imported");
-  assert.match(panel, /case "accounts":\s*\n\s*return <AccountsManager \/>;/, "the section is not rendered");
+  assert.match(panel, /case "accounts":\s*\n\s*return <AccountsManager[\s\S]{0,80}?\/>;/, "the section is not rendered");
   assert.match(panel, /\{ id: "accounts", group: "system"/, "the tab is not in the sidebar");
   for (const locale of ["en", "uz", "ru"]) {
     const messages = JSON.parse(source(`src/i18n/messages/${locale}.json`));
