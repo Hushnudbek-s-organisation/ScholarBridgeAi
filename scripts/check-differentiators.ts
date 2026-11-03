@@ -380,10 +380,10 @@ const us = computeFundsWindow("United States", APP_DATE);
 const none = computeFundsWindow(null, APP_DATE);
 const noDate = computeFundsWindow("United Kingdom", null);
 
-check("the UK window is app−28 / app−31 / app / app−59", uk.fundsInPlaceBy === "2027-08-04" && uk.statementNotBefore === "2027-08-01" && uk.statementNotAfter === APP_DATE && uk.earliestWindowStart === "2027-07-04", JSON.stringify(uk));
+check("the UK suggested buffer is app−28 / app−31 / app / app−59", uk.fundsInPlaceBy === "2027-08-04" && uk.statementNotBefore === "2027-08-01" && uk.statementNotAfter === APP_DATE && uk.earliestWindowStart === "2027-07-04", JSON.stringify(uk));
 check("the UK rule is 28 consecutive days inside a 31-day validity", uk.consecutiveDays === 28 && uk.statementValidityDays === 31);
 check("London maintenance is higher than outside London", (uk.requirement?.amount ?? 0) > (ukOutside.requirement?.amount ?? 0));
-check("the published UK London figure is £13,347", uk.requirement?.amount === 13347 && uk.requirement?.currency === "GBP");
+check("the published UK London maximum is £13,761", uk.requirement?.amount === 13761 && uk.requirement?.currency === "GBP");
 check("the German blocked account is €11,904 a year", de.requirement?.amount === 11904 && de.requirement?.currency === "EUR");
 check("the Korean balance certificate is $20,000", kr.requirement?.amount === 20000);
 check("the Canadian figure is CA$20,635", ca.requirement?.amount === 20635 && ca.requirement?.currency === "CAD");
@@ -392,7 +392,7 @@ check("a missing destination has no window", none.ok === false && none.reason ==
 check("a missing date has no window", noDate.ok === false && noDate.reason === "no_date" && noDate.requirement != null);
 check("every published rule carries an official source URL", PUBLISHED_FUNDS_RULES.every((r) => /^https:\/\//.test(r.sourceUrl) && r.sourceName.trim() !== ""));
 check("estimated benchmarks are flagged as estimates", PUBLISHED_FUNDS_RULES.filter((r) => r.estimated).every((r) => r.amountUsd != null));
-check("the USD mirror uses the shared rate table", Math.round((uk.requirement?.amountUsd ?? 0)) === Math.round(13347 * 1.29));
+check("the USD mirror uses the shared rate table", Math.round((uk.requirement?.amountUsd ?? 0)) === Math.round(13761 * 1.29));
 check("an unsupported destination resolves to no rule", resolveFundsRequirement("Mars", {}) == null);
 
 const readiness = checkApostilleReadiness("Germany", APP_DATE, { today: "2026-10-16" });

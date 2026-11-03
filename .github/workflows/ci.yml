@@ -82,6 +82,21 @@ jobs:
       # catalogue sorts by, and the two personal filters built on it.
       - name: Combined ranking + personal filter tests (offline)
         run: bash ci/run-step.sh "Combined ranking + personal filter tests (offline)" npm run test:ranking
+      - name: Scholarship degree alias regression (offline)
+        run: bash ci/run-step.sh "Scholarship degree alias regression (offline)" npm run test:scholarship-degrees
+      - name: Catalogue evidence and archived-cycle boundaries (offline)
+        run: bash ci/run-step.sh "Catalogue evidence and archived-cycle boundaries (offline)" npm run test:catalog-evidence
+      - name: Catalogue evidence migrations (isolated PostgreSQL)
+        run: bash ci/run-step.sh "Catalogue evidence migrations (isolated PostgreSQL)" npm run test:catalogue-migrations
+
+      - name: Official-source review batch (isolated PostgreSQL)
+        run: bash ci/run-step.sh "Official-source review batch (isolated PostgreSQL)" npm run test:official-source-review
+
+      - name: Uploaded document coverage and evidence boundaries
+        run: bash ci/run-step.sh "Uploaded document coverage and evidence boundaries" npm run test:document-coverage && npm run test:samples
+
+      - name: Primary-source follow-up and UK visa repair (isolated PostgreSQL)
+        run: bash ci/run-step.sh "Primary-source follow-up and UK visa repair" npm run test:source-followup
 
       - name: AI settings tests
         run: bash ci/run-step.sh "AI settings tests" npm run test:ai-settings

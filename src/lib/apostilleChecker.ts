@@ -31,6 +31,7 @@
  */
 
 import { COUNTRY_COST_BENCHMARKS, CURRENCY_RATES_TO_USD } from "./countryCostBenchmarks";
+import { UK_STUDENT_VISA_FACTS as UK } from "./ukStudentVisaFacts";
 import { countriesMatch } from "./countries";
 
 /* -------------------------------------------------------------------------- */
@@ -72,7 +73,7 @@ export interface LiquidFundsRequirement {
   currency: string;
   /** The same amount in USD, via the shared rate table. */
   amountUsd: number | null;
-  /** How the figure is built, in plain numbers ("1,483 × 9 months"). */
+  /** How the figure is built, in plain numbers ("1,529 × 9 months"). */
   basis: string;
   /** True when this is a cost benchmark rather than a published visa figure. */
   estimated: boolean;
@@ -90,8 +91,8 @@ export interface LiquidFundsRequirement {
 }
 
 /** UK maintenance, per month, for up to 9 months (published on GOV.UK). */
-export const UK_MAINTENANCE_PER_MONTH_GBP = { london: 1483, outsideLondon: 1136 } as const;
-export const UK_MAINTENANCE_MONTHS = 9;
+export const UK_MAINTENANCE_PER_MONTH_GBP = { london: UK.maintenanceLondonGbpPerMonth, outsideLondon: UK.maintenanceOutsideLondonGbpPerMonth } as const;
+export const UK_MAINTENANCE_MONTHS = UK.maintenanceMonths;
 
 /**
  * The published funds rules this calculator knows. Countries without an entry
@@ -105,15 +106,15 @@ export const PUBLISHED_FUNDS_RULES: LiquidFundsRequirement[] = [
     amount: UK_MAINTENANCE_PER_MONTH_GBP.london * UK_MAINTENANCE_MONTHS,
     currency: "GBP",
     amountUsd: toUsd(UK_MAINTENANCE_PER_MONTH_GBP.london * UK_MAINTENANCE_MONTHS, "GBP"),
-    basis: "£1,483/month (London) × 9 months = £13,347; £1,136/month outside London × 9 = £10,224",
+    basis: "£1,529/month (London) × up to 9 months = £13,761; £1,171/month outside London × up to 9 = £10,539",
     estimated: false,
     tuitionSeparate: true,
-    consecutiveDays: 28,
-    statementValidityDays: 31,
+    consecutiveDays: UK.fundsConsecutiveDays,
+    statementValidityDays: UK.statementEndWithinDays,
     scholarshipLetterAccepted: true,
     sourceName: "GOV.UK — Student visa: money you need",
     sourceUrl: "https://www.gov.uk/student-visa/money",
-    note: "The balance must never drop below the required amount for 28 consecutive days, and the statement's closing date must be within 31 days of the online application.",
+    note: "Reviewed 2026-11-03: the personal-funds balance must remain sufficient for 28 consecutive days ending within 31 days before applying. Up to 9 months, not automatically 9 for every course. Exemptions and official sponsorship evidence rules apply. Suggested deposit dates leave a full 28-day interval as a planning buffer, not a legal determination of the latest deposit day. Earlier deposits remain valid; the earlier-window start is an example, not an earliest permitted deposit.",
   },
   {
     country: "Germany",
@@ -219,7 +220,7 @@ export function resolveFundsRequirement(
       ...published,
       amount,
       amountUsd: toUsd(amount, "GBP"),
-      basis: "£1,136/month (outside London) × 9 months = £10,224",
+      basis: "£1,171/month (outside London) × up to 9 months = £10,539",
     };
   }
 
@@ -255,15 +256,15 @@ export interface FundsWindow {
   /** `YYYY-MM-DD` of the planned visa application, or null when unparsable. */
   applicationDate: string | null;
   /**
-   * Latest day the money can be deposited and still satisfy the consecutive-day
-   * rule when the statement closes on the application date.
+   * Conservative deposit target: a full interval before the latest statement end.
+   * This is a planning buffer, not a legal latest permissible calendar day.
    */
   fundsInPlaceBy: string | null;
   /** The statement's closing date must not be earlier than this. */
   statementNotBefore: string | null;
   /** The statement's closing date must not be later than this. */
   statementNotAfter: string | null;
-  /** Earliest day a valid holding window could begin (widest option). */
+  /** Illustrative earlier window start; earlier deposits are also permitted. */
   earliestWindowStart: string | null;
   consecutiveDays: number | null;
   statementValidityDays: number | null;
@@ -285,6 +286,7 @@ export function parseYmd(value: string | Date | null | undefined): Date | null {
     ? new Date(Date.UTC(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])))
     : new Date(text);
   if (Number.isNaN(date.getTime())) return null;
+  if (ymd && (date.getUTCFullYear() !== Number(ymd[1]) || date.getUTCMonth() !== Number(ymd[2]) - 1 || date.getUTCDate() !== Number(ymd[3]))) return null;
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
@@ -298,7 +300,7 @@ function shiftDays(date: Date, days: number): Date {
 }
 
 /**
- * Compute the exact dates the money has to be in place for one destination and
+ * Compute conservative suggested dates to have money in place for one destination and
  * one planned application date.
  *
  * The arithmetic, spelled out for the UK (28 consecutive days, statement valid
@@ -307,8 +309,9 @@ function shiftDays(date: Date, days: number): Date {
  *   statementNotBefore  = application − 31 days               → 2027-05-15
  *   fundsInPlaceBy      = statementNotAfter − 28 days         → 2027-05-18
  *   earliestWindowStart = statementNotBefore − 28 days        → 2027-04-17
- * so the student can deposit as late as 2027-05-18 and still show a full
- * 28-day history on the day they apply — or start earlier and keep more slack.
+ * the suggested 2027-05-18 deposit leaves a full
+ * 28-day interval before applying. This is not the statutory latest deposit
+ * day; the earlier-window start is an example, not a lower bound on holding funds.
  */
 export function computeFundsWindow(
   country: string | null | undefined,

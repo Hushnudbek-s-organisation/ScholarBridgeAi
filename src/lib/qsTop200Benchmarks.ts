@@ -1,19 +1,16 @@
 /**
  * Admission benchmarks for the QS World University Rankings 2026 top 200.
  *
- * Compiled from:
- * - QS World University Rankings 2026 (`data/qs2026_top1500.csv`) — the rank
- *   column ONLY. Every `qsRank` below is that edition's published position and
- *   is machine-checked against the CSV by `scripts/check-qs-benchmarks.ts`.
- * - British Council Official QS Top 200 IELTS Score Requirement Table
- * - US University Common Data Sets (CDS 2024–2026, Sections C1 & C9–C12)
- * - UK UCAS & Official University Admissions Statistics
- * - European, Canadian, Australian & Asian Official Admissions Portals
+ * Legacy hand-compiled PLANNING ESTIMATES, not verified CDS observations.
+ * The uploaded report repeats these numbers but supplies no per-metric CDS
+ * evidence. Only the rank column is checked against the repository QS table.
+ * Observed statistics live in admissionsStatistics with separate provenance.
  *
  * `qsRank` is `null` for an institution the 2026 edition does not rank: the
  * row still carries its admission band, but it must never claim a position.
  */
 
+import { admissionsStatisticsFor, type AdmissionsStatistics } from "./admissionsStatistics";
 import { countriesMatch } from "./countries";
 import { clamp, roundTo } from "./scoring";
 
@@ -23,28 +20,27 @@ export interface QsUniversityBenchmark {
    * does not rank this institution. Never a placeholder number.
    */
   qsRank: number | null;
+  admissionsStatistics: AdmissionsStatistics;
   canonicalName: string;
   aliases: string[];
   country: string;
-  acceptRatePct: number; // Overall institutional acceptance/offer rate %
+  acceptRatePct: number; // Legacy estimated institutional rate, NOT an observation
   gpa25: number;         // 25th percentile admitted GPA on 4.0 scale
   gpa50: number;         // 50th percentile (median) admitted GPA on 4.0 scale
   gpa75: number;         // 75th percentile admitted GPA on 4.0 scale
   sat25: number | null;  // 25th percentile SAT (for undergrad applicants submitting SAT)
   sat50: number | null;  // 50th percentile SAT
   sat75: number | null;  // 75th percentile SAT
-  minIelts: number;      // Published minimum IELTS overall band
-  medianIelts: number;   // Competitive admitted median IELTS band
-  minToefl: number;      // Published minimum TOEFL iBT score
+  minIelts: number;      // Legacy assumed IELTS band; not a verified requirement
+  medianIelts: number;   // Legacy assumed IELTS planning median, not an observed median
+  minToefl: number;      // Legacy assumed TOEFL planning value, not a verified requirement
   officialDomain: string;
   officialUrl: string;
   /**
-   * PROVENANCE — every figure in this table is a *compiled* percentile band
-   * (Common Data Sets, UCAS/OfS admissions statistics, institutional profiles),
-   * not a figure the university publishes as an official acceptance rate or a
-   * guaranteed admitted median. `isEstimated` is therefore always `true` and
-   * always travels with the object, so no consumer — API payload, dashboard or
-   * chancing screen — can present it as a verified statistic.
+   * LEGACY PROVENANCE — these planning values have no per-metric source,
+   * cohort, or reproducible derivation. The uploaded report repeating them
+   * does not make them empirical CDS statistics. `isEstimated` must always
+   * travel with them. Use admissionsStatistics for reviewed observations.
    */
   isEstimated: true;
   /** One line a UI can show next to the number, in English. */
@@ -288,6 +284,7 @@ export const QS_TOP_200_BENCHMARKS: QsUniversityBenchmark[] = QS_TOP_200_RAW_TUP
     officialDomain,
   ]) => ({
     qsRank,
+    admissionsStatistics: admissionsStatisticsFor(canonicalName),
     canonicalName,
     aliases,
     country,
@@ -305,7 +302,7 @@ export const QS_TOP_200_BENCHMARKS: QsUniversityBenchmark[] = QS_TOP_200_RAW_TUP
     officialUrl: `https://${officialDomain}`,
     // Compiled bands, never an official published statistic — see the field doc.
     isEstimated: true,
-    estimateBasis: "Compiled percentile band (Common Data Set / admissions statistics), not an official figure",
+    estimateBasis: "Unverified legacy planning estimate; not observed CDS data or a published requirement",
   })
 );
 
@@ -350,10 +347,10 @@ export interface UniversityBenchmarkLookupInput {
 }
 
 /**
- * Matches any database university row to its QS Top 200 Benchmark (or derives a
- * rank-calibrated benchmark if outside the Top 200), merging explicit DB minima
- * (`minGpa`, `minIelts`, `minSat`, `acceptanceRate`) so database facts and QS
- * percentile bands never contradict.
+ * Match by exact normalized institution name/alias with compatible country.
+ * Rank, substring and shared parent domain cannot establish identity. Legacy
+ * database minima can adjust the experimental planning model, never the
+ * independent source-backed admissionsStatistics observation record.
  */
 export function matchQsUniversityBenchmark(
   uni: UniversityBenchmarkLookupInput
@@ -373,44 +370,9 @@ export function matchQsUniversityBenchmark(
     if (matched) break;
   }
 
-  // 2. Substring / token containment match on canonicalName or long aliases
-  if (!matched) {
-    for (const cand of candidates) {
-      if (cand.length < 5) continue;
-      matched = QS_TOP_200_BENCHMARKS.find((b) => {
-        const bNorm = normalizeNameKey(b.canonicalName);
-        if (bNorm.includes(cand) || cand.includes(bNorm)) return true;
-        return b.aliases.some((a) => {
-          const aNorm = normalizeNameKey(a);
-          return aNorm.length >= 5 && (aNorm.includes(cand) || cand.includes(aNorm));
-        });
-      });
-      if (matched) break;
-    }
-  }
-
-  // 3. Official domain match
-  if (!matched) {
-    const domains = [uni.officialWebsiteUrl, uni.websiteUrl, uni.sourceUrl]
-      .map(extractDomain)
-      .filter(Boolean);
-    for (const dom of domains) {
-      matched = QS_TOP_200_BENCHMARKS.find(
-        (b) => dom === b.officialDomain || dom.endsWith(`.${b.officialDomain}`) || b.officialDomain.endsWith(`.${dom}`)
-      );
-      if (matched) break;
-    }
-  }
-
-  // 4. Rank + Country match when worldRanking is 1..200
-  if (!matched && uni.worldRanking != null && uni.worldRanking >= 1 && uni.worldRanking <= 200) {
-    matched = QS_TOP_200_BENCHMARKS.find(
-      (b) => b.qsRank === uni.worldRanking && (!uni.country || countriesMatch(uni.country, b.country))
-    );
-    if (!matched) {
-      matched = QS_TOP_200_BENCHMARKS.find((b) => b.qsRank === uni.worldRanking);
-    }
-  }
+  // An institution's rank, short substring, or shared parent domain cannot
+  // establish identity (e.g. Inha Tashkent is not the parent in Korea).
+  if (matched && uni.country && !countriesMatch(uni.country, matched.country)) matched = undefined;
 
   // Fallback for any institution not in the 201-row table: calibrate from rank
   const rank =
@@ -420,10 +382,11 @@ export function matchQsUniversityBenchmark(
   const base: QsUniversityBenchmark = matched
     ? { ...matched }
     : {
-        qsRank: rank,
+        qsRank: null,
+        admissionsStatistics: admissionsStatisticsFor(uni.canonicalName || uni.name || "University"),
         canonicalName: uni.canonicalName || uni.name || "University",
         aliases: uni.shortName ? [uni.shortName] : [],
-        country: uni.country || "United States",
+        country: uni.country || "Unknown",
         acceptRatePct: clamp(roundTo(12 + rank * 0.22, 1), 5, 75),
         gpa25: clamp(roundTo(3.75 - rank * 0.003, 2), 2.9, 3.88),
         gpa50: clamp(roundTo(3.90 - rank * 0.0025, 2), 3.15, 3.95),

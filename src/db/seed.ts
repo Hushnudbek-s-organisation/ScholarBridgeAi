@@ -1094,12 +1094,12 @@ const FORUM_THREAD_SPECS = [
   },
   {
     categorySlug: "visa",
-    title: "UK Student Visa 28-Day Bank Rule & IOM Tashkent TB Test Timeline",
-    body: "Two critical timing rules for anyone holding a UK university offer (UCL, Oxford, Manchester, Edinburgh, Warwick, Bristol):\n\n1. **28-Day Financial Rule:** Your bank funds (unpaid tuition + £1,483/mo London or £1,136/mo outside London for 9 months) must remain above the threshold for **28 consecutive days**, and the closing date of the statement must be within 31 days of your online UKVI visa application.\n2. **IOM Tashkent TB Certificate:** Book your chest X-ray appointment at the IOM clinic in Tashkent early in June/July before the August peak rush!",
+    title: "UK Student Visa: Financial Evidence & Conditional TB Testing",
+    body: "Official guidance reviewed 3 November 2026: \n\n1. **Financial evidence:** Normally show unpaid course fees on the CAS plus £1,529/month in London or £1,171/month outside London, for up to 9 months. Personal funds must be held for 28 consecutive days ending within 31 days before applying. Exemptions and official sponsorship evidence rules apply: https://www.gov.uk/student-visa/money \n2. **Conditional TB certificate:** Check the six-month stay and residence tests at https://www.gov.uk/tb-test-visa. GOV.UK lists Tashkent International Clinic, not IOM, for Uzbekistan: https://www.gov.uk/government/publications/tuberculosis-test-for-a-uk-visa-clinics-in-uzbekistan/tuberculosis-testing-in-uzbekistan . Book with the approved clinic and confirm current arrangements; children under 11 do not normally need an X-ray.",
     isPinned: false,
     viewCount: 256,
     replies: [
-      "Chevening and El-Yurt Umidi full-grant holders can use their official award letter instead of the 28-day bank statement!",
+      "Official sponsorship and student-loan evidence have separate rules. Check whether your sponsor, award period and covered costs meet GOV.UK requirements; do not assume any award letter is sufficient.",
     ],
   },
 ];

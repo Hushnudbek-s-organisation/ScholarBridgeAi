@@ -282,7 +282,8 @@ export async function GET(req: Request) {
               and(
                 inArray(applicationCycles.universityId, candidateIds),
                 gte(applicationCycles.deadline, new Date().toISOString().slice(0, 10)),
-                eq(applicationCycles.verificationStatus, "verified")
+                eq(applicationCycles.verificationStatus, "verified"),
+                eq(applicationCycles.isActive, true)
               )
             )
             .orderBy(asc(applicationCycles.deadline))

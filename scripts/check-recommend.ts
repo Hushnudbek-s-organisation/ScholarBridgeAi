@@ -547,7 +547,7 @@ async function apiPart() {
     field: "Software Engineering",
     degree: "Bachelor",
     language: "English",
-    tuitionAmount: null,
+    tuitionAmount: 90000,
   }).returning();
   const [law] = await db.insert(schema.universityPrograms).values({
     universityId: uni.id,
@@ -565,6 +565,12 @@ async function apiPart() {
   });
   await db.insert(schema.applicationCycles).values({
     universityId: uni.id, programId: se.id, intake: "Spring", academicYear: "2027/2028", deadline: "2026-12-01", verificationStatus: "unverified",
+  });
+
+  // Archived rows stay in storage but must not be selected as nextCycle.
+  await db.insert(schema.applicationCycles).values({
+    universityId: uni.id, programId: law.id, intake: "Archived", academicYear: "2027/2028",
+    deadline: "2027-01-01", verificationStatus: "verified", isActive: false,
   });
 
   const aliceToken = signSessionToken({ id: alice.id, passwordHash: alice.passwordHash });
@@ -626,6 +632,10 @@ async function apiPart() {
     check("affordability: within budget (9000 ≤ 25000 USD)", csRes?.affordability?.withinBudget === "yes", JSON.stringify(csRes?.affordability?.withinBudget));
     check("next cycle: verified deadline surfaced with source", csRes?.nextCycle?.deadline === "2027-01-15" && csRes?.nextCycle?.isEstimated === false, JSON.stringify(csRes?.nextCycle));
     check("unverified cycle flagged isEstimated=true", byName("RECOMMEND-FIXTURE: BSc Software Engineering")?.nextCycle?.isEstimated === true);
+    const seRes = byName("RECOMMEND-FIXTURE: BSc Software Engineering");
+    check("quarantined requirements are not used to assess eligibility", seRes?.eligibility?.items?.length === 0);
+    check("quarantined tuition is not published or scored as affordability", seRes?.program?.annualTuition === null && seRes?.affordability?.withinBudget === "unknown");
+    check("archived cycles are not selected even when they are the only cycle", byName("RECOMMEND-FIXTURE: BSc Law")?.nextCycle === null);
     check("provenance: program sourceUrl + verificationStatus in response", csRes?.program?.sourceUrl === "https://recommendfixture.example.edu/cs" && csRes?.program?.verificationStatus === "verified");
     check("probability dimension: available=false in the response", res.body?.probability?.available === false && csRes?.probability?.available === false);
     check("no numeric probability anywhere in the payload", !/"(admissionPct|chancePct|odds)"\s*:/.test(JSON.stringify(res.body)));

@@ -1,5 +1,7 @@
 "use client";
 
+import { AdmissionsStatisticsCard } from "./AdmissionsStatisticsCard";
+import type { AdmissionsStatistics } from "@/lib/admissionsStatistics";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { gpaTo40Scale } from "@/lib/gpa";
@@ -54,6 +56,7 @@ interface MatchEvidenceBreakdown {
 }
 
 interface QsUniversityBenchmark {
+  admissionsStatistics?: AdmissionsStatistics;
   /** QS 2026 position, or null when the edition does not rank the institution. */
   qsRank: number | null;
   canonicalName: string;
@@ -913,6 +916,8 @@ export function ChancingPanel({
                       )}
                     </div>
 
+                    <AdmissionsStatisticsCard statistics={baseItem.qsBenchmark?.admissionsStatistics} />
+                    <p className="rounded-control bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">{t("planningEstimateNotice")}</p>
                     {/* Selectivity Comparison Metrics */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                       <div className="rounded-control bg-white p-2.5 border border-slate-200">
@@ -923,7 +928,7 @@ export function ChancingPanel({
                       </div>
                       <div className="rounded-control bg-white p-2.5 border border-slate-200">
                         <div className="text-xs text-slate-500">
-                          Program Offer Rate ({activeProgram.acceptRateMultiplier}x)
+                          {t("programEstimateRate")} ({activeProgram.acceptRateMultiplier}x)
                         </div>
                         <div className="text-sm font-bold text-indigo-600 mt-0.5">
                           {activeProgram.effectiveProgramAcceptRatePct}%

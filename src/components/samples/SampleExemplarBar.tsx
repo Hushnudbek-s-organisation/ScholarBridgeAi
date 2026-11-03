@@ -250,6 +250,13 @@ export function SampleExemplarBar<G extends SampleGroup>({
         <h3 className="min-w-0 break-words text-sm font-bold text-slate-900">{heading}</h3>
       </div>
 
+      {lib && (group === "essay" || group === "sop" || group === "lor") && (
+        <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+          {t("writingCoverage", { essays: new Set(lib.ESSAY_RUBRIC_SAMPLES.map((s) => s.text)).size,
+            letters: lib.LOR_SAMPLES.filter((s) => s.kind !== "requestEmail").length })}
+        </p>
+      )}
+
       {failed ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600" role="alert">
           <span>{t("loadError")}</span>

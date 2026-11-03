@@ -1,4 +1,5 @@
 import { countriesMatch } from "@/lib/countries";
+import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 
 /**
  * Scholarship catalogue filters — one definition shared by the browser and the
@@ -150,25 +151,35 @@ export interface ScholarshipFilterRow {
   fitBucket?: string | null;
 }
 
-/** `degreeLevels` is a JSON array in the catalogue; malformed values yield []. */
+/**
+ * Canonical, distinct degree labels for filtering, facets and grouping.
+ * Imports use both Bachelor/Master and Bachelor's/Master's/Undergraduate.
+ * Resolve those aliases with the shared degree vocabulary, without changing
+ * stored eligibility. Keep unknown labels (e.g. Postdoc) as-is: they must not
+ * silently become PhD or make a scholarship match every degree.
+ * Malformed JSON yields []; legacy comma-separated labels are also accepted.
+ */
 export function parseScholarshipDegreeLevels(raw: string | null | undefined): string[] {
   if (!raw) return [];
   const trimmed = raw.trim();
   if (!trimmed) return [];
+  let values: unknown[];
   if (trimmed.startsWith("[")) {
     try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return parsed.map((value) => String(value).trim()).filter(Boolean);
-      }
+      const parsed: unknown = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) return [];
+      values = parsed;
     } catch {
       return [];
     }
+  } else {
+    values = trimmed.split(",");
   }
-  return trimmed
-    .split(",")
+  return [...new Set(values
+    .filter((value): value is string => typeof value === "string")
     .map((value) => value.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((value) => normalizeDegreeLevel(value) ?? value))];
 }
 
 /** Normalizes a selection against the canonical option list (drops junk). */
