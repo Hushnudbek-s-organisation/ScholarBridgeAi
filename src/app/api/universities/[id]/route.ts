@@ -1,3 +1,4 @@
+import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import {
@@ -9,7 +10,7 @@ import {
   programSources,
   sources,
 } from "@/db/schema";
-import { eq, asc, inArray, sql } from "drizzle-orm";
+import { and, eq, asc, inArray, sql } from "drizzle-orm";
 import { hasUndergraduateAdmission, undergraduateTestApplies } from "@/lib/degreeLevels";
 import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch, type MatchBreakdown } from "@/lib/matching";
@@ -409,12 +410,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       db
         .select()
         .from(universityPrograms)
-        .where(eq(universityPrograms.universityId, uniId))
+        .where(and(eq(universityPrograms.universityId, uniId), eq(universityPrograms.isActive, true)))
         .orderBy(asc(universityPrograms.name)),
       db
         .select()
         .from(applicationCycles)
-        .where(eq(applicationCycles.universityId, uniId))
+        .where(and(eq(applicationCycles.universityId, uniId), eq(applicationCycles.isActive, true)))
         .orderBy(asc(applicationCycles.id)),
       db
         .select({
@@ -581,7 +582,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         // out of the response and out of the program minima consumed by
         // matching/chancing; provenance alone (for example, a university root
         // URL) does not verify a numeric requirement.
-        if (r.verificationStatus !== "verified" || !r.sourceUrl) continue;
+        if (!hasVerifiedProgramEvidence(r)) continue;
         const prov = reqProvenance(r);
         if (r.minIelts != null) {
           reqs.push({ requirementType: "ielts", minimumValue: r.minIelts, valueText: null, ...prov });
@@ -614,8 +615,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         if (r.otherRequirements) reqs.push({ requirementType: "other", minimumValue: null, valueText: r.otherRequirements, ...prov });
       }
 
-      const flags = reqRows.find((r) => r.verificationStatus === "verified" && Boolean(r.sourceUrl)) ?? null;
-      const programVerified = p.verificationStatus === "verified" && Boolean(p.sourceUrl);
+      const flags = reqRows.find((r) => hasVerifiedProgramEvidence(r)) ?? null;
+      const programVerified = hasVerifiedProgramEvidence(p);
       programsWithReqs.push({
         id: p.id,
         name: p.name,

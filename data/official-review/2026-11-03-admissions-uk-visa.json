@@ -1,0 +1,137 @@
+{
+  "reviewedOn": "2026-11-03",
+  "scope": "Six existing UK Student Route Visa records only; no other countries certified. Conditional items must not be treated as universal requirements.",
+  "admissionsPages": [
+    {
+      "institution": "Harvard University",
+      "url": "https://college.harvard.edu/admissions/admissions-statistics",
+      "cohort": "Class of 2030",
+      "applicants": 55104,
+      "admitted": 2037,
+      "waitlistAdmittedIncluded": 103,
+      "note": "Overall rate derived from applicant/admit counts. International geography share is not acceptance rate."
+    },
+    {
+      "institution": "Brown University",
+      "url": "https://admission.brown.edu/explore/brown-admission-numbers",
+      "cohort": "Class of 2030",
+      "applicants": 47944,
+      "admitted": 2687,
+      "publishedRatePercent": 5.6,
+      "edAdmitted": 889,
+      "edApplicants": null,
+      "satRange": [
+        1470,
+        1550
+      ],
+      "actRange": [
+        34,
+        36
+      ],
+      "note": "Tests describe admitted submitters, most recent data as of September 2026; test cohort not separately labeled. No median."
+    },
+    {
+      "institution": "Princeton University",
+      "url": "https://admission.princeton.edu/apply/admission-statistics",
+      "cohort": "Enrolled Class of 2030",
+      "note": "Reviewed page describes enrollment, not applicant/admit counts or test quartiles. 12.9% international enrolled share is not acceptance rate."
+    }
+  ],
+  "visaRows": [
+    {
+      "id": 7,
+      "previousTitle": "Confirmation of Acceptance for Studies (CAS) Reference Number",
+      "title": "Confirmation of Acceptance for Studies (CAS) Reference Number",
+      "instructions": "Obtain an unconditional offer from a licensed Student sponsor and a CAS reference before applying. Apply within 6 months of receiving the CAS. The CAS records course and fee details; check whether ATAS is also required for your course and circumstances.",
+      "sourceUrl": "https://www.gov.uk/student-visa/course",
+      "isRequired": true,
+      "expectedPayloadMd5": "5c077def4e5bf7bdab335746dcfc5d64"
+    },
+    {
+      "id": 8,
+      "previousTitle": "UKVI Online Student Visa Application Fee (£490)",
+      "title": "UKVI Online Student Visa Application Fee (£558)",
+      "instructions": "The standard Student visa application fee is £558 for an application outside the UK, or to extend or switch inside the UK. Pay through the official application. IHS and optional services are separate. GBP is the authoritative fee currency; any USD conversion is an estimate, not the payable fee.",
+      "sourceUrl": "https://www.gov.uk/student-visa",
+      "isRequired": true,
+      "expectedPayloadMd5": "309ec87105983e78d39b9c15a72632bb"
+    },
+    {
+      "id": 9,
+      "previousTitle": "Immigration Health Surcharge (IHS — £776 per year of visa)",
+      "title": "Immigration Health Surcharge (student rate: £776 per visa year)",
+      "instructions": "The student IHS rate is £776 per year, based on visa duration rather than course length. A visa longer than 12 but no more than 18 months costs 1.5 years; longer than 18 but less than 24 months costs 2 years. A visa of 6 months or less applied for outside the UK does not incur IHS; inside the UK it normally costs half a year. Use the official calculator for the actual visa duration and exemptions. This is a surcharge calculation, not a promise that all healthcare is free.",
+      "sourceUrl": "https://www.gov.uk/healthcare-immigration-application/how-much-pay",
+      "isRequired": false,
+      "expectedPayloadMd5": "7af81a63ade850d7abda80721995d769"
+    },
+    {
+      "id": 10,
+      "previousTitle": "28-Day Consecutive Bank Statement (£1,483/mo London or £1,136/mo outside London)",
+      "title": "Financial evidence (£1,529/month London; £1,171/month outside London)",
+      "instructions": "Normally show outstanding course fees for one academic year as stated on the CAS, plus living costs of £1,529/month in London or £1,171/month outside London, for up to 9 months (£13,761 or £10,539). Personal funds must be held for 28 consecutive days ending within 31 days before applying. Student loans and official sponsorship have separate evidence rules. Exemptions include some applicants resident in the UK with a valid visa for at least 12 months and differential evidence arrangements; dependants have separate amounts. Check which rules apply to you.",
+      "sourceUrl": "https://www.gov.uk/student-visa/money",
+      "isRequired": false,
+      "expectedPayloadMd5": "163f44ef2804dbe437abe2f521052afe"
+    },
+    {
+      "id": 11,
+      "previousTitle": "Tuberculosis (TB) Clearance Certificate from IOM Tashkent",
+      "title": "Conditional TB certificate: approved clinic in Uzbekistan",
+      "instructions": "A TB test is normally required when coming to the UK for 6 months or more, having lived in a listed country for at least 6 months and been living there within the last 6 months; exemptions apply. See https://www.gov.uk/tb-test-visa for the residence test. GOV.UK lists Tashkent International Clinic, 38 Sarikul Street, Tashkent 100105, as an approved clinic in Uzbekistan. Book directly with that clinic and confirm current arrangements. The certificate is normally valid for 6 months. Children under 11 do not normally need an X-ray; they still need clinical assessment where the TB rule applies.",
+      "sourceUrl": "https://www.gov.uk/government/publications/tuberculosis-test-for-a-uk-visa-clinics-in-uzbekistan/tuberculosis-testing-in-uzbekistan",
+      "isRequired": false,
+      "expectedPayloadMd5": "2d1c7241ac907cdb3d1fd098bb2a69f2"
+    },
+    {
+      "id": 12,
+      "previousTitle": "Biometrics Enrolment & Passport Submission at TLScontact Tashkent",
+      "title": "Visa application centre: follow UKVI identity instructions",
+      "instructions": "Apply online before booking a visa application centre appointment. Follow the identity, biometrics and document instructions issued for your own application. The GOV.UK centre directory links Uzbekistan to VFS Global: https://visa.vfsglobal.com/uzb/en/gbr/attend-centre. Use that official directory to locate the current centre and booking process. This review establishes no universal 240-day appointment deadline and does not require every applicant to surrender a passport by the same procedure.",
+      "sourceUrl": "https://www.gov.uk/find-a-visa-application-centre",
+      "isRequired": false,
+      "expectedPayloadMd5": "f9aaf3c881f7716e32c64d9767083ef6"
+    }
+  ],
+  "liveBefore": {
+    "total": 75,
+    "ukScope": 6,
+    "practice": 20,
+    "other69RowsMd5": "931eb1939166efb05f7b5800e7bc3050"
+  },
+  "liveAfter": {
+    "migrations": [
+      "official_uk_visa_review_20261103",
+      "correct_uk_tb_source_url_20261103"
+    ],
+    "total": 75,
+    "practice": 20,
+    "other69RowsMd5": "931eb1939166efb05f7b5800e7bc3050",
+    "privateBackups": 6,
+    "anonCanReadBackup": false,
+    "backupRls": true,
+    "evidenceConstraintValidated": true,
+    "lastVerifiedAt": "2026-11-03T06:13:43.478445",
+    "payloadMd5ById": {
+      "7": "5c077def4e5bf7bdab335746dcfc5d64",
+      "8": "309ec87105983e78d39b9c15a72632bb",
+      "9": "7af81a63ade850d7abda80721995d769",
+      "10": "163f44ef2804dbe437abe2f521052afe",
+      "11": "2d1c7241ac907cdb3d1fd098bb2a69f2",
+      "12": "f9aaf3c881f7716e32c64d9767083ef6"
+    },
+    "note": "Connector application transcribed one TB URL incorrectly. Bounded follow-up migration corrected it. Final readback matches every expected payload hash; other 69 row hash is unchanged. Canonical review SQL contains the correct URL; tests rehearse both the canonical replay and actual typo/correction chain."
+  },
+  "coverageAfter": {
+    "institutions": 201,
+    "reviewedInstitutionPages": 4,
+    "institutionsWithNumericFacts": 3,
+    "unreviewedInstitutions": 197,
+    "reviewedMetricSlots": 84,
+    "numericFacts": 16,
+    "notOnReviewedPage": 67,
+    "notApplicable": 1,
+    "unreviewedMetricSlots": 4137,
+    "personalizedProbabilityAvailable": false
+  }
+}

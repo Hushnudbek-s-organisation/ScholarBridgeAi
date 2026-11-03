@@ -31,9 +31,9 @@ type Check = { name: string; sql: string; expect: number };
  */
 const CHECKS: Check[] = [
   {
-    name: "a verified deadline is never in the past",
+    name: "cycle opening never follows its deadline (verified history may be past)",
     sql: `SELECT COUNT(*)::int AS n FROM application_cycles
-           WHERE verification_status = 'verified' AND deadline < CURRENT_DATE`,
+           WHERE opening_date > deadline`,
     expect: 0,
   },
   {

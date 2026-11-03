@@ -1,3 +1,4 @@
+import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
 import { NextResponse } from "next/server";
 import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
@@ -255,11 +256,12 @@ async function ensureRequirements(profileId: number, applicationId: number, forc
   const progRows = await db
     .select({ id: programs.id, name: programs.name })
     .from(programs)
-    .where(eq(programs.universityId, app.universityId ?? -1));
+    .where(and(eq(programs.universityId, app.universityId ?? -1), eq(programs.isActive, true)));
   const named = progRows.find((p) => !app.programName || p.name.toLowerCase() === app.programName.toLowerCase()) ?? progRows[0];
   if (named) {
     program =
-      (await db.select().from(programRequirements).where(eq(programRequirements.programId, named.id)).limit(1))[0] ?? null;
+      (await db.select().from(programRequirements).where(and(eq(programRequirements.programId, named.id), eq(programRequirements.verificationStatus, "verified"))).limit(1))[0] ?? null;
+    if (program && !hasVerifiedProgramEvidence(program)) program = null;
   }
 
   // Admin-published templates for this university (or the generic fallback).

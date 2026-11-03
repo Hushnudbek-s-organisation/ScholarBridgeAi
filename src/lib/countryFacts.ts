@@ -27,6 +27,8 @@
  * when a number loses its source.
  */
 
+import { UK_STUDENT_VISA_FACTS } from "./ukStudentVisaFacts";
+
 /** A line of text in each language the product ships. */
 export interface LocalizedText {
   en: string;
@@ -80,6 +82,8 @@ export interface CountryFacts {
   sourceUrl: string;
   /** ISO date the figures above were read from the source. */
   lastVerifiedAt: string;
+  /** Scoped follow-up reviews; do not refresh unrelated embassy/recognition claims. */
+  fieldReviews?: Partial<Record<"proofOfFunds" | "postStudyWork", { checkedOn: string; sourceUrl: string }>>;
   /** Date the published amounts themselves take effect (they change yearly). */
   asOf: string | null;
 }
@@ -177,14 +181,14 @@ export const COUNTRY_FACTS: CountryFacts[] = [
     country: "United Kingdom",
     iso2: "GB",
     proofOfFunds: proof(
-      10539,
+      UK_STUDENT_VISA_FACTS.maintenanceOutsideLondonGbpPerMonth * UK_STUDENT_VISA_FACTS.maintenanceMonths,
       "GBP",
       "year",
       "£1,171 / month × 9 = £10,539 (outside London)",
       {
-        en: "London rate is £1,529 / month (£13,761 for 9 months). From 30 November 2026 the monthly figures rise to £1,203 and £1,570, so applications lodged after that date need £10,827 / £14,130. The money must sit in the account for 28 consecutive days.",
-        uz: "London uchun £1,529/oy (£13,761 — 9 oy). 2026-yil 30-noyabrdan oylik me'yor £1,203 va £1,570 ga oshadi, ya'ni shu sanadan keyingi arizalar uchun £10,827 / £14,130 kerak bo'ladi. Mablag' hisobda 28 kun uzluksiz turishi shart.",
-        ru: "Для Лондона — £1,529/мес (£13,761 за 9 месяцев). С 30 ноября 2026 года месячные суммы вырастают до £1,203 и £1,570, то есть для заявлений после этой даты нужно £10,827 / £14,130. Деньги должны лежать на счёте 28 дней подряд.",
+        en: "London: £1,529/month, up to 9 months (£13,761); outside London: £1,171/month, up to 9 months (£10,539), plus outstanding course fees shown on the CAS. Hold funds for 28 consecutive days; the period must end within 31 days before applying. Exemptions, sponsorship evidence and separate dependant funds apply. No future rate increase is established by this review.",
+        uz: "London: oyiga £1,529, ko‘pi bilan 9 oy (£13,761); Londondan tashqarida: oyiga £1,171, ko‘pi bilan 9 oy (£10,539). Bunga CASdagi to‘lanmagan kontrakt qo‘shiladi. Mablag‘ 28 kun uzluksiz saqlanadi; davr arizadan oldingi 31 kun ichida tugashi kerak. Istisnolar, homiylik dalili va oila a’zolari uchun alohida mablag‘ qoidalari bor. Ushbu tekshiruv kelajakdagi oshishni tasdiqlamaydi.",
+        ru: "Лондон: £1,529/мес., до 9 месяцев (£13,761); вне Лондона: £1,171/мес., до 9 месяцев (£10,539), плюс неоплаченная учёба по CAS. Средства держат 28 дней подряд; период должен завершиться в пределах 31 дня до заявления. Есть исключения, спонсорское подтверждение и отдельные суммы для иждивенцев. Будущее повышение этим обзором не установлено.",
       },
     ),
     partTimeWorkHours: 20,
@@ -193,11 +197,11 @@ export const COUNTRY_FACTS: CountryFacts[] = [
       uz: "Bakalavr va undan yuqori darajada o'qish davrida haftasiga 20 soat (bakalavrdan pastda — 10 soat); ta'tilda to'liq kunlik.",
       ru: "20 часов в неделю во время учёбы на степени (10 часов ниже степени); в каникулы — полный день.",
     },
-    postStudyWorkMonths: 18,
+    postStudyWorkMonths: 24,
     postStudyWorkNote: {
-      en: "Graduate route: 18 months after a bachelor's or master's, 3 years after a PhD.",
-      uz: "Graduate route: bakalavr yoki magistrdan keyin 18 oy, PhD dan keyin 3 yil.",
-      ru: "Graduate route: 18 месяцев после бакалавриата или магистратуры, 3 года после PhD.",
+      en: "Graduate route: 2 years if applying by 31 December 2026; 18 months if applying on or after 1 January 2027; 3 years for a PhD. Eligibility is separate from Student visa approval. Source: https://www.gov.uk/student-visa",
+      uz: "Graduate route: 2026-yil 31-dekabrgacha ariza topshirilsa 2 yil; 2027-yil 1-yanvardan 18 oy; PhD uchun 3 yil. Alohida muvofiqlik shartlari bor. Manba: https://www.gov.uk/student-visa",
+      ru: "Graduate route: 2 года при подаче до 31 декабря 2026; 18 месяцев с 1 января 2027; 3 года для PhD. Применяются отдельные условия. Источник: https://www.gov.uk/student-visa",
     },
     elevenYearDiploma: "varies",
     elevenYearNote: {
@@ -214,8 +218,12 @@ export const COUNTRY_FACTS: CountryFacts[] = [
     },
     sourceName: "GOV.UK — Student visa: money you need",
     sourceUrl: "https://www.gov.uk/student-visa/money",
-    lastVerifiedAt: VERIFIED,
-    asOf: "2026-11-30",
+    lastVerifiedAt: VERIFIED, // Legacy whole-record date retained; only these two fields re-reviewed.
+    fieldReviews: {
+      proofOfFunds: { checkedOn: UK_STUDENT_VISA_FACTS.checkedOn, sourceUrl: UK_STUDENT_VISA_FACTS.sources.money },
+      postStudyWork: { checkedOn: UK_STUDENT_VISA_FACTS.checkedOn, sourceUrl: UK_STUDENT_VISA_FACTS.sources.overview },
+    },
+    asOf: null, // Current page read on checkedOn; no future effective date asserted.
   },
   {
     country: "Germany",
@@ -794,6 +802,7 @@ export interface LocalizedCountryFacts {
   sourceName: string;
   sourceUrl: string;
   lastVerifiedAt: string;
+  fieldReviews?: CountryFacts["fieldReviews"];
   asOf: string | null;
 }
 
@@ -818,6 +827,7 @@ export function localizeCountryFacts(facts: CountryFacts, locale: string): Local
     sourceName: facts.sourceName,
     sourceUrl: facts.sourceUrl,
     lastVerifiedAt: facts.lastVerifiedAt,
+    fieldReviews: facts.fieldReviews,
     asOf: facts.asOf,
   };
 }

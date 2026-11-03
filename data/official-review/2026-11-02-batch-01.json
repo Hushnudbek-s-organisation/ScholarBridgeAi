@@ -1,0 +1,681 @@
+{
+  "reviewed_on": "2026-11-02",
+  "status": "Applied live: official_source_review_20261102_batch_01; SELECT counts and all 11 ranking outcomes confirmed",
+  "method": "Manual primary-page reading via fetch_page. Notes are reviewer summaries, not archived page bodies. No search-only result qualifies for promotion. Rank bands retain lower bound plus full label.",
+  "sources": [
+    {
+      "key": "princeton_degrees",
+      "url": "https://admission.princeton.edu/academics/degrees-departments",
+      "title": "Princeton Degrees & Departments",
+      "scope": "programme",
+      "review_notes": "Both chunks read: all 20 target concentrations listed. CS offers AB and BSE. Applicants apply to the university, not departments. Public Policy is the official SPIA concentration name.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "princeton_academics",
+      "url": "https://admission.princeton.edu/academics",
+      "title": "Princeton Academics",
+      "scope": "programme",
+      "review_notes": "AB and BSE curricula: first two years followed by junior and senior years; six engineering departments; independent research in both degrees.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "princeton_tuition",
+      "url": "https://admission.princeton.edu/cost-aid/fees-payment-options",
+      "title": "Princeton Fees & Payment Options 2026-27",
+      "scope": "tuition",
+      "review_notes": "Undergraduate student budget 2026-27: annual tuition USD 68,140, total attendance budget USD 94,624. Not a graduate fee or a net-after-aid cost.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "princeton_checklist",
+      "url": "https://admission.princeton.edu/apply/application-checklist",
+      "title": "Princeton First-Year Application Checklist",
+      "scope": "admission_requirement",
+      "review_notes": "Common Application, Princeton questions, fee/waiver, graded written paper, transcript, school report, counselor and two teacher recommendations, midyear report. Alumni interviews and arts supplements (including architecture) are optional. English tests are conditional, with a three-year English-school waiver.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "princeton_testing",
+      "url": "https://admission.princeton.edu/apply/standardized-testing",
+      "title": "Princeton Standardized Testing",
+      "scope": "admission_requirement",
+      "review_notes": "SAT/ACT optional for fall 2027 (2026-27 application cycle), required from fall 2028 (2027-28 cycle). No minimum admission test scores. Conditional English proficiency tests include TOEFL, IELTS Academic, DET and PTE Academic; numeric cutoffs not supplied.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "princeton_preparation",
+      "url": "https://admission.princeton.edu/apply/before-you-apply",
+      "title": "Princeton Before You Apply",
+      "scope": "admission_requirement",
+      "review_notes": "Recommended preparation is explicitly NOT an admission requirement: four years English, mathematics and one language, two years laboratory science and history; engineering calculus, physics and chemistry recommended. IB/A-level qualifications evaluated in curriculum context; no fixed points or grades stated.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "princeton_international",
+      "url": "https://admission.princeton.edu/apply/international-students",
+      "title": "Princeton International Students",
+      "scope": "admission_requirement",
+      "review_notes": "No GPA conversion expected if school does not use GPA. English proficiency conditional on native language and language of instruction; no numeric IELTS/TOEFL cutoff published.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_603",
+      "url": "https://www.topuniversities.com/universities/al-farabi-kazakh-national-university",
+      "title": "QS KazNU profile",
+      "scope": "ranking",
+      "review_notes": "Chunk 0 narrative explicitly states 166 in QS World University Rankings 2026; current banner is 177 for 2027, not the target edition.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_604",
+      "url": "https://en.uw.edu.pl/university-of-warsaw-in-qs-world-university-rankings/",
+      "title": "University of Warsaw QS 2026 announcement",
+      "scope": "ranking",
+      "review_notes": "Official university announcement, 30 June 2025: 271st in QS World University Rankings 2026.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_605",
+      "url": "https://www.topuniversities.com/universities/charles-university",
+      "title": "QS Charles University historical rankings",
+      "scope": "ranking",
+      "review_notes": "Chunk 1, QS World University Rankings history: 2026 =265; current 2027 =273 is not the target edition.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_606",
+      "url": "https://haber.metu.edu.tr/en/2025/06/metu-ranks-269th-in-the-qs-world-university-rankings-2026/",
+      "title": "METU QS 2026 announcement",
+      "scope": "ranking",
+      "review_notes": "Official university announcement, 19 June 2025: 269 in QS World University Rankings 2026.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_607",
+      "url": "https://www.timeshighereducation.com/world-university-rankings/university-warsaw",
+      "title": "THE University of Warsaw historical rankings",
+      "scope": "ranking",
+      "review_notes": "World University Rankings history: 2026 601-800; not the current 2027 801-1000 band.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_608",
+      "url": "https://www.timeshighereducation.com/world-university-rankings/al-farabi-kazakh-national-university",
+      "title": "THE KazNU historical rankings",
+      "scope": "ranking",
+      "review_notes": "World University Rankings history: 2026 1201-1500; not current 2027 1401-1600.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_609",
+      "url": "https://www.timeshighereducation.com/world-university-rankings/middle-east-technical-university",
+      "title": "THE METU historical rankings",
+      "scope": "ranking",
+      "review_notes": "World University Rankings history: 2026 351-400; not current 2027 326-350.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_617",
+      "url": "https://www.timeshighereducation.com/world-university-rankings/nazarbayev-university",
+      "title": "THE Nazarbayev historical rankings",
+      "scope": "ranking",
+      "review_notes": "Chunk 1 World University Rankings history: 2026 401-500; not current 2027 376-400.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_618",
+      "url": "https://www.timeshighereducation.com/world-university-rankings/charles-university",
+      "title": "THE Charles University historical rankings",
+      "scope": "ranking",
+      "review_notes": "World University Rankings history: 2026 401-500; not current 2027 451-500.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_740",
+      "url": "https://www.timeshighereducation.com/world-university-rankings/semmelweis-university",
+      "title": "THE Semmelweis historical rankings",
+      "scope": "ranking",
+      "review_notes": "Chunk 0 World University Rankings history: 2026 251-300; not current 2027 =247 or medical subject ranking 176-200.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    },
+    {
+      "key": "ranking_601",
+      "url": "https://www.fondationdesponts.fr/classement-qs-ranking-2026/",
+      "title": "Fondation des Ponts QS 2026 announcement",
+      "scope": "ranking",
+      "review_notes": "25 July 2025: Ponts now participates through IP Paris (41 in 2026). Standalone 205 explicitly belongs to 2025. Do not assign parent rank 41 to the separate Ponts record.",
+      "retrieval": "primary_page_read",
+      "accessed_on": "2026-11-02"
+    }
+  ],
+  "programs": [
+    {
+      "id": 230,
+      "university_id": 13,
+      "expected_name": "Computer Science",
+      "verified_name": "Computer Science",
+      "requirement_id": 1901,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 231,
+      "university_id": 13,
+      "expected_name": "Electrical and Computer Engineering",
+      "verified_name": "Electrical and Computer Engineering",
+      "requirement_id": 1902,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 232,
+      "university_id": 13,
+      "expected_name": "Mechanical and Aerospace Engineering",
+      "verified_name": "Mechanical and Aerospace Engineering",
+      "requirement_id": 1903,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 233,
+      "university_id": 13,
+      "expected_name": "Chemical and Biological Engineering",
+      "verified_name": "Chemical and Biological Engineering",
+      "requirement_id": 1904,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 234,
+      "university_id": 13,
+      "expected_name": "Civil and Environmental Engineering",
+      "verified_name": "Civil and Environmental Engineering",
+      "requirement_id": 1905,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 235,
+      "university_id": 13,
+      "expected_name": "Operations Research and Financial Engineering",
+      "verified_name": "Operations Research and Financial Engineering",
+      "requirement_id": 1906,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 236,
+      "university_id": 13,
+      "expected_name": "Mathematics",
+      "verified_name": "Mathematics",
+      "requirement_id": 1907,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 237,
+      "university_id": 13,
+      "expected_name": "Physics",
+      "verified_name": "Physics",
+      "requirement_id": 1908,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 238,
+      "university_id": 13,
+      "expected_name": "Chemistry",
+      "verified_name": "Chemistry",
+      "requirement_id": 1909,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 239,
+      "university_id": 13,
+      "expected_name": "Molecular Biology",
+      "verified_name": "Molecular Biology",
+      "requirement_id": 1910,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 240,
+      "university_id": 13,
+      "expected_name": "Economics",
+      "verified_name": "Economics",
+      "requirement_id": 1911,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 241,
+      "university_id": 13,
+      "expected_name": "Politics",
+      "verified_name": "Politics",
+      "requirement_id": 1912,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 242,
+      "university_id": 13,
+      "expected_name": "History",
+      "verified_name": "History",
+      "requirement_id": 1913,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 243,
+      "university_id": 13,
+      "expected_name": "Philosophy",
+      "verified_name": "Philosophy",
+      "requirement_id": 1914,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 244,
+      "university_id": 13,
+      "expected_name": "English",
+      "verified_name": "English",
+      "requirement_id": 1915,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 245,
+      "university_id": 13,
+      "expected_name": "Psychology",
+      "verified_name": "Psychology",
+      "requirement_id": 1916,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 246,
+      "university_id": 13,
+      "expected_name": "Neuroscience",
+      "verified_name": "Neuroscience",
+      "requirement_id": 1917,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 247,
+      "university_id": 13,
+      "expected_name": "Public and International Affairs (SPIA)",
+      "verified_name": "Public Policy (Princeton School of Public and International Affairs)",
+      "requirement_id": 1918,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 248,
+      "university_id": 13,
+      "expected_name": "Architecture",
+      "verified_name": "Architecture",
+      "requirement_id": 1919,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    },
+    {
+      "id": 249,
+      "university_id": 13,
+      "expected_name": "Astrophysical Sciences",
+      "verified_name": "Astrophysical Sciences",
+      "requirement_id": 1920,
+      "academic_year": "2026-2027",
+      "evidence": [
+        "princeton_degrees",
+        "princeton_academics",
+        "princeton_tuition",
+        "princeton_checklist",
+        "princeton_testing",
+        "princeton_preparation",
+        "princeton_international"
+      ]
+    }
+  ],
+  "rankings": [
+    {
+      "id": 603,
+      "university_id": 209,
+      "university_name": "Al-Farabi Kazakh National University (KazNU)",
+      "provider": "QS Quacquarelli Symonds",
+      "edition": "QS World University Rankings",
+      "year": 2026,
+      "rank": 166,
+      "rank_label": "#166",
+      "evidence": "ranking_603"
+    },
+    {
+      "id": 604,
+      "university_id": 210,
+      "university_name": "University of Warsaw",
+      "provider": "QS Quacquarelli Symonds",
+      "edition": "QS World University Rankings",
+      "year": 2026,
+      "rank": 271,
+      "rank_label": "#271",
+      "evidence": "ranking_604"
+    },
+    {
+      "id": 605,
+      "university_id": 212,
+      "university_name": "Charles University",
+      "provider": "QS Quacquarelli Symonds",
+      "edition": "QS World University Rankings",
+      "year": 2026,
+      "rank": 265,
+      "rank_label": "=265",
+      "evidence": "ranking_605"
+    },
+    {
+      "id": 606,
+      "university_id": 201,
+      "university_name": "Middle East Technical University (METU)",
+      "provider": "QS Quacquarelli Symonds",
+      "edition": "QS World University Rankings",
+      "year": 2026,
+      "rank": 269,
+      "rank_label": "#269",
+      "evidence": "ranking_606"
+    },
+    {
+      "id": 607,
+      "university_id": 210,
+      "university_name": "University of Warsaw",
+      "provider": "Times Higher Education",
+      "edition": "Times Higher Education World University Rankings",
+      "year": 2026,
+      "rank": 601,
+      "rank_label": "601-800",
+      "evidence": "ranking_607"
+    },
+    {
+      "id": 608,
+      "university_id": 209,
+      "university_name": "Al-Farabi Kazakh National University (KazNU)",
+      "provider": "Times Higher Education",
+      "edition": "Times Higher Education World University Rankings",
+      "year": 2026,
+      "rank": 1201,
+      "rank_label": "1201-1500",
+      "evidence": "ranking_608"
+    },
+    {
+      "id": 609,
+      "university_id": 201,
+      "university_name": "Middle East Technical University (METU)",
+      "provider": "Times Higher Education",
+      "edition": "Times Higher Education World University Rankings",
+      "year": 2026,
+      "rank": 351,
+      "rank_label": "351-400",
+      "evidence": "ranking_609"
+    },
+    {
+      "id": 617,
+      "university_id": 208,
+      "university_name": "Nazarbayev University",
+      "provider": "Times Higher Education",
+      "edition": "Times Higher Education World University Rankings",
+      "year": 2026,
+      "rank": 401,
+      "rank_label": "401-500",
+      "evidence": "ranking_617"
+    },
+    {
+      "id": 618,
+      "university_id": 212,
+      "university_name": "Charles University",
+      "provider": "Times Higher Education",
+      "edition": "Times Higher Education World University Rankings",
+      "year": 2026,
+      "rank": 401,
+      "rank_label": "401-500",
+      "evidence": "ranking_618"
+    },
+    {
+      "id": 740,
+      "university_id": 342,
+      "university_name": "Semmelweis University",
+      "provider": "Times Higher Education",
+      "edition": "Times Higher Education World University Rankings",
+      "year": 2026,
+      "rank": 251,
+      "rank_label": "251-300",
+      "evidence": "ranking_740"
+    },
+    {
+      "id": 601,
+      "university_id": 298,
+      "university_name": "École des Ponts ParisTech",
+      "provider": "QS Quacquarelli Symonds",
+      "edition": "QS World University Rankings",
+      "year": 2026,
+      "rank": null,
+      "rank_label": "Included via Institut Polytechnique de Paris; no separate rank",
+      "evidence": "ranking_601"
+    }
+  ],
+  "excluded_programs": [
+    250,
+    251,
+    252,
+    253,
+    254,
+    255
+  ],
+  "pending": {
+    "programs": 1150,
+    "requirements": 1150,
+    "original_rankings": 313,
+    "qs_summaries": 5,
+    "historical_cycles": 10
+  },
+  "blocked_sources": [
+    {
+      "url": "https://www.topuniversities.com/rankings-release-summaries/world-university-rankings-2026-release-summary",
+      "reason": "Fetched maintenance page; search index mentions KAIST exclusion, not used for promotion."
+    },
+    {
+      "url": "https://www.econ.muni.cz/do/econ/soubory/oddeleni/ozs/admissions/2026_QS_World_University_Rankings_1.2__For_qs.com__11.2025.pdf",
+      "reason": "Fetch failed; not used as verification evidence."
+    }
+  ],
+  "production_checks": {
+    "programs": {
+      "verified": 3460,
+      "unverified": 1150
+    },
+    "requirements": {
+      "verified": 3460,
+      "unverified": 1150
+    },
+    "rankings": {
+      "verified": 593,
+      "unverified": 313
+    },
+    "private_backups": {
+      "programs": 20,
+      "program_requirements": 20,
+      "university_rankings": 11,
+      "existing_sources": 2
+    },
+    "evidence_sources": 18,
+    "outside_scope_hash_recheck": "Not executed: Arena deduplication guard rejected repeated SELECT as an already-completed write. No bypass attempted."
+  }
+}

@@ -61,8 +61,8 @@ section("1. Library shape");
 const expectedSizes: Record<string, number> = {
   onboardingCv: 3,
   sop: 4,
-  essay: 12,
-  lor: 4,
+  essay: 48,
+  lor: 6,
   cvBuilder: 3,
   answerVault: 10,
   activity: 14,
@@ -72,6 +72,8 @@ const expectedSizes: Record<string, number> = {
 for (const group of SAMPLE_GROUPS) {
   check(`${group}: ${expectedSizes[group]} samples`, SAMPLE_LIBRARY[group].length === expectedSizes[group], `got ${SAMPLE_LIBRARY[group].length}`);
 }
+check("48 distinct essay texts, excluding mirrored SOP picker entries", new Set(SAMPLE_LIBRARY.essay.map((s) => s.text)).size === 48);
+check("five complete letters; request email is not a recommendation", LOR_SAMPLES.filter((s) => s.kind !== "requestEmail").length === 5);
 const ids = samples.map((sample) => sample.id);
 check("ids are unique across the library", new Set(ids).size === ids.length);
 check("ids are camelCase i18n keys (no dots)", ids.every((id) => /^[a-z][A-Za-z0-9]+$/.test(id)));

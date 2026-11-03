@@ -1,10 +1,10 @@
 /**
  * Multi-Currency Reference Rates & Official Country Student Cost Benchmarks (2026).
  *
- * Every benchmark figure below is grounded in published government immigration,
- * statutory health insurance, and embassy fee schedules (US State Dept / ICE,
- * UK Home Office GOV.UK, German DAAD / Sperrkonto, South Korea NHIS / StudyInKorea,
- * IRCC Canada, Australian Home Affairs).
+ * These mix published immigration/insurance figures with illustrative planning
+ * assumptions (including flights, books and tuition defaults). A source link
+ * does not certify every line item, and reference FX rates are not live quotes.
+ * This is not a complete visa invoice or a per-program fee schedule.
  *
  * When a university record does not publish a separate insurance, books, flight,
  * visa fee, application fee, or programme duration figure, `/api/planning` and
@@ -14,6 +14,7 @@
  * university-published vs. country-benchmarked.
  */
 
+import { UK_STUDENT_VISA_FACTS } from "./ukStudentVisaFacts";
 import { calculateCosts, type CostBreakdown, type CostInputs, type ScholarshipInput } from "./costs";
 import {
   normalizeCurrency,
@@ -94,14 +95,14 @@ export const COUNTRY_COST_BENCHMARKS: Record<string, CountryCostBenchmark> = {
     insurancePerYearUsd: 1000, // £776/yr Immigration Health Surcharge (IHS)
     booksPerYearUsd: 750,
     flightsPerYearUsd: 720,
-    visaFeeUsd: 635, // £490 Student Visa application fee
+    visaFeeUsd: Math.round(UK_STUDENT_VISA_FACTS.applicationFeeGbp * CURRENCY_RATES_TO_USD.GBP.rateToUsd), // £558 at the app reference rate, not a live FX quote
     applicationFeeUsd: 35,
     bachelorYears: 3,
     masterYears: 1,
     phdYears: 3,
     officialSourceName: "UK Home Office (GOV.UK Student Visa & IHS)",
     officialSourceUrl: "https://www.gov.uk/student-visa",
-    notes: "UK Master's degrees are typically 1 year; Bachelor's are 3 years. Includes £776/year NHS Immigration Health Surcharge.",
+    notes: "UK Master's degrees are typically 1 year; Bachelor's are 3 years. Includes the £558 application fee converted at the app reference GBP/USD rate. IHS is £776 per VISA year, not necessarily course year; visa duration and half-year rounding affect the total. Books, flights and tuition defaults are planning estimates, not government fees.",
   },
   "Germany": {
     country: "Germany",

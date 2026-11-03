@@ -436,6 +436,22 @@ export function VisaCenterPanel({
       {/* Embassy model answers — the typed country pre-selects its transcript. */}
       <VisaModelAnswers countryHint={country} />
 
+      {data?.practice?.length > 0 && (
+        <JourneyCard title={t("vcPracticeTitle")} subtitle={t("vcPracticeNotice")}>
+          <details>
+            <summary className="cursor-pointer text-sm font-semibold">{t("vcPracticeCount", { count: data.practice.length })}</summary>
+            <ul className="mt-3 space-y-3">
+              {data.practice.map((row: { id: number; title: string; instructions: string | null }) => (
+                <li key={row.id} className="rounded-control border border-amber-200 p-3 dark:border-amber-800">
+                  <h4 className="text-sm font-semibold">{row.title}</h4>
+                  <p className="mt-1 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">{row.instructions}</p>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </JourneyCard>
+      )}
+
       <JourneyCard title={t("vcDocsTitle")} subtitle={t("vcDocsSubtitle")}>
         {loading ? (
           <Loading />
@@ -460,10 +476,10 @@ export function VisaCenterPanel({
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{r.title}</p>
                     <p className="text-sm text-slate-500">
                       {r.visaType}
-                      {r.lastVerifiedAt ? t("vcVerified", { date: String(r.lastVerifiedAt).slice(0, 10) }) : ""}
+                      {r.verificationStatus === "verified" && r.lastVerifiedAt ? t("vcVerified", { date: String(r.lastVerifiedAt).slice(0, 10) }) : ""}
                     </p>
                   </div>
-                  {r.isRequired ? <Pill tone="warn">{t("vcRequired")}</Pill> : <Pill tone="slate">{t("vcOptional")}</Pill>}
+                  {r.isRequired ? <Pill tone="warn">{t("vcRequired")}</Pill> : <Pill tone="slate">{t("vcCheckApplicability")}</Pill>}
                 </div>
                 {r.instructions && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{r.instructions}</p>}
                 {r.sourceUrl ? (

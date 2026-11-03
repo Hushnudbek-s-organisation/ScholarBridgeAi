@@ -236,7 +236,7 @@ check("evaluateUniversityAndProgramChance computes program-specific 25th/50th/75
     },
     null
   );
-  assert.equal(csEval.eligibilityStatus, "meets_all");
+  assert.equal(csEval.eligibilityStatus, "unknown_inputs", "an unsourced fixture cannot establish eligibility");
   assert.ok(csEval.effectiveProgramAcceptRatePct < csEval.universityAcceptRatePct);
   assert.ok(csEval.effectiveProgramAcceptRatePct < histEval.effectiveProgramAcceptRatePct);
   assert.ok(csEval.programGpa50 > histEval.programGpa50);

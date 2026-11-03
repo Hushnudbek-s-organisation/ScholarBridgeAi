@@ -1,3 +1,4 @@
+import { hasVerifiedProgramEvidence } from "./catalogEvidence";
 /**
  * Subject-to-program recommender engine (2026-10).
  *
@@ -485,7 +486,16 @@ export function recommend(
 ): RecommendationResult[] {
   const results: RecommendationResult[] = [];
 
-  for (const program of catalog.programs) {
+  for (const storedProgram of catalog.programs) {
+    // Keep discovery identities, but never score or publish a quarantined
+    // price/duration as a verified programme fact. Also protects direct callers.
+    const program = hasVerifiedProgramEvidence(storedProgram) ? storedProgram : {
+      ...storedProgram,
+      annualTuition: null,
+      durationYears: null,
+      isVerified: false,
+      verificationStatus: "unverified",
+    };
     const university = catalog.universities.get(program.universityId);
     if (!university) continue; // orphan program row — skip, never invent a university
 

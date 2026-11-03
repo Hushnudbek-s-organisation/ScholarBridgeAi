@@ -1,0 +1,83 @@
+{
+  "review_date": "2026-11-02",
+  "method": "All four attachments parsed locally. Relevant benchmark, exemplar and localization sections compared with repository and live visa inventory. This is not a verification of every factual claim in 174 pages.",
+  "attachments": [
+    {
+      "filename": "ScholarBridgeAi_Chancing_Exemplars_i18n_Report.pdf",
+      "sha256": "f37886c07e6f20b2a160cbba28e9f8268e32c2d907ad35bd2e48710627b38918",
+      "bytes": 272412,
+      "pages": 5,
+      "extracted_text_sha256": "7489a73e02fee87b266e258baca48f28cbcbb075152c24ce0e1d60185189b2f2"
+    },
+    {
+      "filename": "ScholarBridgeAi_Master_Compressed.pdf",
+      "sha256": "fe0de57a186ae61308adfcec2385a3a87604fc0ba3fb8813f4fc9cdb2e1b3cba",
+      "bytes": 3788534,
+      "pages": 174,
+      "extracted_text_sha256": "d504fb81292e32b6f739ebfd635577d2beab61b7ce87b0d5bd2d16b7fa26bd38"
+    },
+    {
+      "filename": "ScholarBridgeAi_Master_Full_Document.html",
+      "sha256": "6a1807ae7a333d768beb37645c27c12cfe4ed375775c4199aa49de8c00a66351",
+      "bytes": 2585988,
+      "tables": [
+        201,
+        6647
+      ]
+    },
+    {
+      "filename": "ScholarBridgeAi_Master_Full_Document.pdf",
+      "sha256": "fe0de57a186ae61308adfcec2385a3a87604fc0ba3fb8813f4fc9cdb2e1b3cba",
+      "bytes": 3788534,
+      "pages": 174,
+      "extracted_text_sha256": "d504fb81292e32b6f739ebfd635577d2beab61b7ce87b0d5bd2d16b7fa26bd38"
+    }
+  ],
+  "findings": {
+    "report_claims": {
+      "essays": 48,
+      "complete_lors": 5,
+      "benchmark_records": 201,
+      "visa_entries": 75,
+      "accuracy": "95%+ claimed, no validation evidence supplied"
+    },
+    "master_contents": {
+      "benchmark_table_rows": 201,
+      "mixed_sample_headline": 57,
+      "essay_picker_texts": 12,
+      "complete_lors": 3,
+      "request_emails": 1
+    },
+    "implemented": {
+      "distinct_essays_sops": 48,
+      "complete_lors": 5,
+      "retained_request_email": 1,
+      "original_fictional_essays_added": 36,
+      "original_fictional_letters_added": 2,
+      "benchmark_records": 201,
+      "benchmark_ranked_rows": 200,
+      "benchmark_unranked_bonus": "KAIST",
+      "primary_reviewed_institutions_this_turn": [
+        "Massachusetts Institute of Technology (MIT)"
+      ],
+      "observed_metric_slots_per_institution": 21,
+      "live_visa_total": 75,
+      "live_visa_practice": 20,
+      "remaining_preexisting_verified_visa_requirements": 55
+    },
+    "limitations": [
+      "New essays and letters are fictional teaching material, not real admitted submissions.",
+      "201 records do not mean 201 fully observed CDS datasets. Missing GPA/SAT medians, language cutoffs and round rates remain null.",
+      "The other 55 visa rows were not independently reverified against government pages in this turn.",
+      "Application code changes are not deployed.",
+      "Earlier 1150 programs/requirements and 313 rankings remain pending independent source review."
+    ]
+  },
+  "primary_source": {
+    "url": "https://mitadmissions.org/apply/process/stats/",
+    "accessed_on": "2026-11-02",
+    "cohort": "Class of 2029, fall 2025 entry",
+    "population": "admitted",
+    "notes": "ACT composite 34-36; SAT Math 780-800 and ERW 740-780, no total computed. Overall published 4.6%; EA 721/12052, RA 603/24715 including deferred; international 136/6926. No GPA quartiles or medians inferred."
+  }
+}

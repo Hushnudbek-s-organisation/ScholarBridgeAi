@@ -1,3 +1,4 @@
+import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
 import { NextResponse } from "next/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -223,7 +224,7 @@ export async function GET(req: Request) {
     const rawPrograms = await db
       .select()
       .from(universityPrograms)
-      .where(inArray(universityPrograms.universityId, activeUniIds));
+      .where(and(inArray(universityPrograms.universityId, activeUniIds), eq(universityPrograms.isActive, true)));
 
     const programIds = rawPrograms.map((p) => p.id);
     const rawProgramReqs =
@@ -236,6 +237,7 @@ export async function GET(req: Request) {
 
     const reqByProgramId = new Map<number, ProgramRequirementRowInput>();
     for (const r of rawProgramReqs) {
+      if (!hasVerifiedProgramEvidence(r)) continue;
       reqByProgramId.set(r.programId, {
         id: r.id,
         programId: r.programId,
@@ -270,8 +272,8 @@ export async function GET(req: Request) {
         field: p.field,
         department: p.field,
         language: p.language,
-        durationYears: p.durationYears ? Number(p.durationYears) : null,
-        tuitionAnnualUsd: p.tuitionAmount ? Number(p.tuitionAmount) : null,
+        durationYears: hasVerifiedProgramEvidence(p) && p.durationYears != null ? Number(p.durationYears) : null,
+        tuitionAnnualUsd: hasVerifiedProgramEvidence(p) && p.tuitionCurrency === "USD" && p.tuitionAmount != null ? Number(p.tuitionAmount) : null,
         applicationFeeUsd: null,
         intakeTerms: p.studyMode,
         applicationType: null,
@@ -446,6 +448,8 @@ export async function GET(req: Request) {
         selectedProgramAssessment,
         programAssessment: selectedProgramAssessment,
         percentilePositioning: {
+          isEstimated: true,
+          estimateBasis: "Legacy planning model, not observed CDS percentiles or personal admission probability",
           gpa25: selectedProgramAssessment.programGpa25,
           gpa50: selectedProgramAssessment.programGpa50,
           gpa75: selectedProgramAssessment.programGpa75,

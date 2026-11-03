@@ -1,3 +1,4 @@
+import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
 import { NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -281,7 +282,7 @@ export async function POST(req: Request) {
         .where(eq(universityPrograms.isActive, true)),
       db.select().from(universities),
       db.select().from(programRequirements),
-      db.select().from(applicationCycles),
+      db.select().from(applicationCycles).where(eq(applicationCycles.isActive, true)),
       db
         .select()
         .from(scholarships)
@@ -359,6 +360,7 @@ export async function POST(req: Request) {
 
     const requirements = new Map<number, RecommendRequirement[]>();
     for (const r of reqRows) {
+      if (!hasVerifiedProgramEvidence(r)) continue;
       const arr = requirements.get(r.programId) ?? [];
       arr.push({
         programId: r.programId,

@@ -1,8 +1,9 @@
+import { isPracticeVisaContent, projectVisaEvidence, validateVisaEvidenceWrite } from "@/lib/visaEvidence";
 import { NextResponse } from "next/server";
-import { and, asc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { visaRequirements } from "@/db/schema";
-import { guardAdmin, guardStudent, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
+import { guardAdmin, guardStudent, jsonError, readBody, serverError, text } from "@/lib/journey/api";
 import { ensureJourneyTables } from "@/lib/journey/db";
 import { countriesMatch } from "@/lib/countries";
 
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
       : "";
 
     const conditions = [];
-    if (country) conditions.push(ilike(visaRequirements.country, matchedCountry));
+    if (country) conditions.push(eq(visaRequirements.country, matchedCountry));
     if (visaType) conditions.push(eq(visaRequirements.visaType, visaType));
     const rows = conditions.length
       ? await db
@@ -47,8 +48,12 @@ export async function GET(req: Request) {
           .limit(100)
       : [];
 
+    const practiceRows = await db.select().from(visaRequirements)
+      .where(or(eq(visaRequirements.visaType, "Student Visa Interview Q&A"), eq(visaRequirements.sourceType, "teaching_material")))
+      .orderBy(asc(visaRequirements.sortOrder), asc(visaRequirements.id)).limit(100);
     return NextResponse.json({
-      requirements: rows.map((r) => ({
+      practice: practiceRows.map(projectVisaEvidence),
+      requirements: rows.filter((r) => !isPracticeVisaContent(r)).map((r) => projectVisaEvidence({
         id: r.id,
         country: r.country,
         visaType: r.visaType,
@@ -82,6 +87,8 @@ export async function POST(req: Request) {
   const visaType = text(b.value.visaType, 80);
   const title = text(b.value.title, 200);
   if (!country || !visaType || !title) return jsonError(400, "country, visaType and title are required", "bad_request");
+  const validated = validateVisaEvidenceWrite(b.value, { visaType, title });
+  if (!validated.ok) return jsonError(400, validated.error, "bad_request");
   try {
     const [row] = await db
       .insert(visaRequirements)
@@ -91,13 +98,7 @@ export async function POST(req: Request) {
         title,
         instructions: text(b.value.instructions, 2000),
         isRequired: b.value.isRequired == null ? true : !!b.value.isRequired,
-        // A requirement without a source is stored as `unverified` on purpose:
-        // the UI must be able to say "Not specified" rather than imply authority.
-        sourceUrl: text(b.value.sourceUrl, 800),
-        sourceName: text(b.value.sourceName, 160),
-        sourceType: text(b.value.sourceType, 80),
-        lastVerifiedAt: b.value.lastVerifiedAt ? new Date(String(b.value.lastVerifiedAt)) : null,
-        verificationStatus: text(b.value.verificationStatus, 40) ?? "unverified",
+        ...validated.evidence,
         sortOrder: Number(b.value.sortOrder) || 0,
       })
       .returning();
@@ -120,21 +121,16 @@ export async function PATCH(req: Request) {
   try {
     const [row] = await db.select().from(visaRequirements).where(eq(visaRequirements.id, id)).limit(1);
     if (!row) return jsonError(404, "Requirement not found", "not_found");
+    const nextTitle = b.value.title === undefined ? row.title : text(b.value.title, 200) ?? row.title;
+    const validated = validateVisaEvidenceWrite(b.value, { ...row, title: nextTitle });
+    if (!validated.ok) return jsonError(400, validated.error, "bad_request");
     await db
       .update(visaRequirements)
       .set({
-        title: b.value.title === undefined ? row.title : text(b.value.title, 200) ?? row.title,
+        title: nextTitle,
         instructions: b.value.instructions === undefined ? row.instructions : text(b.value.instructions, 2000),
         isRequired: b.value.isRequired == null ? row.isRequired : !!b.value.isRequired,
-        sourceUrl: b.value.sourceUrl === undefined ? row.sourceUrl : text(b.value.sourceUrl, 800),
-        sourceName: b.value.sourceName === undefined ? row.sourceName : text(b.value.sourceName, 160),
-        sourceType: b.value.sourceType === undefined ? row.sourceType : text(b.value.sourceType, 80),
-        lastVerifiedAt:
-          b.value.lastVerifiedAt === undefined ? row.lastVerifiedAt : new Date(String(b.value.lastVerifiedAt)),
-        verificationStatus:
-          b.value.verificationStatus === undefined
-            ? row.verificationStatus
-            : oneOf(b.value.verificationStatus, ["verified", "needs_review", "outdated", "unverified"] as const, row.verificationStatus as "verified"),
+        ...validated.evidence,
         updatedAt: new Date(),
       })
       .where(eq(visaRequirements.id, id));

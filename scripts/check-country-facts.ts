@@ -34,7 +34,8 @@ import { CURRENCY_RATES_TO_USD } from "../src/lib/countryCostBenchmarks";
 
 const root = join(__dirname, "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
-const TODAY = new Date("2026-10-28T00:00:00Z");
+// Fixed review-date anchor keeps this offline fixture deterministic.
+const TODAY = new Date("2026-11-03T23:59:59Z");
 const MAX_AGE_DAYS = 400;
 
 let passed = 0;

@@ -1,10 +1,10 @@
 /**
- * High-Precision 5-Layer Program-Specific Chancing & Competitive Positioning Engine.
+ * Experimental program planning model — not a validated admission predictor.
  *
  * Evaluates a student's profile against:
  *  Layer 1: 14 Granular Department / Program Selectivity Profiles
  *  Layer 2: Exact `program_requirements` row evaluation (GPA, IELTS/TOEFL/DET, SAT/ACT, IB/A-Level/AP, portfolio, interview)
- *  Layer 3: Student Percentile Positioning within the Program's Admitted Cohort (25th / 50th / 75th bands)
+ *  Layer 3: Modeled positioning against unverified planning bands (not observed cohort percentiles)
  *  Layer 4: Degree-Level Calibration (Bachelor vs Master vs PhD)
  *  Layer 5: Empirical Outcome Calibration (`application_outcomes` with `shareConsent = true`)
  */
@@ -334,6 +334,8 @@ export interface EmpiricalOutcomeSummary {
 }
 
 export interface ProgramChanceEvaluation {
+  isEstimated: true;
+  estimateBasis: string;
   programId: number | null;
   programName: string;
   degreeLevel: string;
@@ -904,9 +906,9 @@ export function evaluateUniversityAndProgramChance(
   }
 
   // 4. Curriculum & Subject Prerequisites (IB / A-Level / AP / Subject Requirements)
-  const ibReq = programReq?.ibRequirement || (benchmarkRank <= 30 ? "38–42 IB Points (HL 6/6/6)" : benchmarkRank <= 100 ? "34–37 IB Points" : "30–34 IB Points");
-  const aLevelReq = programReq?.aLevelRequirement || (benchmarkRank <= 30 ? "A*A*A – A*AA" : benchmarkRank <= 100 ? "AAA – AAB" : "ABB – BBB");
-  const apReq = programReq?.apRequirement || (benchmarkRank <= 50 ? "4–5 AP exams (scores 4–5)" : "2–3 AP exams or Honors coursework");
+  const ibReq = programReq?.ibRequirement || null;
+  const aLevelReq = programReq?.aLevelRequirement || null;
+  const apReq = programReq?.apRequirement || null;
   const subjReq = programReq?.subjectRequirements || dept.typicalPrereqs.join(", ");
 
   const subAlign = subjectAlignment(profile.completedCourses, subjReq);
@@ -923,12 +925,8 @@ export function evaluateUniversityAndProgramChance(
   });
 
   // 5. Portfolio / Interview Requirements
-  const portfolioRequired = Boolean(programReq?.portfolioRequired || dept.portfolioOrAudition);
-  const interviewRequired = Boolean(
-    programReq?.interviewRequired ||
-      benchmarkRank <= 15 ||
-      dept.key === "medicine_health"
-  );
+  const portfolioRequired = Boolean(programReq?.portfolioRequired);
+  const interviewRequired = Boolean(programReq?.interviewRequired);
 
   if (portfolioRequired) {
     const hasPortfolioMention = /portfolio|design|exhibition|github|art|architecture/i.test(
@@ -1112,7 +1110,10 @@ export function evaluateUniversityAndProgramChance(
     );
   }
 
+  const published = evaluatePublishedRequirements(profile, programReq);
   return {
+    isEstimated: true,
+    estimateBasis: "Unvalidated planning model, not observed admitted-cohort percentiles, official program offer rates, or personal admission probability",
     programId: program?.id ?? null,
     programName,
     degreeLevel,
@@ -1147,8 +1148,8 @@ export function evaluateUniversityAndProgramChance(
     studentSatPercentile,
     studentEnglishLabel,
     studentEnglishPercentile,
-    eligibilityStatus,
-    requirementChecks,
+    eligibilityStatus: published.eligibilityStatus,
+    requirementChecks: published.requirementChecks,
     ibRequirement: ibReq,
     aLevelRequirement: aLevelReq,
     apRequirement: apReq,
@@ -1160,8 +1161,62 @@ export function evaluateUniversityAndProgramChance(
     cohortPositionTier,
     selectivityCategory,
     degreeCalibrationNote,
-    strengths: strengths.slice(0, 4),
-    gaps: gaps.slice(0, 4),
+    strengths: strengths.slice(0, 4).map((text) => `Planning estimate, not a published requirement: ${text}`),
+    gaps: gaps.slice(0, 4).map((text) => `Planning estimate, not a published requirement: ${text}`),
     empiricalOutcomes,
   };
+}
+
+/** Compare only explicitly recorded numeric requirements. Unknown is not ineligible.
+ * API callers supply source-reviewed rows; a bare homepage is insufficient.
+ */
+export function evaluatePublishedRequirements(profile: ChancingProfile, req: ProgramRequirementRowInput | null | undefined): { eligibilityStatus: EligibilityStatus; requirementChecks: RequirementCheckItem[] } {
+  const checks: RequirementCheckItem[] = [];
+  let sourced = false;
+  try { const u = new URL(req?.sourceUrl ?? ""); sourced = /^https?:$/.test(u.protocol) && u.pathname.length > 1; } catch { /* unknown */ }
+  if (sourced && req) {
+    for (const [dimension, label, actual, minimum] of [
+      ["gpa", "GPA (4.0)", normalizedGpa(profile), req.minGpa],
+      ["english", "IELTS", profile.ieltsScore, req.minIelts],
+      ["english", "TOEFL", profile.toeflScore, req.minToefl],
+      ["english", "DET", profile.duolingoScore, req.minDet],
+      ["standardized", "SAT", profile.satScore, req.minSat],
+      ["standardized", "ACT", profile.actScore, req.minAct],
+    ] as const) {
+      if (minimum == null || !Number.isFinite(minimum) || minimum <= 0) continue;
+      // English tests and SAT/ACT are alternatives; do not mark an unused
+      // alternative as missing when the student supplied another listed test.
+      if (actual == null && dimension !== "gpa") continue;
+      const known = actual != null && Number.isFinite(actual) && actual > 0;
+      checks.push({ dimension, label, status: !known ? "missing" : actual < minimum ? "below" : "met",
+        studentValue: known ? String(actual) : "Not entered", requiredValue: String(minimum),
+        detail: `Recorded minimum only; check waivers, alternative tests, degree level and admission year at ${req.sourceUrl}. This does not establish overall eligibility.` });
+    }
+    for (const [dimension, minima] of [
+      ["english", [req.minIelts, req.minToefl, req.minDet]],
+      ["standardized", [req.minSat, req.minAct]],
+    ] as const) {
+      if (!minima.some((n) => n != null && Number.isFinite(n) && n > 0)) continue;
+      const alternatives = checks.filter((c) => c.dimension === dimension);
+      if (!alternatives.length) checks.push({ dimension, label: "Recorded test requirement", status: "missing",
+        studentValue: "No relevant test entered", requiredValue: "Check a listed test or waiver",
+        detail: `A numeric requirement is recorded at ${req.sourceUrl}; no relevant student result was supplied.` });
+      else if (alternatives.some((c) => c.status === "met")) {
+        // SAT/ACT and language tests are alternative routes. A lower result
+        // in another listed test must not override the satisfied route.
+        for (const c of alternatives.filter((c) => c.status === "below" || c.status === "missing")) {
+          c.status = "info";
+          c.detail = `Another listed test meets its recorded minimum. Confirm permitted alternatives and waivers at ${req.sourceUrl}.`;
+        }
+      }
+    }
+    checks.push({ dimension: "curriculum", label: "Published policy", status: "info", studentValue: "Review source",
+      requiredValue: req.subjectRequirements || "No numeric cutoff established",
+      detail: req.otherRequirements || `Read the current policy at ${req.sourceUrl}` });
+  }
+  if (!checks.length) checks.push({ dimension: "curriculum", label: "Requirements not established", status: "info",
+    studentValue: "Unknown", requiredValue: "Not established from a reviewed specific source",
+    detail: "Planning estimates and rank-derived bands cannot establish admission requirements." });
+  const numeric = checks.filter((c) => c.status !== "info");
+  return { requirementChecks: checks, eligibilityStatus: numeric.some((c) => c.status === "below") ? "below_minimum" : numeric.some((c) => c.status === "missing") || !numeric.length ? "unknown_inputs" : "meets_all" };
 }

@@ -1,7 +1,9 @@
 # GitHub Actions — Supabase live schema verification.
 #
 # This is the ONLY automated GitHub <-> Supabase link in the repository. On
-# every push to main (and on demand) it runs `npm run db:verify`, which is
+# every push to main (and on demand) it runs schema and catalogue evidence
+# checks (`db:verify`, `audit:catalogue-evidence`). Both are strictly READ-ONLY.
+# The schema step is
 # strictly READ-ONLY: one `SELECT ... FROM information_schema.columns` against
 # the live Supabase database, then a diff against `src/db/schema.ts`. No DDL,
 # no writes, no migrations are ever applied from CI — the repo's rule stays
@@ -118,6 +120,15 @@ jobs:
             echo "::error title=Supabase live verify failed::exit $code — see the per-gap annotations above"
           fi
           exit "$code"
+
+      - name: Verify live catalogue evidence and QS reference (read-only)
+        if: steps.db.outputs.configured == 'yes'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          DATABASE_URL_SECRET: ${{ secrets.DATABASE_URL }}
+        run: |
+          export DATABASE_URL="${SUPABASE_DB_URL:-$DATABASE_URL_SECRET}"
+          npm run audit:catalogue-evidence
 
       - name: Report why it skipped
         if: steps.db.outputs.configured != 'yes'
