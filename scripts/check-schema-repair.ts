@@ -27,10 +27,31 @@
 import { readFileSync, rmSync } from "node:fs";
 import EmbeddedPostgres from "embedded-postgres";
 import pg from "pg";
+import { collectDrizzleTables } from "./lib/schema-tools";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const SQL = readFileSync(new URL("../supabase/full_schema.sql", import.meta.url), "utf8");
 const PAYMENT_MIGRATION = readFileSync(new URL("../supabase/add_payment_provider_lifecycle.sql", import.meta.url), "utf8");
+// Derive the contract from the application schema, not obsolete magic counts.
+// Identity checks below ensure equal counts cannot hide missing/replaced objects.
+const expectedTables = collectDrizzleTables();
+const expectedTableNames = expectedTables.map((t) => t.name).sort();
+const expectedFkKeys = expectedTables.flatMap((t) => t.foreignKeys.map((fk) =>
+  [t.name, fk.sourceCols.join(","), fk.refTable, fk.refColNames.join(",")].join("|"))).sort();
+const tableNames = async (c: pg.Client) => (await c.query<{ name: string }>(
+  "SELECT table_name AS name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"
+)).rows.map((r) => r.name);
+const foreignKeyKeys = async (c: pg.Client) => (await c.query<{ key: string }>(`
+  SELECT t.relname || '|' || array_to_string(ARRAY(
+    SELECT a.attname FROM unnest(c.conkey) WITH ORDINALITY k(num,ord)
+    JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.num ORDER BY k.ord
+  ), ',') || '|' || f.relname || '|' || array_to_string(ARRAY(
+    SELECT a.attname FROM unnest(c.confkey) WITH ORDINALITY k(num,ord)
+    JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.num ORDER BY k.ord
+  ), ',') AS key
+  FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_class f ON f.oid=c.confrelid
+  WHERE c.contype='f' AND t.relnamespace='public'::regnamespace
+`)).rows.map((r) => r.key).sort();
 const PORT = 5521;
 const DIR = "/tmp/scholarbridge-schema-repair";
 const CONN = `postgresql://t:t@127.0.0.1:${PORT}/sb`;
@@ -102,8 +123,8 @@ const main = async () => {
   await c.query(PAYMENT_MIGRATION);
   await c.query(PAYMENT_MIGRATION);
   const fresh = await stats(c);
-  check("creates the full table set (96)", fresh.tables === 96, `got ${fresh.tables}`);
-  check("creates every FK (119)", fresh.fks === 119, `got ${fresh.fks}`);
+  check(`creates the full table set (${expectedTableNames.length})`, fresh.tables === expectedTableNames.length && JSON.stringify(await tableNames(c)) === JSON.stringify(expectedTableNames), `got ${fresh.tables}`);
+  check(`creates every FK (${expectedFkKeys.length})`, fresh.fks === expectedFkKeys.length && JSON.stringify(await foreignKeyKeys(c)) === JSON.stringify(expectedFkKeys), `got ${fresh.fks}`);
   check(
     "composite programs(id, university_id) UNIQUE constraint exists",
     await uniqueConstraintOn(c, "programs", ["id", "university_id"]),
@@ -128,7 +149,7 @@ const main = async () => {
        FROM pg_class WHERE relkind='r' AND relnamespace='public'::regnamespace`,
     )
   ).rows[0];
-  check("RLS enabled on all 96 public tables", rls.total === 96 && rls.enabled === 96, `${rls.enabled}/${rls.total}`);
+  check(`RLS enabled on all ${expectedTableNames.length} public tables`, rls.total === expectedTableNames.length && rls.enabled === expectedTableNames.length, `${rls.enabled}/${rls.total}`);
   check(
     "rate-limit storage table rate_limit_hits exists",
     (await c.query(`SELECT 1 FROM information_schema.tables WHERE table_name='rate_limit_hits'`)).rows.length === 1,
@@ -192,7 +213,7 @@ const main = async () => {
   // Repair with the canonical file.
   await c.query(SQL);
   const repaired = await stats(c);
-  check("repair restores every FK (119)", repaired.fks === 119, `got ${repaired.fks}`);
+  check(`repair restores every FK (${expectedFkKeys.length})`, repaired.fks === expectedFkKeys.length && JSON.stringify(await foreignKeyKeys(c)) === JSON.stringify(expectedFkKeys), `got ${repaired.fks}`);
   check(
     "repair backfills the composite FK on application_cycles",
     (

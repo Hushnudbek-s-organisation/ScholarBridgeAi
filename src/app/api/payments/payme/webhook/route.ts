@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   let parsed: Awaited<ReturnType<typeof readJsonBody<unknown>>> | null = null;
   let id: number | string | null = null;
   try {
-    parsed = await readJsonBody<unknown>(req, 64 * 1024);
+    parsed = await readJsonBody<unknown>(req, 64 * 1024, { allowNonObject: true });
     if (parsed.ok) id = requestId(parsed.body);
 
     if (!isPaymeConfigured()) {

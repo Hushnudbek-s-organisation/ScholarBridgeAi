@@ -109,9 +109,49 @@ check("the app shell asks for its configuration once", () => {
   assert.ok(read("src/lib/bootConfig.ts").includes('fetch("/api/config/boot")'), "one boot request");
 });
 
+check("public visits do not mount closed auth/profile dialogs or heavyweight loading primitives", () => {
+  const home = read("src/app/HomeClient.tsx");
+  assert.match(home, /const profilePicker = isPickerOpen \?/);
+  assert.match(home, /isProfileModalOpen && <ProfileModal/);
+  assert.match(home, /import \{ ProfilePicker \} from "@\/components\/ProfilePicker"/);
+  assert.doesNotMatch(home, /const ProfilePicker = dynamic/);
+  assert.match(home, /from "@\/components\/ui\/PanelSkeleton"/);
+});
+
+check("the hero is visible in server HTML, without waiting for animation hydration", () => {
+  const landing = read("src/components/LandingPage.tsx");
+  assert.match(landing, /<motion.div initial=\{false\} animate="visible" variants=\{heroGroup\}>/);
+  assert.doesNotMatch(landing, /initial=\{\{ opacity: 0, y: 28/);
+});
+
+check("theme switching does not animate every descendant and SVG", () => {
+  const css = read("src/app/globals.css");
+  assert.doesNotMatch(css, /html\.theme-transition \*/);
+  assert.match(css, /html\.theme-transition :where\(body, header, main, nav, aside, footer\)/);
+});
+
+check("below-fold campus images and detached scroll animations do not compete with startup", () => {
+  const landing = read("src/components/LandingPage.tsx");
+  assert.match(landing, /data-campus-src=\{campusPhotoSrc/);
+  assert.match(landing, /rootMargin: "160px"/);
+  assert.doesNotMatch(landing, /fetchPriority: "high"|eagerCount/);
+  assert.match(landing, /if \(subs.size === 0\)/);
+  assert.match(landing, /resizeObserver\?\.disconnect\(\)/);
+});
+
+check("destination changes never wait for outgoing nested animations", () => {
+  const transition = read("src/components/motion/PageTransition.tsx").split("export function SectionTransition")[0];
+  assert.doesNotMatch(transition, /<AnimatePresence/);
+  assert.match(transition, /key=\{transitionKey\}/);
+});
+
+check("an exiting hub cannot overwrite a newer navigation target", () => {
+  assert.match(read("src/app/HomeClient.tsx"), /if \(linked && linked.section !== activeTab\) return/);
+});
+
 check("the analytics beacon stays out of the first three seconds", () => {
   const tracker = read("src/components/SiteTracker.tsx");
-  assert.ok(/scheduleWhenIdle\([\s\S]*?\}, 3000\)/.test(tracker), "SiteTracker must be deferred by 3 s");
+  assert.ok(/scheduleWhenIdle\([\s\S]*?\}, 3000, 3000\)/.test(tracker), "SiteTracker must be deferred by 3 s");
 });
 
 /*
@@ -125,10 +165,10 @@ if (existsSync(statsPath)) {
   const shell = stats.find((row) => row.route === "/privacy");
   console.log("\nPerformance — first-load JavaScript budget");
 
-  check("the landing page stays under 1.4 MB of JavaScript (was 2.2 MB)", () => {
+  check("the landing page stays under 1.3 MB of JavaScript (was 2.2 MB)", () => {
     assert.ok(landing, "the build must report the / route");
     const kb = Math.round(landing!.firstLoadUncompressedJsBytes / 1024);
-    assert.ok(kb < 1400, `landing first-load JS is ${kb} KB — the dictionary regression is back?`);
+    assert.ok(kb < 1300, `landing first-load JS is ${kb} KB — the dictionary regression is back?`);
     console.log(`    landing: ${kb} KB uncompressed`);
   });
 

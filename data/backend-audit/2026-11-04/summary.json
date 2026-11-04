@@ -1,0 +1,139 @@
+{
+  "date_local": "2026-11-04",
+  "timezone": "Asia/Tashkent",
+  "branch": "arena/6db82aa0-scholarbridgeai",
+  "base_commit": "788d66c105d4fa7bd7a9d0d56426db7d58f76c40",
+  "state": "uncommitted working tree; no push or deployment",
+  "source_fingerprint": {
+    "sha256": "86014e8da77099f586ba91351531e0f40c24effddd16de114b79528613d73ce3",
+    "files": 835,
+    "scope": "all files in src/, scripts/, e2e/, ci/, .github/workflows/ plus package.json, package-lock.json, next.config.ts, tsconfig.json, playwright.config.ts; sorted path + NUL + bytes + NUL"
+  },
+  "backend_suites": [
+    {
+      "name": "backend-resilience",
+      "reported_checks_passed": 30,
+      "failed": 0,
+      "log": "test-results/backend/backend-resilience.log"
+    },
+    {
+      "name": "dashboard-cache",
+      "reported_checks_passed": 13,
+      "failed": 0,
+      "log": "test-results/backend/dashboard-cache.log"
+    },
+    {
+      "name": "security",
+      "reported_checks_passed": 107,
+      "failed": 0,
+      "log": "test-results/backend/security.log"
+    },
+    {
+      "name": "ai-settings",
+      "reported_checks_passed": 98,
+      "failed": 0,
+      "log": "test-results/backend/ai-settings.log"
+    },
+    {
+      "name": "integration",
+      "reported_checks_passed": 421,
+      "failed": 0,
+      "log": "test-results/backend/integration.log"
+    },
+    {
+      "name": "payments",
+      "reported_checks_passed": 114,
+      "failed": 0,
+      "log": "test-results/backend/payments.log"
+    },
+    {
+      "name": "journey",
+      "reported_checks_passed": 115,
+      "failed": 0,
+      "log": "test-results/backend/journey.log"
+    },
+    {
+      "name": "ownership",
+      "reported_checks_passed": 83,
+      "failed": 0,
+      "log": "test-results/backend/ownership.log"
+    },
+    {
+      "name": "telegram",
+      "reported_checks_passed": 40,
+      "failed": 0,
+      "log": "test-results/backend/telegram.log"
+    },
+    {
+      "name": "channel",
+      "reported_checks_passed": 196,
+      "failed": 0,
+      "log": "test-results/backend/channel.log"
+    },
+    {
+      "name": "portability",
+      "reported_checks_passed": 57,
+      "failed": 0,
+      "log": "test-results/backend/portability.log"
+    },
+    {
+      "name": "schema-repair",
+      "reported_checks_passed": 18,
+      "failed": 0,
+      "log": "test-results/backend/schema-repair.log"
+    }
+  ],
+  "backend_reported_checks_passed": 1292,
+  "production_functional": {
+    "passed": 18,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "duration_ms": 232850.459,
+    "new_api_resilience_scenarios": 4
+  },
+  "anonymous_api_audit": {
+    "route_files": 157,
+    "handlers": 280,
+    "additional_disposable_fixture_probes": 49,
+    "non_public_2xx": 0,
+    "non_authorization_404_responses_needing_classification": [
+      "PUT /api/goals",
+      "DELETE /api/goals",
+      "GET /api/health/diagnostics",
+      "DELETE /api/saved-programs"
+    ]
+  },
+  "quality": {
+    "typecheck": "PASS",
+    "production_build": "PASS",
+    "lint_errors": 0,
+    "lint_warnings": 0,
+    "compiled_performance_budget_checks_passed": 15,
+    "stage3_response_hygiene": "PASS",
+    "audit_safety_assertions": 27,
+    "isolated_environment_assertions": 15,
+    "dependency_audit": {
+      "critical": 0,
+      "high": 0,
+      "moderate": 12,
+      "low": 0
+    }
+  },
+  "safety": {
+    "disposable_postgresql_only": true,
+    "provider_faults": "mocked or loopback",
+    "real_paid_ai_calls": false,
+    "real_purchases": false,
+    "production_mutations": false,
+    "deployment": false
+  },
+  "limitations": [
+    "No production-scale traffic baseline or speedup percentage measured.",
+    "No live provider, storage, SMTP or payment gateway acceptance test.",
+    "Timeouts and caches are process/per-query scoped; not a distributed HTTP SLA.",
+    "DNS pinning and durable background-job queue are not implemented.",
+    "Legacy university-detail get/set cache is not migrated to the new single-flight cache.",
+    "12 moderate dependency advisories remain."
+  ]
+}

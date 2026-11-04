@@ -1,0 +1,189 @@
+{
+  "date": "2026-11-04",
+  "scope": "Local production-build Chromium measurements, not a production deployment/field-Web-Vitals or Lighthouse score",
+  "repetitionsPerProfilePerStage": 3,
+  "totalMeasuredRuns": 12,
+  "profiles": {
+    "desktop": {
+      "conditions": {
+        "coldBrowserCache": true,
+        "locale": "en",
+        "runs": 3,
+        "cpuSlowdown": 1,
+        "roundTripLatencyMs": 0,
+        "downloadMbps": null,
+        "externalOrigins": "blocked equally: sandbox limitation; image delivery not measured",
+        "data": "disposable two-university fixtures, not production catalogue load",
+        "observationWindow": "4 seconds after DOMContentLoaded and visible heading",
+        "interactionMetric": "browser-driven click/hash to visible control + two animation frames; not field INP"
+      },
+      "metrics": {
+        "ttfbMs": {
+          "before": 47.60000000009313,
+          "after": 62.799999999813735,
+          "improvementPercent": -31.932773108594255
+        },
+        "fcpMs": {
+          "before": 340,
+          "after": 356,
+          "improvementPercent": -4.705882352941177
+        },
+        "lcp": {
+          "before": 1248,
+          "after": 1008,
+          "improvementPercent": 19.230769230769234
+        },
+        "cls": {
+          "before": 0,
+          "after": 0,
+          "improvementPercent": null
+        },
+        "blockingMs": {
+          "before": 200,
+          "after": 174,
+          "improvementPercent": 13
+        },
+        "scriptDecodedBytes": {
+          "before": 1319792,
+          "after": 1291510,
+          "improvementPercent": 2.1429134287827174
+        },
+        "themeClickMs": {
+          "before": 1159,
+          "after": 466.30000000074506,
+          "improvementPercent": 59.76704055213589
+        },
+        "signInDialogMs": {
+          "before": 214.39999999990687,
+          "after": 229.6000000005588,
+          "improvementPercent": -7.08955223911312
+        },
+        "signInShellMs": {
+          "before": 660.1999999997206,
+          "after": 689.9000000003725,
+          "improvementPercent": -4.4986367768349735
+        }
+      },
+      "transitions": [
+        {
+          "target": "universities/search",
+          "revisit": false,
+          "before": 1113.6999999997206,
+          "after": 561.2999999998137,
+          "improvementPercent": 49.60043099578391
+        },
+        {
+          "target": "scholarships/browse",
+          "revisit": false,
+          "before": 1083.1000000000931,
+          "after": 477,
+          "improvementPercent": 55.95974517588782
+        },
+        {
+          "target": "universities/search",
+          "revisit": true,
+          "before": 988.6999999997206,
+          "after": 188.70000000018626,
+          "improvementPercent": 80.9143319510226
+        }
+      ]
+    },
+    "mobile": {
+      "conditions": {
+        "coldBrowserCache": true,
+        "locale": "en",
+        "runs": 3,
+        "cpuSlowdown": 4,
+        "roundTripLatencyMs": 150,
+        "downloadMbps": 1.6,
+        "externalOrigins": "blocked equally: sandbox limitation; image delivery not measured",
+        "data": "disposable two-university fixtures, not production catalogue load",
+        "observationWindow": "4 seconds after DOMContentLoaded and visible heading",
+        "interactionMetric": "browser-driven click/hash to visible control + two animation frames; not field INP"
+      },
+      "metrics": {
+        "ttfbMs": {
+          "before": 51.200000000186265,
+          "after": 28.200000000186265,
+          "improvementPercent": 44.921874999836575
+        },
+        "fcpMs": {
+          "before": 1488,
+          "after": 1360,
+          "improvementPercent": 8.60215053763441
+        },
+        "lcp": {
+          "before": 5588,
+          "after": 1360,
+          "improvementPercent": 75.66213314244811
+        },
+        "cls": {
+          "before": 0,
+          "after": 0,
+          "improvementPercent": null
+        },
+        "blockingMs": {
+          "before": 1441,
+          "after": 1592,
+          "improvementPercent": -10.47883414295628
+        },
+        "scriptDecodedBytes": {
+          "before": 1319792,
+          "after": 1291510,
+          "improvementPercent": 2.1429134287827174
+        },
+        "themeClickMs": {
+          "before": 3895.100000000093,
+          "after": 1288.6000000005588,
+          "improvementPercent": 66.91740905238561
+        },
+        "signInDialogMs": {
+          "before": 754.2000000001863,
+          "after": 728.7000000001863,
+          "improvementPercent": 3.3810660302298725
+        },
+        "signInShellMs": {
+          "before": 1711.2000000001863,
+          "after": 1791.4000000003725,
+          "improvementPercent": -4.686769518476948
+        }
+      },
+      "transitions": [
+        {
+          "target": "universities/search",
+          "revisit": false,
+          "before": 2880.5,
+          "after": 2910.5,
+          "improvementPercent": -1.0414858531504947
+        },
+        {
+          "target": "scholarships/browse",
+          "revisit": false,
+          "before": 1378.0999999996275,
+          "after": 1013.8999999994412,
+          "improvementPercent": 26.42769029825736
+        },
+        {
+          "target": "universities/search",
+          "revisit": true,
+          "before": 2463.399999999907,
+          "after": 851.3999999994412,
+          "improvementPercent": 65.43801250306595
+        }
+      ]
+    }
+  },
+  "landingBuildJsBytes": {
+    "before": 1298952,
+    "after": 1291510,
+    "improvementPercent": 0.5729234028663107
+  },
+  "limitations": [
+    "Warm loopback backend and two-university disposable fixtures, not production load or geographic latency",
+    "External origins blocked equally; CDN/image delivery is not measured",
+    "4-second post-DCL observation before interactions; interactions are not timed at the first instant of navigation",
+    "Shared-runner noise: report all medians, including unchanged/slower metrics",
+    "Blocking sum is a fixed-window long-task proxy, not Lighthouse TBT; interactions are browser-driven timings, not field INP",
+    "Sign-in is a static critical import; only the open dialog mounts. Returning-session and immediate sub-two-second tap timings are not separate benchmark profiles"
+  ]
+}

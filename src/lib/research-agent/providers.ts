@@ -2,6 +2,8 @@
  * Search provider interface (spec §22).
  * The agent is NOT hardwired to one search service.
  */
+import { cancelBody, readBoundedBytes } from "@/lib/boundedBody";
+import { fetchGuarded } from "./fetch";
 import { isSameDomain } from "./domain";
 import { unsafeOutboundReason } from "@/lib/ssrf";
 
@@ -88,19 +90,21 @@ export class WebSearchProvider implements SearchProvider {
       return [];
     }
     try {
-      const res = await fetch(this.endpoint, {
+      const signal = AbortSignal.timeout(10_000);
+      const res = await fetchGuarded(this.endpoint, {
+        signal,
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.apiKey}` },
         body: JSON.stringify({ query, count: 10 }),
       });
-      if (!res.ok) return [];
-      const data = await res.json();
+      if (!res.ok) { cancelBody(res.body); return []; }
+      const data = JSON.parse(new TextDecoder().decode(await readBoundedBytes(res.body, 1024 * 1024, signal)));
       const results = Array.isArray(data?.results) ? data.results : [];
       return results
         .filter((r: any) => r?.url)
         .map((r: any) => ({ url: String(r.url), title: String(r.title || ""), snippet: r.snippet }));
-    } catch (err) {
-      console.error("[research-agent] WebSearchProvider error:", err);
+    } catch {
+      console.error("[research-agent] WebSearchProvider unavailable");
       return [];
     }
   }

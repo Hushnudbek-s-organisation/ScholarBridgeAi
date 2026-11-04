@@ -1,3 +1,5 @@
+import { BodyLimitError, cancelBody, readBoundedBytes } from "./boundedBody";
+
 /**
  * Request hardening helpers (security baseline).
  *
@@ -22,38 +24,17 @@ export type ReadTextBodyResult =
   | { ok: false; status: number; error: string; code: string };
 
 /** Read a request body with a hard byte limit, independent of its media type. */
-export async function readTextBody(req: Request, limitBytes = DEFAULT_JSON_BODY_LIMIT): Promise<ReadTextBodyResult> {
-  const tooLarge = (): ReadTextBodyResult => ({
-    ok: false,
-    status: 413,
-    error: `Payload too large (limit ${limitBytes} bytes).`,
-    code: "payload_too_large",
-  });
+export async function readTextBody(req: Request, limitBytes = DEFAULT_JSON_BODY_LIMIT, timeoutMs = 30_000): Promise<ReadTextBodyResult> {
+  const tooLarge = (): ReadTextBodyResult => ({ ok: false, status: 413, error: `Payload too large (limit ${limitBytes} bytes).`, code: "payload_too_large" });
   const declared = Number(req.headers.get("content-length") ?? "0");
-  if (Number.isFinite(declared) && declared > limitBytes) return tooLarge();
-
-  // `content-length` can be absent (chunked) — enforce the cap while reading.
+  if (Number.isFinite(declared) && declared > limitBytes) { cancelBody(req.body); return tooLarge(); }
+  const signal = AbortSignal.any([req.signal, AbortSignal.timeout(timeoutMs)]);
   try {
-    const reader = req.body?.getReader();
-    if (!reader) {
-      const raw = await req.text();
-      return Buffer.byteLength(raw, "utf8") > limitBytes ? tooLarge() : { ok: true, body: raw };
-    }
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      total += value.byteLength;
-      if (total > limitBytes) {
-        await reader.cancel().catch(() => {});
-        return tooLarge();
-      }
-      chunks.push(value);
-    }
-    return { ok: true, body: Buffer.concat(chunks).toString("utf8") };
-  } catch {
+    const bytes = await readBoundedBytes(req.body, limitBytes, signal);
+    return { ok: true, body: new TextDecoder().decode(bytes) };
+  } catch (error) {
+    if (error instanceof BodyLimitError) return tooLarge();
+    if (signal.aborted && !req.signal.aborted) return { ok: false, status: 408, error: "Request body timed out", code: "request_timeout" };
     return { ok: false, status: 400, error: "Unable to read request body", code: "bad_body" };
   }
 }
@@ -65,12 +46,13 @@ export async function readTextBody(req: Request, limitBytes = DEFAULT_JSON_BODY_
  */
 export async function readJsonBody<T = Record<string, unknown>>(
   req: Request,
-  limitBytes: number = DEFAULT_JSON_BODY_LIMIT
+  limitBytes: number = DEFAULT_JSON_BODY_LIMIT,
+  options: { allowNonObject?: boolean; timeoutMs?: number } = {},
 ): Promise<
   | { ok: true; body: T }
   | { ok: false; status: number; error: string; code: string }
 > {
-  const read = await readTextBody(req, limitBytes);
+  const read = await readTextBody(req, limitBytes, options.timeoutMs);
   if (!read.ok) {
     return read.code === "bad_body"
       ? { ok: false, status: 400, error: "Invalid JSON body", code: "bad_json" }
@@ -82,7 +64,13 @@ export async function readJsonBody<T = Record<string, unknown>>(
   }
 
   try {
-    return { ok: true, body: JSON.parse(raw) as T };
+    const body: unknown = JSON.parse(raw);
+    // All application payloads are object envelopes. JSON null/arrays/scalars
+    // otherwise crash callers at body.email/id/etc despite valid JSON syntax.
+    if (!options.allowNonObject && (body === null || typeof body !== "object" || Array.isArray(body))) {
+      return { ok: false, status: 400, error: "JSON body must be an object", code: "bad_json" };
+    }
+    return { ok: true, body: body as T };
   } catch {
     return { ok: false, status: 400, error: "Invalid JSON body", code: "bad_json" };
   }

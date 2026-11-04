@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
@@ -89,7 +90,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const profileId = positiveId(body.profileId);
     const universityId = positiveId(body.universityId);
     const status = body.status === undefined ? "Shortlisted" : body.status;
@@ -157,7 +160,9 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const id = positiveId(body.id);
     const status = body.status;
     const notes = body.notes;

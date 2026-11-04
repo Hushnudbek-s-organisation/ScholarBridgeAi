@@ -694,17 +694,11 @@
     snapping. `ThemeProvider` adds/removes the class; it is never left on (a
     permanent global transition makes every hover feel sluggish and hurts
     scroll performance). */
+/* Animate a few large surfaces, not every text/SVG/pseudo-element. The
+   universal rule created thousands of simultaneous color animations on phones. */
 html.theme-transition,
-html.theme-transition *,
-html.theme-transition *::before,
-html.theme-transition *::after {
-  transition:
-    background-color 250ms ease,
-    border-color 250ms ease,
-    color 250ms ease,
-    fill 250ms ease,
-    stroke 250ms ease !important;
-  transition-delay: 0ms !important;
+html.theme-transition :where(body, header, main, nav, aside, footer) {
+  transition: background-color 160ms ease, border-color 160ms ease;
 }
 
 /*  Reduced motion ---------------------------------------------------------

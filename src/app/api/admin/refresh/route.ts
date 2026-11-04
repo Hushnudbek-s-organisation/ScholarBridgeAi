@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { runRefresh, listRefreshJobs } from "@/lib/refresh";
@@ -5,7 +6,9 @@ import { runRefresh, listRefreshJobs } from "@/lib/refresh";
 /** POST: trigger a manual refresh (admin). GET: list refresh jobs. */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const access = await requireAdmin(req);
     if (!access.ok) {
       return NextResponse.json(

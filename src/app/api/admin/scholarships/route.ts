@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { scholarships } from "@/db/schema";
@@ -98,7 +99,9 @@ function buildScholarshipValues(s: any) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const access = await requireAdmin(req);
     if (!access.ok) {
       return NextResponse.json(
@@ -131,7 +134,9 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const access = await requireAdmin(req);
     if (!access.ok) {
       return NextResponse.json(

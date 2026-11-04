@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div lang="en" className="min-h-screen bg-slate-50 font-sans">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
@@ -28,7 +28,7 @@ export default function TermsPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
         <div className="bg-white rounded-overlay border border-slate-200 shadow-sm p-6 sm:p-10">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Terms of Service</h1>
-          <p className="mt-2 text-sm text-slate-500">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • Effective for all users of ScholarBridgeAI</p>
+          <p className="mt-2 text-sm text-slate-500">Last updated: <time dateTime="2026-11-04">November 4, 2026</time> • Effective for all users of ScholarBridgeAI</p>
 
           <div className="mt-8 space-y-8 text-sm text-slate-700 leading-relaxed">
             <section>

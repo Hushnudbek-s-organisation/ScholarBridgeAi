@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin, requireProfileAccess, type Session } from "@/lib/auth";
 import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { isDatabaseUnreachable } from "@/lib/dbError";
 import { readJsonBody } from "@/lib/request";
 import { ensureGrowthTables, GROWTH_UNAVAILABLE, growthSchemaStatus } from "./db";
 
@@ -104,5 +105,6 @@ export function oneOf<T extends string>(v: unknown, allowed: readonly T[], fallb
 /** Internal error → log + generic 500 (never leak SQL/stack to the client). */
 export function serverError(where: string, err: unknown) {
   console.error(`[growth] ${where}:`, err);
+  if (isDatabaseUnreachable(err)) return jsonError(503, "Service temporarily unavailable. Please try again.", "temporarily_unavailable");
   return jsonError(500, "Something went wrong. Please try again.", "server_error");
 }

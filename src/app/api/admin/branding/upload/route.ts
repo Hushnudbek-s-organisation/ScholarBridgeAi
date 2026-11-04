@@ -1,3 +1,4 @@
+import { BodyLimitError, cancelBody, fetchBoundedResponse, readBoundedBytes } from "@/lib/boundedBody";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { setConfig } from "@/lib/config";
@@ -26,9 +27,18 @@ export async function POST(request: Request) {
     }
     const declared = Number(request.headers.get("content-length") || 0);
     if (declared > MAX_BYTES + 64 * 1024) {
+      cancelBody(request.body);
       return NextResponse.json({ error: "Image must be 5 MB or smaller" }, { status: 413 });
     }
-    const form = await request.formData();
+    let form: FormData;
+    try {
+      const raw = await readBoundedBytes(request.body, MAX_BYTES + 64 * 1024, AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]));
+      form = await new Response(raw as BodyInit, { headers: { "content-type": request.headers.get("content-type") ?? "" } }).formData();
+    } catch (error) {
+      if (error instanceof BodyLimitError) return NextResponse.json({ error: "Image must be 5 MB or smaller" }, { status: 413 });
+      const timeout = error instanceof Error && error.name === "TimeoutError";
+      return NextResponse.json({ error: timeout ? "Upload timed out" : "Invalid multipart upload" }, { status: timeout ? 408 : 400 });
+    }
 
     const kind = form.get("kind");
     if (kind !== "logo" && kind !== "favicon") {
@@ -56,19 +66,24 @@ export async function POST(request: Request) {
     // Keep stable filenames so all pages use the latest asset. The timestamp
     // in the saved URL also avoids stale CDN/browser caches after replacement.
     const path = `${kind}.${extension}`;
-    const upload = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        apikey: serviceKey,
-        "Content-Type": file.type,
-        "x-upsert": "true",
-      },
-      body: Buffer.from(bytes),
-    });
+    let upload: Response;
+    try {
+      upload = await fetchBoundedResponse(`${supabaseUrl}/storage/v1/object/${bucket}/${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+          "Content-Type": file.type,
+          "x-upsert": "true",
+        },
+        body: Buffer.from(bytes),
+        signal: request.signal,
+      }, 15_000, 64 * 1024);
+    } catch {
+      return NextResponse.json({ error: "Storage is temporarily unavailable. Please try again." }, { status: 502 });
+    }
     if (!upload.ok) {
-      const detail = await upload.text();
-      console.error("Supabase branding upload failed:", detail);
+      console.error("Supabase branding upload failed:", upload.status);
       return NextResponse.json({ error: "Storage upload failed. Check that the branding bucket exists." }, { status: 502 });
     }
 
