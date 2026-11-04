@@ -10,6 +10,7 @@ import { ThemeSwitch } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { SVG_COLORS } from "@/components/ui/tokens";
 import Link from "next/link";
+import { isLiteMotionSync, subscribeLiteMotion } from "@/lib/liteMotion";
 import { PUBLIC_TELEGRAM_CHANNEL_URL, PUBLIC_TELEGRAM_HANDLE } from "@/lib/publicLinks";
 
 /** Hero children: each one rises a beat after the previous. */
@@ -523,17 +524,29 @@ const HUD_SECTIONS = [
  *    cursor rides `0.22 + 0.52 · progress` of the viewport with a
  *    zero-padded `033 %` readout, exactly like a HUD altitude tape.
  */
-function PhotoCraftKineticHud() {
+function useLiteMotionTier(): boolean {
+  const [lite, setLite] = React.useState(false);
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync with device tier on mount
+    setLite(isLiteMotionSync());
+    return subscribeLiteMotion(setLite);
+  }, []);
+  return lite;
+}
+
+function PhotoCraftKineticHud({ lite: liteProp }: { lite?: boolean } = {}) {
   const locale = useLocale();
   const wordRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const tapeRef = React.useRef<HTMLDivElement | null>(null);
   const laserRef = React.useRef<HTMLDivElement | null>(null);
   const readoutRef = React.useRef<HTMLSpanElement | null>(null);
+  const liteDetected = useLiteMotionTier();
+  const lite = liteProp ?? liteDetected;
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     scrollEngine.initialize();
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || lite;
 
     const N = HUD_SECTIONS.length;
     const ROW_GAP = 22;
@@ -579,10 +592,10 @@ function PhotoCraftKineticHud() {
           const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
           const currentY = bottomSlotY + (topSlotY - bottomSlotY) * easeT;
           const bell = Math.pow(Math.sin(t * Math.PI), 0.72);
-          const scale = 1 + bell * 2.15;
-          const shiftX = -bell * 10;
+          const scale = 1 + bell * (lite ? 1.0 : 2.15);
+          const shiftX = -bell * (lite ? 4 : 10);
           transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
-          opacity = (0.48 + bell * 0.52).toFixed(3);
+          opacity = (0.48 + bell * (lite ? 0.32 : 0.52)).toFixed(3);
         }
         if (prevTransforms[i] !== transform) {
           el.style.transform = transform;
@@ -618,7 +631,7 @@ function PhotoCraftKineticHud() {
 
     const unsub = paintOnceUnderReducedMotion(paint, !!reducedMotion);
     return unsub;
-  }, [locale]);
+  }, [locale, lite]);
 
   const ticks = [];
   for (let val = 0; val <= 100; val += 5) {
@@ -699,7 +712,7 @@ function CountUp({ value, suffix = "", className }: { value: number; suffix?: st
   // only animate when the user has not asked for reduced motion.
   React.useEffect(() => {
     if (typeof window === "undefined" || !ref.current) return;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || isLiteMotionSync();
     if (reduce) return;
     const el = ref.current;
     const observer = new IntersectionObserver(
@@ -883,10 +896,10 @@ export function LandingPage({
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
 
-  // Gentle desktop-only parallax for the hero mockup (disabled under reduced-motion).
+  // Gentle desktop-only parallax for the hero mockup (disabled in lite / reduced-motion).
   useEffect(() => {
     if (typeof window === "undefined" || !heroMockRef.current) return;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || isLiteMotionSync();
     const isDesktop = window.matchMedia?.("(min-width: 1024px)").matches;
     if (reduce || !isDesktop) return;
     const el = heroMockRef.current;
@@ -2165,7 +2178,9 @@ function ExecutiveMonochromeJet({
   );
 }
 
-function ScrollFlightPath() {
+function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
+  const liteDetected = useLiteMotionTier();
+  const lite = liteProp ?? liteDetected;
   /**
    * Scroll-locked aerobatic flight on the SHARED damped scroll engine
    * (`paintOnceUnderReducedMotion` → `scrollEngine.subscribe`): zero React
@@ -2208,9 +2223,9 @@ function ScrollFlightPath() {
     if (!path) return;
     const reducedMotion = window.matchMedia?.(
       "(prefers-reduced-motion: reduce)",
-    ).matches;
+    ).matches || lite;
 
-    const STEPS = 360;
+    const STEPS = lite ? 120 : 360;
     // [x, y, unwrapped screen-heading°, bank-turn°] per sample.
     let lut = new Float64Array((STEPS + 1) * 4);
     let totalLen = 4200;
@@ -2332,36 +2347,44 @@ function ScrollFlightPath() {
         lastBellyOp = bellyValue;
       }
 
-      const vortOp = Math.min(
-        0.85,
-        Math.abs(bankDeg) / 22 +
-          (inRoll ? Math.sin(rollPhase * Math.PI) * 0.8 : 0) +
-          vel * 12,
-      );
-      const vL = 1 + Math.min(1.6, Math.abs(bankDeg) / 26 + vel * 20);
-      const curl = inRoll ? Math.sin(rollPhase * Math.PI * 2) * 10 : 0;
-      const vortValue = vortOp.toFixed(3);
-      if (Math.abs(vortOp - lastVortOp) > 0.01) {
-        vortexGroupRef.current?.setAttribute("opacity", vortValue);
-        lastVortOp = Number(vortValue);
-      }
-      const vortexTransform = `scale(${vL.toFixed(3)} ${(1 + curl * 0.015).toFixed(3)})`;
-      if (vortexTransform !== lastVortexTransform) {
-        vortexGroupRef.current?.setAttribute("transform", vortexTransform);
-        lastVortexTransform = vortexTransform;
+      // In lite mode: no vortices, no afterburner pulsing — keep plane visible but reduce rAF work.
+      if (lite) {
+        if (vortexGroupRef.current && lastVortOp !== 0) {
+          vortexGroupRef.current.setAttribute("opacity", "0");
+          lastVortOp = 0;
+        }
+      } else {
+        const vortOp = Math.min(
+          0.85,
+          Math.abs(bankDeg) / 22 +
+            (inRoll ? Math.sin(rollPhase * Math.PI) * 0.8 : 0) +
+            vel * 12,
+        );
+        const vL = 1 + Math.min(1.6, Math.abs(bankDeg) / 26 + vel * 20);
+        const curl = inRoll ? Math.sin(rollPhase * Math.PI * 2) * 10 : 0;
+        const vortValue = vortOp.toFixed(3);
+        if (Math.abs(vortOp - lastVortOp) > 0.01) {
+          vortexGroupRef.current?.setAttribute("opacity", vortValue);
+          lastVortOp = Number(vortValue);
+        }
+        const vortexTransform = `scale(${vL.toFixed(3)} ${(1 + curl * 0.015).toFixed(3)})`;
+        if (vortexTransform !== lastVortexTransform) {
+          vortexGroupRef.current?.setAttribute("transform", vortexTransform);
+          lastVortexTransform = vortexTransform;
+        }
       }
 
-      const plumeTransform = `scale(${(1 + Math.min(1.8, vel * 28)).toFixed(3)} 1)`;
+      const plumeTransform = lite ? "scale(1 1)" : `scale(${(1 + Math.min(1.8, vel * 28)).toFixed(3)} 1)`;
       if (plumeTransform !== lastPlumeTransform) {
         plumeRef.current?.setAttribute("transform", plumeTransform);
         lastPlumeTransform = plumeTransform;
       }
-      const burnerTransform = `scale(${(1 + Math.min(2.2, vel * 34)).toFixed(3)} 1)`;
+      const burnerTransform = lite ? "scale(1 1)" : `scale(${(1 + Math.min(2.2, vel * 34)).toFixed(3)} 1)`;
       if (burnerTransform !== lastBurnerTransform) {
         burnerRef.current?.setAttribute("transform", burnerTransform);
         lastBurnerTransform = burnerTransform;
       }
-      const burnerValue = Math.min(0.9, vel * 40).toFixed(3);
+      const burnerValue = lite ? "0" : Math.min(0.9, vel * 40).toFixed(3);
       if (burnerValue !== lastBurnerOp) {
         burnerRef.current?.setAttribute("opacity", burnerValue);
         lastBurnerOp = burnerValue;
@@ -2392,7 +2415,7 @@ function ScrollFlightPath() {
       window.removeEventListener("resize", handleResize);
       if (resizeTimer) clearTimeout(resizeTimer);
     };
-  }, []);
+  }, [lite]);
 
   return (
     <div
@@ -2476,9 +2499,11 @@ function ScrollFlightPath() {
   );
 }
 
-function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
+function UniversityCampusMarquee({ onStart, lite: liteProp }: { onStart: () => void; lite?: boolean }) {
   const tIndex = useTranslations("landing");
   const sectionRef = React.useRef<HTMLElement | null>(null);
+  const liteDetected = useLiteMotionTier();
+  const lite = liteProp ?? liteDetected;
 
   React.useEffect(() => {
     const el = sectionRef.current;
@@ -2517,7 +2542,6 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                 className="group relative w-64 shrink-0 rounded-overlay border border-slate-200/90 bg-white p-2 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-72 dark:border-slate-700/80 dark:bg-surface dark:hover:border-indigo-400 dark:focus-visible:ring-indigo-400"
               >
                 <span className="relative block h-32 w-full overflow-hidden rounded-surface border border-slate-200/70 bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900">
-                  {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={campusPhotoSrc(university.url, 320)}
@@ -2526,6 +2550,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                     alt={university.landmark}
                     width={288}
                     height={128}
+                    sizes="(max-width: 640px) 256px, 288px"
                     loading={copy === 0 && index < eagerCount ? "eager" : "lazy"}
                     {...(copy === 0 && index < eagerCount
                       ? { fetchPriority: "high" as const }
@@ -2562,7 +2587,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       id="campuses"
       aria-labelledby="university-marquee-title"
       data-paused="false"
-      className="sb-marquee-fade relative z-10 border-y border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-canvas sm:py-10"
+      className="sb-cv-section sb-marquee-fade relative z-10 border-y border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-canvas sm:py-10"
     >
       <div className="mx-auto mb-5 w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
         <SectionIndex n="02" label={tIndex("secCampuses")} />
@@ -2579,7 +2604,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       <div className="space-y-3 overflow-hidden">
         {renderRow(MARQUEE_ROW_1, "sb-marquee-right", 2)}
         {renderRow(MARQUEE_ROW_2, "sb-marquee-left", 0)}
-        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow", 0)}
+        {!lite && renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow", 0)}
       </div>
     </section>
   );

@@ -1216,9 +1216,9 @@ html.theme-transition *::after {
   0% { transform: translate3d(0%, 0, 0); }
   100% { transform: translate3d(-50%, 0, 0); }
 }
-.sb-marquee-right { display: flex; width: max-content; animation: sbMarqueeRight 46s linear infinite; will-change: transform; }
-.sb-marquee-left { display: flex; width: max-content; animation: sbMarqueeLeft 42s linear infinite; will-change: transform; }
-.sb-marquee-right-slow { display: flex; width: max-content; animation: sbMarqueeRight 50s linear infinite; will-change: transform; }
+.sb-marquee-right { display: flex; width: max-content; animation: sbMarqueeRight 46s linear infinite; }
+.sb-marquee-left { display: flex; width: max-content; animation: sbMarqueeLeft 42s linear infinite; }
+.sb-marquee-right-slow { display: flex; width: max-content; animation: sbMarqueeRight 50s linear infinite; }
 .sb-marquee-track:hover, .sb-marquee-track:focus-within, .sb-marquee-paused .sb-marquee-track { animation-play-state: paused; }
 /* The IntersectionObserver publishes the off-screen state as a data attribute
    too, so the rows stop animating while nobody is looking at them. */
@@ -1237,11 +1237,19 @@ html.theme-transition *::after {
   content-visibility: auto;
   contain-intrinsic-size: auto 600px;
 }
+/* Pause marquee when page is hidden — saves rAF on background tabs. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-paused="true"] .sb-marquee-track { animation-play-state: paused; }
+}
+/* Lite motion: reduce blur and layers for coarse/low-memory devices. */
+@media (pointer: coarse) and (max-width: 1024px) {
+  .sb-hero-mockup-glow { filter: none; opacity: 0.35; }
+  .sb-jet-plumes { animation: none; opacity: 0.35; }
+}
 
 /* A single pre-composited glow replaces frame-by-frame blur-radius changes. */
 .sb-kinetic-word {
   transform-origin: right center;
-  will-change: transform, opacity;
   opacity: 0;
 }
 
@@ -1252,8 +1260,11 @@ html.theme-transition *::after {
   text-shadow: 0 0 22px rgb(224 231 255 / 0.72), 0 0 44px rgb(129 140 248 / 0.48);
 }
 
-.sb-gpu-transform { transform: translate3d(0, 0, 0); will-change: transform; }
+.sb-gpu-transform { transform: translate3d(0, 0, 0); }
 .sb-will-transform { will-change: transform; }
+@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+  .sb-will-transform { will-change: auto; }
+}
 .sb-kinetic-track { height: 2424px; }
 .sb-contain-strict { contain: strict; }
 .sb-ring-transition { transition: stroke-dashoffset 1.2s ease-out; }
