@@ -11,6 +11,7 @@ import { ReferralShareCard } from "./ReferralShareCard";
 import { ReferralProgramCard } from "./ReferralProgramCard";
 import { Leaderboard, LeaderboardEntry } from "./Leaderboard";
 import { DailyStreakCard, type StreakView } from "./DailyStreakCard";
+import { PanelSkeleton } from "@/components/ui/hubs";
 
 interface RewardsSectionProps {
   activeProfile: StudentProfile | null;
@@ -90,24 +91,20 @@ export function RewardsSection({ activeProfile }: RewardsSectionProps) {
   }
 
   if (loading || !gamification) {
-    return (
-      <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-10 text-center">
-        <p className="text-sm text-slate-500">{t("loading")}</p>
-      </div>
-    );
+    return <PanelSkeleton rows={4} />;
   }
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 sb-ink-on-bright rounded-overlay p-6 shadow-xl">
+      <div className="sb-journey-hero relative overflow-hidden rounded-overlay border p-6 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-surface bg-white/20 flex items-center justify-center">
-              <Gift className="h-6 w-6 text-white sb-ink-on-bright" />
+            <div className="h-10 w-10 rounded-surface bg-amber-500/15 ring-1 ring-amber-500/30 flex items-center justify-center">
+              <Gift className="h-6 w-6 text-amber-600 dark:text-amber-300" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-extrabold">{t("title")}</h1>
-              <p className="text-sm text-slate-700 sb-ink-on-bright mt-0.5">{t("subtitle")}</p>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">{t("title")}</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">{t("subtitle")}</p>
             </div>
           </div>
           <PointsBadge points={gamification.totalPoints} levelName={gamification.level.name} levelIcon={gamification.level.iconUrl} />

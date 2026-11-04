@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Check, Flame, Info } from "lucide-react";
 import { AnimatedBar } from "@/components/motion";
+import { Confetti } from "@/components/ui/Confetti";
 
 export interface StreakView {
   current: number;
@@ -45,6 +46,7 @@ export function DailyStreakCard({
 }) {
   const t = useTranslations("rewards");
   const locale = useLocale();
+  const [showInfo, setShowInfo] = useState(false);
   const [loaded, setLoaded] = useState<StreakView | null>(supplied ?? null);
 
   useEffect(() => {
@@ -86,11 +88,15 @@ export function DailyStreakCard({
   // alive.
   const streakLapsed = !activeToday && current === 0;
   const statusPill = (
-    <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+    <button
+      type="button"
+      onClick={() => setShowInfo((v) => !v)}
+      aria-expanded={showInfo}
+      aria-label={t("streakLastSeven")}
+      className={`flex min-h-11 shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${
         activeToday
           ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200"
-          : "bg-white text-orange-700 ring-1 ring-orange-200 dark:bg-slate-900 dark:text-orange-200 dark:ring-orange-500/40"
+          : "bg-white text-orange-700 ring-1 ring-orange-200 hover:bg-orange-50 dark:bg-slate-900 dark:text-orange-200 dark:ring-orange-500/40 dark:hover:bg-slate-800"
       }`}
     >
       {activeToday
@@ -98,7 +104,8 @@ export function DailyStreakCard({
         : streakLapsed
           ? t("streakStartToday")
           : t("streakContinueToday")}
-    </span>
+      <Info className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+    </button>
   );
 
   const week = (size: "sm" | "md") => (
@@ -146,14 +153,17 @@ export function DailyStreakCard({
     </ol>
   );
 
+  const reachedMilestone = activeToday && daysToMilestone === 0 && nextMilestone != null;
+
   // ---------------------------------------------------------------- compact
   if (compact) {
     return (
       <section
         aria-label={t("streakTitle")}
         title={t("streakHonestNote")}
-        className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-overlay border border-orange-200/80 bg-gradient-to-r from-orange-50 via-amber-50 to-white px-3 py-2 dark:border-orange-500/30 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900"
+        className="relative flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-overlay border border-orange-200/80 bg-gradient-to-r from-orange-50 via-amber-50 to-white px-3 py-2 dark:border-orange-500/30 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900"
       >
+        <Confetti active={reachedMilestone} />
         <span
           className="grid h-8 w-8 shrink-0 place-items-center rounded-surface bg-gradient-to-br from-orange-600 to-amber-700 text-white shadow-sm"
           aria-hidden
@@ -189,6 +199,11 @@ export function DailyStreakCard({
         )}
 
         <div className="ml-auto flex items-center gap-2">{statusPill}</div>
+        {showInfo && (
+          <p className="mt-2 w-full rounded-control bg-white/90 px-2 py-1.5 text-sm leading-relaxed text-slate-600 ring-1 ring-orange-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
+            {t("streakHonestNote")}
+          </p>
+        )}
       </section>
     );
   }
@@ -197,8 +212,9 @@ export function DailyStreakCard({
   return (
     <section
       aria-label={t("streakTitle")}
-      className="rounded-overlay border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-4 dark:border-orange-500/30 dark:from-slate-900 dark:to-slate-900"
+      className="relative rounded-overlay border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-4 dark:border-orange-500/30 dark:from-slate-900 dark:to-slate-900"
     >
+      <Confetti active={reachedMilestone} />
       <div className="flex items-center gap-3">
         <span
           className="grid h-9 w-9 shrink-0 place-items-center rounded-surface bg-gradient-to-br from-orange-600 to-amber-700 text-white shadow-sm"

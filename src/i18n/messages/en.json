@@ -461,7 +461,8 @@
     "streakStart": "Nothing counted yet — finish a lesson, quiz or community answer to start day 1.",
     "streakMilestoneShort": "{days} more to {milestone}",
     "streakMilestoneProgress": "{current} of {milestone} days towards the {milestone}-day milestone",
-    "you": "You"
+    "you": "You",
+    "maxLevel": "★ Max level"
   },
   "ai": {
     "chatTitle": "ScholarBridgeAI Counselor",
@@ -779,7 +780,19 @@
       "reviewStage3": "Preparing actionable feedback",
       "loadingDescription": "You can stay on this page. The stages are indicative, not a fabricated percentage.",
       "networkError": "Could not reach the AI service. Please try again."
-    }
+    },
+    "scholarshipFitTitle": "Scholarship fit",
+    "scholarshipFitSubtitle": "Score this essay against your saved scholarships — word limit, themes, major, country, GPA and English.",
+    "scholarshipFitNeedLength": "Write at least 50 characters first.",
+    "scholarshipFitNoSaved": "No saved scholarships yet — save some in the Scholarship Hub.",
+    "scholarshipFitAnalyze": "Analyze fit",
+    "scholarshipFitAdapt": "Adapt essay with AI",
+    "scholarshipFitAiUnavailable": "AI is unavailable right now — follow the plan above by hand.",
+    "essayVersionHistory": "Version history",
+    "peerReviewTitle": "Peer review",
+    "peerReviewSubtitle": "Open one of your saved drafts for other students to review — or review an essay someone else opened. You can never review your own essay, and reviewers stay anonymized.",
+    "peerReviewNoReviews": "No reviews yet — students will see this essay in their Peer review list.",
+    "peerReviewOpenToCollect": "Open the version to collect reviews."
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logo",
@@ -5006,7 +5019,8 @@
       "saving": "Saving Profile...",
       "createProfile": "Create Profile",
       "saveChanges": "Save Profile Changes",
-      "currentBudget": "Current: {value}"
+      "currentBudget": "Current: {value}",
+      "sectionDone": "Complete"
     }
   },
   "careerDiscovery": {

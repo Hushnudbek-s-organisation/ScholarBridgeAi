@@ -530,6 +530,13 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               {PROFILE_SECTIONS.map((section, index) => {
                 const Icon = section.icon;
                 const selected = activeSection === section.id;
+                const done = (() => {
+                  if (section.id === "account") return !!formData.name.trim() && !!formData.email.trim();
+                  if (section.id === "academics") return !!(formData.degreeLevel && (formData.targetMajor || formData.studyInterests.length > 0) && formData.gpa !== "" && formData.gpaScale !== "");
+                  if (section.id === "finance") return !!(formData.budgetAnnualUsd !== "" && formData.preferredCountries.length > 0);
+                  if (section.id === "experience") return !!(formData.extracurriculars || formData.leadership || formData.volunteering || formData.awards);
+                  return false;
+                })();
                 return (
                   <Button
                     key={section.id}
@@ -564,6 +571,8 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                   >
                     <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
                     <span className="min-w-0 break-words">{te(`sections.${section.id}`)}</span>
+                    {done && <span className="ml-1 h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden title={te("sectionDone")} />}
+                    {!done && <span className="ml-1 h-2 w-2 shrink-0 rounded-full bg-slate-300 dark:bg-slate-600" aria-hidden />}
                   </Button>
                 );
               })}

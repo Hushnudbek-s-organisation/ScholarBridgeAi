@@ -461,7 +461,8 @@
     "streakStart": "Hali hech narsa hisoblanmadi — 1-kunni boshlash uchun dars, test yoki jamiyatdagi javobni yakunlang.",
     "streakMilestoneShort": "{milestone} gacha yana {days} kun",
     "streakMilestoneProgress": "{milestone} kunlik bosqichga {milestone} kundan {current} tasi",
-    "you": "Siz"
+    "you": "Siz",
+    "maxLevel": "★ Maksimal daraja"
   },
   "ai": {
     "chatTitle": "ScholarBridgeAI maslahatchi",
@@ -779,7 +780,19 @@
       "reviewStage3": "Amaliy tavsiyalar tayyorlanmoqda",
       "loadingDescription": "Sahifada qolishingiz mumkin. Bosqichlar taxminiy ko‘rsatkich, to‘qib chiqarilgan foiz emas.",
       "networkError": "AI xizmatiga ulanib bo‘lmadi. Qayta urinib ko‘ring."
-    }
+    },
+    "scholarshipFitTitle": "Grant mosligi",
+    "scholarshipFitSubtitle": "Ushbu esseni saqlangan grantlaringizga nisbatan baholang.",
+    "scholarshipFitNeedLength": "Avval kamida 50 ta belgi yozing.",
+    "scholarshipFitNoSaved": "Hali saqlangan grantlar yo'q.",
+    "scholarshipFitAnalyze": "Moslikni tahlil qilish",
+    "scholarshipFitAdapt": "Essen AI bilan moslashtirish",
+    "scholarshipFitAiUnavailable": "AI hozir mavjud emas.",
+    "essayVersionHistory": "Versiyalar tarixi",
+    "peerReviewTitle": "Tengdoshlar tekshiruvi",
+    "peerReviewSubtitle": "Saqlangan qoralamalaringizdan birini boshqalarga oching.",
+    "peerReviewNoReviews": "Hali sharhlar yo'q.",
+    "peerReviewOpenToCollect": "Sharh yig'ish uchun versiyani oching."
   },
   "landing": {
     "logoAlt": "ScholarBridge AI logotipi",
@@ -5006,7 +5019,8 @@
       "saving": "Profil saqlanmoqda...",
       "createProfile": "Profil yaratish",
       "saveChanges": "O‘zgarishlarni saqlash",
-      "currentBudget": "Joriy: {value}"
+      "currentBudget": "Joriy: {value}",
+      "sectionDone": "Tayyor"
     }
   },
   "careerDiscovery": {

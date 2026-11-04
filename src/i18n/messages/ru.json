@@ -461,7 +461,8 @@
     "streakStart": "Пока ничего не засчитано — завершите урок, тест или ответ в сообществе, чтобы начать день 1.",
     "streakMilestoneShort": "ещё {days} до {milestone}",
     "streakMilestoneProgress": "{current} из {milestone} дней до рубежа в {milestone} дней",
-    "you": "Вы"
+    "you": "Вы",
+    "maxLevel": "★ Максимальный уровень"
   },
   "ai": {
     "chatTitle": "AI-консультант ScholarBridgeAI",
@@ -779,7 +780,19 @@
       "reviewStage3": "Готовим практические рекомендации",
       "loadingDescription": "Оставайтесь на странице. Этапы ориентировочные, а не выдуманный процент.",
       "networkError": "Не удалось связаться с ИИ-сервисом. Попробуйте ещё раз."
-    }
+    },
+    "scholarshipFitTitle": "Соответствие стипендии",
+    "scholarshipFitSubtitle": "Оцените это эссе по сохранённым стипендиям.",
+    "scholarshipFitNeedLength": "Сначала напишите не менее 50 символов.",
+    "scholarshipFitNoSaved": "Пока нет сохранённых стипендий.",
+    "scholarshipFitAnalyze": "Анализ соответствия",
+    "scholarshipFitAdapt": "Адаптировать эссе с ИИ",
+    "scholarshipFitAiUnavailable": "ИИ сейчас недоступен.",
+    "essayVersionHistory": "История версий",
+    "peerReviewTitle": "Взаимная проверка",
+    "peerReviewSubtitle": "Откройте один из черновиков для проверки.",
+    "peerReviewNoReviews": "Пока нет отзывов.",
+    "peerReviewOpenToCollect": "Откройте версию для сбора отзывов."
   },
   "landing": {
     "logoAlt": "Логотип ScholarBridge AI",
@@ -5006,7 +5019,8 @@
       "saving": "Сохранение профиля...",
       "createProfile": "Создать профиль",
       "saveChanges": "Сохранить изменения",
-      "currentBudget": "Текущий бюджет: {value}"
+      "currentBudget": "Текущий бюджет: {value}",
+      "sectionDone": "Готово"
     }
   },
   "careerDiscovery": {

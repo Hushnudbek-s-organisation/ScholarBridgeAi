@@ -38,7 +38,7 @@ export function BadgeShowcase({ badges }: BadgeShowcaseProps) {
               <span className="text-3xl mb-1.5">{badge.iconUrl}</span>
               <p className="text-sm font-bold text-slate-800">{badge.name}</p>
               <p className="text-sm text-slate-500 mt-0.5 leading-snug">{badge.description}</p>
-              <p className="text-sm text-slate-300 mt-1">{new Date(badge.awardedAt).toLocaleDateString()}</p>
+              <p className="text-sm text-slate-500 mt-1 dark:text-slate-400">{new Date(badge.awardedAt).toLocaleDateString()}</p>
             </div>
           ))}
         </div>

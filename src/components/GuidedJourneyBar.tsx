@@ -40,12 +40,20 @@ interface GuidedJourneyBarProps {
 
 const STORAGE_KEY = "scholarbridge:guided-journey-collapsed";
 
-function readCollapsed(): boolean {
+function readCollapsed(): boolean | null {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
+    const v = localStorage.getItem(STORAGE_KEY);
+    if (v === "1") return true;
+    if (v === "0") return false;
+    return null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isMobileViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 640px)").matches;
 }
 
 export function GuidedJourneyBar({
@@ -63,7 +71,11 @@ export function GuidedJourneyBar({
   const [taskCount, setTaskCount] = useState<{ profileId: number; count: number } | null>(null);
 
   useEffect(() => {
-    void Promise.resolve().then(() => setCollapsed(readCollapsed()));
+    void Promise.resolve().then(() => {
+      const stored = readCollapsed();
+      if (stored !== null) setCollapsed(stored);
+      else if (isMobileViewport()) setCollapsed(true);
+    });
   }, []);
 
   const toggleCollapsed = () => {
@@ -224,7 +236,7 @@ export function GuidedJourneyBar({
           className="ml-auto inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-surface border border-slate-200 px-2 text-xs font-bold text-slate-500 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-700 dark:hover:bg-slate-800"
         >
           {collapsed ? <ChevronDown className="h-3.5 w-3.5" aria-hidden /> : <ChevronUp className="h-3.5 w-3.5" aria-hidden />}
-          <span className="hidden sm:inline">{collapsed ? t("cta") : t("title")}</span>
+          <span className="hidden sm:inline">{collapsed ? t("showLabel") : t("hideLabel")}</span>
         </Button>
       </div>
 
