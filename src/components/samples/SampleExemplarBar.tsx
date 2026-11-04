@@ -251,7 +251,7 @@ export function SampleExemplarBar<G extends SampleGroup>({
       </div>
 
       {lib && (group === "essay" || group === "sop" || group === "lor") && (
-        <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
           {t("writingCoverage", { essays: new Set(lib.ESSAY_RUBRIC_SAMPLES.map((s) => s.text)).size,
             letters: lib.LOR_SAMPLES.filter((s) => s.kind !== "requestEmail").length })}
         </p>

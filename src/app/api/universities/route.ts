@@ -47,8 +47,8 @@ export async function GET(req: Request) {
     const maxRank = rank("maxRank");
 
     // One cached read of the base catalogue (all universities + program fields
-    // + source links) instead of 3 full joins per filter change; the returned
-    // array/map are copies, so filtering and sorting below are unaffected.
+    // + source links) instead of 3 full joins per filter change. Treat the
+    // cached snapshot as read-only; map into response-local rows below.
     const bundle = await getCachedUniversitiesBundle();
     // Values on an unverified university row are not suitable for filters,
     // ordering, or chancing inputs. Preserve the database row; sanitize only

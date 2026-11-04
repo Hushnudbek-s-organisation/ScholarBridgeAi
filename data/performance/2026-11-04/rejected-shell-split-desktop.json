@@ -1,0 +1,117 @@
+{
+  "stage": "after",
+  "profile": "desktop",
+  "samples": [
+    {
+      "run": 1,
+      "lcp": 1336,
+      "cls": 0.04492390896267362,
+      "blockingMs": 118,
+      "longTasks": 3,
+      "lcpElement": "BUTTON",
+      "ttfbMs": 156.89999999990687,
+      "domContentLoadedMs": 420.29999999981374,
+      "fcpMs": 820,
+      "scriptDecodedBytes": 1194554,
+      "resourceRequests": 36,
+      "domNodes": 1131,
+      "analyticsStartMs": null,
+      "externalRequests": 10,
+      "themeClickMs": 430.29999999981374,
+      "signInDialogMs": 534.4000000003725,
+      "signInShellMs": 1044.8999999999069,
+      "transitions": [
+        {
+          "target": "universities/search",
+          "readyMs": 735.1999999997206
+        },
+        {
+          "target": "scholarships/browse",
+          "readyMs": 588.7999999998137
+        },
+        {
+          "target": "universities/search",
+          "readyMs": 213.70000000018626
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "lcp": 800,
+      "cls": 0,
+      "blockingMs": 171,
+      "longTasks": 3,
+      "lcpElement": "BUTTON",
+      "ttfbMs": 55.60000000009313,
+      "domContentLoadedMs": 324.39999999990687,
+      "fcpMs": 384,
+      "scriptDecodedBytes": 1194554,
+      "resourceRequests": 36,
+      "domNodes": 1131,
+      "analyticsStartMs": null,
+      "externalRequests": 10,
+      "themeClickMs": 437.40000000037253,
+      "signInDialogMs": 531.1999999997206,
+      "signInShellMs": 671,
+      "transitions": [
+        {
+          "target": "universities/search",
+          "readyMs": 716.3999999999069
+        },
+        {
+          "target": "scholarships/browse",
+          "readyMs": 577.2999999998137
+        },
+        {
+          "target": "universities/search",
+          "readyMs": 268.39999999990687
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "lcp": 832,
+      "cls": 0,
+      "blockingMs": 127,
+      "longTasks": 3,
+      "lcpElement": "BUTTON",
+      "ttfbMs": 38.799999999813735,
+      "domContentLoadedMs": 313,
+      "fcpMs": 288,
+      "scriptDecodedBytes": 1194554,
+      "resourceRequests": 36,
+      "domNodes": 1131,
+      "analyticsStartMs": null,
+      "externalRequests": 10,
+      "themeClickMs": 472.60000000009313,
+      "signInDialogMs": 549.2999999998137,
+      "signInShellMs": 589.2000000001863,
+      "transitions": [
+        {
+          "target": "universities/search",
+          "readyMs": 651.7000000001863
+        },
+        {
+          "target": "scholarships/browse",
+          "readyMs": 585.3999999999069
+        },
+        {
+          "target": "universities/search",
+          "readyMs": 278.20000000018626
+        }
+      ]
+    }
+  ],
+  "conditions": {
+    "coldBrowserCache": true,
+    "locale": "en",
+    "runs": 3,
+    "cpuSlowdown": 1,
+    "roundTripLatencyMs": 0,
+    "downloadMbps": null,
+    "externalOrigins": "blocked equally: sandbox limitation; image delivery not measured",
+    "data": "disposable two-university fixtures, not production catalogue load",
+    "observationWindow": "4 seconds after DOMContentLoaded and visible heading",
+    "interactionMetric": "browser-driven click/hash to visible control + two animation frames; not field INP"
+  }
+}

@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { universities } from "@/db/schema";
@@ -188,7 +189,9 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const values = normalizeValues((body.university || {}) as Input, true);
     const [university] = await db.insert(universities).values(values as typeof universities.$inferInsert).returning();
     await writeAudit({
@@ -216,7 +219,9 @@ export async function PATCH(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const id = Number(body.id);
     if (!Number.isInteger(id) || id < 1) {
       return NextResponse.json({ error: "University id is required" }, { status: 400 });

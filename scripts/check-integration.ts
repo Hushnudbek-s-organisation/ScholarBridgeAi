@@ -3815,6 +3815,59 @@ async function main() {
 
   // -----------------------------------------------------------------------
   // -----------------------------------------------------------------------
+  section("Backend resilience: atomic config writes, single-flight reads and database deadlines");
+  {
+    const assert = (await import("node:assert/strict")).default;
+    const { Pool } = await import("pg");
+    const { databasePoolOptions } = await import("../src/db/poolOptions");
+    const { getStoredConfig, setConfig, deleteConfig, invalidateConfigCache } = await import("../src/lib/config");
+    const key = "backend_audit_concurrent_config";
+    await Promise.all(Array.from({ length: 12 }, (_, index) => setConfig(key, `value-${index}`)));
+    const [stored] = await db.select().from(schema.appConfig).where(eq(schema.appConfig.key, key));
+    check("12 simultaneous first config writes upsert one row without unique-constraint failures", !!stored && /^value-\d+$/.test(stored.value));
+    await setConfig(key, "described", "keep-this-description");
+    await setConfig(key, "updated");
+    const [described] = await db.select().from(schema.appConfig).where(eq(schema.appConfig.key, key));
+    check("config upsert without a description preserves its previous description", described?.description === "keep-this-description");
+
+    const originalQuery = pool.query;
+    let queries = 0;
+    // Observe actual node-postgres calls without replacing the SQL or results.
+    pool.query = function (...args: unknown[]) {
+      queries++;
+      return Reflect.apply(originalQuery, pool, args);
+    } as typeof pool.query;
+    try {
+      invalidateConfigCache(key);
+      const values = await Promise.all(Array.from({ length: 12 }, () => getStoredConfig(key)));
+      check("12 cold reads of the same config key issue exactly one SQL query", queries === 1 && values.every((value) => value === "updated"), `queries=${queries}`);
+    } finally { pool.query = originalQuery; }
+    await deleteConfig(key);
+    check("config deletion invalidates the cached value immediately", await getStoredConfig(key) === null);
+
+    const limited = new Pool(databasePoolOptions({ DATABASE_URL: URL_, NODE_ENV: "production", PG_QUERY_TIMEOUT_MS: "2000", PG_LOCK_TIMEOUT_MS: "300" }));
+    // query_timeout can remove a client before its socket has fully closed.
+    // Pool.end() alone does not await that already-removed client; drain all
+    // end events before stopping disposable Postgres to avoid a teardown race.
+    const disconnected: Promise<void>[] = [];
+    limited.on("connect", (client) => disconnected.push(new Promise<void>((resolve) => client.once("end", resolve))));
+    try {
+      const started = Date.now();
+      await assert.rejects(() => limited.query("SELECT pg_sleep(5)"));
+      check("a genuine slow PostgreSQL query is cancelled within its deadline", Date.now() - started < 3500);
+      check("the pool still serves a healthy query after a timeout", (await limited.query("SELECT 1 AS ok")).rows[0]?.ok === 1);
+      await pool.query("CREATE TABLE backend_audit_lock (value integer)");
+      const holder = await pool.connect();
+      try {
+        await holder.query("BEGIN"); await holder.query("LOCK TABLE backend_audit_lock IN ACCESS EXCLUSIVE MODE");
+        const lockStarted = Date.now();
+        await assert.rejects(() => limited.query("SELECT * FROM backend_audit_lock"), (error: { code?: string }) => error.code === "55P03");
+        check("a blocked PostgreSQL table lock fails fast instead of pinning a connection", Date.now() - lockStarted < 1500);
+      } finally { await holder.query("ROLLBACK"); holder.release(); }
+      check("the pool recovers once a blocking transaction is released", (await limited.query("SELECT 1 AS ok")).rows[0]?.ok === 1);
+    } finally { await limited.end(); await Promise.all(disconnected); }
+  }
+
   // Close the app's own pool before the server goes away. Killing Postgres
   // under a live pool makes node-postgres report 57P01 admin_shutdown, which
   // surfaces as an unhandled fatal and fails the run even though every

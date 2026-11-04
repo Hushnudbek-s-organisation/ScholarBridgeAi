@@ -1,9 +1,11 @@
 import { writeFileSync } from "node:fs";
 import { db, pool } from "@/db";
-import { savedScholarships, scholarships, studentProfiles, universities, userDocuments } from "@/db/schema";
+import { appConfig, savedScholarships, scholarships, studentProfiles, universities, userDocuments } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
 
 async function main() {
+  // Expose all student panes in this disposable audit fixture only.
+  await db.insert(appConfig).values({ key: "nav_hidden_items", value: "[]" });
   const password = "Phase12-E2E-Only-Password-2026!";
   const [student] = await db.insert(studentProfiles).values({
     name: "Phase 12 E2E Student",
@@ -19,6 +21,11 @@ async function main() {
     isPremium: true,
     premiumUntil: new Date(Date.now() + 30 * 86400000),
     onboardingCompleted: true,
+  }).returning();
+  const [admin] = await db.insert(studentProfiles).values({
+    name: "Site Audit Admin", email: "site-audit-admin@example.test",
+    passwordHash: hashPassword(password), degreeLevel: "Bachelor", isAdmin: true,
+    isPremium: true, premiumUntil: new Date(Date.now() + 86400000), onboardingCompleted: true,
   }).returning();
   const [other] = await db.insert(studentProfiles).values({
     name: "Phase 12 E2E Other Student",
@@ -101,10 +108,15 @@ async function main() {
   const fixturePath = process.env.E2E_FIXTURE_FILE;
   if (!fixturePath) throw new Error("E2E_FIXTURE_FILE must point to the disposable fixture manifest");
   writeFileSync(fixturePath, JSON.stringify({
+    adminEmail: admin.email,
+    adminPassword: password,
     studentId: student.id,
     studentEmail: student.email,
     studentPassword: password,
     otherProfileId: other.id,
+    verifiedUniversityId: verifiedUniversity.id,
+    unverifiedUniversityId: unverifiedUniversity.id,
+    scholarshipId: scholarship.id,
     verifiedUniversityName: verifiedUniversity.name,
     unverifiedUniversityName: unverifiedUniversity.name,
     scholarshipTitle: scholarship.title,

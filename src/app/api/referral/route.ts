@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { getReferralStatus, activateReferralReward } from "@/lib/referrals";
@@ -44,7 +45,9 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const profileId = Number(body.profileId);
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {

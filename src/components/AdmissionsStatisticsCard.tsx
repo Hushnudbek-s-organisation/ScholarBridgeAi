@@ -10,8 +10,8 @@ export function AdmissionsStatisticsCard({ statistics }: { statistics?: Admissio
   return (
     <details className="rounded-control border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
       <summary className="cursor-pointer text-sm font-semibold">{t("observedStatsTitle")} · {statistics.verifiedMetricCount}/{Object.keys(statistics.metrics).length}</summary>
-      <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{t("observedStatsNotice")}</p>
-      {statistics.level === "undergraduate_first_year" && <p className="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-200">{t("statUndergraduateScope")}</p>}
+      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t("observedStatsNotice")}</p>
+      {statistics.level === "undergraduate_first_year" && <p className="mt-2 text-sm font-semibold text-amber-800 dark:text-amber-200">{t("statUndergraduateScope")}</p>}
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-left text-xs">
           <caption className="sr-only">{t("observedStatsTitle")} — {statistics.institution}</caption>

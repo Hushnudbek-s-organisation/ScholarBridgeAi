@@ -122,7 +122,10 @@ function miniAppText(lang: Lang): MiniAppMessages {
  * shown, which is what `miniAppText` falls back to.
  */
 function useMiniAppText(lang: Lang): MiniAppMessages {
-  const [ready, setReady] = useState<Lang | null>(() => (dictionaries[lang] ? lang : null));
+  // Module-level dictionaries can already be warm on the server but cold in
+  // a new browser. Use the same English fallback for SSR and first hydration;
+  // switch to the requested dictionary only after this component mounts.
+  const [ready, setReady] = useState<Lang | null>(null);
   useEffect(() => {
     if (dictionaries[lang]) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot: the dictionary is already registered

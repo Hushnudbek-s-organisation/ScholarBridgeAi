@@ -417,6 +417,15 @@ const scrollEngine = (() => {
     if (!raf) raf = requestAnimationFrame(step);
     return () => {
       subs.delete(fn);
+      if (subs.size === 0) {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        window.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onResize);
+        resizeObserver?.disconnect();
+        resizeObserver = null;
+        bound = false;
+      }
     };
   };
   return {
@@ -995,7 +1004,8 @@ export function LandingPage({
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(99,102,241,0.16),transparent_36%),radial-gradient(circle_at_12%_78%,rgba(14,165,233,0.10),transparent_32%)] dark:bg-[radial-gradient(circle_at_82%_18%,rgba(99,102,241,0.18),transparent_36%),radial-gradient(circle_at_12%_78%,rgba(14,165,233,0.10),transparent_32%)]"
           />
           <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-8">
-            <motion.div initial="hidden" animate="visible" variants={heroGroup}>
+            {/* Above-the-fold copy must paint in SSR, not wait for JS + stagger. */}
+            <motion.div initial={false} animate="visible" variants={heroGroup}>
               <div>
                 <SectionIndex n="01" label={t("secOverview")} />
               </div>
@@ -1066,7 +1076,7 @@ export function LandingPage({
             {/* A compact colorful preview built from the app's real navigation source. */}
             <motion.div
               className="relative mx-auto w-full max-w-[700px] md:max-w-[620px]"
-              initial={{ opacity: 0, y: 28, scale: 0.98 }}
+              initial={false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
                 duration: 0.7,
@@ -2084,7 +2094,29 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
     return () => observer.disconnect();
   }, []);
 
-  const renderRow = (items: MarqueeUniversityItem[], animClass: string, eagerCount = 0) => (
+  React.useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const images = el.querySelectorAll<HTMLImageElement>("img[data-campus-src]");
+    const load = (image: HTMLImageElement) => {
+      const src = image.dataset.campusSrc;
+      if (src) image.src = src;
+    };
+    if (typeof IntersectionObserver === "undefined") {
+      images.forEach(load);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        load(entry.target as HTMLImageElement);
+        observer.unobserve(entry.target);
+      }
+    }, { rootMargin: "160px" });
+    images.forEach((image) => observer.observe(image));
+    return () => observer.disconnect();
+  }, []);
+
+  const renderRow = (items: MarqueeUniversityItem[], animClass: string) => (
     <div className="relative overflow-hidden">
       <div className={`sb-marquee-track ${animClass}`}>
         {[0, 1].map((copy) => (
@@ -2093,7 +2125,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
             className="flex shrink-0 gap-3 px-1.5"
             aria-hidden={copy === 1 ? true : undefined}
           >
-            {items.map((university, index) => (
+            {items.map((university) => (
               <Button variant="unstyled"
                 key={university.name}
                 type="button"
@@ -2105,16 +2137,15 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                   {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={campusPhotoSrc(university.url, 320)}
+                    data-campus-src={campusPhotoSrc(university.url, 320)}
                     onError={onWikimediaThumbError(university.url)}
                     crossOrigin="anonymous"
                     alt={university.landmark}
                     width={288}
                     height={128}
-                    loading={copy === 0 && index < eagerCount ? "eager" : "lazy"}
-                    {...(copy === 0 && index < eagerCount
-                      ? { fetchPriority: "high" as const }
-                      : { fetchPriority: "low" as const, decoding: "async" as const })}
+                    loading="lazy"
+                    fetchPriority="low"
+                    decoding="async"
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
@@ -2146,7 +2177,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       ref={sectionRef}
       id="campuses"
       aria-labelledby="university-marquee-title"
-      data-paused="false"
+      data-paused="true"
       className="relative z-10 border-b border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-canvas sm:py-10"
     >
       <div className="mx-auto mb-5 w-[min(1180px,94%)]">
@@ -2162,9 +2193,9 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
         </h2>
       </div>
       <div className="space-y-3 overflow-hidden">
-        {renderRow(MARQUEE_ROW_1, "sb-marquee-right", 2)}
-        {renderRow(MARQUEE_ROW_2, "sb-marquee-left", 0)}
-        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow", 0)}
+        {renderRow(MARQUEE_ROW_1, "sb-marquee-right")}
+        {renderRow(MARQUEE_ROW_2, "sb-marquee-left")}
+        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
       </div>
     </section>
   );

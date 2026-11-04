@@ -1,0 +1,2025 @@
+{
+  "auditDate": "2026-11-04",
+  "branch": "arena/6db82aa0-scholarbridgeai",
+  "scope": "Local repository/static + isolated production browser/integration checks. Not a per-file manual review or every-button/every-provider certification.",
+  "productionMutations": false,
+  "productionDeployment": false,
+  "newCommitOrPullRequest": false,
+  "inventory": {
+    "path": "data/site-audit/2026-11-04-file-inventory.json",
+    "files": 1414,
+    "counters": {
+      "sourceSyntax": 806,
+      "jsonSyntax": 26,
+      "yamlSyntax": 8,
+      "literalInternalLinks": 42,
+      "buttonDeclarations": 710,
+      "pageFiles": 13,
+      "apiFiles": 157
+    },
+    "findings": [],
+    "reviewCandidates": []
+  },
+  "browser": {
+    "startTime": "2026-11-04T16:49:31.024Z",
+    "duration": 244203.064,
+    "expected": 11,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0,
+    "retries": 0,
+    "tests": [
+      {
+        "title": "public university catalogue searches and filters real seeded records",
+        "file": "phase12.spec.ts",
+        "line": 39,
+        "status": "passed",
+        "durationMs": 13618,
+        "retry": 0
+      },
+      {
+        "title": "authenticated dashboard and saved scholarship/deadline state are profile-scoped",
+        "file": "phase12.spec.ts",
+        "line": 74,
+        "status": "passed",
+        "durationMs": 18020,
+        "retry": 0
+      },
+      {
+        "title": "document vault renders only the signed-in profile's documents",
+        "file": "phase12.spec.ts",
+        "line": 97,
+        "status": "passed",
+        "durationMs": 17433,
+        "retry": 0
+      },
+      {
+        "title": "public routes, mobile overflow and recovery states (en)",
+        "file": "site-audit.spec.ts",
+        "line": 25,
+        "status": "passed",
+        "durationMs": 16001,
+        "retry": 0
+      },
+      {
+        "title": "public routes, mobile overflow and recovery states (uz)",
+        "file": "site-audit.spec.ts",
+        "line": 25,
+        "status": "passed",
+        "durationMs": 5224,
+        "retry": 0
+      },
+      {
+        "title": "public routes, mobile overflow and recovery states (ru)",
+        "file": "site-audit.spec.ts",
+        "line": 25,
+        "status": "passed",
+        "durationMs": 6039,
+        "retry": 0
+      },
+      {
+        "title": "all student destinations and pane buttons (1440px)",
+        "file": "site-audit.spec.ts",
+        "line": 52,
+        "status": "passed",
+        "durationMs": 56508,
+        "retry": 0
+      },
+      {
+        "title": "all student destinations and pane buttons (390px)",
+        "file": "site-audit.spec.ts",
+        "line": 52,
+        "status": "passed",
+        "durationMs": 33825,
+        "retry": 0
+      },
+      {
+        "title": "public language/theme controls and missing reset link are usable",
+        "file": "site-audit.spec.ts",
+        "line": 88,
+        "status": "passed",
+        "durationMs": 5429,
+        "retry": 0
+      },
+      {
+        "title": "all admin sections render and account support is readable",
+        "file": "site-audit.spec.ts",
+        "line": 103,
+        "status": "passed",
+        "durationMs": 27848,
+        "retry": 0
+      },
+      {
+        "title": "mobile account utility buttons and logout work",
+        "file": "site-audit.spec.ts",
+        "line": 127,
+        "status": "passed",
+        "durationMs": 30379,
+        "retry": 0
+      }
+    ],
+    "coverage": {
+      "public-routes-en": [
+        {
+          "route": "/",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 70
+        },
+        {
+          "route": "/universities",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 16
+        },
+        {
+          "route": "/scholarships",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/features",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/forgot-password",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/reset-password",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 10
+        },
+        {
+          "route": "/privacy",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 5
+        },
+        {
+          "route": "/terms",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 5
+        },
+        {
+          "route": "/tg",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 0
+        },
+        {
+          "route": "/universities/1",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 11
+        },
+        {
+          "route": "/scholarships/1",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 18
+        },
+        {
+          "route": "/certificates/not-a-real-certificate",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/certificates/%25",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/parent/not-a-valid-token",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/audit-not-a-real-page",
+          "status": 404,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 0
+        }
+      ],
+      "public-routes-uz": [
+        {
+          "route": "/",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 70
+        },
+        {
+          "route": "/universities",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 16
+        },
+        {
+          "route": "/scholarships",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/features",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/forgot-password",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/reset-password",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 10
+        },
+        {
+          "route": "/privacy",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 5
+        },
+        {
+          "route": "/terms",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 5
+        },
+        {
+          "route": "/tg",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 0
+        },
+        {
+          "route": "/universities/1",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 11
+        },
+        {
+          "route": "/scholarships/1",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 18
+        },
+        {
+          "route": "/certificates/not-a-real-certificate",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/certificates/%25",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/parent/not-a-valid-token",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/audit-not-a-real-page",
+          "status": 404,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 0
+        }
+      ],
+      "public-routes-ru": [
+        {
+          "route": "/",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 70
+        },
+        {
+          "route": "/universities",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 16
+        },
+        {
+          "route": "/scholarships",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/features",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/forgot-password",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 12
+        },
+        {
+          "route": "/reset-password",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 10
+        },
+        {
+          "route": "/privacy",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 5
+        },
+        {
+          "route": "/terms",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 5
+        },
+        {
+          "route": "/tg",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 0
+        },
+        {
+          "route": "/universities/1",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 11
+        },
+        {
+          "route": "/scholarships/1",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 18
+        },
+        {
+          "route": "/certificates/not-a-real-certificate",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/certificates/%25",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/parent/not-a-valid-token",
+          "status": 200,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 1
+        },
+        {
+          "route": "/audit-not-a-real-page",
+          "status": 404,
+          "dimensions": {
+            "viewport": 390,
+            "content": 390
+          },
+          "controlsRendered": 0
+        }
+      ],
+      "student-navigation-1440": [
+        {
+          "section": "dashboard",
+          "pane": null
+        },
+        {
+          "section": "universities",
+          "pane": "search",
+          "controlsRendered": 21
+        },
+        {
+          "section": "universities",
+          "pane": "careers",
+          "controlsRendered": 3
+        },
+        {
+          "section": "universities",
+          "pane": "matches",
+          "controlsRendered": 32
+        },
+        {
+          "section": "universities",
+          "pane": "outlook",
+          "controlsRendered": 0
+        },
+        {
+          "section": "universities",
+          "pane": "countries",
+          "controlsRendered": 17
+        },
+        {
+          "section": "scholarships",
+          "pane": "browse",
+          "controlsRendered": 17
+        },
+        {
+          "section": "scholarships",
+          "pane": "recommended",
+          "controlsRendered": 9
+        },
+        {
+          "section": "scholarships",
+          "pane": "opportunities",
+          "controlsRendered": 26
+        },
+        {
+          "section": "study-plan",
+          "pane": "plan",
+          "controlsRendered": 7
+        },
+        {
+          "section": "study-plan",
+          "pane": "tests",
+          "controlsRendered": 23
+        },
+        {
+          "section": "study-plan",
+          "pane": "tools",
+          "controlsRendered": 14
+        },
+        {
+          "section": "tasks",
+          "pane": "tasks",
+          "controlsRendered": 4
+        },
+        {
+          "section": "tasks",
+          "pane": "deadlines",
+          "controlsRendered": 5
+        },
+        {
+          "section": "profile",
+          "pane": "readiness",
+          "controlsRendered": 0
+        },
+        {
+          "section": "profile",
+          "pane": "goals",
+          "controlsRendered": 24
+        },
+        {
+          "section": "profile",
+          "pane": "activities",
+          "controlsRendered": 12
+        },
+        {
+          "section": "profile",
+          "pane": "stories",
+          "controlsRendered": 7
+        },
+        {
+          "section": "profile",
+          "pane": "similar",
+          "controlsRendered": 3
+        },
+        {
+          "section": "funding",
+          "pane": null
+        },
+        {
+          "section": "applications",
+          "pane": "tracker",
+          "controlsRendered": 13
+        },
+        {
+          "section": "applications",
+          "pane": "workspace",
+          "controlsRendered": 1
+        },
+        {
+          "section": "materials",
+          "pane": "requirements",
+          "controlsRendered": 4
+        },
+        {
+          "section": "materials",
+          "pane": "documents",
+          "controlsRendered": 22
+        },
+        {
+          "section": "materials",
+          "pane": "essays",
+          "controlsRendered": 4
+        },
+        {
+          "section": "materials",
+          "pane": "interviews",
+          "controlsRendered": 12
+        },
+        {
+          "section": "offers",
+          "pane": null
+        },
+        {
+          "section": "post-admission-funding",
+          "pane": null
+        },
+        {
+          "section": "visa",
+          "pane": "speaking",
+          "controlsRendered": 18
+        },
+        {
+          "section": "visa",
+          "pane": "visa",
+          "controlsRendered": 6
+        },
+        {
+          "section": "visa",
+          "pane": "apostille",
+          "controlsRendered": 5
+        },
+        {
+          "section": "visa",
+          "pane": "departure",
+          "controlsRendered": 2
+        },
+        {
+          "section": "guidance",
+          "pane": "mentor",
+          "controlsRendered": 8
+        },
+        {
+          "section": "guidance",
+          "pane": "consulting",
+          "controlsRendered": 6
+        },
+        {
+          "section": "guidance",
+          "pane": "faq",
+          "controlsRendered": 0
+        },
+        {
+          "section": "community",
+          "pane": "forum",
+          "controlsRendered": 5
+        },
+        {
+          "section": "community",
+          "pane": "courses",
+          "controlsRendered": 2
+        }
+      ],
+      "student-navigation-390": [
+        {
+          "section": "dashboard",
+          "pane": null
+        },
+        {
+          "section": "universities",
+          "pane": "search",
+          "controlsRendered": 21
+        },
+        {
+          "section": "universities",
+          "pane": "careers",
+          "controlsRendered": 3
+        },
+        {
+          "section": "universities",
+          "pane": "matches",
+          "controlsRendered": 32
+        },
+        {
+          "section": "universities",
+          "pane": "outlook",
+          "controlsRendered": 0
+        },
+        {
+          "section": "universities",
+          "pane": "countries",
+          "controlsRendered": 17
+        },
+        {
+          "section": "scholarships",
+          "pane": "browse",
+          "controlsRendered": 17
+        },
+        {
+          "section": "scholarships",
+          "pane": "recommended",
+          "controlsRendered": 9
+        },
+        {
+          "section": "scholarships",
+          "pane": "opportunities",
+          "controlsRendered": 26
+        },
+        {
+          "section": "study-plan",
+          "pane": "plan",
+          "controlsRendered": 7
+        },
+        {
+          "section": "study-plan",
+          "pane": "tests",
+          "controlsRendered": 23
+        },
+        {
+          "section": "study-plan",
+          "pane": "tools",
+          "controlsRendered": 14
+        },
+        {
+          "section": "tasks",
+          "pane": "tasks",
+          "controlsRendered": 4
+        },
+        {
+          "section": "tasks",
+          "pane": "deadlines",
+          "controlsRendered": 2
+        },
+        {
+          "section": "profile",
+          "pane": "readiness",
+          "controlsRendered": 0
+        },
+        {
+          "section": "profile",
+          "pane": "goals",
+          "controlsRendered": 24
+        },
+        {
+          "section": "profile",
+          "pane": "activities",
+          "controlsRendered": 12
+        },
+        {
+          "section": "profile",
+          "pane": "stories",
+          "controlsRendered": 7
+        },
+        {
+          "section": "profile",
+          "pane": "similar",
+          "controlsRendered": 3
+        },
+        {
+          "section": "funding",
+          "pane": null
+        },
+        {
+          "section": "applications",
+          "pane": "tracker",
+          "controlsRendered": 13
+        },
+        {
+          "section": "applications",
+          "pane": "workspace",
+          "controlsRendered": 1
+        },
+        {
+          "section": "materials",
+          "pane": "requirements",
+          "controlsRendered": 4
+        },
+        {
+          "section": "materials",
+          "pane": "documents",
+          "controlsRendered": 22
+        },
+        {
+          "section": "materials",
+          "pane": "essays",
+          "controlsRendered": 4
+        },
+        {
+          "section": "materials",
+          "pane": "interviews",
+          "controlsRendered": 12
+        },
+        {
+          "section": "offers",
+          "pane": null
+        },
+        {
+          "section": "post-admission-funding",
+          "pane": null
+        },
+        {
+          "section": "visa",
+          "pane": "speaking",
+          "controlsRendered": 18
+        },
+        {
+          "section": "visa",
+          "pane": "visa",
+          "controlsRendered": 6
+        },
+        {
+          "section": "visa",
+          "pane": "apostille",
+          "controlsRendered": 5
+        },
+        {
+          "section": "visa",
+          "pane": "departure",
+          "controlsRendered": 2
+        },
+        {
+          "section": "guidance",
+          "pane": "mentor",
+          "controlsRendered": 8
+        },
+        {
+          "section": "guidance",
+          "pane": "consulting",
+          "controlsRendered": 6
+        },
+        {
+          "section": "guidance",
+          "pane": "faq",
+          "controlsRendered": 0
+        },
+        {
+          "section": "community",
+          "pane": "forum",
+          "controlsRendered": 5
+        },
+        {
+          "section": "community",
+          "pane": "courses",
+          "controlsRendered": 2
+        }
+      ],
+      "admin-read-only-navigation": [
+        {
+          "section": "overview",
+          "label": "Overview"
+        },
+        {
+          "section": "analytics",
+          "label": "Analytics"
+        },
+        {
+          "section": "universities",
+          "label": "Universities"
+        },
+        {
+          "section": "scholarships",
+          "label": "Scholarships"
+        },
+        {
+          "section": "opportunities",
+          "label": "Opportunities"
+        },
+        {
+          "section": "courses",
+          "label": "Courses & videos"
+        },
+        {
+          "section": "verify",
+          "label": "Verification"
+        },
+        {
+          "section": "research",
+          "label": "Research agent"
+        },
+        {
+          "section": "refresh",
+          "label": "Data refresh"
+        },
+        {
+          "section": "stories",
+          "label": "Admission stories"
+        },
+        {
+          "section": "reports",
+          "label": "Forum reports"
+        },
+        {
+          "section": "consulting",
+          "label": "Consulting requests"
+        },
+        {
+          "section": "guide",
+          "label": "Guide & help"
+        },
+        {
+          "section": "goalLibrary",
+          "label": "Goal library"
+        },
+        {
+          "section": "vaultPrompts",
+          "label": "Answer Vault questions"
+        },
+        {
+          "section": "checklist",
+          "label": "Departure checklist"
+        },
+        {
+          "section": "navigation",
+          "label": "Sidebar sections"
+        },
+        {
+          "section": "premium",
+          "label": "Premium gifts"
+        },
+        {
+          "section": "config",
+          "label": "Settings"
+        },
+        {
+          "section": "ai",
+          "label": "AI settings"
+        },
+        {
+          "section": "audit",
+          "label": "Audit log"
+        },
+        {
+          "section": "telegram",
+          "label": "Telegram bot"
+        },
+        {
+          "section": "ownership",
+          "label": "Ownership"
+        },
+        {
+          "section": "channel",
+          "label": "Telegram channel"
+        },
+        {
+          "section": "accounts",
+          "label": "Accounts"
+        }
+      ],
+      "account-utility-buttons": [
+        "payments",
+        "notifications",
+        "rewards",
+        "parent"
+      ]
+    }
+  },
+  "api": {
+    "routeFiles": 157,
+    "handlers": 280,
+    "additionalDisposableFixtureProbes": 49,
+    "private2xxResponses": 0,
+    "remainingNonAuthClassifications": [
+      {
+        "method": "PUT",
+        "route": "/api/goals",
+        "status": 404,
+        "detail": "{\"error\":\"Goal not found\",\"code\":\"not_found\"}"
+      },
+      {
+        "method": "DELETE",
+        "route": "/api/goals",
+        "status": 404,
+        "detail": "{\"error\":\"Goal not found\",\"code\":\"not_found\"}"
+      },
+      {
+        "method": "GET",
+        "route": "/api/health/diagnostics",
+        "status": 404,
+        "detail": "{\"error\":\"Not found\"}"
+      },
+      {
+        "method": "DELETE",
+        "route": "/api/saved-programs",
+        "status": 404,
+        "detail": "{\"error\":\"Not found\"}"
+      }
+    ],
+    "limitation": "Plausible fixture probes do not prove all valid/adversarial payloads or every resource ownership case."
+  },
+  "schemaRepair": {
+    "status": "passed",
+    "assertions": 18,
+    "tables": 113,
+    "foreignKeyIdentities": 130,
+    "rlsTables": 113,
+    "preservesExistingRows": true
+  },
+  "quality": {
+    "typecheck": "passed",
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "i18n": "passed",
+    "productionBuild": "passed",
+    "designSystem": "passed",
+    "dependencyAudit": {
+      "critical": 0,
+      "high": 0,
+      "moderate": 19
+    },
+    "isolationAssertions": 15,
+    "auditSourceContractAssertions": 27,
+    "performance": {
+      "assertions": 9,
+      "landingUncompressedKb": 1269,
+      "shellUncompressedKb": 1025
+    }
+  },
+  "integrations": {
+    "provenance": "passed_disposable_stack",
+    "telegramChannel": {
+      "status": "passed_local_mock",
+      "assertions": 21
+    },
+    "seedCatalogueSourceChecks": "passed_no_live_catalogue_claim"
+  },
+  "broadBaseline": {
+    "originalChecks": 91,
+    "originalPassed": 86,
+    "latestPassed": 90,
+    "blocked": 1,
+    "checks": [
+      {
+        "name": "typecheck",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 40664,
+        "log": "test-results/full-audit/typecheck.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "check:i18n",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 958,
+        "log": "test-results/full-audit/check-i18n.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "lint:baseline",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 54328,
+        "log": "test-results/full-audit/lint-baseline.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "audit:check",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 32745,
+        "log": "test-results/full-audit/audit-check.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "audit:ui",
+        "status": "failed",
+        "exitCode": 1,
+        "durationMs": 1438,
+        "log": "test-results/full-audit/audit-ui.log",
+        "latest": {
+          "status": "passed_after_fix_or_isolated_prerequisite",
+          "log": "test-results/full-audit/ui-after.log"
+        }
+      },
+      {
+        "name": "test:plain-text",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 288,
+        "log": "test-results/full-audit/test-plain-text.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:ai-settings",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 1193,
+        "log": "test-results/full-audit/test-ai-settings.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:ai-format",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 558,
+        "log": "test-results/full-audit/test-ai-format.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:ai-cost",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 1287,
+        "log": "test-results/full-audit/test-ai-cost.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:stage3-performance",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 390,
+        "log": "test-results/full-audit/test-stage3-performance.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:groq",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 334,
+        "log": "test-results/full-audit/test-groq.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:schema",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 742,
+        "log": "test-results/full-audit/test-schema.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:security",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 1400,
+        "log": "test-results/full-audit/test-security.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:password-reset",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 437,
+        "log": "test-results/full-audit/test-password-reset.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:admin-accounts",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 518,
+        "log": "test-results/full-audit/test-admin-accounts.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:auth",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 525,
+        "log": "test-results/full-audit/test-auth.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:remote",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 2000,
+        "log": "test-results/full-audit/test-remote.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:auth-flow",
+        "status": "failed",
+        "exitCode": 1,
+        "durationMs": 148,
+        "log": "test-results/full-audit/test-auth-flow.log",
+        "latest": {
+          "status": "blocked_missing_packaged_standalone",
+          "reason": "The desktop auth script needs a separately prepared .next/standalone bundle; not certified by the website build."
+        }
+      },
+      {
+        "name": "test:localization",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 605,
+        "log": "test-results/full-audit/test-localization.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:catalogue-language",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 430,
+        "log": "test-results/full-audit/test-catalogue-language.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:catalogue-order",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 319,
+        "log": "test-results/full-audit/test-catalogue-order.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:deadline-day",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 333,
+        "log": "test-results/full-audit/test-deadline-day.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:opportunity-notes",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 343,
+        "log": "test-results/full-audit/test-opportunity-notes.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:university-prose",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 422,
+        "log": "test-results/full-audit/test-university-prose.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:university-rank",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 392,
+        "log": "test-results/full-audit/test-university-rank.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:university-hub",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 399,
+        "log": "test-results/full-audit/test-university-hub.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:university-list",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 404,
+        "log": "test-results/full-audit/test-university-list.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:landing-ranks",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 780,
+        "log": "test-results/full-audit/test-landing-ranks.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:qs-benchmarks",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 409,
+        "log": "test-results/full-audit/test-qs-benchmarks.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:university-rank-year",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 290,
+        "log": "test-results/full-audit/test-university-rank-year.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:university-costs",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 322,
+        "log": "test-results/full-audit/test-university-costs.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:qs-catalogue-ranks",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 378,
+        "log": "test-results/full-audit/test-qs-catalogue-ranks.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:country-facts",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 349,
+        "log": "test-results/full-audit/test-country-facts.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:match",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 415,
+        "log": "test-results/full-audit/test-match.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:ranking",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 405,
+        "log": "test-results/full-audit/test-ranking.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:scholarship-degrees",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 408,
+        "log": "test-results/full-audit/test-scholarship-degrees.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:catalog-evidence",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 359,
+        "log": "test-results/full-audit/test-catalog-evidence.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:catalogue-migrations",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 1022,
+        "log": "test-results/full-audit/test-catalogue-migrations.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:chancing",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 615,
+        "log": "test-results/full-audit/test-chancing.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:roadmap",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 359,
+        "log": "test-results/full-audit/test-roadmap.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:documents",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 303,
+        "log": "test-results/full-audit/test-documents.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:essays",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 523,
+        "log": "test-results/full-audit/test-essays.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:visa",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 725,
+        "log": "test-results/full-audit/test-visa.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:visa-render",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 1018,
+        "log": "test-results/full-audit/test-visa-render.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:samples",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 564,
+        "log": "test-results/full-audit/test-samples.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:costs",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 330,
+        "log": "test-results/full-audit/test-costs.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:video",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 540,
+        "log": "test-results/full-audit/test-video.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:cv",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 394,
+        "log": "test-results/full-audit/test-cv.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:compare",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 349,
+        "log": "test-results/full-audit/test-compare.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:mentors",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 361,
+        "log": "test-results/full-audit/test-mentors.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:parent",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 290,
+        "log": "test-results/full-audit/test-parent.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:dataset",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 344,
+        "log": "test-results/full-audit/test-dataset.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:render",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 2677,
+        "log": "test-results/full-audit/test-render.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:essay-adapter",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 334,
+        "log": "test-results/full-audit/test-essay-adapter.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:rec-letter",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 302,
+        "log": "test-results/full-audit/test-rec-letter.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:country-compare",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 357,
+        "log": "test-results/full-audit/test-country-compare.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:panel-placement",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 310,
+        "log": "test-results/full-audit/test-panel-placement.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:countries",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 379,
+        "log": "test-results/full-audit/test-countries.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:opportunities",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 412,
+        "log": "test-results/full-audit/test-opportunities.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:essay-reviews",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 288,
+        "log": "test-results/full-audit/test-essay-reviews.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:integration",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 8127,
+        "log": "test-results/full-audit/test-integration.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:dashboard-cache",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 275,
+        "log": "test-results/full-audit/test-dashboard-cache.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:growth",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 574,
+        "log": "test-results/full-audit/test-growth.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:telegram",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 451,
+        "log": "test-results/full-audit/test-telegram.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:telegram-integration",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 10013,
+        "log": "test-results/full-audit/test-telegram-integration.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:channel",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 807,
+        "log": "test-results/full-audit/test-channel.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:ownership",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 5468,
+        "log": "test-results/full-audit/test-ownership.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:portability",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 3984,
+        "log": "test-results/full-audit/test-portability.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:deploy",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 298,
+        "log": "test-results/full-audit/test-deploy.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:journey",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 446,
+        "log": "test-results/full-audit/test-journey.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:differentiators",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 499,
+        "log": "test-results/full-audit/test-differentiators.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:dark",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 3051,
+        "log": "test-results/full-audit/test-dark.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:schema-repair",
+        "status": "failed",
+        "exitCode": 1,
+        "durationMs": 1828,
+        "log": "test-results/full-audit/test-schema-repair.log",
+        "latest": {
+          "status": "passed_after_fix_or_isolated_prerequisite",
+          "log": "test-results/full-audit/schema-repair-after.log"
+        }
+      },
+      {
+        "name": "test:provenance",
+        "status": "failed",
+        "exitCode": 1,
+        "durationMs": 367,
+        "log": "test-results/full-audit/test-provenance.log",
+        "latest": {
+          "status": "passed_after_fix_or_isolated_prerequisite",
+          "log": "test-results/full-audit/stack-integration-final.log"
+        }
+      },
+      {
+        "name": "test:recommend",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 3485,
+        "log": "test-results/full-audit/test-recommend.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:study-interests",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 334,
+        "log": "test-results/full-audit/test-study-interests.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:referral",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 3378,
+        "log": "test-results/full-audit/test-referral.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:payments",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 3321,
+        "log": "test-results/full-audit/test-payments.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:career-discovery",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 388,
+        "log": "test-results/full-audit/test-career-discovery.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:arrival",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 330,
+        "log": "test-results/full-audit/test-arrival.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:calculations",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 289,
+        "log": "test-results/full-audit/test-calculations.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:streak",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 314,
+        "log": "test-results/full-audit/test-streak.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:responsive",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 171,
+        "log": "test-results/full-audit/test-responsive.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:ux",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 426,
+        "log": "test-results/full-audit/test-ux.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:schema-apply-safety",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 581,
+        "log": "test-results/full-audit/test-schema-apply-safety.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:stage7-seed-safety",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 116,
+        "log": "test-results/full-audit/test-stage7-seed-safety.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:task-sync",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 120,
+        "log": "test-results/full-audit/test-task-sync.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:channel-e2e",
+        "status": "failed",
+        "exitCode": 1,
+        "durationMs": 925,
+        "log": "test-results/full-audit/test-channel-e2e.log",
+        "latest": {
+          "status": "passed_after_fix_or_isolated_prerequisite",
+          "log": "test-results/full-audit/stack-integration-final.log"
+        }
+      },
+      {
+        "name": "test:official-source-review",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 1341,
+        "log": "test-results/full-audit/test-official-source-review.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:document-coverage",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 1083,
+        "log": "test-results/full-audit/test-document-coverage.log",
+        "latest": {
+          "status": "passed"
+        }
+      },
+      {
+        "name": "test:source-followup",
+        "status": "passed",
+        "exitCode": 0,
+        "durationMs": 1073,
+        "log": "test-results/full-audit/test-source-followup.log",
+        "latest": {
+          "status": "passed"
+        }
+      }
+    ],
+    "originalDeferred": [
+      "test:desktop-app",
+      "test:api-security",
+      "test:api-security:isolated",
+      "test:e2e",
+      "test:perf",
+      "test:seed-catalog",
+      "test:duplicates",
+      "test:deadlines",
+      "test:scholarship-detail"
+    ]
+  },
+  "notCertified": [
+    "Every control inside every mounted pane",
+    "Live payments, paid AI answers, external delivery and production cron/publishing",
+    "Administrative write/delete/reset/send actions during read-only traversal",
+    "Production catalogue duplicate/deadline/scholarship-detail integrity",
+    "All authoritative source facts and legal translations",
+    "Packaged desktop/native wrappers and every account/device/accessibility combination",
+    "Remote GitHub CI or deployment"
+  ],
+  "localLogDirectory": "test-results/full-audit (ignored; not a committed artefact)",
+  "report": "docs/SITE_AUDIT_2026-11-04.md"
+}

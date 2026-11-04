@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import {
@@ -21,7 +22,9 @@ import { NOTIFY_TEXTS } from "@/lib/notificationTexts";
  */
 export async function POST(req: Request) {
   try {
-    const { profileId } = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const { profileId } = boundedJson.body;
     if (!profileId) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }

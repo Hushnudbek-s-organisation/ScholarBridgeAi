@@ -24,6 +24,7 @@
  * limit and a genuine typo need four different next steps.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/Button";
 import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
@@ -62,11 +63,11 @@ interface Account {
 }
 
 const inputCls =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-200";
+  "min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200";
 const btnDark =
-  "flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50";
+  "min-h-11 flex items-center justify-center gap-1.5 rounded-control bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-700 disabled:opacity-50";
 const btnLight =
-  "flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50";
+  "min-h-11 flex items-center justify-center gap-1.5 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50";
 
 type Result =
   | { kind: "link"; link: string; expiresAt: string }
@@ -330,21 +331,21 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
   return (
     <div className="space-y-4">
       {/* Why there is no "show password" button — said once, in place. */}
-      <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-[11px] leading-relaxed text-sky-900">
+      <div className="flex items-start gap-2 rounded-surface border border-sky-200 bg-sky-50 p-3 text-sm leading-relaxed text-sky-900">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
         <p>{t("whyNoPassword")}</p>
       </div>
 
       {/* The operator's own way out: replace the password they cannot recall. */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+      <div className="rounded-surface border border-slate-200 bg-white p-4 shadow-xs">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs font-bold text-slate-800">{t("selfTitle")}</p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
+            <p className="text-sm font-bold text-slate-800">{t("selfTitle")}</p>
+            <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
               {viewer ? t("selfBody", { email: viewer.email }) : t("selfBodyNoViewer")}
             </p>
           </div>
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => {
               setSelfOpen((open) => !open);
@@ -355,27 +356,27 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
           >
             <KeyRound className="h-3.5 w-3.5" />
             {selfOpen ? t("selfCancel") : t("selfOpen")}
-          </button>
+          </Button>
         </div>
 
         {selfDone && (
-          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-            <p className="text-[11px] font-bold text-emerald-900">{t("selfDoneTitle")}</p>
+          <div className="mt-3 rounded-control border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-sm font-bold text-emerald-900">{t("selfDoneTitle")}</p>
             <div className="mt-1.5 flex items-start gap-2">
-              <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-2 py-1.5 text-xs font-bold tracking-wide text-slate-800">
+              <code className="min-w-0 flex-1 break-all rounded-control bg-white px-2 py-1.5 text-sm font-bold tracking-wide text-slate-800">
                 {selfDone}
               </code>
-              <button type="button" onClick={() => void copy(selfDone)} className={btnLight}>
+              <Button variant="unstyled" type="button" onClick={() => void copy(selfDone)} className={btnLight}>
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? t("copied") : t("copy")}
-              </button>
+              </Button>
             </div>
-            <p className="mt-1.5 text-[10px] leading-relaxed text-emerald-800">{t("selfDoneBody")}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-emerald-800">{t("selfDoneBody")}</p>
           </div>
         )}
 
         {selfOpen && (
-          <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+          <div className="mt-3 space-y-2 rounded-control border border-slate-200 bg-slate-50/60 p-3">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <input
                 type="password"
@@ -397,7 +398,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button variant="unstyled"
                 type="button"
                 disabled={selfBusy || selfPw.length < 8 || selfPw !== selfPw2}
                 onClick={() => void changeOwnPassword(false)}
@@ -405,8 +406,8 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
               >
                 {selfBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                 {t("selfSave")}
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 type="button"
                 disabled={selfBusy}
                 onClick={() => void changeOwnPassword(true)}
@@ -414,11 +415,11 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
               >
                 {selfBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
                 {t("selfGenerate")}
-              </button>
-              <span className="text-[10px] text-slate-500">{t("selfPolicy")}</span>
+              </Button>
+              <span className="text-sm text-slate-500">{t("selfPolicy")}</span>
             </div>
             {selfError && (
-              <p role="alert" className="text-[11px] font-semibold text-red-700">
+              <p role="alert" className="text-sm font-semibold text-rose-700">
                 {selfError}
               </p>
             )}
@@ -426,9 +427,9 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
         )}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+      <div className="rounded-surface border border-slate-200 bg-white p-4 shadow-xs">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             type="search"
             value={q}
@@ -439,24 +440,24 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
           />
         </div>
         {showErrorBanner && (
-          <div role="alert" className="mt-2 flex items-start gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+          <div role="alert" className="mt-2 flex items-start gap-1.5 rounded-control border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {loading ? (
-          <p className="p-6 text-center text-xs font-semibold text-slate-400">
+          <p className="p-6 text-center text-sm font-semibold text-slate-500">
             <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
             {t("loading")}
           </p>
         ) : accounts.length === 0 ? (
-          <p className="p-6 text-center text-xs font-semibold text-slate-400">{t("empty")}</p>
+          <p className="p-6 text-center text-sm font-semibold text-slate-500">{t("empty")}</p>
         ) : (
           <ul className="mt-3 divide-y divide-slate-100">
             {accounts.map((a) => (
               <li key={a.id}>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => {
                     setSelected(a);
@@ -466,19 +467,19 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                     setAdminPassword("");
                     setTypedPassword("");
                   }}
-                  className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-2 py-2.5 text-left text-xs transition-colors hover:bg-slate-50 ${
+                  className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-control px-2 py-2.5 text-left text-sm transition-colors hover:bg-slate-50 ${
                     selected?.id === a.id ? "bg-indigo-50/60" : ""
                   }`}
                 >
-                  <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
+                  <UserRound className="h-4 w-4 shrink-0 text-slate-500" />
                   <span className="font-bold text-slate-800">{a.name}</span>
                   <span className="truncate text-slate-500">{a.email}</span>
                   {a.isAdmin && (
-                    <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                    <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-sm font-bold text-indigo-700">
                       {t("adminBadge")}
                     </span>
                   )}
-                  <span className="ml-auto flex shrink-0 items-center gap-2 text-[10px] font-semibold">
+                  <span className="ml-auto flex shrink-0 items-center gap-2 text-sm font-semibold">
                     <span className={a.hasPassword ? "text-emerald-700" : "text-amber-700"}>
                       {a.hasPassword ? t("hasPassword") : t("noPassword")}
                     </span>
@@ -490,7 +491,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                     )}
                     {a.telegram && <span className="text-sky-600">Telegram</span>}
                   </span>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -498,33 +499,33 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
       </div>
 
       {selected && (
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+        <div className="space-y-4 rounded-surface border border-slate-200 bg-white p-4 shadow-xs">
           <div>
             <h3 className="text-sm font-extrabold text-slate-800">{selected.name}</h3>
-            <p className="text-xs text-slate-500">{selected.email}</p>
+            <p className="text-sm text-slate-500">{selected.email}</p>
           </div>
 
-          <dl className="grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
-            <div className="rounded-xl bg-slate-50 px-2.5 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("passwordSetAt")}</dt>
+          <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+            <div className="rounded-control bg-slate-50 px-2.5 py-2">
+              <dt className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("passwordSetAt")}</dt>
               <dd className="mt-0.5 font-semibold text-slate-700">{when(selected.passwordChangedAt)}</dd>
             </div>
-            <div className="rounded-xl bg-slate-50 px-2.5 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("sessions")}</dt>
+            <div className="rounded-control bg-slate-50 px-2.5 py-2">
+              <dt className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("sessions")}</dt>
               <dd className="mt-0.5 font-semibold text-slate-700">{selected.liveSessions}</dd>
             </div>
-            <div className="rounded-xl bg-slate-50 px-2.5 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("lastSeen")}</dt>
+            <div className="rounded-control bg-slate-50 px-2.5 py-2">
+              <dt className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("lastSeen")}</dt>
               <dd className="mt-0.5 font-semibold text-slate-700">{when(selected.lastSeenAt)}</dd>
             </div>
-            <div className="rounded-xl bg-slate-50 px-2.5 py-2">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{t("createdAt")}</dt>
+            <div className="rounded-control bg-slate-50 px-2.5 py-2">
+              <dt className="text-sm font-bold uppercase tracking-wide text-slate-500">{t("createdAt")}</dt>
               <dd className="mt-0.5 font-semibold text-slate-700">{when(selected.createdAt)}</dd>
             </div>
           </dl>
 
           <div>
-            <label htmlFor="admin-reauth" className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            <label htmlFor="admin-reauth" className="mb-1 block text-sm font-bold uppercase tracking-wide text-slate-500">
               {t("yourPassword")}
             </label>
             <input
@@ -537,13 +538,13 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
               className={inputCls}
             />
             {/* WHOSE password this is. The field is useless until it says so. */}
-            <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+            <p className="mt-1 text-sm leading-relaxed text-slate-500">
               {viewer
                 ? t("yourPasswordWhose", { email: viewer.email, when: when(viewer.passwordChangedAt) })
                 : t("yourPasswordHint")}
             </p>
             {ownPasswordProblem && (
-              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+              <div className="mt-2 rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-900">
                 <p className="font-bold">
                   {ownPasswordProblem === "legacy"
                     ? t("viewerLegacyTitle")
@@ -560,7 +561,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {/* The fix belongs where the failure happened, not two screens away. */}
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     onClick={() => {
                       setSelfOpen(true);
@@ -570,12 +571,12 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                   >
                     <KeyRound className="h-3.5 w-3.5" />
                     {t("selfOpen")}
-                  </button>
+                  </Button>
                   {onOpenProfileEditor && (
-                    <button type="button" onClick={onOpenProfileEditor} className={btnLight}>
+                    <Button variant="unstyled" type="button" onClick={onOpenProfileEditor} className={btnLight}>
                       <UserRound className="h-3.5 w-3.5" />
                       {t("openProfile")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -583,13 +584,13 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
           </div>
 
           {/* 1. reset link — the path that works with email down */}
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+          <div className="rounded-control border border-indigo-100 bg-indigo-50/50 p-3">
             <div className="flex items-start gap-2">
               <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-slate-800">{t("linkTitle")}</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">{t("linkBody")}</p>
-                <button
+                <p className="text-sm font-bold text-slate-800">{t("linkTitle")}</p>
+                <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{t("linkBody")}</p>
+                <Button variant="unstyled"
                   type="button"
                   disabled={!!busy || !adminPassword}
                   onClick={() => void createLink()}
@@ -597,18 +598,18 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                 >
                   {busy === "link" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
                   {t("linkBtn")}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
 
           {/* 2. temporary password */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+          <div className="rounded-control border border-slate-200 bg-slate-50/60 p-3">
             <div className="flex items-start gap-2">
               <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-slate-800">{t("passwordTitle")}</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">{t("passwordBody")}</p>
+                <p className="text-sm font-bold text-slate-800">{t("passwordTitle")}</p>
+                <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{t("passwordBody")}</p>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto]">
                   <input
                     type="text"
@@ -619,7 +620,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                     className={inputCls}
                     autoComplete="new-password"
                   />
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     disabled={!!busy || !adminPassword || typedPassword.length < 8}
                     onClick={() => void setPassword(false)}
@@ -627,8 +628,8 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                   >
                     {busy === "set" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
                     {t("setBtn")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="unstyled"
                     type="button"
                     disabled={!!busy || !adminPassword}
                     onClick={() => void setPassword(true)}
@@ -636,7 +637,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                   >
                     {busy === "generate" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                     {t("generateBtn")}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -644,37 +645,37 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
 
           {/* The one-time result */}
           {result?.kind === "link" && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-              <p className="text-[11px] font-bold text-emerald-900">{t("linkReady")}</p>
+            <div className="rounded-control border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-sm font-bold text-emerald-900">{t("linkReady")}</p>
               <div className="mt-1.5 flex items-start gap-2">
-                <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-2 py-1.5 text-[10px] leading-relaxed text-slate-700">
+                <code className="min-w-0 flex-1 break-all rounded-control bg-white px-2 py-1.5 text-sm leading-relaxed text-slate-700">
                   {result.link}
                 </code>
-                <button type="button" onClick={() => void copy(result.link)} className={btnLight}>
+                <Button variant="unstyled" type="button" onClick={() => void copy(result.link)} className={btnLight}>
                   {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   {copied ? t("copied") : t("copy")}
-                </button>
+                </Button>
               </div>
-              <p className="mt-1.5 text-[10px] text-emerald-800">
+              <p className="mt-1.5 text-sm text-emerald-800">
                 {t("linkExpiry", { when: when(result.expiresAt) })}
               </p>
             </div>
           )}
           {result?.kind === "password" && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <p className="text-[11px] font-bold text-amber-900">{t("passwordReady", { email: result.email })}</p>
+            <div className="rounded-control border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm font-bold text-amber-900">{t("passwordReady", { email: result.email })}</p>
               {result.password && (
                 <div className="mt-1.5 flex items-center gap-2">
-                  <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-2 py-1.5 text-xs font-bold tracking-wide text-slate-800">
+                  <code className="min-w-0 flex-1 break-all rounded-control bg-white px-2 py-1.5 text-sm font-bold tracking-wide text-slate-800">
                     {result.password}
                   </code>
-                  <button type="button" onClick={() => void copy(result.password!)} className={btnLight}>
+                  <Button variant="unstyled" type="button" onClick={() => void copy(result.password!)} className={btnLight}>
                     {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                     {copied ? t("copied") : t("copy")}
-                  </button>
+                  </Button>
                 </div>
               )}
-              <p className="mt-1.5 text-[10px] leading-relaxed text-amber-800">{t("passwordShownOnce")}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-amber-800">{t("passwordShownOnce")}</p>
             </div>
           )}
         </div>

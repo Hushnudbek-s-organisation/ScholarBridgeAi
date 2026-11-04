@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
@@ -182,7 +183,9 @@ export async function GET(req: Request) {
 /** POST: add a custom document. */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const profileId = Number(body.profileId);
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
@@ -231,7 +234,9 @@ export async function POST(req: Request) {
 /** PATCH: update document status (uploaded/missing/not_required) or fileUrl. */
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const id = Number(body.id);
     if (!id) {
       return privateNoStoreJson({ error: "document id is required" }, { status: 400 });

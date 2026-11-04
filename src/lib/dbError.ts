@@ -10,6 +10,9 @@
  */
 
 const CODES = [
+  "08000", "08001", "08003", "08004", "08006", "08007", "08P01",
+  "57014", // statement timeout/cancellation: temporary, not invalid credentials
+  "55P03", // bounded lock wait
   "ENOTFOUND",
   "EAI_AGAIN",
   "ECONNREFUSED",
@@ -31,7 +34,7 @@ const CODES = [
 
 function findCode(err: unknown, depth = 0): string {
   if (err == null || depth > 3) return "";
-  const e = err as { code?: unknown; errno?: unknown; cause?: unknown; message?: unknown };
+  const e = err as { code?: unknown; errno?: unknown; cause?: unknown; message?: unknown; errors?: unknown };
   for (const candidate of [e.code, e.errno]) {
     if (typeof candidate === "string" && CODES.includes(candidate as (typeof CODES)[number])) return candidate;
   }
@@ -40,7 +43,10 @@ function findCode(err: unknown, depth = 0): string {
     if (message.includes(code)) return code;
   }
   if (/getaddrinfo/i.test(message)) return "ENOTFOUND";
-  if (/timeout/i.test(message)) return "ETIMEDOUT";
+  if (/timeout|connection (?:terminated|closed)|socket hang up/i.test(message)) return "ETIMEDOUT";
+  if (Array.isArray(e.errors)) {
+    for (const inner of e.errors) { const code = findCode(inner, depth + 1); if (code) return code; }
+  }
   if (e.cause && typeof e.cause === "object") return findCode(e.cause, depth + 1);
   return "";
 }

@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import { join } from "node:path";
 import type { FullConfig } from "@playwright/test";
 import globalSetup from "../e2e/global-setup";
+import { isolatedServiceEnvironment } from "../e2e/isolated-env";
 
 function freeLoopbackPort(): Promise<number> {
   return new Promise((resolvePromise, reject) => {
@@ -27,14 +28,11 @@ async function main() {
   const cleanup = await globalSetup({} as FullConfig);
   try {
     const env: Record<string, string | undefined> = {
-      ...process.env,
+      ...isolatedServiceEnvironment(process.env, process.cwd()),
+      API_AUDIT_DISPOSABLE: "1",
+      DATABASE_URL: process.env.E2E_DATABASE_URL,
       API_BASE_URL: `http://127.0.0.1:${appPort}`,
     };
-    for (const key of Object.keys(env)) {
-      if (/(API_KEY|APIKEY|OPENROUTER|OPENAI|ANTHROPIC|GEMINI|GOOGLE_GENERATIVE|GROQ|MISTRAL|DEEPSEEK|COHERE|XAI|AI_PROVIDER|TELEGRAM_BOT_TOKEN|PAYME|CLICK_SECRET)/i.test(key)) {
-        delete env[key];
-      }
-    }
     const result = spawnSync(process.execPath, [join(process.cwd(), "node_modules/tsx/dist/cli.mjs"), "scripts/check-api-anonymous.ts"], {
       cwd: process.cwd(),
       env: env as NodeJS.ProcessEnv,

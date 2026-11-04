@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -57,12 +58,9 @@ export async function POST(req: Request) {
     const locked = await premiumGate(access.session.profile.id, "ai_essay");
     if (locked) return locked;
     const profileId = access.targetId!;
-    let body: Record<string, any>;
-    try {
-      body = await req.json();
-    } catch {
-      body = {};
-    }
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
 
     const rows = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
     const row = rows[0];

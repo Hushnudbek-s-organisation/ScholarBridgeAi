@@ -263,10 +263,11 @@ export async function POST(req: Request) {
 
     let token: { name?: string };
     try {
-      const client = new GoogleGenAI({ apiKey, apiVersion });
+      const client = new GoogleGenAI({ apiKey, apiVersion, httpOptions: { timeout: 15_000 } });
       token = await client.authTokens.create({
         config: {
-          httpOptions: { apiVersion },
+          httpOptions: { apiVersion, timeout: 15_000, retryOptions: { attempts: 1 } },
+          abortSignal: AbortSignal.any([req.signal, AbortSignal.timeout(15_000)]),
           uses: 1,
           expireTime,
           newSessionExpireTime,

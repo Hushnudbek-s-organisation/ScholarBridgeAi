@@ -66,7 +66,7 @@ test("public university catalogue searches and filters real seeded records", asy
   await expect(page.getByText(fixtures.unverifiedUniversityName, { exact: true })).toBeVisible();
   await search.fill("");
   const country = page.getByRole("combobox", { name: /all destinations/i });
-  await country.selectOption({ label: "Germany" });
+  await country.selectOption("Germany");
   await expect(page.getByText(fixtures.verifiedUniversityName, { exact: true })).toBeVisible();
   await expect(page.getByText(fixtures.unverifiedUniversityName, { exact: true })).toHaveCount(0);
 });
@@ -90,7 +90,7 @@ test("authenticated dashboard and saved scholarship/deadline state are profile-s
   expect(foreignSaved.status).toBe(403);
 
   await page.evaluate(() => { window.location.hash = "#deadlines"; });
-  await expect(page.getByText(fixtures.scholarshipTitle, { exact: true })).toBeVisible();
+  await expect(page.getByRole("article").getByText(fixtures.scholarshipTitle, { exact: true })).toBeVisible();
   await expect(page.getByText("Date not verified — check the source", { exact: true })).toBeVisible();
 });
 

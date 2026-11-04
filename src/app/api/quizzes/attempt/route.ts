@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
@@ -10,7 +11,9 @@ import { percentage } from "@/lib/calculations";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const { quizId, profileId, answers } = body;
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {

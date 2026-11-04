@@ -32,7 +32,9 @@ export function CertificateVerifyView({ code }: { code: string }) {
   // performs no synchronous setState).
   useEffect(() => {
     let cancelled = false;
-    const clean = decodeURIComponent(code).trim();
+    // Next has already decoded the route param. A second decode throws for
+    // ordinary literal percent signs, leaving the page stuck on Loading.
+    const clean = code.trim();
     fetch(`/api/certificates/verify?code=${encodeURIComponent(clean)}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));

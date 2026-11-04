@@ -390,7 +390,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
             })}
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-1.5">
+        <div className="flex max-w-full shrink-0 flex-wrap gap-1.5">
           <span className="rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
             {t("counts.deadlines", { count: timeline.counts.deadlines })}
           </span>
@@ -540,7 +540,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                       )}
                     </div>
 
-                    <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                    <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1.5">
                       <Button variant="unstyled"
                         type="button"
                         onClick={() => void syncPlan(plan)}

@@ -2,12 +2,31 @@
  * Fetching with retries, caching, same-domain protection and PDF handling
  * (spec §3D, §18, §21, §23).
  */
+import { BodyLimitError, cancelBody, readBoundedBytes } from "@/lib/boundedBody";
 import { AGENT_CONFIG } from "./config";
 import { isSameDomain } from "./domain";
 import { isResearchContentType } from "./urlFilter";
 import { unsafeOutboundReason } from "@/lib/ssrf";
 
-const cache = new Map<string, { html: string; at: number }>();
+const cache = new Map<string, { html: string; at: number; bytes: number }>();
+const inFlight = new Map<string, Promise<string | null>>();
+const MAX_PAGE_BYTES = 2 * 1024 * 1024;
+const MAX_CACHE_BYTES = 8 * 1024 * 1024;
+let cacheBytes = 0;
+class UnsafeFetchError extends Error {}
+
+function storePage(url: string, html: string) {
+  const old = cache.get(url);
+  if (old) cacheBytes -= old.bytes;
+  cache.delete(url);
+  const bytes = Buffer.byteLength(html, "utf8");
+  cache.set(url, { html, at: Date.now(), bytes }); cacheBytes += bytes;
+  while (cache.size > 64 || cacheBytes > MAX_CACHE_BYTES) {
+    const first = cache.keys().next().value;
+    if (first === undefined) break;
+    cacheBytes -= cache.get(first)!.bytes; cache.delete(first);
+  }
+}
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /** Redirect statuses the agent will follow manually. */
@@ -30,10 +49,14 @@ const MAX_REDIRECTS = 5;
  */
 export async function fetchGuarded(url: string, init: RequestInit): Promise<Response> {
   let current = url;
+  let options = { ...init, headers: new Headers(init.headers) };
+  const initialUnsafe = unsafeOutboundReason(current);
+  if (initialUnsafe) throw new UnsafeFetchError(`refusing to fetch ${current}: ${initialUnsafe}`);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const res = await fetch(current, { ...init, redirect: "manual" });
+    const res = await fetch(current, { ...options, redirect: "manual" });
     if (!REDIRECT_STATUSES.has(res.status)) return res;
 
+    cancelBody(res.body); // even a redirect may stream forever
     const location = res.headers.get("location");
     if (!location) throw new Error(`HTTP ${res.status} without a Location header`);
 
@@ -48,7 +71,12 @@ export async function fetchGuarded(url: string, init: RequestInit): Promise<Resp
     if (unsafe) {
       // Deliberately not a retryable error message: the target is refused, so
       // retrying the same chain would only repeat the refusal.
-      throw new Error(`refusing to follow redirect to ${next}: ${unsafe}`);
+      throw new UnsafeFetchError(`refusing to follow redirect to ${next}: ${unsafe}`);
+    }
+    if (new URL(current).origin !== new URL(next).origin) {
+      const headers = new Headers(options.headers);
+      for (const name of ["authorization", "cookie", "proxy-authorization", "host"]) headers.delete(name);
+      options = { ...options, headers };
     }
     current = next;
   }
@@ -67,40 +95,48 @@ export async function fetchPageText(url: string): Promise<string | null> {
   }
 
   const cached = cache.get(url);
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.html;
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    cache.delete(url); cache.set(url, cached);
+    return cached.html;
+  }
+  if (cached) { cache.delete(url); cacheBytes -= cached.bytes; }
+  const pending = inFlight.get(url);
+  if (pending) return pending;
+  // Bounded concurrent crawls: don't let one admin batch exhaust the app heap.
+  if (inFlight.size >= 8) return null;
+  const run = loadPage(url).finally(() => { inFlight.delete(url); });
+  inFlight.set(url, run);
+  return run;
+}
 
+async function loadPage(url: string): Promise<string | null> {
   for (let attempt = 0; attempt <= AGENT_CONFIG.retries; attempt++) {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), AGENT_CONFIG.timeoutMs);
+      const signal = AbortSignal.timeout(AGENT_CONFIG.timeoutMs);
       const res = await fetchGuarded(url, {
-        headers: { "User-Agent": AGENT_CONFIG.userAgent, Accept: "text/html,application/pdf,*/*" },
-        signal: controller.signal,
+        headers: { "User-Agent": AGENT_CONFIG.userAgent, Accept: "text/html,application/pdf,*/*" }, signal,
       });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
+      if (!res.ok) {
+        cancelBody(res.body);
+        // Permanent 4xx are not healed by repeating the same request.
+        if (res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status)) return null;
+        throw new Error(`HTTP ${res.status}`);
+      }
       const contentType = res.headers.get("content-type") || "";
-      // Only research pages are fetched: HTML, PDF, plain text. Fonts,
-      // stylesheets, scripts and images are never treated as pages.
-      if (!isResearchContentType(contentType)) {
-        console.warn(`[research-agent] skipped non-page content-type: ${contentType} (${url})`);
-        return null;
-      }
-      let text = "";
-      if (contentType.includes("application/pdf")) {
-        // PDF text extraction is not implemented in the MVP — mark as unparsed.
-        text = "";
-      } else {
-        text = await res.text();
-      }
-      // Strip scripts/styles to reduce noise.
+      if (!isResearchContentType(contentType)) { cancelBody(res.body); return null; }
+      // PDF extraction is still unsupported: don't download an unbounded PDF.
+      if (contentType.includes("application/pdf")) { cancelBody(res.body); return ""; }
+      const declared = Number(res.headers.get("content-length"));
+      if (Number.isFinite(declared) && declared > MAX_PAGE_BYTES) { cancelBody(res.body); return null; }
+      let text = new TextDecoder().decode(await readBoundedBytes(res.body, MAX_PAGE_BYTES, signal));
       text = text.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
-      cache.set(url, { html: text, at: Date.now() });
+      storePage(url, text);
       return text;
     } catch (err) {
-      console.warn(`[research-agent] fetch failed (${attempt}/${AGENT_CONFIG.retries}): ${url}`, err);
-      await sleep(600 * (attempt + 1));
+      if (err instanceof UnsafeFetchError || err instanceof BodyLimitError) return null;
+      // Metadata only: upstream errors/URLs may contain access tokens.
+      console.warn(`[research-agent] fetch failed (${attempt + 1}/${AGENT_CONFIG.retries + 1})`);
+      if (attempt < AGENT_CONFIG.retries) await sleep(600 * (attempt + 1));
     }
   }
   return null;
