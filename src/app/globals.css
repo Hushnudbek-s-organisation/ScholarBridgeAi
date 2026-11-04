@@ -21,10 +21,10 @@
       • `--sb-*` tokens name the four surface tiers, the text ramp and the
         field styles. Every pin below references them.
 
-          Tier 0  canvas          light #f8fafc   dark #090e1a
-          Tier 1  card / shell    light #ffffff   dark #111a2e
-          Tier 2  inner well      light #f1f5f9   dark #17233b
-          Tier 3  hover / control light #e2e8f0   dark #1f2f4d
+          Tier 0  canvas          light #f8fafc   dark #060a14
+          Tier 1  card / shell    light #ffffff   dark #0d1324
+          Tier 2  inner well      light #f1f5f9   dark #131c33
+          Tier 3  hover / control light #e2e8f0   dark #1a2644
 
    2. PINS (`@layer utilities` block)
       Some classes mean the OPPOSITE of the inverted ramp — `bg-white` is "a
@@ -84,21 +84,36 @@
   --color-cta-from: var(--sb-cta-from);
   --color-cta-via: var(--sb-cta-via);
   --color-cta-to: var(--sb-cta-to);
+  --shadow-glow: var(--sb-glow);
 }
 
 @theme inline {
   --font-sans: var(--font-inter-latin), var(--font-inter-cyrillic), ui-sans-serif, system-ui, sans-serif;
 }
 
-/*  Tokens — light ----------------------------------------------------------- */
+/*  Tokens — light + shared motion/type scale -------------------------------- */
 :root {
+  color-scheme: light;
+
+  /* Motion tokens */
+  --sb-duration-instant: 100ms;
+  --sb-duration-fast: 160ms;
+  --sb-duration-base: 240ms;
+  --sb-duration-slow: 400ms;
+  --sb-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --sb-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --sb-ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Surfaces & borders */
   --sb-canvas: #f8fafc;
   --sb-surface: #ffffff;
   --sb-well: #f1f5f9;
   --sb-control: #e2e8f0;
   --sb-border-subtle: #e2e8f0;
-  --sb-border: rgb(226 232 240 / 0.9);
+  --sb-border: rgb(226 232 240 / 0.92);
   --sb-border-strong: #cbd5e1;
+
+  /* Ink hierarchy */
   --sb-ink-display: #020617;
   --sb-ink-heading: #0f172a;
   --sb-ink-body: #1e293b;
@@ -106,7 +121,11 @@
   --sb-ink-muted: #475569;
   --sb-ink-dim: #475569;
   --sb-ink-faint: #64748b;
-  --sb-focus: #6366f1;
+
+  /* Brand, semantic status & soft glow */
+  --sb-focus: #4f46e5;
+  --sb-glow: 0 0 0 1px rgb(99 102 241 / 0.14), 0 10px 28px -8px rgb(79 70 229 / 0.18);
+  --sb-glow-button: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 4px 14px -4px rgb(79 70 229 / 0.35);
   --sb-on-accent: #ffffff;
   --sb-on-warm: #0f172a;
   --sb-status-neutral: #64748b;
@@ -121,10 +140,10 @@
   --sb-switch-knob: #ffffff;
   --sb-scrim-rgb: 15 23 42;
   --sb-primary: #4f46e5;
-  --sb-success: #10b981;
-  --sb-warning: #f59e0b;
+  --sb-success: #059669;
+  --sb-warning: #d97706;
   --sb-info: #2563eb;
-  --sb-danger: #f43f5e;
+  --sb-danger: #e11d48;
   --sb-violet: #7c3aed;
   --sb-hero-from: #12143a;
   --sb-hero-via: #1b1f5e;
@@ -135,75 +154,77 @@
   --sb-field-bg: #ffffff;
   --sb-field-border: #cbd5e1;
   --sb-field-border-hover: #94a3b8;
-  --sb-field-ring: rgb(99 102 241 / 0.16);
+  --sb-field-ring: rgb(79 70 229 / 0.16);
   --sb-field-disabled: #f1f5f9;
   --sb-field-placeholder: #64748b;
 }
 
-/*  Tokens — dark ------------------------------------------------------------ */
+/*  Tokens — dark (polished indigo, obsidian-blue 3-tier elevation) ---------- */
 .dark {
   color-scheme: dark;
 
-  /* Surface tiers (obsidian navy) */
-  --sb-canvas: #090e1a;          /* Tier 0 — app canvas                  */
-  --sb-surface: #111a2e;         /* Tier 1 — cards, sidebar, header      */
-  --sb-surface-rgb: 17 26 46;
-  --sb-surface-hero: #0c1324;    /* deliberately dark hero panels        */
-  --sb-surface-hero-rgb: 12 19 36;
-  --sb-well: #17233b;            /* Tier 2 — inner wells, chips, inputs  */
-  --sb-well-rgb: 23 35 59;
-  --sb-control: #1f2f4d;         /* Tier 3 — hover / selected control    */
-  --sb-control-rgb: 31 47 77;
-  --sb-control-strong: #26375a;
+  /* Surface tiers (deep blue-tinted obsidian) */
+  --sb-canvas: #060a14;          /* Tier 0 — app canvas                  */
+  --sb-surface: #0d1324;         /* Tier 1 — cards, sidebar, header      */
+  --sb-surface-rgb: 13 19 36;
+  --sb-surface-hero: #090e1d;    /* deliberately dark hero panels        */
+  --sb-surface-hero-rgb: 9 14 29;
+  --sb-well: #131c33;            /* Tier 2 — inner wells, chips, inputs  */
+  --sb-well-rgb: 19 28 51;
+  --sb-control: #1a2644;         /* Tier 3 — hover / selected control    */
+  --sb-control-rgb: 26 38 68;
+  --sb-control-strong: #223156;
   --sb-scrim-rgb: 2 6 23;        /* modal backdrops                      */
 
-  /* Hairlines */
-  --sb-border-subtle: #1b2842;
-  --sb-border: #24324f;
-  --sb-border-rgb: 36 50 79;
-  --sb-border-strong: #33425f;
-  --sb-border-stronger: #5b6b88; /* ≥3:1 on Tier 1 — checkbox outlines  */
+  /* Crisp 1px hairlines */
+  --sb-border-subtle: #162038;
+  --sb-border: #1f2d4d;
+  --sb-border-rgb: 31 45 77;
+  --sb-border-strong: #2d3f68;
+  --sb-border-stronger: #5c6f91; /* ≥3.3:1 on Tier 1 — checkbox outlines */
 
-  /* Text ramp — every step ≥ 4.5:1 on Tier 1 (#111a2e) and Tier 2 (#17233b) */
-  --sb-ink-display: #f8fafc;     /* 16.6:1 */
-  --sb-ink-heading: #f1f5f9;     /* 15.8:1 */
-  --sb-ink-body: #e2e8f0;        /* 14.1:1 */
-  --sb-ink-secondary: #cbd5e1;   /* 11.7:1 */
-  --sb-ink-muted: #94a3b8;       /*  6.8:1 */
-  --sb-ink-dim: #8496b3;         /*  5.8:1 */
-  --sb-ink-faint: #64748b;       /*  decorative icons only (3.6:1)     */
+  /* Text ramp — every step ≥ 4.5:1 on Tier 1 (#0d1324) and Tier 2 (#131c33) */
+  --sb-ink-display: #f8fafc;     /* 17.4:1 on Tier 1 */
+  --sb-ink-heading: #f1f5f9;     /* 16.5:1 on Tier 1 */
+  --sb-ink-body: #e2e8f0;        /* 14.6:1 on Tier 1 */
+  --sb-ink-secondary: #cbd5e1;   /* 12.1:1 on Tier 1 */
+  --sb-ink-muted: #94a3b8;       /*  7.1:1 on Tier 1 */
+  --sb-ink-dim: #8699b8;         /*  6.1:1 on Tier 1, 4.85:1 on Tier 3 */
+  --sb-ink-faint: #64748b;       /*  decorative icons only (3.8:1)     */
 
   /* Royal indigo for dark controls written as `bg-slate-900` */
   --sb-control-indigo: #3730a3;
   --sb-control-indigo-hover: #4338ca;
 
-  /* Fields */
-  --sb-focus: #6366f1;
+  /* Brand, semantic status, soft glow & fields */
+  --sb-focus: #818cf8;
+  --sb-glow: 0 0 0 1px rgb(129 140 248 / 0.24), 0 14px 36px -10px rgb(99 102 241 / 0.34);
+  --sb-glow-button: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 8px 22px -6px rgb(79 70 229 / 0.55);
   --sb-primary: #818cf8;
   --sb-success: #34d399;
   --sb-warning: #fbbf24;
   --sb-info: #60a5fa;
   --sb-danger: #fb7185;
   --sb-violet: #a78bfa;
-  --sb-hero-from: #0c1324;
-  --sb-hero-via: #151d4b;
-  --sb-hero-to: #243486;
-  --sb-cta-from: #0c1324;
-  --sb-cta-via: #171b47;
-  --sb-cta-to: #241d50;
-  --sb-field-bg: #0d1526;
-  --sb-field-border: #2a3a5c;
-  --sb-field-border-hover: #3b4f78;
-  --sb-field-ring: rgb(99 102 241 / 0.22);
-  --sb-field-disabled: #17233b;
-  --sb-field-placeholder: #8496b3;
+  --sb-hero-from: #090e1d;
+  --sb-hero-via: #121a44;
+  --sb-hero-to: #202f7a;
+  --sb-cta-from: #090e1d;
+  --sb-cta-via: #141942;
+  --sb-cta-to: #201a4a;
+  --sb-field-bg: #090f1d;
+  --sb-field-border: #243456;
+  --sb-field-border-hover: #364b78;
+  --sb-field-ring: rgb(129 140 248 / 0.26);
+  --sb-field-disabled: #131c33;
+  --sb-field-placeholder: #8699b8;
 
   /* Inverted neutral ramp */
-  --color-slate-50: #090e1a;   /* = Tier 0 canvas      */
-  --color-slate-100: #17233b;  /* = Tier 2 well        */
-  --color-slate-200: #24324f;  /* borders, tracks      */
-  --color-slate-300: #33425f;  /* strong borders       */
-  --color-slate-400: #8496b3;  /* captions             */
+  --color-slate-50: #060a14;   /* = Tier 0 canvas      */
+  --color-slate-100: #131c33;  /* = Tier 2 well        */
+  --color-slate-200: #1f2d4d;  /* 1px borders, tracks  */
+  --color-slate-300: #2d3f68;  /* strong borders       */
+  --color-slate-400: #8699b8;  /* captions             */
   --color-slate-500: #94a3b8;  /* metadata             */
   --color-slate-600: #cbd5e1;  /* secondary copy       */
   --color-slate-700: #e2e8f0;  /* body copy            */
@@ -644,23 +665,39 @@
     Premium page share it: a pale indigo wash on light, a deep indigo→violet on
     dark that sits WITH the obsidian palette instead of shouting over it.     */
 .sb-journey-hero {
-  background-image: linear-gradient(135deg, #eef2ff 0%, #ffffff 45%, #f0f9ff 100%);
-  border-color: rgb(199 210 254 / 0.7);
+  background-image: linear-gradient(135deg, #eef2ff 0%, #ffffff 48%, #f5f3ff 100%);
+  border-color: rgb(199 210 254 / 0.75);
 }
 .dark .sb-journey-hero {
-  background-image: linear-gradient(135deg, #131d3d 0%, #191741 55%, #1d1847 100%);
-  border-color: rgb(129 140 248 / 0.28);
+  background-image: linear-gradient(135deg, #0d1633 0%, #131336 58%, #18143b 100%);
+  border-color: rgb(129 140 248 / 0.26);
   box-shadow:
-    inset 0 1px 0 rgb(165 180 252 / 0.1),
-    0 12px 32px -18px rgb(49 46 129 / 0.9);
+    inset 0 1px 0 rgb(165 180 252 / 0.12),
+    0 14px 34px -18px rgb(49 46 129 / 0.75);
 }
-/* The aurora behind the hero is tuned for a light card; in dark mode it has to
-   be far dimmer or it turns the block into a glowing blob. */
+/* Zero-cost ambient depth on the dark root canvas (painted once, scroll-attached,
+   no fixed repaint or blur filter). */
+.dark .sb-canvas-bg {
+  background-image:
+    radial-gradient(ellipse 75% 420px at 50% -90px, rgb(79 70 229 / 0.11), transparent 70%),
+    radial-gradient(ellipse 45% 320px at 88% 36px, rgb(124 58 237 / 0.055), transparent 72%);
+  background-repeat: no-repeat;
+}
+/* Crisp 1px top specular highlight for dark Tier-1 cards & surfaces. */
+.dark .sb-surface-card {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.045),
+    0 4px 16px -6px rgb(2 6 23 / 0.55);
+}
+/* Luminous primary CTA depth in both themes without breaking solid indigo-600 contrast. */
+.sb-btn-primary {
+  box-shadow: var(--sb-glow-button);
+}
 .dark .sb-aurora {
-  opacity: 0.4;
+  opacity: 0.42;
 }
 .sb-journey-eyebrow { color: #4338ca; }
-.dark .sb-journey-eyebrow { color: #93a0f5; }
+.dark .sb-journey-eyebrow { color: #a5b4fc; }
 
 /* Branded modal/tool heroes share the same tokens instead of inventing a new
    indigo/blue/slate gradient per module. Solid fallback also keeps contrast
@@ -825,25 +862,25 @@ html.theme-transition *::after {
 .sb-skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: 0.5rem;
-  background-color: rgb(148 163 184 / 0.18);
+  border-radius: var(--radius-control);
+  background-color: rgb(148 163 184 / 0.16);
   background-image: linear-gradient(
     100deg,
     transparent 20%,
-    rgb(255 255 255 / 0.55) 50%,
+    rgb(255 255 255 / 0.58) 50%,
     transparent 80%
   );
   background-size: 220% 100%;
   background-repeat: no-repeat;
-  animation: sb-shimmer 1.5s ease-in-out infinite;
+  animation: sb-shimmer 1.6s ease-in-out infinite;
 }
 
 .dark .sb-skeleton {
-  background-color: rgb(148 163 184 / 0.12);
+  background-color: rgb(99 102 241 / 0.1);
   background-image: linear-gradient(
     100deg,
     transparent 20%,
-    rgb(255 255 255 / 0.09) 50%,
+    rgb(165 180 252 / 0.11) 50%,
     transparent 80%
   );
 }
@@ -861,7 +898,7 @@ html.theme-transition *::after {
 }
 
 .sb-rise {
-  animation: sb-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: sb-rise var(--sb-duration-slow) var(--sb-ease-out) both;
 }
 
 /* Subtle, GPU-cheap lift for interactive cards. `will-change` is deliberately
@@ -869,22 +906,26 @@ html.theme-transition *::after {
    more than the animation saves. */
 .sb-card-hover {
   transition:
-    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 220ms ease,
-    border-color 220ms ease;
+    transform var(--sb-duration-base) var(--sb-ease-out),
+    box-shadow var(--sb-duration-base) var(--sb-ease-standard),
+    border-color var(--sb-duration-fast) var(--sb-ease-standard);
 }
 
 @media (hover: hover) {
   .sb-card-hover:hover {
     transform: translateY(-2px);
     box-shadow:
-      0 10px 24px -12px rgb(15 23 42 / 0.28),
-      0 2px 6px -2px rgb(15 23 42 / 0.12);
+      0 10px 24px -12px rgb(15 23 42 / 0.22),
+      0 2px 6px -2px rgb(15 23 42 / 0.08);
+  }
+  .dark .sb-card-hover:hover {
+    border-color: rgb(129 140 248 / 0.38);
+    box-shadow: var(--sb-glow);
   }
 }
 
 .sb-card-hover:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.995);
 }
 
 /*  Progress fill: a soft travelling highlight while something is in flight -- */
@@ -927,24 +968,16 @@ html.theme-transition *::after {
   background-image: linear-gradient(100deg, #a5b4fc 0%, #c4b5fd 45%, #7dd3fc 100%);
 }
 
-/* Slow-drifting aurora used behind hero cards. Two blurred radial blobs, no
-   images, no external requests. */
-@keyframes sb-aurora {
-  0% { transform: translate3d(-4%, -2%, 0) scale(1); }
-  50% { transform: translate3d(4%, 3%, 0) scale(1.08); }
-  100% { transform: translate3d(-4%, -2%, 0) scale(1); }
-}
-
+/* Static, zero-GPU-cost ambient mesh behind hero cards (no blur filter, no
+   infinite keyframe recompositing on mobile GPUs). */
 .sb-aurora {
   position: absolute;
-  inset: -30%;
+  inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(38% 45% at 20% 25%, rgb(99 102 241 / 0.35), transparent 70%),
-    radial-gradient(34% 40% at 78% 30%, rgb(168 85 247 / 0.28), transparent 70%),
-    radial-gradient(40% 45% at 55% 85%, rgb(56 189 248 / 0.25), transparent 72%);
-  filter: blur(6px);
-  animation: sb-aurora 16s ease-in-out infinite;
+    radial-gradient(52% 65% at 16% 18%, rgb(99 102 241 / 0.24), transparent 72%),
+    radial-gradient(44% 55% at 84% 24%, rgb(139 92 246 / 0.18), transparent 72%),
+    radial-gradient(48% 58% at 54% 92%, rgb(56 189 248 / 0.14), transparent 74%);
 }
 
 /*  Animated underline for the active tab in a segmented control ------------ */
@@ -966,14 +999,67 @@ html.theme-transition *::after {
 }
 
 .sb-pop {
-  animation: sb-pop 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: sb-pop 320ms var(--sb-ease-out) both;
 }
 
-/*  Focus ring that stays visible on both themes --------------------------- */
+/*  Consistent focus-visible ring across both themes ------------------------ */
 .sb-focus:focus-visible,
-.sb-button:focus-visible {
+.sb-button:focus-visible,
+.sb-focus-within:focus-within {
   outline: 2px solid var(--sb-focus);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--sb-field-ring);
+}
+
+/*  Semantic Inter typography scale (font-black reserved for display only) --- */
+.sb-type-display {
+  font-size: clamp(2.25rem, 5vw, 3.875rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+}
+.sb-type-h1 {
+  font-size: clamp(1.375rem, 2.2vw, 1.875rem);
+  line-height: 1.18;
+  letter-spacing: -0.026em;
+  font-weight: 700;
+}
+.sb-type-h2 {
+  font-size: clamp(1.125rem, 1.5vw, 1.3125rem);
+  line-height: 1.26;
+  letter-spacing: -0.018em;
+  font-weight: 700;
+}
+.sb-type-h3 {
+  font-size: 1rem;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+  font-weight: 600;
+}
+.sb-type-h4 {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+  font-weight: 600;
+}
+.sb-type-body {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  letter-spacing: -0.003em;
+  font-weight: 400;
+}
+.sb-type-caption {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  letter-spacing: 0.005em;
+  font-weight: 500;
+}
+.sb-type-eyebrow {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 @layer components {
@@ -981,11 +1067,21 @@ html.theme-transition *::after {
      ring. Explicit rounded-* utilities still win in the utilities layer. */
   .sb-button {
     border-radius: var(--radius-control);
+    transition:
+      transform var(--sb-duration-instant) var(--sb-ease-out),
+      background-color var(--sb-duration-fast) var(--sb-ease-standard),
+      border-color var(--sb-duration-fast) var(--sb-ease-standard),
+      color var(--sb-duration-fast) var(--sb-ease-standard),
+      box-shadow var(--sb-duration-fast) var(--sb-ease-standard);
   }
 }
 
 .sb-button {
   -webkit-tap-highlight-color: transparent;
+}
+
+.sb-button:active:not(:disabled) {
+  transform: scale(0.985);
 }
 
 .sb-button:disabled {
@@ -1166,5 +1262,10 @@ html.theme-transition *::after {
 @media (prefers-reduced-motion: reduce) {
   .sb-marquee-track, .sb-jet-plumes { animation: none; }
   .sb-marquee-track { width: max-content; }
+  .sb-button:active:not(:disabled),
+  .sb-card-hover:hover,
+  .sb-card-hover:active {
+    transform: none;
+  }
 }
 @media print { .sb-flight { display: none; } }

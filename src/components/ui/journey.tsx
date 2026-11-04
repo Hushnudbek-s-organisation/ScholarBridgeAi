@@ -12,7 +12,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, Circle, CircleDashed, Info, TriangleAlert, XCircle } from "lucide-react";
-import { AnimatedNumber, AnimatedRing } from "@/components/motion";
+import { AnimatedNumber, AnimatedRing, MOTION_TOKENS } from "@/components/motion";
 import { dictionaries } from "@/i18n/messages";
 import { isLocale } from "@/i18n/config";
 import { Button } from "@/components/ui/Button";
@@ -44,31 +44,36 @@ export function JourneyCard({
   interactive?: boolean;
   /** Stagger cards inside a row by passing 0, 0.05, 0.1 … */
   delay?: number;
-  /** `hero` gets the soft aurora backdrop (one per screen, please). */
-  tone?: "plain" | "hero" | "accent";
+  /** `hero` gets the soft ambient mesh backdrop (one per screen, please). */
+  tone?: "plain" | "hero" | "accent" | "well";
 }) {
   const reduceMotion = useReducedMotion();
   const tones: Record<string, string> = {
-    plain: "",
+    plain: "sb-surface-card bg-white dark:bg-slate-900",
     // The hero gets its own colour identity in both themes (see `.sb-journey-hero`
     // in globals.css) instead of borrowing the card palette: a pale indigo wash
     // on light, a deep indigo→violet on dark. It must stay the ONE hero per
-    // screen, so panels keep `plain` / `accent`.
-    hero: "sb-journey-hero relative overflow-hidden",
-    accent: "border-indigo-100 bg-indigo-50/40 dark:border-indigo-500/20 dark:bg-indigo-950/20",
+    // screen, so panels keep `plain` / `accent` / `well`.
+    hero: "sb-journey-hero relative overflow-hidden bg-white dark:bg-slate-900",
+    accent: "sb-surface-card border-indigo-200/80 bg-indigo-50/40 dark:border-indigo-500/25 dark:bg-indigo-950/20",
+    well: "border-slate-200/80 bg-slate-50 dark:border-slate-800 dark:bg-slate-800",
   };
   return (
     <motion.section
       initial={reduceMotion ? false : { opacity: 0, y: 12 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px 0px -50px 0px" }}
-      transition={{ duration: 0.42, delay: reduceMotion ? 0 : delay, ease: [0.16, 1, 0.3, 1] }}
+      transition={{
+        duration: MOTION_TOKENS.duration.reveal,
+        delay: reduceMotion ? 0 : delay,
+        ease: MOTION_TOKENS.ease.out,
+      }}
       // `min-w-0` matters: these cards are grid items, and a grid track
       // defaults to `minmax(auto, 1fr)`. A long university name inside a
       // `truncate` (nowrap) <p> then pushed the track to ~640px and gave every
       // phone a horizontal page scroll. Allowing the track to shrink keeps the
       // page at the viewport width (WCAG 1.4.10 Reflow).
-      className={`min-w-0 rounded-overlay border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 ${tones[tone]} ${
+      className={`min-w-0 rounded-overlay border border-slate-200 shadow-xs dark:border-slate-700 ${tones[tone]} ${
         interactive ? "sb-card-hover" : ""
       } ${className}`}
     >
@@ -77,7 +82,7 @@ export function JourneyCard({
       {(title || action) && (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-5">
           <div className="min-w-0">
-            {title && <h2 className="text-sm font-bold text-slate-900 dark:text-white sm:text-base">{title}</h2>}
+            {title && <h2 className="sb-type-h3 text-slate-900 dark:text-white">{title}</h2>}
             {subtitle && <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
           </div>
           {action}
@@ -138,20 +143,21 @@ export function Pill({
   className = "",
 }: {
   children: React.ReactNode;
-  tone?: "slate" | "brand" | "good" | "warn" | "bad" | "info";
+  tone?: "slate" | "brand" | "good" | "warn" | "bad" | "info" | "violet";
   className?: string;
 }) {
   const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
-    brand: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-200",
-    good: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200",
-    warn: "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200",
-    bad: "bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-200",
-    info: "bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-200",
+    slate: "border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200",
+    brand: "border border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-900/60 dark:text-indigo-200",
+    good: "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-900/60 dark:text-emerald-200",
+    warn: "border border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-900/60 dark:text-amber-200",
+    bad: "border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-900/60 dark:text-rose-200",
+    info: "border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-900/60 dark:text-sky-200",
+    violet: "border border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-900/60 dark:text-violet-200",
   };
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${tones[tone]} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide ${tones[tone]} ${className}`}
     >
       {children}
     </span>
@@ -241,7 +247,7 @@ export function SkeletonCard({ lines = 3, className = "" }: { lines?: number; cl
   const widths = ["w-1/3", "w-full", "w-5/6", "w-2/3", "w-3/4"];
   return (
     <div
-      className={`rounded-overlay border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-5 ${className}`}
+      className={`sb-surface-card rounded-overlay border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900 sm:p-5 ${className}`}
       aria-hidden
     >
       <div className="sb-skeleton h-4 w-2/5" />
@@ -346,11 +352,11 @@ export function StatTile({
   };
   const tile = (
     <>
-      <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
         {icon}
         <span className="break-words whitespace-normal">{label}</span>
       </div>
-      <p className={`mt-1 text-2xl font-extrabold tabular-nums ${valueTones[state]}`}>
+      <p className={`mt-1 text-2xl font-bold tracking-tight tabular-nums ${valueTones[state]}`}>
         {typeof value === "number" ? (
           <AnimatedNumber value={value} decimals={decimals} prefix={prefix} suffix={suffix} />
         ) : value}

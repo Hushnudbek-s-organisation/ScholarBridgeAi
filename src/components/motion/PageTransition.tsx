@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
-import { fadeUp } from "./variants";
+import { fadeUp, MOTION_TOKENS } from "./variants";
 
 /**
  * Cross-fades + lifts content when the key changes.
@@ -31,7 +31,7 @@ export function PageTransition({
         initial={{ opacity: 0, y: distance }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -distance / 2 }}
-        transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: MOTION_TOKENS.duration.page, ease: MOTION_TOKENS.ease.out }}
         className={className}
       >
         {children}
