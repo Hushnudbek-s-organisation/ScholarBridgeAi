@@ -1163,10 +1163,50 @@ html.theme-transition *::after {
   font-style: normal;
 }
 
-.sb-flight { color: #0f172a; }
-.dark .sb-flight { color: #f8fafc; }
+.sb-flight { color: #312e81; }
+.dark .sb-flight { color: #c7d2fe; }
 @keyframes sb-jet-exhaust { 50% { opacity: 0.55; } }
 .sb-jet-plumes { animation: sb-jet-exhaust 2.4s ease-in-out infinite; }
+
+.sb-hud-laser {
+  background-image: linear-gradient(90deg, rgb(99 102 241 / 0.08), #4f46e5 48%, #7c3aed 100%);
+  box-shadow: 0 0 12px 1px rgb(99 102 241 / 0.65);
+}
+.dark .sb-hud-laser {
+  background-image: linear-gradient(90deg, rgb(129 140 248 / 0.12), #818cf8 45%, #a78bfa 100%);
+  box-shadow: 0 0 14px 2px rgb(129 140 248 / 0.85);
+}
+.sb-hud-readout {
+  text-shadow: 0 0 10px rgb(99 102 241 / 0.28);
+}
+.dark .sb-hud-readout {
+  text-shadow: 0 0 12px rgb(129 140 248 / 0.72);
+}
+
+.sb-marquee-fade {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 4%, #000 94%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 4%, #000 94%, transparent 100%);
+}
+
+.sb-hero-mockup-glow {
+  background-image:
+    radial-gradient(62% 56% at 52% 44%, rgb(79 70 229 / 0.16), transparent 72%),
+    radial-gradient(46% 44% at 82% 24%, rgb(124 58 237 / 0.14), transparent 70%);
+}
+.dark .sb-hero-mockup-glow {
+  background-image:
+    radial-gradient(64% 58% at 52% 44%, rgb(99 102 241 / 0.28), transparent 72%),
+    radial-gradient(48% 46% at 82% 22%, rgb(139 92 246 / 0.22), transparent 70%);
+}
+
+.sb-cta-banner {
+  color: #ffffff;
+  background-color: var(--sb-cta-from);
+  background-image:
+    radial-gradient(circle at 86% 8%, rgb(139 92 246 / 0.34), transparent 44%),
+    radial-gradient(circle at 14% 92%, rgb(79 70 229 / 0.28), transparent 42%),
+    linear-gradient(135deg, var(--sb-cta-from), var(--sb-cta-via), var(--sb-cta-to));
+}
 
 @keyframes sbMarqueeRight {
   0% { transform: translate3d(-50%, 0, 0); }
@@ -1206,7 +1246,10 @@ html.theme-transition *::after {
 }
 
 .sb-kinetic-word[data-state="active"] {
-  text-shadow: 0 0 22px rgba(255, 255, 255, 0.75), 0 0 44px rgba(56, 189, 248, 0.45);
+  text-shadow: 0 0 18px rgb(79 70 229 / 0.25), 0 0 36px rgb(124 58 237 / 0.18);
+}
+.dark .sb-kinetic-word[data-state="active"] {
+  text-shadow: 0 0 22px rgb(224 231 255 / 0.72), 0 0 44px rgb(129 140 248 / 0.48);
 }
 
 .sb-gpu-transform { transform: translate3d(0, 0, 0); will-change: transform; }

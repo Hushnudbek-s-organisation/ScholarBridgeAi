@@ -43,6 +43,9 @@ export const SVG_COLORS = {
   zinc100: "#f4f4f5",
   blue50: "#eff6ff",
   sky400: "#38bdf8",
+  indigo100: "#e0e7ff",
+  indigo400: "#818cf8",
+  violet400: "#a78bfa",
 } as const;
 
 /** Telegram's native header/background setters require hex, not CSS variables. */
