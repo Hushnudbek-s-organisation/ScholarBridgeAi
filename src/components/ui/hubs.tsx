@@ -88,19 +88,19 @@ export function HubTabs({
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(pane.id)}
             onKeyDown={(e) => onKeyDown(e, pane.id)}
-            className={`inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-surface px-3.5 py-2 text-xs font-bold transition-colors sm:text-sm ${
+            className={`inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-surface px-3.5 py-2 text-xs font-semibold transition-colors sm:text-sm ${
               // Active = royal indigo in BOTH themes, so the selected tab reads
               // as part of the indigo hero instead of a dead-black pill (light)
               // or a washed-out grey one (dark).
               isActive
-                ? "border border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-600/20"
+                ? "sb-btn-primary border border-indigo-600 bg-indigo-600 text-white"
                 : "border border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"
             }`}
           >
             {pane.label}
             {pane.premium && (
               <span
-                className={`rounded-full px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide ${
+                className={`rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${
                   isActive ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                 }`}
               >
@@ -148,7 +148,7 @@ export function ShowMoreToggle({
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-slate-200 bg-slate-50/80 px-3.5 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
       >
         {expanded ? tc("showLess") : tc("showMoreCount", { count: hiddenCount })}
         {expanded ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
@@ -266,14 +266,14 @@ export function HubPage({
       <JourneyCard tone="hero">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">{title}</h1>
-            <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:text-sm">{intro}</p>
+            <h1 className="sb-type-h1 text-slate-900 dark:text-white">{title}</h1>
+            <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">{intro}</p>
           </div>
           {primaryLabel && onPrimary && (
             <Button variant="unstyled"
               type="button"
               onClick={onPrimary}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-surface bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 sm:w-auto"
+              className="sb-btn-primary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-surface bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
             >
               {primaryLabel}
               <ArrowRight className="h-4 w-4" aria-hidden />
@@ -442,12 +442,4 @@ export function ScrollRegion({
   );
 }
 
-/**
- * Lightweight placeholder for a lazily-loaded panel.
- *
- * The heavy panes (the visa studio, the AI studios, the admin panel) are
- * code-split, so this is what the student sees for the few hundred
- * milliseconds while the chunk arrives: the SHAPE of the panel, not a
- * spinner floating in an empty page.
- */
 export { PanelSkeleton } from "./PanelSkeleton";

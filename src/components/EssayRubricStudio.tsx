@@ -672,29 +672,29 @@ export function EssayRubricStudio({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-              <Sparkles className="h-3.5 w-3.5" /> Scholarship fit
+              <Sparkles className="h-3.5 w-3.5" /> {t("scholarshipFitTitle")}
             </h3>
             <p className="mt-0.5 max-w-xl text-sm text-slate-500">
-              Score this essay against your saved scholarships — word limit, themes, major, country, GPA and English.
+              {t("scholarshipFitSubtitle")}
             </p>
           </div>
           <Button variant="unstyled"
             onClick={() => void analyzeFit()}
             disabled={fitBusy || text.trim().length < 50}
-            className="rounded-control bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="min-h-11 rounded-control bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
-            {fitBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Analyze fit"}
+            {fitBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("scholarshipFitAnalyze")}
           </Button>
         </div>
         {text.trim().length < 50 && (
-          <p className="mt-2 text-sm text-slate-500">Write at least 50 characters first.</p>
+          <p className="mt-2 text-sm text-slate-500">{t("scholarshipFitNeedLength")}</p>
         )}
         {fitError && <p className="mt-2 text-sm font-semibold text-rose-600">{fitError}</p>}
 
         {fitMatches && (
           <div className="mt-3 space-y-3">
             {fitMatches.length === 0 && (
-              <p className="text-sm text-slate-500">No saved scholarships yet — save some in the Scholarship Hub.</p>
+              <p className="text-sm text-slate-500">{t("scholarshipFitNoSaved")}</p>
             )}
             {fitMatches.map((m) => {
               const a = adapted[m.scholarshipId];
@@ -735,12 +735,12 @@ export function EssayRubricStudio({
                   <Button variant="unstyled"
                     onClick={() => void adaptEssay(m.scholarshipId)}
                     disabled={adaptingId !== null}
-                    className="mt-2 rounded-control border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+                    className="mt-2 min-h-11 rounded-control border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
                   >
                     {adaptingId === m.scholarshipId ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      "Adapt essay with AI"
+                      t("scholarshipFitAdapt")
                     )}
                   </Button>
                   {a && (
@@ -751,7 +751,7 @@ export function EssayRubricStudio({
                         </pre>
                       ) : (
                         <p className="text-sm font-semibold text-amber-700">
-                          AI is unavailable right now — follow the plan above by hand.
+                          {t("scholarshipFitAiUnavailable")}
                         </p>
                       )}
                     </div>
@@ -766,7 +766,7 @@ export function EssayRubricStudio({
       {versions.length > 0 && (
         <div className="rounded-overlay border border-slate-200 bg-white p-4">
           <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-            <History className="h-3.5 w-3.5" /> Version history
+            <History className="h-3.5 w-3.5" /> {t("essayVersionHistory")}
           </h3>
           <ul className="mt-2 divide-y divide-slate-100">
             {versions.map((v) => (
@@ -876,6 +876,7 @@ const PEER_DIMS = [
 ] as const;
 
 function PeerReviewSection({ profileId }: { profileId: number }) {
+  const t = useTranslations("ai");
   const [myVersions, setMyVersions] = useState<PeerVersion[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [reviewResult, setReviewResult] = useState<{
@@ -1007,11 +1008,10 @@ function PeerReviewSection({ profileId }: { profileId: number }) {
   return (
     <div className="rounded-overlay border border-slate-200 bg-white p-4">
       <h3 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500">
-        <MessageSquare className="h-3.5 w-3.5" /> Peer review
+        <MessageSquare className="h-3.5 w-3.5" /> {t("peerReviewTitle")}
       </h3>
       <p className="mt-1 max-w-2xl text-sm text-slate-500">
-        Open one of your saved drafts for other students to review — or review an essay someone else opened. You can
-        never review your own essay, and reviewers stay anonymized.
+        {t("peerReviewSubtitle")}
       </p>
 
       {notice && (

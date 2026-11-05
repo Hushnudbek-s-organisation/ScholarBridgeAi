@@ -14,6 +14,9 @@ export type ResolvedTheme = "light" | "dark";
 
 export const THEME_COOKIE = "scholarbridge_theme_hint";
 
+/** Dark-first default for first-time visitors without a saved preference. */
+export const DEFAULT_THEME: ThemeChoice = "dark";
+
 export function isThemeChoice(value: unknown): value is ThemeChoice {
   return value === "light" || value === "dark" || value === "system";
 }
@@ -21,14 +24,15 @@ export function isThemeChoice(value: unknown): value is ThemeChoice {
 /**
  * Blocking inline script for <head>.
  *
- * It runs before first paint, so the page never flashes light-on-dark (or the
- * reverse) while React hydrates. Deliberately tiny and wrapped in try/catch:
- * if localStorage is unavailable the app still works, it just starts in the
- * system theme.
+ * Runs synchronously before first paint so the page never flashes the wrong
+ * theme while React hydrates:
+ *   1. Saved choice in `localStorage` (`light` | `dark` | `system`) wins.
+ *   2. Otherwise falls back to `DEFAULT_THEME` (`dark`) for first-time visitors.
+ *   3. Only when the resolved choice is `system` is `prefers-color-scheme` read.
  *
  * Pass the CSP nonce from `headers().get("x-nonce")` — the middleware sends a
  * nonce-based policy, and an inline script without a nonce is blocked.
  */
 export function themeInitScript(): string {
-  return `(function(){try{var k="${THEME_STORAGE_KEY}";var s=localStorage.getItem(k);var t=(s==="light"||s==="dark"||s==="system")?s:"system";var d=t==="system"?window.matchMedia("(prefers-color-scheme: dark)").matches:t==="dark";var r=document.documentElement;r.classList.toggle("dark",d);r.style.colorScheme=d?"dark":"light";}catch(e){}})();`;
+  return `(function(){var r=document.documentElement;try{var s=localStorage.getItem("${THEME_STORAGE_KEY}");var t=(s==="light"||s==="dark"||s==="system")?s:"${DEFAULT_THEME}";var d=t==="system"?window.matchMedia("(prefers-color-scheme: dark)").matches:t==="dark";r.classList.toggle("dark",d);r.style.colorScheme=d?"dark":"light";}catch(e){r.classList.add("dark");r.style.colorScheme="dark";}})();`;
 }

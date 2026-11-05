@@ -8,6 +8,7 @@ import {
   Award,
   Bot,
   CheckSquare,
+  GraduationCap,
   ChevronDown,
   Crown,
   FolderOpen,
@@ -57,7 +58,6 @@ import { CommandPalette, type PaletteItem } from "./CommandPalette";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
   NAV_GROUP_I18N,
-  NAV_GROUP_ICONS,
   NAV_GROUPS,
   NAV_SECTIONS,
   NAV_UTILITY_SECTIONS,
@@ -324,6 +324,15 @@ const BOTTOM_BAR_GROUPS: { group: NavGroupId; section: string; icon: React.Compo
   { group: "applications", section: "applications", icon: CheckSquare, labelKey: "tabApps" },
 ];
 
+const GROUP_ICONS_LUCIDE: Record<NavGroupId, React.ComponentType<{ className?: string }>> = {
+  home: Home,
+  explore: Compass,
+  plan: Route,
+  applications: FileText,
+  after: GraduationCap,
+  help: Headset,
+};
+
 /**
  * The tablet icon rail (768px – 1023px) shows the destinations a student
  * moves between all day, one tap away. The full list stays in the drawer.
@@ -372,8 +381,11 @@ export function Navbar({
   // itself, so the sidebar always shows where the student is without a wall of
   // links. Collapsing another group is remembered for the session.
   const activeGroup = useMemo(() => groupOfSection(activeTab), [activeTab]);
+  // Default: Home, Explore, My Plan and Applications are open — the core journey
+  // a new student needs. Only After and Help start collapsed to avoid a wall.
+  const DEFAULT_EXPANDED = new Set<NavGroupId>(["home", "explore", "plan", "applications"]);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(NAV_GROUPS.map((group) => [group, group !== activeGroup]))
+    () => Object.fromEntries(NAV_GROUPS.map((group) => [group, !(DEFAULT_EXPANDED.has(group as NavGroupId) || group === activeGroup)]))
   );
 
   useEffect(() => {
@@ -623,10 +635,10 @@ export function Navbar({
         {isActive && (
           <motion.span layoutId={layoutId} className={`absolute inset-0 rounded-control shadow-xs ${activeBg}`} transition={LAYOUT_SPRING} />
         )}
-        <Icon className={`relative h-4 w-4 shrink-0 ${isActive ? "" : item.premium ? "text-amber-500" : "text-slate-500 dark:text-slate-400"}`} />
+        <Icon className={`relative h-4 w-4 shrink-0 ${isActive ? "" : item.premium ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`} />
         <span className="relative min-w-0 flex-1 break-words whitespace-normal">{item.label}</span>
-        {item.premium && !isActive && (
-          <span className="relative rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+        {item.premium && (
+          <span className={`relative rounded-full px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide ${isActive ? "bg-white/20 text-white ring-1 ring-white/30" : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"}`}>
             {t("proBadge")}
           </span>
         )}
@@ -656,7 +668,7 @@ export function Navbar({
           aria-expanded={open}
           className="mb-1 flex min-h-11 w-full items-center gap-1.5 rounded-control px-3 py-1.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
-          <span aria-hidden>{NAV_GROUP_ICONS[g]}</span>
+          {(() => { const GIcon = GROUP_ICONS_LUCIDE[g]; return <GIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />; })()}
           {t(NAV_GROUP_I18N[g])}
           {!open && items.length > 0 && (
             // The badge is a visual hint; the accessible name of the group

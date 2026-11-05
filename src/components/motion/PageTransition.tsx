@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
-import { fadeUp } from "./variants";
+import { fadeUp, MOTION_TOKENS } from "./variants";
 
 /**
  * Replace the previous destination immediately and animate only the entrance.

@@ -8,7 +8,7 @@ import { getBranding } from "@/lib/branding";
 import { siteUrlForRequest } from "@/lib/requestAppUrl";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { MotionProvider } from "@/components/motion";
-import { isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
+import { DEFAULT_THEME, isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 
 // Self-hosted Inter keeps the brand font available offline and avoids a
@@ -124,9 +124,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   // Server-side hint so the first render matches what the inline script
-  // painted, avoiding a hydration mismatch on the theme toggle.
+  // painted, avoiding a hydration mismatch on the theme toggle. First-time
+  // visitors without a cookie receive the dark-first default immediately in
+  // SSR HTML (`class="dark"`), preventing any white flash before script parse.
   const stored = (await cookies()).get(THEME_COOKIE)?.value;
-  const initialTheme = isThemeChoice(stored) ? stored : "system";
+  const initialTheme = isThemeChoice(stored) ? stored : DEFAULT_THEME;
+  const ssrDark = initialTheme === "dark";
 
   // Language of the document itself. Screen readers use it to pick a
   // pronunciation dictionary, so it must match the locale the app renders —
@@ -136,7 +139,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const lang = storedLocale && isLocale(storedLocale) ? storedLocale : defaultLocale;
 
   return (
-    <html lang={lang} suppressHydrationWarning>
+    <html
+      lang={lang}
+      className={ssrDark ? "dark" : undefined}
+      suppressHydrationWarning
+    >
       <head>
         {/* Applies the saved theme before first paint — no light/dark flash. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
@@ -146,7 +153,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <link rel="preconnect" href="https://upload.wikimedia.org" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
       </head>
-      <body className={`${interLatin.variable} ${interCyrillic.variable} bg-slate-50 font-sans text-sm text-slate-900 antialiased`}>
+      <body className={`${interLatin.variable} ${interCyrillic.variable} sb-canvas-bg bg-slate-50 font-sans text-sm text-slate-900 antialiased`}>
         <ThemeProvider defaultTheme={initialTheme}>
           <MotionProvider>
             {/* Anonymous, first-party traffic counter for Admin → Analytics. */}

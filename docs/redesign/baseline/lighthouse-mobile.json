@@ -1,0 +1,125 @@
+{
+  "lighthouseVersion": "13.6.0",
+  "fetchTime": "2026-11-04T18:33:56.280Z",
+  "finalDisplayedUrl": "http://127.0.0.1:3001/",
+  "environment": {
+    "networkUserAgent": "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+    "hostUserAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.0 Safari/537.36",
+    "benchmarkIndex": 2292,
+    "credits": {}
+  },
+  "performanceScore": 61,
+  "metrics": {
+    "fcpMs": 1282,
+    "fcpDisplay": "1.3 s",
+    "lcpMs": 5474,
+    "lcpDisplay": "5.5 s",
+    "tbtMs": 763,
+    "tbtDisplay": "760 ms",
+    "cls": 0,
+    "clsDisplay": "0",
+    "speedIndexMs": 1697,
+    "speedIndexDisplay": "1.7 s",
+    "ttiMs": 5541,
+    "ttiDisplay": "5.5 s"
+  },
+  "lcpElement": [],
+  "byteSummary": {
+    "totalRequests": 61,
+    "totalTransferBytes": 553741,
+    "totalResourceBytes": 1797851,
+    "documentTransferBytes": 21690,
+    "documentResourceBytes": 170947,
+    "jsRequests": 19,
+    "jsTransferBytes": 457660,
+    "jsUncompressedBytes": 1554217,
+    "cssRequests": 2,
+    "cssTransferBytes": 35753,
+    "cssUncompressedBytes": 234425,
+    "fontRequests": 1,
+    "fontTransferBytes": 48818,
+    "imageRequestsAttempted": 39,
+    "imageRequestsSucceeded": 1,
+    "imageRequestsBlockedBySandboxEgress": 26,
+    "imageTransferBytesObservedInSandbox": 24815
+  },
+  "localeHtmlPayloads": {
+    "en": {
+      "transferBytes": 170947,
+      "uncompressedBytes": 170947,
+      "ttfbMs": 64
+    },
+    "uz": {
+      "transferBytes": 624564,
+      "uncompressedBytes": 624564,
+      "ttfbMs": 65
+    },
+    "ru": {
+      "transferBytes": 843454,
+      "uncompressedBytes": 843454,
+      "ttfbMs": 76
+    }
+  },
+  "topJsChunks": [
+    {
+      "file": "/_next/static/chunks/1zigvpefw8av_.js",
+      "transferKB": 127.3,
+      "uncompressedKB": 390.1
+    },
+    {
+      "file": "/_next/static/chunks/2h0jrdro6vnyu.js",
+      "transferKB": 72.5,
+      "uncompressedKB": 229.4
+    },
+    {
+      "file": "/_next/static/chunks/2c2ouxf4mnxl_.css",
+      "transferKB": 33.8,
+      "uncompressedKB": 227.9
+    },
+    {
+      "file": "/_next/static/chunks/194sr_qt0u9td.js",
+      "transferKB": 44.9,
+      "uncompressedKB": 160.3
+    },
+    {
+      "file": "/_next/static/chunks/1zu-v7zzwmahx.js",
+      "transferKB": 46.4,
+      "uncompressedKB": 136.7
+    },
+    {
+      "file": "/_next/static/chunks/0j0mk4d5r-5h3.js",
+      "transferKB": 30.8,
+      "uncompressedKB": 115
+    },
+    {
+      "file": "/_next/static/chunks/257ncogne0yil.js",
+      "transferKB": 26.5,
+      "uncompressedKB": 79.8
+    },
+    {
+      "file": "/_next/static/chunks/3cjhjg7ejn4yg.js",
+      "transferKB": 12.5,
+      "uncompressedKB": 39
+    },
+    {
+      "file": "/_next/static/chunks/0vpv-zgcuhm6d.js",
+      "transferKB": 9.4,
+      "uncompressedKB": 32.6
+    },
+    {
+      "file": "/_next/static/chunks/1394q_-4qamyn.js",
+      "transferKB": 9.9,
+      "uncompressedKB": 28.7
+    },
+    {
+      "file": "/_next/static/chunks/3e0xteymjg_m1.js",
+      "transferKB": 6.7,
+      "uncompressedKB": 20.4
+    },
+    {
+      "file": "/_next/static/chunks/1q-37w9ygwnxc.js",
+      "transferKB": 5.6,
+      "uncompressedKB": 17.2
+    }
+  ]
+}

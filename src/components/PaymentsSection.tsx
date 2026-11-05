@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Check, Crown, Sparkles, Users, Infinity as InfinityIcon, FileText, MessageSquare, Plane } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { SubscriptionStatusBadge } from "./SubscriptionStatusBadge";
@@ -49,12 +49,17 @@ const PRO_FEATURES = [
   { icon: Check, key: "pro9" },
 ] as const;
 
-function formatUzs(n: number) {
-  return `${n.toLocaleString("uz-UZ")} so'm`;
+function formatUzs(n: number, locale: string) {
+  try {
+    return `${n.toLocaleString(locale)} so'm`;
+  } catch {
+    return `${n.toLocaleString("uz-UZ")} so'm`;
+  }
 }
 
 export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
   const t = useTranslations("payments");
+  const locale = useLocale();
   const profileId = activeProfile?.id;
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [isPremium, setIsPremium] = useState(false);
@@ -197,9 +202,9 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
                     </span>
                   )}
                   <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
-                    {pack.labelUz || pack.label}
+                    {pack.label || pack.labelUz}
                   </p>
-                  <p className="mt-1 text-lg font-extrabold text-slate-900">{formatUzs(pack.priceUzs)}</p>
+                  <p className="mt-1 text-lg font-extrabold text-slate-900">{formatUzs(pack.priceUzs, locale)}</p>
                   <p className="text-sm text-slate-500">{t("perDays", { days: pack.days })}</p>
                 </Button>
               );
@@ -209,7 +214,7 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-surface bg-slate-50 px-4 py-3">
             <div>
               <p className="text-sm font-bold text-slate-900">
-                {selected ? formatUzs(selected.priceUzs) : "—"}{" "}
+                {selected ? formatUzs(selected.priceUzs, locale) : "—"}{" "}
                 <span className="text-xs font-medium text-slate-500">
                   {t("perDayUnit", { days: selected?.days ?? 30 })}
                 </span>

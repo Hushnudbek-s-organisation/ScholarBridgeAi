@@ -2,6 +2,7 @@
 
 import { MotionConfig } from "framer-motion";
 import type { ReactNode } from "react";
+import { MOTION_TOKENS } from "@/components/ui/tokens";
 
 /**
  * App-wide Framer Motion configuration.
@@ -15,7 +16,10 @@ import type { ReactNode } from "react";
  */
 export function MotionProvider({ children }: { children: ReactNode }) {
   return (
-    <MotionConfig reducedMotion="user" transition={{ duration: 0.32 }}>
+    <MotionConfig
+      reducedMotion="user"
+      transition={{ duration: MOTION_TOKENS.duration.page, ease: MOTION_TOKENS.ease.out }}
+    >
       {children}
     </MotionConfig>
   );

@@ -9,11 +9,23 @@ import { staggerParent } from "./motion/variants";
 import { ThemeSwitch } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { SVG_COLORS } from "@/components/ui/tokens";
+import Link from "next/link";
+import { isLiteMotionSync, subscribeLiteMotion } from "@/lib/liteMotion";
+import { PUBLIC_TELEGRAM_CHANNEL_URL, PUBLIC_TELEGRAM_HANDLE } from "@/lib/publicLinks";
 
 /** Hero children: each one rises a beat after the previous. */
 const heroGroup = staggerParent(0.1, 0.08);
 const heroItem = {
   hidden: { opacity: 0, y: 22 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const },
+  },
+};
+/** Static hero copy keeps LCP text visible on first paint (no SSR opacity:0). */
+const heroStaticItem = {
+  hidden: { opacity: 1, y: 0 },
   visible: {
     opacity: 1,
     y: 0,
@@ -29,6 +41,7 @@ import {
   CheckSquare,
   Compass,
   Crown,
+  ExternalLink,
   FileText,
   FolderOpen,
   Gift,
@@ -145,7 +158,7 @@ export const MARQUEE_ROW_1: MarqueeUniversityItem[] = [
   },
 ];
 
-/** Row 2: QS #9–#21, continuously scrolling left. */
+ /** Row 2: QS #9–#21, continuously scrolling left. */
 export const MARQUEE_ROW_2: MarqueeUniversityItem[] = [
   {
     qsRank: 9,
@@ -520,17 +533,29 @@ const HUD_SECTIONS = [
  *    cursor rides `0.22 + 0.52 · progress` of the viewport with a
  *    zero-padded `033 %` readout, exactly like a HUD altitude tape.
  */
-function PhotoCraftKineticHud() {
+function useLiteMotionTier(): boolean {
+  const [lite, setLite] = React.useState(false);
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync with device tier on mount
+    setLite(isLiteMotionSync());
+    return subscribeLiteMotion(setLite);
+  }, []);
+  return lite;
+}
+
+function PhotoCraftKineticHud({ lite: liteProp }: { lite?: boolean } = {}) {
   const locale = useLocale();
   const wordRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const tapeRef = React.useRef<HTMLDivElement | null>(null);
   const laserRef = React.useRef<HTMLDivElement | null>(null);
   const readoutRef = React.useRef<HTMLSpanElement | null>(null);
+  const liteDetected = useLiteMotionTier();
+  const lite = liteProp ?? liteDetected;
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     scrollEngine.initialize();
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || lite;
 
     const N = HUD_SECTIONS.length;
     const ROW_GAP = 22;
@@ -576,10 +601,10 @@ function PhotoCraftKineticHud() {
           const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
           const currentY = bottomSlotY + (topSlotY - bottomSlotY) * easeT;
           const bell = Math.pow(Math.sin(t * Math.PI), 0.72);
-          const scale = 1 + bell * 2.15;
-          const shiftX = -bell * 10;
+          const scale = 1 + bell * (lite ? 1.0 : 2.15);
+          const shiftX = -bell * (lite ? 4 : 10);
           transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
-          opacity = (0.48 + bell * 0.52).toFixed(3);
+          opacity = (0.48 + bell * (lite ? 0.32 : 0.52)).toFixed(3);
         }
         if (prevTransforms[i] !== transform) {
           el.style.transform = transform;
@@ -613,9 +638,9 @@ function PhotoCraftKineticHud() {
       }
     };
 
-    const unsub = paintOnceUnderReducedMotion(paint, reducedMotion);
+    const unsub = paintOnceUnderReducedMotion(paint, !!reducedMotion);
     return unsub;
-  }, [locale]);
+  }, [locale, lite]);
 
   const ticks = [];
   for (let val = 0; val <= 100; val += 5) {
@@ -644,8 +669,8 @@ function PhotoCraftKineticHud() {
   }
 
   return (
-    <div aria-hidden="true" className="print:hidden fixed inset-0 z-30 hidden select-none md:block">
-      {/* Zoomed altimeter tape + glowing laser cursor (far right edge). */}
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-30 hidden select-none md:block print:hidden">
+      {/* Zoomed altimeter tape + glowing laser cursor (far right edge) — indigo/violet tuned. */}
       <div className="pointer-events-none absolute inset-y-0 right-0 w-14 overflow-hidden">
         <div
           ref={tapeRef}
@@ -657,30 +682,180 @@ function PhotoCraftKineticHud() {
           ref={laserRef}
           className="sb-gpu-transform absolute right-0 top-0 w-full"
         >
-          <span className="block h-[2px] w-full bg-sky-400 shadow-[0_0_12px_2px_rgba(56,189,248,0.95)]" />
+          <span className="sb-hud-laser block h-[2px] w-full" />
           <span
             ref={readoutRef}
-            className="mt-1 block pr-1.5 text-right font-mono text-xs font-bold tracking-wider text-sky-600 drop-shadow-[0_0_8px_rgba(56,189,248,0.7)] dark:text-sky-400"
+            className="sb-hud-readout mt-1 block pr-1.5 text-right font-mono text-xs font-bold tracking-wider text-indigo-600 dark:text-indigo-300"
           >
             000 %
           </span>
         </div>
       </div>
-      {/* Kinetic section words — peel, swell, dock (see useEffect for math). */}
-      {HUD_SECTIONS.map((sec, idx) => (
-        <Button variant="unstyled"
-          key={sec.id}
-          ref={(el) => {
-            wordRefs.current[idx] = el;
-          }}
-          type="button"
-          tabIndex={-1}
-          onClick={() => scrollToId(sec.id)}
-          className="sb-kinetic-word pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-xs font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-slate-950 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
-        >
-          {sec.word[locale as "en" | "uz" | "ru"] ?? sec.word.en}
-        </Button>
-      ))}
+      {/* Kinetic section words — visible only on wide viewports to avoid overlap at 820px. */}
+      <div className="hidden xl:block">
+        {HUD_SECTIONS.map((sec, idx) => (
+          <Button variant="unstyled"
+            key={sec.id}
+            ref={(el) => {
+              wordRefs.current[idx] = el;
+            }}
+            type="button"
+            tabIndex={-1}
+            onClick={() => scrollToId(sec.id)}
+            className="sb-kinetic-word pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-xs font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-indigo-700 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
+          >
+            {sec.word[locale as "en" | "uz" | "ru"] ?? sec.word.en}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Count-up for real numbers only; respects prefers-reduced-motion and only runs once in view. */
+function CountUp({ value, suffix = "", className }: { value: number; suffix?: string; className?: string }) {
+  const ref = React.useRef<HTMLSpanElement | null>(null);
+  const [display, setDisplay] = React.useState(value);
+  const hasAnimated = React.useRef(false);
+  // Reduced-motion is already handled by initializing display to final value;
+  // only animate when the user has not asked for reduced motion.
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !ref.current) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || isLiteMotionSync();
+    if (reduce) return;
+    const el = ref.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !hasAnimated.current) {
+            hasAnimated.current = true;
+            let start: number | null = null;
+            const duration = 900;
+            const step = (ts: number) => {
+              if (start === null) start = ts;
+              const p = Math.min(1, (ts - start) / duration);
+              const eased = 1 - Math.pow(1 - p, 3);
+              setDisplay(Math.round(value * eased));
+              if (p < 1) requestAnimationFrame(step);
+              else setDisplay(value);
+            };
+            requestAnimationFrame(step);
+          }
+        }
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [value]);
+  return (
+    <span ref={ref} className={className}>
+      {display}
+      {suffix}
+    </span>
+  );
+}
+
+/* --------------------- How-it-works mini-UIs (CSS/SVG, zero Unsplash) --------------------- */
+
+function ProfileMini({ t }: { t: ReturnType<typeof useTranslations> }) {
+  return (
+    <div className="rounded-surface border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex items-center gap-2.5">
+        <div className="grid h-9 w-9 place-items-center rounded-full bg-indigo-600 text-sm font-black text-white dark:bg-indigo-500">AS</div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-bold text-slate-900 dark:text-white">Aziza S.</div>
+          <div className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">{t("mini1Major")}</div>
+        </div>
+        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-black text-emerald-700 dark:text-emerald-300">✓ {t("mini1Coverage")}</span>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="rounded-control border border-slate-200 bg-canvas px-2 py-1.5 text-center dark:border-slate-800 dark:bg-canvas">
+          <div className="text-xs font-bold text-slate-500 dark:text-slate-400">GPA</div>
+          <div className="text-sm font-black text-slate-900 dark:text-white">{t("mini1Gpa")}</div>
+        </div>
+        <div className="rounded-control border border-slate-200 bg-canvas px-2 py-1.5 text-center dark:border-slate-800 dark:bg-canvas">
+          <div className="text-xs font-bold text-slate-500 dark:text-slate-400">Test</div>
+          <div className="text-sm font-black text-slate-900 dark:text-white">{t("mini1Test")}</div>
+        </div>
+        <div className="rounded-control border border-slate-200 bg-canvas px-2 py-1.5 text-center dark:border-slate-800 dark:bg-canvas">
+          <div className="text-xs font-bold text-slate-500 dark:text-slate-400">Budget</div>
+          <div className="text-sm font-black text-slate-900 dark:text-white">{t("mini1Budget")}</div>
+        </div>
+      </div>
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+        <div className="h-full w-[73%] rounded-full bg-indigo-600 dark:bg-indigo-400" />
+      </div>
+    </div>
+  );
+}
+function MatchMini({ t }: { t: ReturnType<typeof useTranslations> }) {
+  const rows = [
+    { title: t("mini2Row1"), tag: t("mini2Row1Tag"), tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+    { title: t("mini2Row2"), tag: t("mini2Row2Tag"), tone: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300" },
+    { title: t("mini2Row3"), tag: t("mini2Row3Tag"), tone: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+  ];
+  return (
+    <div className="rounded-surface border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Matches</span>
+        <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-black text-white dark:bg-indigo-500">3 new</span>
+      </div>
+      <div className="space-y-2">
+        {rows.map((r) => (
+          <div key={r.title} className="flex items-center justify-between rounded-control border border-slate-200 bg-canvas px-2.5 py-2 dark:border-slate-800 dark:bg-canvas">
+            <span className="truncate pr-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{r.title}</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-black ${r.tone}`}>{r.tag}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function RoadmapMini({ t }: { t: ReturnType<typeof useTranslations> }) {
+  const tasks = [
+    { title: t("mini3Task1"), state: t("mini3Task1State"), tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
+    { title: t("mini3Task2"), state: t("mini3Task2State"), tone: "bg-amber-500/15 text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
+    { title: t("mini3Task3"), state: t("mini3Task3State"), tone: "bg-sky-500/15 text-sky-700 dark:text-sky-300", dot: "bg-sky-500" },
+  ];
+  return (
+    <div className="rounded-surface border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      <div className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Roadmap · This month</div>
+      <div className="relative pl-4">
+        <span aria-hidden className="absolute left-1.5 top-1 bottom-1 w-px bg-slate-200 dark:bg-slate-700" />
+        <div className="space-y-2.5">
+          {tasks.map((task) => (
+            <div key={task.title} className="relative flex items-center justify-between gap-2">
+              <span className={`absolute -left-4 grid h-2.5 w-2.5 place-items-center rounded-full ${task.dot}`} aria-hidden />
+              <span className="truncate pr-2 text-sm font-medium text-slate-700 dark:text-slate-200">{task.title}</span>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${task.tone}`}>{task.state}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+function TrackerMini({ t }: { t: ReturnType<typeof useTranslations> }) {
+  const cols = [
+    { label: t("mini4Col1"), pct: 100, color: "bg-emerald-500" },
+    { label: t("mini4Col2"), pct: 65, color: "bg-indigo-600 dark:bg-indigo-400" },
+    { label: t("mini4Col3"), pct: 30, color: "bg-amber-500" },
+  ];
+  return (
+    <div className="rounded-surface border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+      <div className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Tracker</div>
+      <div className="grid grid-cols-3 gap-2">
+        {cols.map((c) => (
+          <div key={c.label} className="rounded-control border border-slate-200 bg-canvas p-2 text-center dark:border-slate-800 dark:bg-canvas">
+            <div className="text-xs font-semibold leading-tight text-slate-600 dark:text-slate-300">{c.label}</div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              <div className={`h-full rounded-full ${c.color}`} style={{ width: `${c.pct}%` }} />
+            </div>
+            <div className="mt-1 text-xs font-black text-slate-900 dark:text-white">{c.pct}%</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -717,6 +892,7 @@ export function LandingPage({
    */
   const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const heroMockRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -728,6 +904,23 @@ export function LandingPage({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
+
+  // Gentle desktop-only parallax for the hero mockup (disabled in lite / reduced-motion).
+  useEffect(() => {
+    if (typeof window === "undefined" || !heroMockRef.current) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || isLiteMotionSync();
+    const isDesktop = window.matchMedia?.("(min-width: 1024px)").matches;
+    if (reduce || !isDesktop) return;
+    const el = heroMockRef.current;
+    const paint = () => {
+      const p = scrollEngine.progress();
+      const y = Math.max(-10, Math.min(10, (p - 0.02) * -28));
+      el.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+    };
+    const unsub = scrollEngine.subscribe(paint);
+    return unsub;
+  }, []);
+
   const goToSection = (id: string) => {
     setMenuOpen(false);
     scrollToId(id);
@@ -739,28 +932,28 @@ export function LandingPage({
       label: t("step1Label"),
       title: t("step1Title"),
       text: t("step1Text"),
-      photo: LANDING_PHOTOS.step1Profile,
+      mini: <ProfileMini t={t} />,
     },
     {
       num: "02",
       label: t("step2Label"),
       title: t("step2Title"),
       text: t("step2Text"),
-      photo: LANDING_PHOTOS.step2UniversityMatch,
+      mini: <MatchMini t={t} />,
     },
     {
       num: "03",
       label: t("step3Label"),
       title: t("step3Title"),
       text: t("step3Text"),
-      photo: LANDING_PHOTOS.step3SopWriting,
+      mini: <RoadmapMini t={t} />,
     },
     {
       num: "04",
       label: t("step4Label"),
       title: t("step4Title"),
       text: t("step4Text"),
-      photo: LANDING_PHOTOS.step4VisaDeparture,
+      mini: <TrackerMini t={t} />,
     },
   ];
 
@@ -774,9 +967,9 @@ export function LandingPage({
   ];
 
   const roadItems = [
-    { num: "1", title: t("r1Title"), text: t("r1Text") },
-    { num: "2", title: t("r2Title"), text: t("r2Text") },
-    { num: "3", title: t("r3Title"), text: t("r3Text") },
+    { num: "1", title: t("r1Title"), text: t("r1Text"), tag: t("roadTag1") },
+    { num: "2", title: t("r2Title"), text: t("r2Text"), tag: t("roadTag2") },
+    { num: "3", title: t("r3Title"), text: t("r3Text"), tag: t("roadTag3") },
   ];
 
   /**
@@ -863,12 +1056,15 @@ export function LandingPage({
 
   return (
     <div className="min-h-screen bg-canvas font-sans text-slate-900 antialiased selection:bg-indigo-600 selection:text-white dark:bg-canvas dark:text-white dark:selection:bg-indigo-300 dark:selection:text-slate-950">
+      {/* Flight path lives underneath content so it never covers text/CTAs. */}
       <ScrollFlightPath />
       <PhotoCraftKineticHud />
 
+      {/* All foreground must sit above the jet. Gutters keep ruler/words clear. */}
+      <div className="relative z-10">
       {/* ===== Header ===== */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-canvas/90 backdrop-blur-md dark:border-slate-800 dark:bg-canvas/90">
-        <div className="mx-auto flex h-16 w-[min(1180px,94%)] items-center justify-between gap-2">
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-canvas/80 backdrop-blur-xl supports-[backdrop-filter]:bg-canvas/65 dark:border-slate-800 dark:bg-canvas/80">
+        <div className="mx-auto flex h-16 w-[min(1180px,94%)] items-center justify-between gap-2 md:pr-14 xl:pr-40 2xl:pr-28">
           <a
             href="#top"
             className="flex min-h-11 min-w-0 items-center gap-2 rounded-surface text-base font-black tracking-[-0.02em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:focus-visible:ring-indigo-400 sm:gap-2.5 sm:text-lg"
@@ -914,14 +1110,14 @@ export function LandingPage({
             {onSignIn && (
               <Button variant="unstyled"
                 onClick={onSignIn}
-                className="hidden min-h-11 rounded-surface border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:-translate-y-px hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400 sm:block"
+                className="hidden min-h-11 rounded-surface border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:-translate-y-px hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400 sm:block"
               >
                 {t("signIn")}
               </Button>
             )}
             <Button variant="unstyled"
               onClick={onStart}
-              className="hidden min-h-11 rounded-surface bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-canvas sm:block"
+              className="sb-btn-primary hidden min-h-11 rounded-surface bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-canvas sm:block"
             >
               {t("getStarted")}
             </Button>
@@ -932,7 +1128,7 @@ export function LandingPage({
               aria-expanded={menuOpen}
               aria-controls="landing-mobile-nav"
               aria-label={t("navAria")}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-surface border border-slate-200 bg-white text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400 lg:hidden"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-surface border border-slate-200 bg-white text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400 lg:hidden"
             >
               {menuOpen ? (
                 <X className="h-5 w-5" aria-hidden />
@@ -947,9 +1143,9 @@ export function LandingPage({
           <nav
             id="landing-mobile-nav"
             aria-label={t("navAria")}
-            className="border-t border-slate-200 bg-canvas px-4 pb-3 pt-2 dark:border-slate-800 dark:bg-canvas lg:hidden"
+            className="border-t border-slate-200 bg-canvas px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 dark:border-slate-800 dark:bg-canvas lg:hidden"
           >
-            <ul className="mx-auto flex w-[min(1180px,100%)] flex-col">
+            <ul className="mx-auto flex w-[min(1180px,100%)] flex-col gap-0.5 py-1">
               {[
                 { id: "how", label: t("navHow") },
                 { id: "features", label: t("navFeatures") },
@@ -959,38 +1155,52 @@ export function LandingPage({
                 <li key={item.id}>
                   <Button variant="unstyled"
                     onClick={() => goToSection(item.id)}
-                    className="flex min-h-11 w-full items-center rounded-control px-2 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-200 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
+                    className="flex min-h-11 w-full items-center rounded-control px-3 text-left text-sm font-semibold text-slate-700 transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-200 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
                   >
                     {item.label}
                   </Button>
                 </li>
               ))}
-              <li className="mt-1 border-t border-slate-200 pt-1 dark:border-slate-800 sm:hidden">
+              <li className="mt-1 border-t border-slate-200 pt-2 dark:border-slate-800 sm:hidden">
                 <Button variant="unstyled"
                   onClick={() => {
                     menuTriggerRef.current?.focus();
                     setMenuOpen(false);
                     onStart();
                   }}
-                  className="flex min-h-11 w-full items-center rounded-control px-2 text-left text-sm font-black text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
+                  className="flex min-h-11 w-full items-center justify-center rounded-surface bg-indigo-600 px-3 text-center text-sm font-black text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400"
                 >
                   {t("getStarted")}
                 </Button>
               </li>
               {onSignIn && (
-                <li className="sm:mt-1 sm:border-t sm:border-slate-200 sm:pt-1">
+                <li>
                   <Button variant="unstyled"
                     onClick={() => {
                       menuTriggerRef.current?.focus();
                       setMenuOpen(false);
                       onSignIn();
                     }}
-                    className="flex min-h-11 w-full items-center rounded-control px-2 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-200 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
+                    className="flex min-h-11 w-full items-center rounded-control px-3 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-200 dark:hover:bg-indigo-500/10 dark:focus-visible:ring-indigo-400"
                   >
                     {t("signIn")}
                   </Button>
                 </li>
               )}
+              <li className="flex items-center justify-between gap-2 border-t border-slate-200 px-3 py-2 dark:border-slate-800">
+                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">{t("mobileLanguageLabel")}</span>
+                <LanguageSwitcher compact />
+              </li>
+              <li className="px-3 pb-1">
+                <a
+                  href={PUBLIC_TELEGRAM_CHANNEL_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-surface border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
+                >
+                  <Send className="h-3.5 w-3.5" aria-hidden /> {t("tgCta")} · {PUBLIC_TELEGRAM_HANDLE}
+                </a>
+              </li>
             </ul>
           </nav>
         )}
@@ -998,58 +1208,63 @@ export function LandingPage({
 
       <main id="top">
         {/* ===== Hero ===== */}
-        <section className="relative overflow-hidden border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10">
+        <section className="relative overflow-hidden border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(99,102,241,0.16),transparent_36%),radial-gradient(circle_at_12%_78%,rgba(14,165,233,0.10),transparent_32%)] dark:bg-[radial-gradient(circle_at_82%_18%,rgba(99,102,241,0.18),transparent_36%),radial-gradient(circle_at_12%_78%,rgba(14,165,233,0.10),transparent_32%)]"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(68%_55%_at_78%_14%,rgba(99,102,241,0.12),transparent_62%),radial-gradient(52%_42%_at_14%_82%,rgba(124,58,237,0.10),transparent_58%)] dark:bg-[radial-gradient(68%_55%_at_78%_14%,rgba(99,102,241,0.18),transparent_62%),radial-gradient(52%_42%_at_14%_82%,rgba(124,58,237,0.14),transparent_58%)]"
           />
-          <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-8">
+          <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:pr-14 xl:pr-40 2xl:pr-28 md:gap-10 lg:grid-cols-[0.96fr_1.04fr] lg:gap-8">
             {/* Above-the-fold copy must paint in SSR, not wait for JS + stagger. */}
-            <motion.div initial={false} animate="visible" variants={heroGroup}>
+            <motion.div initial={false} animate="visible" variants={heroGroup} className="min-w-0">
               <div>
                 <SectionIndex n="01" label={t("secOverview")} />
               </div>
               <motion.span
-                variants={heroItem}
+                variants={heroStaticItem}
                 className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-300" />
                 {t("heroBadge")}
               </motion.span>
-              <motion.h1
-                variants={heroItem}
+              <h1
                 className="mt-4 max-w-[720px] text-[clamp(38px,5.2vw,64px)] font-black leading-[0.98] tracking-[-0.045em] text-slate-950 dark:text-white"
               >
                 {t("heroTitle")}{" "}
-                <span className="bg-gradient-to-r from-indigo-600 to-violet-500 bg-clip-text font-serif font-medium italic text-transparent underline decoration-indigo-200 decoration-2 underline-offset-[0.12em] dark:from-indigo-300 dark:to-violet-300 dark:decoration-indigo-700">
+                <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 bg-clip-text font-extrabold text-transparent dark:from-indigo-300 dark:via-violet-300 dark:to-indigo-300">
                   {t("heroTitleAccent")}
                 </span>
-              </motion.h1>
+              </h1>
               <motion.p
-                variants={heroItem}
+                variants={heroStaticItem}
                 className="mt-5 max-w-[620px] text-base leading-relaxed text-slate-600 dark:text-slate-300 sm:text-lg"
               >
                 {t("heroBody")}
               </motion.p>
+              <motion.p
+                variants={heroStaticItem}
+                className="mt-3 max-w-[620px] text-sm font-medium leading-relaxed text-slate-500 dark:text-slate-400"
+              >
+                {t("heroAudienceNote")}
+              </motion.p>
               <motion.div
-                variants={heroItem}
+                variants={heroStaticItem}
                 className="mt-6 flex flex-wrap items-center gap-3"
               >
                 <Button variant="unstyled"
                   onClick={onStart}
-                  className="inline-flex min-h-12 items-center gap-2 rounded-surface bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-xl shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-canvas"
+                  className="sb-btn-primary inline-flex min-h-12 items-center gap-2 rounded-surface bg-indigo-600 px-7 py-3 text-sm font-black text-white shadow-xl shadow-indigo-600/25 transition hover:-translate-y-px hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-canvas"
                 >
-                  {t("ctaStart")} <ArrowRight className="h-4 w-4" aria-hidden />
+                  {t("getStarted")} <ArrowRight className="h-4 w-4" aria-hidden />
                 </Button>
                 <Button variant="unstyled"
                   onClick={() => scrollToId("how")}
-                  className="min-h-12 rounded-surface border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:-translate-y-px hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
+                  className="inline-flex min-h-12 items-center gap-1.5 rounded-surface border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:-translate-y-px hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
                 >
                   {t("ctaHow")}
                 </Button>
               </motion.div>
               <motion.div
-                variants={heroItem}
+                variants={heroStaticItem}
                 className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-slate-600 dark:text-slate-300"
               >
                 {[t("trust1"), t("trust2"), t("trust3")].map((item) => (
@@ -1062,9 +1277,26 @@ export function LandingPage({
                   </span>
                 ))}
               </motion.div>
+              <motion.div
+                variants={heroStaticItem}
+                className="mt-4 flex flex-wrap items-center gap-3"
+              >
+                <Link
+                  href="/universities"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
+                >
+                  {t("browsePublicCatalog")} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                </Link>
+                <Link
+                  href="/scholarships"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-control border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
+                >
+                  {t("browsePublicGrants")} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                </Link>
+              </motion.div>
               {onEnterApp && (
                 <MotionButton variant="unstyled"
-                  variants={heroItem}
+                  variants={heroStaticItem}
                   onClick={onEnterApp}
                   className="mt-3 inline-flex min-h-11 items-center rounded-control px-1 text-xs font-semibold text-indigo-700 underline-offset-4 hover:text-indigo-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-200 dark:focus-visible:ring-indigo-400"
                 >
@@ -1073,18 +1305,19 @@ export function LandingPage({
               )}
             </motion.div>
 
-            {/* A compact colorful preview built from the app's real navigation source. */}
+            {/* Layered product shot — soft glow */}
             <motion.div
               className="relative mx-auto w-full max-w-[700px] md:max-w-[620px]"
               initial={false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
                 duration: 0.7,
-                delay: 0.15,
+                delay: 0.12,
                 ease: [0.16, 1, 0.3, 1],
               }}
             >
-              <div className="rounded-overlay border border-indigo-100 bg-white p-2 shadow-2xl shadow-indigo-900/10 dark:border-slate-700 dark:bg-surface dark:shadow-black/40">
+              <div aria-hidden className="sb-hero-mockup-glow pointer-events-none absolute -inset-6 -z-10 rounded-overlay opacity-70 blur-2xl" />
+              <div className="relative rounded-overlay border border-indigo-100 bg-white p-2 shadow-2xl shadow-indigo-900/10 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/40">
                 <div className="overflow-hidden rounded-overlay border border-slate-200 bg-white dark:border-slate-800 dark:bg-surface">
                   <div className="flex h-9 items-center gap-1.5 border-b border-slate-200 px-4 dark:border-slate-800">
                     <span className="h-2 w-2 rounded-full bg-rose-400 dark:bg-rose-300" />
@@ -1094,7 +1327,7 @@ export function LandingPage({
                       {t("demoBadge")}
                     </span>
                   </div>
-                  <div className="grid min-h-[392px] grid-cols-1 sm:grid-cols-[146px_1fr]">
+                  <div className="grid min-h-[394px] grid-cols-1 sm:grid-cols-[146px_1fr]">
                     <aside className="hidden border-r border-slate-200 bg-canvas p-2.5 dark:border-slate-800 dark:bg-canvas sm:block">
                       <div className="mb-2 flex items-center gap-1.5 px-1">
                         <span className="sb-logo-well grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-control border border-slate-200 dark:border-slate-800">
@@ -1262,6 +1495,18 @@ export function LandingPage({
                   </div>
                 </div>
               </div>
+              {/* Floating layered badges — honest sample annotations */}
+              <div className="pointer-events-none absolute -right-2 -top-2 hidden select-none sm:flex sm:flex-col sm:gap-2 lg:-right-4">
+                <div className="rounded-surface border border-slate-200 bg-white px-2.5 py-2 shadow-lg shadow-black/10 dark:border-slate-800 dark:bg-surface dark:shadow-black/30">
+                  <div className="text-xs font-bold text-slate-500 dark:text-slate-400">{t("mockFloatGrantLabel")}</div>
+                  <div className="max-w-[190px] text-sm font-black leading-tight text-slate-900 dark:text-white">{t("mockFloatGrantTitle")}</div>
+                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{t("mockFloatGrantMeta")}</div>
+                </div>
+                <div className="rounded-surface border border-emerald-200 bg-emerald-50 px-2.5 py-2 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                  <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{t("mockFloatFitLabel")}</div>
+                  <div className="text-sm font-black text-emerald-700 dark:text-emerald-300">{t("mockFloatFitValue")}</div>
+                </div>
+              </div>
             </motion.div>
           </div>
         </section>
@@ -1271,9 +1516,9 @@ export function LandingPage({
         {/* ===== How it works ===== */}
         <section
           id="how"
-          className="sb-cv-section scroll-mt-20 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
+          className="sb-cv-section scroll-mt-20 border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10"
         >
-          <div className="mx-auto w-[min(1180px,94%)]">
+          <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
               <SectionIndex n="03" label={t("secHow")} />
               <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
@@ -1290,19 +1535,10 @@ export function LandingPage({
               {steps.map((step) => (
                 <RevealItem
                   key={step.num}
-                  className="rounded-overlay border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-surface"
+                  className="group flex flex-col rounded-overlay border border-slate-200 bg-white p-2 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:border-slate-800 dark:bg-surface dark:hover:shadow-black/30"
                 >
-                  <div className="overflow-hidden rounded-surface border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={step.photo}
-                      alt={step.title}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-28 w-full object-cover transition-transform duration-500 hover:scale-[1.03]"
-                    />
-                  </div>
-                  <div className="px-3 pb-3 pt-4">
+                  <div className="p-1">{step.mini}</div>
+                  <div className="flex flex-1 flex-col px-3 pb-3 pt-3">
                     <div className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
                       {step.num} — {step.label}
                     </div>
@@ -1319,37 +1555,104 @@ export function LandingPage({
           </div>
         </section>
 
-        {/* ===== Features ===== */}
+        {/* ===== Features — hero + supporting grid ===== */}
         <section
           id="features"
-          className="sb-cv-section scroll-mt-16 border-b border-slate-800 bg-slate-900 py-8 text-white sm:py-10"
+          className="sb-cv-section scroll-mt-16 border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10"
         >
-          <div className="mx-auto w-[min(1180px,94%)]">
+          <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
-              <SectionIndex n="04" label={t("secCapabilities")} onDark />
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
+              <SectionIndex n="04" label={t("secCapabilities")} />
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
                 {t("featEyebrow")}
               </div>
-              <h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.035em] sm:text-[40px]">
+              <h2 className="mt-2 text-3xl font-black leading-tight tracking-[-0.035em] text-slate-950 dark:text-white sm:text-[40px]">
                 {t("featTitle")}
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300 sm:text-base">
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:text-base">
                 {t("featText")}
               </p>
             </div>
-            <RevealGroup className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {features.map((feature) => (
+
+            {/* Hero feature */}
+            <Reveal className="overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-surface">
+              <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
+                <div className="p-6 sm:p-8">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-black uppercase tracking-[0.12em] text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
+                    <Sparkles className="h-3 w-3" aria-hidden /> {t("featHeroBadge")}
+                  </span>
+                  <h3 className="mt-3 text-2xl font-black tracking-[-0.02em] text-slate-950 dark:text-white sm:text-3xl">
+                    {t("f1Title")}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                    {t("f1Text")}
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-6 border-t border-slate-100 pt-4 dark:border-slate-800">
+                    <div>
+                      <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                        <CountUp value={24} />
+                      </div>
+                      <div className="text-xs font-semibold leading-tight text-slate-500 dark:text-slate-400">{t("featStat1Label")}</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                        <CountUp value={8} />
+                      </div>
+                      <div className="text-xs font-semibold leading-tight text-slate-500 dark:text-slate-400">{t("featStat2Label")}</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                        <CountUp value={3} />
+                      </div>
+                      <div className="text-xs font-semibold leading-tight text-slate-500 dark:text-slate-400">{t("featStat3Label")}</div>
+                    </div>
+                  </div>
+                  {/* Pipeline */}
+                  <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
+                    {[t("featPipeline1"), t("featPipeline2"), t("featPipeline3"), t("featPipeline4")].map((label, i) => (
+                      <React.Fragment key={label}>
+                        <span className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${i === 0 ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-500 dark:bg-indigo-500" : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"}`}>
+                          {label}
+                        </span>
+                        {i < 3 && <span className="h-px w-6 shrink-0 bg-slate-200 dark:bg-slate-700" aria-hidden />}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+                {/* Advisor mock */}
+                <div className="border-t border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-canvas sm:p-6 lg:border-l lg:border-t-0">
+                  <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                      <span className="grid h-6 w-6 place-items-center rounded-full bg-indigo-600 text-white dark:bg-indigo-500"><Bot className="h-3.5 w-3.5" aria-hidden /></span>
+                      ScholarBridge AI
+                    </div>
+                    <div className="mt-3 rounded-surface bg-indigo-50 px-3 py-2 text-sm font-medium text-slate-700 dark:bg-indigo-500/10 dark:text-slate-200">
+                      “{t("featAdvisorPrompt")}”
+                    </div>
+                    <div className="mt-2 rounded-surface border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm leading-snug text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                      {t("featAdvisorReply")}
+                    </div>
+                  </div>
+                  <div className="mt-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {t("f4Text")}
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+
+            <RevealGroup className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {features.slice(1).map((feature) => (
                 <RevealItem
                   key={feature.title}
-                  className="min-h-[170px] rounded-overlay border border-white/10 bg-slate-800 p-5 dark:border-slate-700/70 dark:bg-surface"
+                  className="min-h-[170px] rounded-overlay border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 dark:border-slate-800 dark:bg-surface dark:hover:shadow-black/20"
                 >
-                  <div className="mb-3 grid h-9 w-9 place-items-center rounded-control bg-white/10 text-xs font-black text-indigo-300">
+                  <div className="mb-3 grid h-9 w-9 place-items-center rounded-control bg-indigo-50 text-xs font-black text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
                     {feature.icon}
                   </div>
-                  <h3 className="text-base font-black text-white">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
                     {feature.title}
                   </h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-300">
+                  <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                     {feature.text}
                   </p>
                 </RevealItem>
@@ -1358,12 +1661,12 @@ export function LandingPage({
           </div>
         </section>
 
-        {/* ===== Chancing (honest) ===== */}
+        {/* ===== Chancing (honest) — prominent Fit ≠ Probability ===== */}
         <section
           id="chancing"
-          className="sb-cv-section scroll-mt-16 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
+          className="sb-cv-section scroll-mt-16 border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10"
         >
-          <div className="mx-auto grid w-[min(1180px,94%)] items-center gap-7 lg:grid-cols-2">
+          <div className="mx-auto grid w-[min(1180px,94%)] items-start gap-7 md:pr-14 lg:grid-cols-[1.05fr_0.95fr] xl:pr-40 2xl:pr-28">
             <Reveal>
               <SectionIndex n="05" label={t("secChancing")} />
               <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
@@ -1375,6 +1678,28 @@ export function LandingPage({
               <p className="mt-3 text-base leading-relaxed text-slate-600 dark:text-slate-300">
                 {t("chanceText")}
               </p>
+              <div className="mt-5 rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-surface">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">How fit is calculated</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: t("chanceDim1"), pct: 82 },
+                    { label: t("chanceDim2"), pct: 100 },
+                    { label: t("chanceDim3"), pct: 65 },
+                    { label: t("chanceDim4"), pct: 72 },
+                  ].map((dim) => (
+                    <div key={dim.label} className="rounded-control border border-slate-100 bg-canvas px-2.5 py-2 dark:border-slate-800 dark:bg-canvas">
+                      <div className="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">{dim.label}</div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div className="h-full rounded-full bg-indigo-600 dark:bg-indigo-400" style={{ width: `${dim.pct}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 rounded-surface border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+                <div className="text-sm font-black text-amber-800 dark:text-amber-200">{t("chanceWhyTitle")}</div>
+                <p className="mt-1 text-sm leading-relaxed text-amber-900 dark:text-amber-200">{t("chanceWhyText")}</p>
+              </div>
               <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                 {[t("chanceLi1"), t("chanceLi2"), t("chanceLi3")].map(
                   (item) => (
@@ -1390,7 +1715,7 @@ export function LandingPage({
               </ul>
             </Reveal>
             <Reveal
-              delay={0.12}
+              delay={0.08}
               className="rounded-overlay border border-slate-200 bg-white p-2 shadow-lg shadow-black/5 dark:border-slate-800 dark:bg-surface dark:shadow-black/30"
             >
               <div className="rounded-surface border border-slate-200 p-5 dark:border-slate-800">
@@ -1407,44 +1732,48 @@ export function LandingPage({
                     </span>
                   </span>
                 </div>
-                <div className="mt-2 flex items-center justify-between border-b border-slate-200 py-3 dark:border-slate-800">
-                  <span className="text-sm text-slate-600 dark:text-slate-300">
-                    {t("chanceMatch")}
-                  </span>
-                  <strong className="text-base font-black text-emerald-600 dark:text-emerald-300">
-                    92%
-                  </strong>
+                {/* Fit vs Probability comparison */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-surface border border-emerald-200 bg-emerald-50 p-3 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                    <div className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">{t("chanceMatch")}</div>
+                    <div className="mt-1 text-2xl font-black text-emerald-600 dark:text-emerald-300">
+                      <CountUp value={92} suffix="%" />
+                    </div>
+                    <div className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">Example profile fit</div>
+                  </div>
+                  <div className="rounded-surface border border-slate-200 bg-canvas p-3 text-center dark:border-slate-700 dark:bg-canvas">
+                    <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t("chanceAdmission")}</div>
+                    <div className="mt-1 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                      —
+                    </div>
+                    <div className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">Not estimated</div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between border-b border-slate-200 py-3 dark:border-slate-800">
-                  <span className="text-sm text-slate-600 dark:text-slate-300">
-                    {t("chanceAdmission")}
-                  </span>
-                  <span className="text-4xl font-black tracking-tight text-indigo-600 dark:text-indigo-300">
-                    —
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-3">
+                <div className="mt-2 flex items-center justify-between border-y border-slate-200 py-3 dark:border-slate-800">
                   <span className="text-sm text-slate-600 dark:text-slate-300">
                     {t("chanceDataBasis")}
                   </span>
-                  <strong className="text-base font-black text-slate-950 dark:text-white">
+                  <strong className="text-sm font-black text-slate-950 dark:text-white">
                     {t("chanceDataPublished")}
                   </strong>
                 </div>
-                <p className="mt-2 border-t border-slate-200 pt-3 text-sm leading-relaxed text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
                   {t("chanceNote")}
                 </p>
+                <div className="mt-3 rounded-control bg-slate-50 px-3 py-2 text-center text-xs font-semibold text-slate-500 dark:bg-canvas dark:text-slate-400">
+                  Fit — not a probability · Scholarship fit uses published catalogue fields only.
+                </div>
               </div>
             </Reveal>
           </div>
         </section>
 
-        {/* ===== Roadmap ===== */}
+        {/* ===== Roadmap — connected spine ===== */}
         <section
           id="roadmap"
-          className="sb-cv-section scroll-mt-16 border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10"
+          className="sb-cv-section scroll-mt-16 border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10"
         >
-          <div className="mx-auto w-[min(1180px,94%)]">
+          <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
               <SectionIndex n="06" label={t("secRoadmap")} />
               <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">
@@ -1457,30 +1786,76 @@ export function LandingPage({
                 {t("roadText")}
               </p>
             </div>
-            <RevealGroup className="grid gap-3 sm:grid-cols-3">
-              {roadItems.map((item) => (
-                <RevealItem
-                  key={item.num}
-                  className="rounded-overlay border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-surface"
-                >
-                  <div className="grid h-9 w-9 place-items-center rounded-control bg-indigo-50 text-sm font-black text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
-                    {item.num}
+            <div className="relative mx-auto max-w-[760px]">
+              {/* Spine line — desktop only */}
+              <span aria-hidden className="pointer-events-none absolute left-1/2 top-2 hidden h-[calc(100%-16px)] w-px -translate-x-1/2 bg-slate-200 dark:bg-slate-700 sm:block" />
+              <RevealGroup className="space-y-3 sm:space-y-4">
+                {roadItems.map((item, idx) => (
+                  <RevealItem
+                    key={item.num}
+                    className={`relative rounded-overlay border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-surface sm:w-[calc(50%-20px)] ${idx % 2 === 0 ? "sm:mr-auto" : "sm:ml-auto"}`}
+                  >
+                    {/* Dot on spine */}
+                    <span aria-hidden className="absolute top-6 hidden h-3 w-3 rounded-full border-2 border-indigo-600 bg-white dark:border-indigo-400 dark:bg-surface sm:block" style={idx % 2 === 0 ? { right: "-26px" } : { left: "-26px" }} />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="grid h-8 w-8 place-items-center rounded-control bg-indigo-600 text-sm font-black text-white dark:bg-indigo-500">
+                        {item.num}
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 dark:bg-canvas dark:text-slate-300">{item.tag}</span>
+                    </div>
+                    <h3 className="mb-1.5 mt-3 text-base font-black text-slate-950 dark:text-white">
+                      {item.title}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                      {item.text}
+                    </p>
+                  </RevealItem>
+                ))}
+              </RevealGroup>
+            </div>
+          </div>
+        </section>
+
+        {/* ===== Telegram strip ===== */}
+        <section className="border-b border-slate-200 bg-canvas py-7 dark:border-slate-800 sm:py-8">
+          <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
+            <div className="overflow-hidden rounded-overlay border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 shadow-sm dark:border-indigo-500/20 dark:from-indigo-500/10 dark:via-surface dark:to-violet-500/10 dark:bg-surface sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
+                    {t("secTelegram")} · <span className="font-mono text-xs font-bold normal-case tracking-normal text-slate-500 dark:text-slate-400">{PUBLIC_TELEGRAM_HANDLE}</span>
                   </div>
-                  <h3 className="mb-1.5 mt-3 text-base font-black text-slate-950 dark:text-white">
-                    {item.title}
+                  <div className="mt-1 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">{t("tgEyebrow")}</div>
+                  <h3 className="mt-1 text-lg font-black leading-tight text-slate-950 dark:text-white sm:text-xl">
+                    {t("tgTitle")}
                   </h3>
-                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                    {item.text}
+                  <p className="mt-1.5 max-w-[640px] text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                    {t("tgBody")}
                   </p>
-                </RevealItem>
-              ))}
-            </RevealGroup>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[t("tgPill1"), t("tgPill2"), t("tgPill3")].map((pill) => (
+                      <span key={pill} className="rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-slate-900 dark:text-indigo-300">
+                        {pill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <a
+                  href={PUBLIC_TELEGRAM_CHANNEL_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-surface bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-md shadow-indigo-600/20 transition hover:-translate-y-px hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-surface"
+                >
+                  <Send className="h-4 w-4" aria-hidden /> {t("tgCta")}
+                </a>
+              </div>
+            </div>
           </div>
         </section>
 
         {/* ===== Testimonial ===== */}
-        <section className="border-b border-slate-200 py-8 dark:border-slate-800 sm:py-10">
-          <div className="mx-auto w-[min(1180px,94%)]">
+        <section className="border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10">
+          <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <Reveal>
               <div className="mx-auto max-w-[900px] rounded-overlay border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-7 text-center dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-surface dark:bg-surface sm:p-8">
                 <div className="mx-auto grid h-9 w-9 place-items-center rounded-full border border-indigo-200 bg-white/70 dark:border-indigo-500/30 dark:bg-indigo-500/10">
@@ -1489,7 +1864,7 @@ export function LandingPage({
                     aria-hidden
                   />
                 </div>
-                <p className="mx-auto mt-3 max-w-[760px] font-serif text-xl font-semibold italic leading-relaxed tracking-[-0.01em] text-slate-950 dark:text-white sm:text-2xl">
+                <p className="mx-auto mt-3 max-w-[760px] text-xl font-semibold italic leading-relaxed tracking-[-0.01em] text-slate-950 dark:text-white sm:text-2xl">
                   “{t("quote")}”
                 </p>
                 <p className="mt-3 text-sm font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
@@ -1501,34 +1876,44 @@ export function LandingPage({
         </section>
 
         {/* ===== CTA ===== */}
-        <section id="cta" className="sb-cv-section scroll-mt-20 py-8 sm:py-10">
-          <div className="mx-auto w-[min(1180px,94%)]">
+        <section id="cta" className="sb-cv-section scroll-mt-20 bg-canvas py-8 sm:py-10">
+          <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <Reveal>
-              <div className="relative overflow-hidden rounded-overlay border border-indigo-900/20 bg-gradient-to-br from-cta-from via-cta-via to-cta-to px-6 py-10 text-center text-white dark:border-indigo-500/20 dark:from-cta-from dark:via-cta-via dark:to-cta-to sm:px-14 sm:py-12">
+              <div className="sb-cta-banner relative overflow-hidden rounded-overlay border border-indigo-900/20 px-6 py-10 text-center shadow-xl shadow-indigo-900/15 dark:border-indigo-500/20 sm:px-14 sm:py-12">
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_88%_0%,rgba(148,92,255,0.35),transparent_42%)]"
+                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_88%_0%,rgba(148,92,255,0.32),transparent_42%),radial-gradient(circle_at_12%_90%,rgba(99,102,241,0.22),transparent_40%)]"
                 />
                 <div className="relative">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em]">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-white">
                     <ShieldCheck
                       className="h-3.5 w-3.5 text-emerald-300"
                       aria-hidden
                     />{" "}
                     {t("ctaBadge")}
                   </div>
-                  <h2 className="mt-4 text-3xl font-black tracking-[-0.035em] sm:text-[43px]">
+                  <h2 className="mt-4 text-3xl font-black tracking-[-0.035em] text-white sm:text-[43px]">
                     {t("ctaTitle")}
                   </h2>
-                  <p className="mx-auto mt-2 max-w-[620px] text-sm leading-relaxed text-slate-300 sm:text-base">
+                  <p className="mx-auto mt-2 max-w-[620px] text-sm leading-relaxed text-indigo-100 sm:text-base">
                     {t("ctaText")}
                   </p>
-                  <Button variant="unstyled"
-                    onClick={onStart}
-                    className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-surface bg-white px-7 py-3 text-sm font-black text-indigo-700 shadow-xl transition hover:-translate-y-px hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-900 dark:ring-offset-surface"
-                  >
-                    {t("ctaBtn")} <ArrowRight className="h-4 w-4" aria-hidden />
-                  </Button>
+                  <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                    <Button variant="unstyled"
+                      onClick={onStart}
+                      className="sb-btn-primary inline-flex min-h-12 items-center gap-2 rounded-surface bg-white px-7 py-3 text-sm font-black text-indigo-700 shadow-xl transition hover:-translate-y-px hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-900 dark:bg-white dark:text-indigo-700 dark:hover:bg-indigo-50 dark:ring-offset-surface"
+                    >
+                      {t("ctaBtn")} <ArrowRight className="h-4 w-4" aria-hidden />
+                    </Button>
+                    <a
+                      href={PUBLIC_TELEGRAM_CHANNEL_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-12 items-center gap-2 rounded-surface border border-white/25 bg-white/10 px-6 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    >
+                      <Send className="h-4 w-4" aria-hidden /> {t("tgCta")}
+                    </a>
+                  </div>
                 </div>
               </div>
             </Reveal>
@@ -1537,24 +1922,66 @@ export function LandingPage({
       </main>
 
       {/* ===== Footer ===== */}
-      <footer className="border-t border-slate-200 py-7 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
-        <div className="mx-auto flex w-[min(1180px,94%)] flex-col items-center justify-between gap-2 sm:flex-row">
+      <footer className="border-t border-slate-200 bg-canvas py-7 text-sm text-slate-600 dark:border-slate-800 dark:bg-canvas dark:text-slate-300">
+        <div className="mx-auto grid w-[min(1180px,94%)] gap-6 md:pr-14 xl:pr-40 2xl:pr-28 md:grid-cols-[1.2fr_0.7fr_0.9fr] md:gap-8">
           <div>
-            © {new Date().getFullYear()} {t("footerLeft")}
+            <div className="flex items-center gap-2 font-black tracking-tight text-slate-900 dark:text-white">
+              <span className="sb-logo-well grid h-7 w-7 place-items-center overflow-hidden rounded-control border border-slate-200 bg-white p-0.5 dark:border-slate-800 dark:bg-surface">
+                <BrandingImage alt={t("logoAlt")} className="h-full w-full rounded-control object-cover" />
+              </span>
+              {tm("appName")} · ScholarBridge AI
+            </div>
+            <p className="mt-2 max-w-[420px] text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              {t("heroBody")}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href="/universities" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200">{t("browsePublicCatalog")}</Link>
+              <span className="text-slate-300 dark:text-slate-600">·</span>
+              <Link href="/scholarships" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200">{t("browsePublicGrants")}</Link>
+            </div>
+            <div className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+              © {new Date().getFullYear()} {t("footerLeft")}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <a href="/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-1 transition hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400">
-              {t("footerPrivacy")}
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-900 dark:text-white">{t("footerExplore")}</div>
+            <ul className="mt-3 space-y-1">
+              <li><a href="#how" onClick={(e)=>{e.preventDefault();scrollToId("how");}} className="inline-flex min-h-8 items-center text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300">{t("navHow")}</a></li>
+              <li><a href="#features" onClick={(e)=>{e.preventDefault();scrollToId("features");}} className="inline-flex min-h-8 items-center text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300">{t("navFeatures")}</a></li>
+              <li><a href="#chancing" onClick={(e)=>{e.preventDefault();scrollToId("chancing");}} className="inline-flex min-h-8 items-center text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300">{t("navChancing")}</a></li>
+              <li><a href="#roadmap" onClick={(e)=>{e.preventDefault();scrollToId("roadmap");}} className="inline-flex min-h-8 items-center text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300">{t("navPlanning")}</a></li>
+              <li><a href="/features" className="inline-flex min-h-8 items-center text-sm font-medium text-slate-600 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300">{t("footerFeatures")}</a></li>
+            </ul>
+          </div>
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-900 dark:text-white">{t("footerLegal")}</div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <a href="/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-2 text-sm font-medium text-slate-600 transition hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400">
+                {t("footerPrivacy")}
+              </a>
+              <a href="/terms" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-2 text-sm font-medium text-slate-600 transition hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400">
+                {t("footerTerms")}
+              </a>
+            </div>
+            <a
+              href={PUBLIC_TELEGRAM_CHANNEL_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-control border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400"
+            >
+              <Send className="h-3.5 w-3.5" aria-hidden /> {PUBLIC_TELEGRAM_HANDLE}
             </a>
-            <a href="/terms" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-1 transition hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300 dark:focus-visible:ring-indigo-400">
-              {t("footerTerms")}
-            </a>
+            <div className="mt-3 flex items-center gap-1.5">
+              <LanguageSwitcher compact />
+              <ThemeSwitch />
+            </div>
           </div>
         </div>
-        <div className="mx-auto mt-3 w-[min(1180px,94%)] border-t border-slate-200 pt-3 dark:border-slate-800">
+        <div className="mx-auto mt-6 w-[min(1180px,94%)] border-t border-slate-200 pt-4 dark:border-slate-800 md:pr-14 xl:pr-40 2xl:pr-28">
           <AppNote kind="general" className="mx-auto max-w-[900px]" />
         </div>
       </footer>
+      </div>{/* end relative z-10 foreground */}
     </div>
   );
 }
@@ -1760,7 +2187,9 @@ function ExecutiveMonochromeJet({
   );
 }
 
-function ScrollFlightPath() {
+function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
+  const liteDetected = useLiteMotionTier();
+  const lite = liteProp ?? liteDetected;
   /**
    * Scroll-locked aerobatic flight on the SHARED damped scroll engine
    * (`paintOnceUnderReducedMotion` → `scrollEngine.subscribe`): zero React
@@ -1803,9 +2232,9 @@ function ScrollFlightPath() {
     if (!path) return;
     const reducedMotion = window.matchMedia?.(
       "(prefers-reduced-motion: reduce)",
-    ).matches;
+    ).matches || lite;
 
-    const STEPS = 360;
+    const STEPS = lite ? 120 : 360;
     // [x, y, unwrapped screen-heading°, bank-turn°] per sample.
     let lut = new Float64Array((STEPS + 1) * 4);
     let totalLen = 4200;
@@ -1927,36 +2356,44 @@ function ScrollFlightPath() {
         lastBellyOp = bellyValue;
       }
 
-      const vortOp = Math.min(
-        0.85,
-        Math.abs(bankDeg) / 22 +
-          (inRoll ? Math.sin(rollPhase * Math.PI) * 0.8 : 0) +
-          vel * 12,
-      );
-      const vL = 1 + Math.min(1.6, Math.abs(bankDeg) / 26 + vel * 20);
-      const curl = inRoll ? Math.sin(rollPhase * Math.PI * 2) * 10 : 0;
-      const vortValue = vortOp.toFixed(3);
-      if (Math.abs(vortOp - lastVortOp) > 0.01) {
-        vortexGroupRef.current?.setAttribute("opacity", vortValue);
-        lastVortOp = Number(vortValue);
-      }
-      const vortexTransform = `scale(${vL.toFixed(3)} ${(1 + curl * 0.015).toFixed(3)})`;
-      if (vortexTransform !== lastVortexTransform) {
-        vortexGroupRef.current?.setAttribute("transform", vortexTransform);
-        lastVortexTransform = vortexTransform;
+      // In lite mode: no vortices, no afterburner pulsing — keep plane visible but reduce rAF work.
+      if (lite) {
+        if (vortexGroupRef.current && lastVortOp !== 0) {
+          vortexGroupRef.current.setAttribute("opacity", "0");
+          lastVortOp = 0;
+        }
+      } else {
+        const vortOp = Math.min(
+          0.85,
+          Math.abs(bankDeg) / 22 +
+            (inRoll ? Math.sin(rollPhase * Math.PI) * 0.8 : 0) +
+            vel * 12,
+        );
+        const vL = 1 + Math.min(1.6, Math.abs(bankDeg) / 26 + vel * 20);
+        const curl = inRoll ? Math.sin(rollPhase * Math.PI * 2) * 10 : 0;
+        const vortValue = vortOp.toFixed(3);
+        if (Math.abs(vortOp - lastVortOp) > 0.01) {
+          vortexGroupRef.current?.setAttribute("opacity", vortValue);
+          lastVortOp = Number(vortValue);
+        }
+        const vortexTransform = `scale(${vL.toFixed(3)} ${(1 + curl * 0.015).toFixed(3)})`;
+        if (vortexTransform !== lastVortexTransform) {
+          vortexGroupRef.current?.setAttribute("transform", vortexTransform);
+          lastVortexTransform = vortexTransform;
+        }
       }
 
-      const plumeTransform = `scale(${(1 + Math.min(1.8, vel * 28)).toFixed(3)} 1)`;
+      const plumeTransform = lite ? "scale(1 1)" : `scale(${(1 + Math.min(1.8, vel * 28)).toFixed(3)} 1)`;
       if (plumeTransform !== lastPlumeTransform) {
         plumeRef.current?.setAttribute("transform", plumeTransform);
         lastPlumeTransform = plumeTransform;
       }
-      const burnerTransform = `scale(${(1 + Math.min(2.2, vel * 34)).toFixed(3)} 1)`;
+      const burnerTransform = lite ? "scale(1 1)" : `scale(${(1 + Math.min(2.2, vel * 34)).toFixed(3)} 1)`;
       if (burnerTransform !== lastBurnerTransform) {
         burnerRef.current?.setAttribute("transform", burnerTransform);
         lastBurnerTransform = burnerTransform;
       }
-      const burnerValue = Math.min(0.9, vel * 40).toFixed(3);
+      const burnerValue = lite ? "0" : Math.min(0.9, vel * 40).toFixed(3);
       if (burnerValue !== lastBurnerOp) {
         burnerRef.current?.setAttribute("opacity", burnerValue);
         lastBurnerOp = burnerValue;
@@ -1966,7 +2403,7 @@ function ScrollFlightPath() {
     scrollEngine.initialize();
     sampledWidth = window.innerWidth;
     sampleLut();
-    const unsub = paintOnceUnderReducedMotion(paint, reducedMotion);
+    const unsub = paintOnceUnderReducedMotion(paint, !!reducedMotion);
     const handleResize = () => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
@@ -1987,12 +2424,12 @@ function ScrollFlightPath() {
       window.removeEventListener("resize", handleResize);
       if (resizeTimer) clearTimeout(resizeTimer);
     };
-  }, []);
+  }, [lite]);
 
   return (
     <div
       aria-hidden="true"
-      className="sb-flight sb-contain-strict pointer-events-none fixed inset-0 z-20 overflow-hidden text-zinc-900/75 dark:text-white/80"
+      className="sb-flight pointer-events-none fixed inset-0 z-0 overflow-hidden"
     >
       <svg
         viewBox="0 0 1200 1000"
@@ -2017,14 +2454,14 @@ function ScrollFlightPath() {
             <stop offset="100%" stopColor={SVG_COLORS.zinc400} />
           </linearGradient>
           <linearGradient id="jetPlumeGrad" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0.55" />
-            <stop offset="50%" stopColor="currentColor" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+            <stop offset="0%" stopColor={SVG_COLORS.indigo100} stopOpacity="0.55" />
+            <stop offset="50%" stopColor={SVG_COLORS.indigo400} stopOpacity="0.22" />
+            <stop offset="100%" stopColor={SVG_COLORS.violet400} stopOpacity="0" />
           </linearGradient>
           <linearGradient id="jetAfterburnGrad" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor={SVG_COLORS.blue50} stopOpacity="0.95" />
-            <stop offset="40%" stopColor={SVG_COLORS.sky400} stopOpacity="0.8" />
-            <stop offset="100%" stopColor={SVG_COLORS.sky400} stopOpacity="0" />
+            <stop offset="0%" stopColor={SVG_COLORS.white} stopOpacity="0.95" />
+            <stop offset="40%" stopColor={SVG_COLORS.indigo400} stopOpacity="0.85" />
+            <stop offset="100%" stopColor={SVG_COLORS.violet400} stopOpacity="0" />
           </linearGradient>
         </defs>
         <g ref={cameraRef} transform="translate(0 380)" className="sb-will-transform">
@@ -2032,7 +2469,7 @@ function ScrollFlightPath() {
             d={FLIGHT_PATH_D}
             fill="none"
             stroke="currentColor"
-            opacity="0.25"
+            opacity="0.18"
             strokeWidth="2.2"
             strokeDasharray="8 12"
             strokeLinecap="round"
@@ -2042,8 +2479,8 @@ function ScrollFlightPath() {
             d={FLIGHT_PATH_D}
             fill="none"
             stroke="currentColor"
-            opacity="0.8"
-            strokeWidth="3.2"
+            opacity="0.62"
+            strokeWidth="3"
             strokeLinecap="round"
             strokeDasharray="4200 4200"
             strokeDashoffset={4200}
@@ -2071,9 +2508,11 @@ function ScrollFlightPath() {
   );
 }
 
-function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
+function UniversityCampusMarquee({ onStart, lite: liteProp }: { onStart: () => void; lite?: boolean }) {
   const tIndex = useTranslations("landing");
   const sectionRef = React.useRef<HTMLElement | null>(null);
+  const liteDetected = useLiteMotionTier();
+  const lite = liteProp ?? liteDetected;
 
   React.useEffect(() => {
     const el = sectionRef.current;
@@ -2131,10 +2570,9 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                 type="button"
                 tabIndex={copy === 1 ? -1 : undefined}
                 onClick={onStart}
-                className="group relative w-64 shrink-0 rounded-overlay border border-slate-200/90 bg-white p-2 text-left shadow-xs transition-all hover:border-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-72 dark:border-slate-700/80 dark:bg-surface dark:hover:border-indigo-400 dark:focus-visible:ring-indigo-400"
+                className="group relative w-64 shrink-0 rounded-overlay border border-slate-200/90 bg-white p-2 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-72 dark:border-slate-700/80 dark:bg-surface dark:hover:border-indigo-400 dark:focus-visible:ring-indigo-400"
               >
                 <span className="relative block h-32 w-full overflow-hidden rounded-surface border border-slate-200/70 bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900">
-                  {/* Native images avoid forcing a 48-image optimizer queue on first load. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     data-campus-src={campusPhotoSrc(university.url, 320)}
@@ -2143,6 +2581,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
                     alt={university.landmark}
                     width={288}
                     height={128}
+                    sizes="(max-width: 640px) 256px, 288px"
                     loading="lazy"
                     fetchPriority="low"
                     decoding="async"
@@ -2177,10 +2616,10 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       ref={sectionRef}
       id="campuses"
       aria-labelledby="university-marquee-title"
-      data-paused="true"
-      className="relative z-10 border-b border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-canvas sm:py-10"
+      data-paused="false"
+      className="sb-cv-section sb-marquee-fade relative z-10 border-y border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-canvas sm:py-10"
     >
-      <div className="mx-auto mb-5 w-[min(1180px,94%)]">
+      <div className="mx-auto mb-5 w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
         <SectionIndex n="02" label={tIndex("secCampuses")} />
         <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-indigo-700 dark:text-indigo-300">
           {tIndex("marqueeBadge")}
@@ -2195,7 +2634,7 @@ function UniversityCampusMarquee({ onStart }: { onStart: () => void }) {
       <div className="space-y-3 overflow-hidden">
         {renderRow(MARQUEE_ROW_1, "sb-marquee-right")}
         {renderRow(MARQUEE_ROW_2, "sb-marquee-left")}
-        {renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
+        {!lite && renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
       </div>
     </section>
   );

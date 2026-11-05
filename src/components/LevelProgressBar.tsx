@@ -3,6 +3,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { ProgressFill } from "@/components/ui/ProgressBar";
+import { Confetti } from "@/components/ui/Confetti";
 
 interface LevelProgressBarProps {
   levelName: string;
@@ -25,8 +26,10 @@ export function LevelProgressBar({
   const pct = pointsForLevel > 0 ? Math.min(100, Math.round((pointsIntoLevel / pointsForLevel) * 100)) : 100;
   const remaining = Math.max(0, pointsForLevel - pointsIntoLevel);
 
+  const isMax = !nextLevelName || pointsForLevel <= 0;
   return (
-    <div className="bg-white rounded-overlay border border-slate-200 shadow-xs p-5">
+    <div className="relative bg-white rounded-overlay border border-slate-200 shadow-xs p-5 overflow-hidden">
+      <Confetti active={isMax && totalPoints > 0} />
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-2xl">{levelIcon}</span>
@@ -47,7 +50,7 @@ export function LevelProgressBar({
           {remaining.toLocaleString()} {t("pointsToNextLevel")} · {nextLevelName}
         </p>
       ) : (
-        <p className="text-sm text-slate-500 mt-2">★ Max level</p>
+        <p className="text-sm text-slate-500 mt-2">{t("maxLevel")}</p>
       )}
     </div>
   );

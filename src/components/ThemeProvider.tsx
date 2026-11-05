@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  DEFAULT_THEME,
   isThemeChoice,
   THEME_COOKIE,
   THEME_STORAGE_KEY,
@@ -49,7 +50,7 @@ function readStoredTheme(): ThemeChoice {
   } catch {
     // private mode / storage disabled
   }
-  return "system";
+  return DEFAULT_THEME;
 }
 
 function subscribeChoice(onChange: () => void) {
@@ -111,7 +112,7 @@ function applyTheme(resolved: ResolvedTheme) {
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = DEFAULT_THEME,
 }: {
   children: ReactNode;
   /**

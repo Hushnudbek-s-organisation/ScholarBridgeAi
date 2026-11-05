@@ -59,7 +59,7 @@ export function PageHeader({
   };
   const Heading = level;
   return (
-    <div className="flex flex-col gap-3 rounded-overlay border border-slate-200 bg-white px-4 py-3.5 shadow-xs dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+    <div className="sb-surface-card flex flex-col gap-3 rounded-overlay border border-slate-200 bg-white px-4 py-3.5 shadow-xs dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-surface ring-1 ${tone[accent]}`}>
           <Icon className="h-5 w-5" />
@@ -68,8 +68,8 @@ export function PageHeader({
           <Heading
             className={
               level === "h1"
-                ? "text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl"
-                : "text-base font-bold tracking-tight text-slate-900 sm:text-lg"
+                ? "sb-type-h1 text-slate-900"
+                : "sb-type-h2 text-slate-900"
             }
           >
             {title}
@@ -102,12 +102,12 @@ export function StatCard({
     violet: "text-violet-600",
   };
   return (
-    <div className="rounded-overlay border border-slate-200 bg-white p-3 sm:p-4">
+    <div className="sb-surface-card rounded-overlay border border-slate-200 bg-white p-3 sm:p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
-        {Icon && <Icon className="h-4 w-4 text-slate-300" />}
+        <span className="sb-type-eyebrow text-slate-500">{label}</span>
+        {Icon && <Icon className="h-4 w-4 text-slate-500" />}
       </div>
-      <div className={`mt-1 text-2xl font-black ${color[tone]}`}>{value}</div>
+      <div className={`mt-1 text-2xl font-bold tracking-tight tabular-nums ${color[tone]}`}>{value}</div>
     </div>
   );
 }
@@ -133,9 +133,9 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.id)}
-            className={`inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-surface px-3.5 py-2 text-left text-xs font-bold transition-colors ${
+            className={`inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-surface px-3.5 py-2 text-left text-xs font-semibold transition-colors ${
               active
-                ? "border border-indigo-600 bg-indigo-600 text-white shadow-sm shadow-indigo-600/20"
+                ? "sb-btn-primary border border-indigo-600 bg-indigo-600 text-white"
                 : "border border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"
             }`}
           >

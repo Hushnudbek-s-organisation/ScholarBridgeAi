@@ -2,7 +2,7 @@
 
 import { motion, type HTMLMotionProps } from "framer-motion";
 import type { ReactNode } from "react";
-import { staggerParent } from "./variants";
+import { MOTION_TOKENS, staggerParent } from "./variants";
 
 type RevealProps = Omit<HTMLMotionProps<"div">, "children"> & {
   children: ReactNode;
@@ -20,7 +20,7 @@ type RevealProps = Omit<HTMLMotionProps<"div">, "children"> & {
  */
 export function Reveal({
   children,
-  distance = 18,
+  distance = 16,
   delay = 0,
   ...rest
 }: RevealProps) {
@@ -35,9 +35,9 @@ export function Reveal({
           opacity: 1,
           y: 0,
           transition: {
-            duration: 0.45,
+            duration: MOTION_TOKENS.duration.reveal,
             delay,
-            ease: [0.16, 1, 0.3, 1] as const,
+            ease: MOTION_TOKENS.ease.out,
           },
         },
       }}
@@ -80,7 +80,7 @@ export function RevealGroup({
  */
 export function RevealItem({
   children,
-  distance = 14,
+  distance = 12,
   ...rest
 }: Omit<HTMLMotionProps<"div">, "children" | "variants"> & {
   children: ReactNode;
@@ -93,7 +93,7 @@ export function RevealItem({
         visible: {
           opacity: 1,
           y: 0,
-          transition: { duration: 0.34, ease: [0.16, 1, 0.3, 1] as const },
+          transition: { duration: MOTION_TOKENS.duration.page, ease: MOTION_TOKENS.ease.out },
         },
       }}
       {...rest}
