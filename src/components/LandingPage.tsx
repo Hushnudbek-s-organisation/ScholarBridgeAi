@@ -12,6 +12,7 @@ import { SVG_COLORS } from "@/components/ui/tokens";
 import Link from "next/link";
 import { isLiteMotionSync, subscribeLiteMotion } from "@/lib/liteMotion";
 import { PUBLIC_TELEGRAM_CHANNEL_URL, PUBLIC_TELEGRAM_HANDLE } from "@/lib/publicLinks";
+import { useTranslations, useLocale } from "next-intl";
 
 /** Hero children: each one rises a beat after the previous. */
 const heroGroup = staggerParent(0.1, 0.08);
@@ -32,7 +33,6 @@ const heroStaticItem = {
     transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const },
   },
 };
-import { useTranslations, useLocale } from "next-intl";
 import {
   ArrowRight,
   Award,
@@ -589,22 +589,29 @@ function PhotoCraftKineticHud({ lite: liteProp }: { lite?: boolean } = {}) {
 
         let transform: string;
         let opacity: string;
+        // Hero hududida - yirik SCHOLARBRIDGE hero mock ustiga chiqmasin (p<0.04)
+        const inHero = smooth < 0.04;
         if (state === "passed") {
           transform = `translate3d(0px, ${topSlotY.toFixed(1)}px, 0px) scale(1)`;
-          opacity = "0.48";
+          opacity = inHero ? "0.0" : "0.48";
         } else if (state === "upcoming") {
           transform = `translate3d(0px, ${bottomSlotY.toFixed(1)}px, 0px) scale(1)`;
-          opacity = "0.48";
+          opacity = inHero ? "0.0" : "0.48";
         } else {
-          const rawT = (WINDOW - delta) / (2 * WINDOW);
-          const t = Math.max(0, Math.min(1, rawT));
-          const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-          const currentY = bottomSlotY + (topSlotY - bottomSlotY) * easeT;
-          const bell = Math.pow(Math.sin(t * Math.PI), 0.72);
-          const scale = 1 + bell * (lite ? 1.0 : 2.15);
-          const shiftX = -bell * (lite ? 4 : 10);
-          transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
-          opacity = (0.48 + bell * (lite ? 0.32 : 0.52)).toFixed(3);
+          if (inHero) {
+            transform = `translate3d(0px, ${bottomSlotY.toFixed(1)}px, 0px) scale(1)`;
+            opacity = "0.0";
+          } else {
+            const rawT = (WINDOW - delta) / (2 * WINDOW);
+            const t = Math.max(0, Math.min(1, rawT));
+            const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            const currentY = bottomSlotY + (topSlotY - bottomSlotY) * easeT;
+            const bell = Math.pow(Math.sin(t * Math.PI), 0.72);
+            const scale = 1 + bell * (lite ? 0.8 : 1.4);
+            const shiftX = -bell * (lite ? 2 : 4);
+            transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
+            opacity = (0.48 + bell * (lite ? 0.2 : 0.35)).toFixed(3);
+          }
         }
         if (prevTransforms[i] !== transform) {
           el.style.transform = transform;
@@ -669,7 +676,7 @@ function PhotoCraftKineticHud({ lite: liteProp }: { lite?: boolean } = {}) {
   }
 
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-30 hidden select-none md:block print:hidden">
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-20 hidden select-none md:block print:hidden">
       {/* Zoomed altimeter tape + glowing laser cursor (far right edge) — indigo/violet tuned. */}
       <div className="pointer-events-none absolute inset-y-0 right-0 w-14 overflow-hidden">
         <div
@@ -702,7 +709,7 @@ function PhotoCraftKineticHud({ lite: liteProp }: { lite?: boolean } = {}) {
             type="button"
             tabIndex={-1}
             onClick={() => scrollToId(sec.id)}
-            className="sb-kinetic-word pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-xs font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-indigo-700 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
+            className="sb-kinetic-word pointer-events-auto fixed right-12 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-xs font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-indigo-700 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
           >
             {sec.word[locale as "en" | "uz" | "ru"] ?? sec.word.en}
           </Button>
@@ -999,17 +1006,17 @@ export function LandingPage({
     guidance: Bot,
     community: MessagesSquare,
   };
-  const mockSidebarGroups = NAV_GROUPS.map((group) => ({
+  const mockSidebarGroups = NAV_GROUPS.slice(0, 3).map((group) => ({
     id: group,
     label: nav(NAV_GROUP_I18N[group] as never),
-    items: NAV_SECTIONS.filter((section) => section.group === group).map(
-      (section) => ({
+    items: NAV_SECTIONS.filter((section) => section.group === group)
+      .slice(0, 4)
+      .map((section) => ({
         id: section.id,
         label: nav(NAV_SECTION_LABEL_KEYS[section.id] as never),
         icon: mockIcon[section.id] ?? Sparkles,
         pro: Boolean(section.premium),
-      }),
-    ),
+      })),
   })).filter((group) => group.items.length > 0);
   const mockAccountItems = NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).map(
     (u) => ({
@@ -1215,7 +1222,8 @@ export function LandingPage({
           />
           <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:pr-14 xl:pr-40 2xl:pr-28 md:gap-10 lg:grid-cols-[0.96fr_1.04fr] lg:gap-8">
             {/* Above-the-fold copy must paint in SSR, not wait for JS + stagger. */}
-            <motion.div initial={false} animate="visible" variants={heroGroup} className="min-w-0">
+            <motion.div initial={false} animate="visible" variants={heroGroup}>
+              <div className="min-w-0">
               <div>
                 <SectionIndex n="01" label={t("secOverview")} />
               </div>
@@ -1303,6 +1311,7 @@ export function LandingPage({
                   {t("enterApp")}
                 </MotionButton>
               )}
+              </div>
             </motion.div>
 
             {/* Layered product shot — soft glow */}
@@ -1327,8 +1336,8 @@ export function LandingPage({
                       {t("demoBadge")}
                     </span>
                   </div>
-                  <div className="grid min-h-[394px] grid-cols-1 sm:grid-cols-[146px_1fr]">
-                    <aside className="hidden border-r border-slate-200 bg-canvas p-2.5 dark:border-slate-800 dark:bg-canvas sm:block">
+                  <div className="grid min-h-[360px] grid-cols-1 sm:grid-cols-[160px_1fr]">
+                    <aside className="hidden max-h-[420px] overflow-hidden border-r border-slate-200 bg-canvas p-2.5 dark:border-slate-800 dark:bg-canvas sm:block">
                       <div className="mb-2 flex items-center gap-1.5 px-1">
                         <span className="sb-logo-well grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-control border border-slate-200 dark:border-slate-800">
                           <BrandingImage
@@ -1455,7 +1464,7 @@ export function LandingPage({
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                         {mockStats.map(
                           ({ label, value, sub, icon: Icon, tone }) => (
                             <div
@@ -1495,8 +1504,8 @@ export function LandingPage({
                   </div>
                 </div>
               </div>
-              {/* Floating layered badges — honest sample annotations */}
-              <div className="pointer-events-none absolute -right-2 -top-2 hidden select-none sm:flex sm:flex-col sm:gap-2 lg:-right-4">
+              {/* Floating layered badges — wrapped inside mock so they never overflow HUD gutter */}
+              <div className="pointer-events-none absolute right-2 top-2 hidden max-w-[220px] select-none flex-col gap-2 sm:flex xl:hidden">
                 <div className="rounded-surface border border-slate-200 bg-white px-2.5 py-2 shadow-lg shadow-black/10 dark:border-slate-800 dark:bg-surface dark:shadow-black/30">
                   <div className="text-xs font-bold text-slate-500 dark:text-slate-400">{t("mockFloatGrantLabel")}</div>
                   <div className="max-w-[190px] text-sm font-black leading-tight text-slate-900 dark:text-white">{t("mockFloatGrantTitle")}</div>
