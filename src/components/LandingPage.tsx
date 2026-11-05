@@ -10,8 +10,11 @@ import { ThemeSwitch } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { SVG_COLORS } from "@/components/ui/tokens";
 import Link from "next/link";
+import { PremiumTestimonials } from "./landing/PremiumTestimonials";
+import { PremiumFAQ } from "./landing/PremiumFAQ";
 import { isLiteMotionSync, subscribeLiteMotion } from "@/lib/liteMotion";
 import { PUBLIC_TELEGRAM_CHANNEL_URL, PUBLIC_TELEGRAM_HANDLE } from "@/lib/publicLinks";
+import { useTranslations, useLocale } from "next-intl";
 
 /** Hero children: each one rises a beat after the previous. */
 const heroGroup = staggerParent(0.1, 0.08);
@@ -32,7 +35,6 @@ const heroStaticItem = {
     transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const },
   },
 };
-import { useTranslations, useLocale } from "next-intl";
 import {
   ArrowRight,
   Award,
@@ -589,22 +591,29 @@ function PhotoCraftKineticHud({ lite: liteProp }: { lite?: boolean } = {}) {
 
         let transform: string;
         let opacity: string;
+        // Hero hududida - yirik SCHOLARBRIDGE hero mock ustiga chiqmasin (p<0.04)
+        const inHero = smooth < 0.04;
         if (state === "passed") {
           transform = `translate3d(0px, ${topSlotY.toFixed(1)}px, 0px) scale(1)`;
-          opacity = "0.48";
+          opacity = inHero ? "0.0" : "0.48";
         } else if (state === "upcoming") {
           transform = `translate3d(0px, ${bottomSlotY.toFixed(1)}px, 0px) scale(1)`;
-          opacity = "0.48";
+          opacity = inHero ? "0.0" : "0.48";
         } else {
-          const rawT = (WINDOW - delta) / (2 * WINDOW);
-          const t = Math.max(0, Math.min(1, rawT));
-          const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-          const currentY = bottomSlotY + (topSlotY - bottomSlotY) * easeT;
-          const bell = Math.pow(Math.sin(t * Math.PI), 0.72);
-          const scale = 1 + bell * (lite ? 1.0 : 2.15);
-          const shiftX = -bell * (lite ? 4 : 10);
-          transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
-          opacity = (0.48 + bell * (lite ? 0.32 : 0.52)).toFixed(3);
+          if (inHero) {
+            transform = `translate3d(0px, ${bottomSlotY.toFixed(1)}px, 0px) scale(1)`;
+            opacity = "0.0";
+          } else {
+            const rawT = (WINDOW - delta) / (2 * WINDOW);
+            const t = Math.max(0, Math.min(1, rawT));
+            const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            const currentY = bottomSlotY + (topSlotY - bottomSlotY) * easeT;
+            const bell = Math.pow(Math.sin(t * Math.PI), 0.72);
+            const scale = 1 + bell * (lite ? 0.8 : 1.4);
+            const shiftX = -bell * (lite ? 2 : 4);
+            transform = `translate3d(${shiftX.toFixed(1)}px, ${currentY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
+            opacity = (0.48 + bell * (lite ? 0.2 : 0.35)).toFixed(3);
+          }
         }
         if (prevTransforms[i] !== transform) {
           el.style.transform = transform;
@@ -669,7 +678,7 @@ function PhotoCraftKineticHud({ lite: liteProp }: { lite?: boolean } = {}) {
   }
 
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-30 hidden select-none md:block print:hidden">
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-20 hidden select-none md:block print:hidden">
       {/* Zoomed altimeter tape + glowing laser cursor (far right edge) — indigo/violet tuned. */}
       <div className="pointer-events-none absolute inset-y-0 right-0 w-14 overflow-hidden">
         <div
@@ -702,7 +711,7 @@ function PhotoCraftKineticHud({ lite: liteProp }: { lite?: boolean } = {}) {
             type="button"
             tabIndex={-1}
             onClick={() => scrollToId(sec.id)}
-            className="sb-kinetic-word pointer-events-auto fixed right-16 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-xs font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-indigo-700 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
+            className="sb-kinetic-word pointer-events-auto fixed right-12 top-0 cursor-pointer select-none whitespace-nowrap font-sans text-xs font-black uppercase tracking-[0.12em] text-slate-700 transition-colors hover:text-indigo-600 data-[state=active]:text-indigo-700 dark:text-zinc-300 dark:hover:text-white dark:data-[state=active]:text-white"
           >
             {sec.word[locale as "en" | "uz" | "ru"] ?? sec.word.en}
           </Button>
@@ -932,6 +941,7 @@ export function LandingPage({
       label: t("step1Label"),
       title: t("step1Title"),
       text: t("step1Text"),
+      image: LANDING_PHOTOS.step1Profile,
       mini: <ProfileMini t={t} />,
     },
     {
@@ -939,6 +949,7 @@ export function LandingPage({
       label: t("step2Label"),
       title: t("step2Title"),
       text: t("step2Text"),
+      image: LANDING_PHOTOS.step2UniversityMatch,
       mini: <MatchMini t={t} />,
     },
     {
@@ -946,6 +957,7 @@ export function LandingPage({
       label: t("step3Label"),
       title: t("step3Title"),
       text: t("step3Text"),
+      image: LANDING_PHOTOS.step3SopWriting,
       mini: <RoadmapMini t={t} />,
     },
     {
@@ -953,6 +965,7 @@ export function LandingPage({
       label: t("step4Label"),
       title: t("step4Title"),
       text: t("step4Text"),
+      image: LANDING_PHOTOS.step4VisaDeparture,
       mini: <TrackerMini t={t} />,
     },
   ];
@@ -1002,14 +1015,13 @@ export function LandingPage({
   const mockSidebarGroups = NAV_GROUPS.map((group) => ({
     id: group,
     label: nav(NAV_GROUP_I18N[group] as never),
-    items: NAV_SECTIONS.filter((section) => section.group === group).map(
-      (section) => ({
+    items: NAV_SECTIONS.filter((section) => section.group === group)
+      .map((section) => ({
         id: section.id,
         label: nav(NAV_SECTION_LABEL_KEYS[section.id] as never),
         icon: mockIcon[section.id] ?? Sparkles,
         pro: Boolean(section.premium),
-      }),
-    ),
+      })),
   })).filter((group) => group.items.length > 0);
   const mockAccountItems = NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).map(
     (u) => ({
@@ -1211,11 +1223,12 @@ export function LandingPage({
         <section className="relative overflow-hidden border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(68%_55%_at_78%_14%,rgba(99,102,241,0.12),transparent_62%),radial-gradient(52%_42%_at_14%_82%,rgba(124,58,237,0.10),transparent_58%)] dark:bg-[radial-gradient(68%_55%_at_78%_14%,rgba(99,102,241,0.18),transparent_62%),radial-gradient(52%_42%_at_14%_82%,rgba(124,58,237,0.14),transparent_58%)]"
+            className="sb-premium-aurora"
           />
           <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:pr-14 xl:pr-40 2xl:pr-28 md:gap-10 lg:grid-cols-[0.96fr_1.04fr] lg:gap-8">
             {/* Above-the-fold copy must paint in SSR, not wait for JS + stagger. */}
-            <motion.div initial={false} animate="visible" variants={heroGroup} className="min-w-0">
+            <motion.div initial={false} animate="visible" variants={heroGroup}>
+              <div className="min-w-0">
               <div>
                 <SectionIndex n="01" label={t("secOverview")} />
               </div>
@@ -1303,6 +1316,7 @@ export function LandingPage({
                   {t("enterApp")}
                 </MotionButton>
               )}
+              </div>
             </motion.div>
 
             {/* Layered product shot — soft glow */}
@@ -1327,7 +1341,7 @@ export function LandingPage({
                       {t("demoBadge")}
                     </span>
                   </div>
-                  <div className="grid min-h-[394px] grid-cols-1 sm:grid-cols-[146px_1fr]">
+                  <div className="grid min-h-[360px] grid-cols-1 sm:grid-cols-[180px_1fr]">
                     <aside className="hidden border-r border-slate-200 bg-canvas p-2.5 dark:border-slate-800 dark:bg-canvas sm:block">
                       <div className="mb-2 flex items-center gap-1.5 px-1">
                         <span className="sb-logo-well grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-control border border-slate-200 dark:border-slate-800">
@@ -1363,9 +1377,9 @@ export function LandingPage({
                                 className="h-2.5 w-2.5 shrink-0"
                                 aria-hidden
                               />
-                              <span className="truncate">{label}</span>
+                              <span className="min-w-0 flex-1 break-words">{label}</span>
                               {pro && (
-                                <span className="ml-auto rounded-control bg-amber-100 px-1 text-xs font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+                                <span className="ml-auto shrink-0 rounded-control bg-amber-100 px-1 text-xs font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
                                   PRO
                                 </span>
                               )}
@@ -1387,9 +1401,9 @@ export function LandingPage({
                                 className="h-2.5 w-2.5 shrink-0"
                                 aria-hidden
                               />
-                              <span className="truncate">{label}</span>
+                              <span className="min-w-0 flex-1 break-words">{label}</span>
                               {pro && (
-                                <span className="ml-auto rounded-control bg-amber-100 px-1 text-xs font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
+                                <span className="ml-auto shrink-0 rounded-control bg-amber-100 px-1 text-xs font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
                                   PRO
                                 </span>
                               )}
@@ -1455,7 +1469,7 @@ export function LandingPage({
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                         {mockStats.map(
                           ({ label, value, sub, icon: Icon, tone }) => (
                             <div
@@ -1491,22 +1505,21 @@ export function LandingPage({
                           {t("mockPortfolioNote")}
                         </p>
                       </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="inline-flex max-w-[200px] flex-col rounded-surface border border-slate-200 bg-white px-2.5 py-1.5 text-left shadow-sm dark:border-slate-700 dark:bg-surface">
+                          <span className="text-xs font-bold leading-none text-slate-500 dark:text-slate-400">{t("mockFloatGrantLabel")}</span>
+                          <span className="mt-0.5 line-clamp-2 text-xs font-black leading-tight text-slate-900 dark:text-white">{t("mockFloatGrantTitle")}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-surface border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                          {t("mockFloatFitLabel")} · {t("mockFloatFitValue")}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              {/* Floating layered badges — honest sample annotations */}
-              <div className="pointer-events-none absolute -right-2 -top-2 hidden select-none sm:flex sm:flex-col sm:gap-2 lg:-right-4">
-                <div className="rounded-surface border border-slate-200 bg-white px-2.5 py-2 shadow-lg shadow-black/10 dark:border-slate-800 dark:bg-surface dark:shadow-black/30">
-                  <div className="text-xs font-bold text-slate-500 dark:text-slate-400">{t("mockFloatGrantLabel")}</div>
-                  <div className="max-w-[190px] text-sm font-black leading-tight text-slate-900 dark:text-white">{t("mockFloatGrantTitle")}</div>
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{t("mockFloatGrantMeta")}</div>
-                </div>
-                <div className="rounded-surface border border-emerald-200 bg-emerald-50 px-2.5 py-2 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                  <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{t("mockFloatFitLabel")}</div>
-                  <div className="text-sm font-black text-emerald-700 dark:text-emerald-300">{t("mockFloatFitValue")}</div>
-                </div>
-              </div>
+              {/* Floating badges removed — content now inline inside mock (no overflow) */}
+              <div className="sr-only" aria-hidden="true" hidden />
             </motion.div>
           </div>
         </section>
@@ -1532,12 +1545,18 @@ export function LandingPage({
               </p>
             </div>
             <RevealGroup className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {steps.map((step) => (
+              {(steps as Array<{ num: string; label: string; title: string; text: string; image: string; mini: React.ReactNode }>).map((step) => (
                 <RevealItem
                   key={step.num}
-                  className="group flex flex-col rounded-overlay border border-slate-200 bg-white p-2 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:border-slate-800 dark:bg-surface dark:hover:shadow-black/30"
+                  className="group flex flex-col overflow-hidden rounded-overlay border border-slate-200 bg-white p-0 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:border-slate-800 dark:bg-surface dark:hover:shadow-black/30"
                 >
-                  <div className="p-1">{step.mini}</div>
+                  <img
+                    src={step.image}
+                    alt=""
+                    loading="lazy"
+                    className="aspect-[16/10] w-full object-cover"
+                  />
+                  <div className="p-2">{step.mini}</div>
                   <div className="flex flex-1 flex-col px-3 pb-3 pt-3">
                     <div className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
                       {step.num} — {step.label}
@@ -1853,33 +1872,23 @@ export function LandingPage({
           </div>
         </section>
 
-        {/* ===== Testimonial ===== */}
-        <section className="border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10">
-          <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
-            <Reveal>
-              <div className="mx-auto max-w-[900px] rounded-overlay border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-7 text-center dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-surface dark:bg-surface sm:p-8">
-                <div className="mx-auto grid h-9 w-9 place-items-center rounded-full border border-indigo-200 bg-white/70 dark:border-indigo-500/30 dark:bg-indigo-500/10">
-                  <Sparkles
-                    className="h-4 w-4 text-indigo-500 dark:text-indigo-300"
-                    aria-hidden
-                  />
-                </div>
-                <p className="mx-auto mt-3 max-w-[760px] text-xl font-semibold italic leading-relaxed tracking-[-0.01em] text-slate-950 dark:text-white sm:text-2xl">
-                  “{t("quote")}”
-                </p>
-                <p className="mt-3 text-sm font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                  {t("quoteBy")}
-                </p>
-              </div>
-            </Reveal>
-          </div>
-        </section>
+        {/* ===== Premium Testimonials — quiet luxury carousel (autoplay, pause on hover) ===== */}
+        <PremiumTestimonials />
+
+        {/* ===== Premium FAQ — subtle accordion ===== */}
+        <PremiumFAQ />
 
         {/* ===== CTA ===== */}
         <section id="cta" className="sb-cv-section scroll-mt-20 bg-canvas py-8 sm:py-10">
           <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <Reveal>
               <div className="sb-cta-banner relative overflow-hidden rounded-overlay border border-indigo-900/20 px-6 py-10 text-center shadow-xl shadow-indigo-900/15 dark:border-indigo-500/20 sm:px-14 sm:py-12">
+                <img
+                  src={LANDING_PHOTOS.ctaAirplaneSunset}
+                  alt=""
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.22]"
+                />
                 <div
                   aria-hidden="true"
                   className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_88%_0%,rgba(148,92,255,0.32),transparent_42%),radial-gradient(circle_at_12%_90%,rgba(99,102,241,0.22),transparent_40%)]"
@@ -2429,7 +2438,7 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
   return (
     <div
       aria-hidden="true"
-      className="sb-flight pointer-events-none fixed inset-0 z-0 overflow-hidden"
+      className="sb-flight pointer-events-none fixed inset-0 z-30 overflow-hidden"
     >
       <svg
         viewBox="0 0 1200 1000"

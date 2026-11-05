@@ -89,13 +89,16 @@ export function AdminOverview({ onOpen }: { onOpen: (section: string) => void })
       key={label}
       onClick={section ? () => onOpen(section) : undefined}
       disabled={!section}
-      className="group rounded-overlay border border-slate-200 bg-white p-3 text-left transition-colors enabled:hover:border-indigo-200 enabled:hover:bg-indigo-50/40 sm:p-4"
+      className="group relative overflow-hidden rounded-overlay border border-slate-200 bg-white p-3 text-left shadow-sm transition-all enabled:hover:-translate-y-0.5 enabled:hover:border-indigo-200 enabled:hover:shadow-md enabled:hover:bg-indigo-50/30 sm:p-4 sb-premium-card"
     >
+      <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-200/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
       <span className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
-        <Icon className="h-4 w-4 text-slate-300 group-enabled:group-hover:text-indigo-400" />
+        <span className="grid h-7 w-7 place-items-center rounded-control bg-slate-50 text-slate-400 transition-colors group-enabled:group-hover:bg-indigo-50 group-enabled:group-hover:text-indigo-500 dark:bg-white/5">
+          <Icon className="h-4 w-4" />
+        </span>
       </span>
-      <span className={`mt-1 block text-2xl font-black ${tone}`}>{fmt(value)}</span>
+      <span className={`mt-2 block text-2xl font-black tracking-tight ${tone}`}>{fmt(value)}</span>
     </Button>
   );
 
