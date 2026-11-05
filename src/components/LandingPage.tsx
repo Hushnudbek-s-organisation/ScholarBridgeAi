@@ -1505,22 +1505,21 @@ export function LandingPage({
                           {t("mockPortfolioNote")}
                         </p>
                       </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="inline-flex max-w-[200px] flex-col rounded-surface border border-slate-200 bg-white px-2.5 py-1.5 text-left shadow-sm dark:border-slate-700 dark:bg-surface">
+                          <span className="text-xs font-bold leading-none text-slate-500 dark:text-slate-400">{t("mockFloatGrantLabel")}</span>
+                          <span className="mt-0.5 line-clamp-2 text-xs font-black leading-tight text-slate-900 dark:text-white">{t("mockFloatGrantTitle")}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-surface border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                          {t("mockFloatFitLabel")} · {t("mockFloatFitValue")}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              {/* Floating layered badges — wrapped inside mock so they never overflow HUD gutter */}
-              <div className="pointer-events-none absolute right-2 top-2 hidden max-w-[220px] select-none flex-col gap-2 sm:flex xl:hidden">
-                <div className="rounded-surface border border-slate-200 bg-white px-2.5 py-2 shadow-lg shadow-black/10 dark:border-slate-800 dark:bg-surface dark:shadow-black/30">
-                  <div className="text-xs font-bold text-slate-500 dark:text-slate-400">{t("mockFloatGrantLabel")}</div>
-                  <div className="max-w-[190px] text-sm font-black leading-tight text-slate-900 dark:text-white">{t("mockFloatGrantTitle")}</div>
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{t("mockFloatGrantMeta")}</div>
-                </div>
-                <div className="rounded-surface border border-emerald-200 bg-emerald-50 px-2.5 py-2 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                  <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{t("mockFloatFitLabel")}</div>
-                  <div className="text-sm font-black text-emerald-700 dark:text-emerald-300">{t("mockFloatFitValue")}</div>
-                </div>
-              </div>
+              {/* Floating badges removed — content now inline inside mock (no overflow) */}
+              <div className="sr-only" aria-hidden="true" hidden />
             </motion.div>
           </div>
         </section>
