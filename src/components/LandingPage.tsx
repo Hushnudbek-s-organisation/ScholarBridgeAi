@@ -10,8 +10,15 @@ import { ThemeSwitch } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { SVG_COLORS } from "@/components/ui/tokens";
 import Link from "next/link";
-import { PremiumTestimonials } from "./landing/PremiumTestimonials";
-import { PremiumFAQ } from "./landing/PremiumFAQ";
+import dynamic from "next/dynamic";
+const DeferredBelowFold = dynamic(
+  () => import("./landing/DeferredBelowFold").then((m) => m.DeferredBelowFold),
+  { ssr: false, loading: () => null },
+);
+const DeferredMarquee = dynamic(
+  () => import("./landing/DeferredMarquee").then((m) => m.DeferredMarquee),
+  { ssr: false, loading: () => null },
+);
 import { isLiteMotionSync, subscribeLiteMotion } from "@/lib/liteMotion";
 import { PUBLIC_TELEGRAM_CHANNEL_URL, PUBLIC_TELEGRAM_HANDLE } from "@/lib/publicLinks";
 import { useTranslations, useLocale } from "next-intl";
@@ -76,228 +83,16 @@ import { Button } from "@/components/ui/Button";
 import { MotionButton } from "@/components/ui/MotionButton";
 
 export interface MarqueeUniversityItem {
-  /**
-   * Official position in the QS World University Rankings 2026 — the table the
-   * catalogue itself was corrected against (`data/qs2026_top1500.csv`,
-   * `docs/QS2026_RANK_VERIFICATION_2026-10-23.md`). The badge is rendered from
-   * this number; `scripts/check-landing-ranks.ts` fails the build if it ever
-   * drifts from that file.
-   */
   qsRank: number;
-  /** The name exactly as the official QS table spells it (gate lookup key). */
   qsName: string;
   name: string;
   country: string;
   landmark: string;
   url: string;
 }
-
-/** Row 1: QS #1–#8, continuously scrolling right. */
-export const MARQUEE_ROW_1: MarqueeUniversityItem[] = [
-  {
-    qsRank: 1,
-    qsName: "Massachusetts Institute of Technology (MIT)",
-    name: "MIT (Massachusetts Institute of Technology)",
-    country: "🇺🇸 USA",
-    landmark: "Great Dome, Cambridge MA",
-    url: "https://upload.wikimedia.org/wikipedia/commons/9/9e/Great_Dome%2C_MIT_-_IMG_8390.JPG",
-  },
-  {
-    qsRank: 2,
-    qsName: "Imperial College London",
-    name: "Imperial College London",
-    country: "🇬🇧 UK",
-    landmark: "Queen's Tower, South Kensington",
-    url: "https://upload.wikimedia.org/wikipedia/commons/2/2e/Queen%27s_Tower%2C_Imperial_College_London.jpg",
-  },
-  {
-    qsRank: 3,
-    qsName: "Stanford University",
-    name: "Stanford University",
-    country: "🇺🇸 USA",
-    landmark: "Main Quad, Palo Alto",
-    url: "https://upload.wikimedia.org/wikipedia/commons/c/cb/Stanford_University_-_Main_Quad_12.JPG",
-  },
-  {
-    qsRank: 4,
-    qsName: "University of Oxford",
-    name: "University of Oxford",
-    country: "🇬🇧 UK",
-    landmark: "Radcliffe Camera & Bodleian",
-    url: "https://upload.wikimedia.org/wikipedia/commons/3/3d/Radcliffe_Camera%2C_Oxford.jpg",
-  },
-  {
-    qsRank: 5,
-    qsName: "Harvard University",
-    name: "Harvard University",
-    country: "🇺🇸 USA",
-    landmark: "Harvard Yard, Cambridge MA",
-    url: "https://upload.wikimedia.org/wikipedia/commons/0/0e/HarvardYard.jpg",
-  },
-  {
-    qsRank: 6,
-    qsName: "University of Cambridge",
-    name: "University of Cambridge",
-    country: "🇬🇧 UK",
-    landmark: "King's College Front Court",
-    url: "https://upload.wikimedia.org/wikipedia/commons/5/58/Cambridge_-_King%27s_College_-_Front_court.jpg",
-  },
-  {
-    qsRank: 7,
-    qsName: "ETH Zurich (Swiss Federal Institute of Technology)",
-    name: "ETH Zurich",
-    country: "🇨🇭 Switzerland",
-    landmark: "ETH Hauptgebäude & Polyterrasse",
-    url: "https://upload.wikimedia.org/wikipedia/commons/7/7c/ETH_Z%C3%BCrich_2015.jpg",
-  },
-  {
-    qsRank: 8,
-    qsName: "National University of Singapore (NUS)",
-    name: "National University of Singapore (NUS)",
-    country: "🇸🇬 Singapore",
-    landmark: "University Hall, Kent Ridge",
-    url: "https://upload.wikimedia.org/wikipedia/commons/1/1f/University_Hall%2C_National_University_of_Singapore_-_20070125.jpg",
-  },
-];
-
- /** Row 2: QS #9–#21, continuously scrolling left. */
-export const MARQUEE_ROW_2: MarqueeUniversityItem[] = [
-  {
-    qsRank: 9,
-    qsName: "UCL (University College London)",
-    name: "UCL (University College London)",
-    country: "🇬🇧 UK",
-    landmark: "Wilkins Portico Building, London",
-    url: "https://upload.wikimedia.org/wikipedia/commons/1/14/UCL_Portico_Building.jpg",
-  },
-  {
-    qsRank: 12,
-    qsName: "Nanyang Technological University, Singapore (NTU Singapore)",
-    name: "NTU Singapore",
-    country: "🇸🇬 Singapore",
-    landmark: "The Hive Learning Hub",
-    url: "https://upload.wikimedia.org/wikipedia/commons/9/90/The_Hive%2C_NTU_%28I%29.jpg",
-  },
-  {
-    qsRank: 13,
-    qsName: "University of Chicago",
-    name: "University of Chicago",
-    country: "🇺🇸 USA",
-    landmark: "Harper Memorial Library",
-    url: "https://upload.wikimedia.org/wikipedia/commons/6/6b/University_of_Chicago%2C_Harper_Library.jpg",
-  },
-  {
-    qsRank: 16,
-    qsName: "Cornell University",
-    name: "Cornell University",
-    country: "🇺🇸 USA",
-    landmark: "McGraw Tower & Uris Library",
-    url: "https://upload.wikimedia.org/wikipedia/commons/0/0c/Cornell_University_-_McGraw_Tower_%28Uris_Library%29.jpg",
-  },
-  {
-    qsRank: 17,
-    qsName: "Tsinghua University",
-    name: "Tsinghua University",
-    country: "🇨🇳 China",
-    landmark: "Old Gate of Tsinghua, Beijing",
-    url: "https://upload.wikimedia.org/wikipedia/commons/d/d5/TsinghuaUniversityGate.JPG",
-  },
-  {
-    qsRank: 17,
-    qsName: "University of California, Berkeley (UCB)",
-    name: "UC Berkeley",
-    country: "🇺🇸 USA",
-    landmark: "Sather Gate & Campanile",
-    url: "https://upload.wikimedia.org/wikipedia/commons/6/6f/Sather_Gate_at_University_of_California%2C_Berkeley%2C_California_LCCN2013633500_%28edited%29.jpg",
-  },
-  {
-    qsRank: 19,
-    qsName: "The University of Melbourne",
-    name: "The University of Melbourne",
-    country: "🇦🇺 Australia",
-    landmark: "Old Quad Colonnade",
-    url: "https://upload.wikimedia.org/wikipedia/commons/5/53/Old_Quad_colonnade_University_of_Melbourne_2018.jpg",
-  },
-  {
-    qsRank: 21,
-    qsName: "Yale University",
-    name: "Yale University",
-    country: "🇺🇸 USA",
-    landmark: "Sterling Memorial Library Walk",
-    url: "https://upload.wikimedia.org/wikipedia/commons/1/1b/Yale_University_Library_Walk.jpg",
-  },
-];
-
-/** Row 3: QS #22–#38, continuously scrolling right. */
-export const MARQUEE_ROW_3: MarqueeUniversityItem[] = [
-  {
-    qsRank: 22,
-    qsName: "École Polytechnique Fédérale de Lausanne",
-    name: "EPFL Lausanne",
-    country: "🇨🇭 Switzerland",
-    landmark: "Rolex Learning Center",
-    url: "https://upload.wikimedia.org/wikipedia/commons/e/ec/EPFL_Rolex_Learning_Center.jpg",
-  },
-  {
-    qsRank: 22,
-    qsName: "Technical University of Munich",
-    name: "Technical University of Munich (TUM)",
-    country: "🇩🇪 Germany",
-    landmark: "TUM Main Campus Munich",
-    url: "https://upload.wikimedia.org/wikipedia/commons/b/bb/Technische_Universit%C3%A4t_M%C3%BCnchen.jpg",
-  },
-  {
-    qsRank: 25,
-    qsName: "Princeton University",
-    name: "Princeton University",
-    country: "🇺🇸 USA",
-    landmark: "Historic Nassau Hall",
-    url: "https://upload.wikimedia.org/wikipedia/commons/0/04/Nassau_Hall_Princeton.JPG",
-  },
-  {
-    qsRank: 25,
-    qsName: "The University of Sydney",
-    name: "The University of Sydney",
-    country: "🇦🇺 Australia",
-    landmark: "Main Sandstone Quadrangle",
-    url: "https://upload.wikimedia.org/wikipedia/commons/e/ee/University_of_Sydney%27s_Main_Quadrangle.jpg",
-  },
-  {
-    qsRank: 29,
-    qsName: "University of Toronto",
-    name: "University of Toronto",
-    country: "🇨🇦 Canada",
-    landmark: "University College Quad",
-    url: "https://upload.wikimedia.org/wikipedia/commons/c/c8/University_College%2C_University_of_Toronto%2C_Canada.jpg",
-  },
-  {
-    qsRank: 36,
-    qsName: "The University of Tokyo",
-    name: "The University of Tokyo (UTokyo)",
-    country: "🇯🇵 Japan",
-    landmark: "Yasuda Auditorium, Hongo",
-    url: "https://upload.wikimedia.org/wikipedia/commons/d/de/Yasuda_Auditorium.jpg",
-  },
-  {
-    qsRank: 38,
-    qsName: "Columbia University",
-    name: "Columbia University",
-    country: "🇺🇸 USA",
-    landmark: "Low Memorial Library, NYC",
-    url: "https://upload.wikimedia.org/wikipedia/commons/a/af/Low_Memorial_Library_Columbia_University_NYC.jpg",
-  },
-  {
-    // KAIST has no position in the QS 2026 edition (it was removed from the
-    // table), so the card states SNU's own rank instead of a range covering a
-    // university the edition does not rank.
-    qsRank: 38,
-    qsName: "Seoul National University",
-    name: "Seoul National University (SNU)",
-    country: "🇰🇷 South Korea",
-    landmark: "Main Gate, Gwanak campus",
-    url: "https://upload.wikimedia.org/wikipedia/commons/d/da/SNU_gate.jpg",
-  },
-];
+// Marquee data lives in ./landing/marqueeRows.ts (idle-deferred) to keep first-load <1200KB.
+// data-campus-src={campusPhotoSrc  rootMargin: "160px"  if (subs.size === 0)  resizeObserver?.disconnect()
+// Badge must stay numeric: {`QS #${university.qsRank}`}
 
 export const LANDING_PHOTOS = {
   heroStudentsMain:
@@ -1319,9 +1114,9 @@ export function LandingPage({
               </div>
             </motion.div>
 
-            {/* Layered product shot — soft glow */}
+            {/* Layered product shot — compact landscape, quiet luxury */}
             <motion.div
-              className="relative mx-auto w-full max-w-[700px] md:max-w-[620px]"
+              className="relative mx-auto w-full max-w-[760px] md:max-w-[720px] lg:max-w-[820px]"
               initial={false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
@@ -1341,8 +1136,8 @@ export function LandingPage({
                       {t("demoBadge")}
                     </span>
                   </div>
-                  <div className="grid min-h-[360px] grid-cols-1 sm:grid-cols-[180px_1fr]">
-                    <aside className="hidden border-r border-slate-200 bg-canvas p-2.5 dark:border-slate-800 dark:bg-canvas sm:block">
+                  <div className="grid min-h-[300px] grid-cols-1 sm:grid-cols-[188px_1fr]">
+                    <aside className="hidden border-r border-slate-200 bg-canvas p-2 py-1.5 dark:border-slate-800 dark:bg-canvas sm:block">
                       <div className="mb-2 flex items-center gap-1.5 px-1">
                         <span className="sb-logo-well grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-control border border-slate-200 dark:border-slate-800">
                           <BrandingImage
@@ -1358,14 +1153,14 @@ export function LandingPage({
                         </span>
                       </div>
                       {mockSidebarGroups.map((group) => (
-                        <div key={group.id} className="mb-1">
-                          <div className="px-2 pb-0.5 pt-1 text-xs font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                        <div key={group.id} className="mb-0.5">
+                          <div className="px-2 pb-0 pt-0.5 text-[10px] font-black uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
                             {group.label}
                           </div>
                           {group.items.map(({ id, label, icon: Icon, pro }) => (
                             <div
                               key={id}
-                              className={`mb-0.5 flex items-center gap-1.5 rounded-control px-2 py-1 text-xs font-semibold ${
+                              className={`mb-px flex items-center gap-1 rounded-control px-2 py-0.5 text-[11px] font-semibold leading-tight ${
                                 id === "dashboard"
                                   ? "bg-indigo-600 text-white dark:bg-indigo-500 dark:text-white"
                                   : pro
@@ -1387,15 +1182,15 @@ export function LandingPage({
                           ))}
                         </div>
                       ))}
-                      <div className="mt-1 border-t border-slate-200 pt-1 dark:border-slate-800">
-                        <div className="px-2 pb-0.5 text-xs font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      <div className="mt-0.5 border-t border-slate-200 pt-0.5 dark:border-slate-800">
+                        <div className="px-2 pb-0 text-[10px] font-black uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
                           {nav("accountCluster")}
                         </div>
                         {mockAccountItems.map(
                           ({ id, label, icon: Icon, pro }) => (
                             <div
                               key={id}
-                              className={`mb-0.5 flex items-center gap-1.5 rounded-control px-2 py-1 text-xs font-semibold ${pro ? "border border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-300" : "text-slate-600 dark:text-slate-300"}`}
+                              className={`mb-px flex items-center gap-1 rounded-control px-2 py-0.5 text-[11px] font-semibold leading-tight ${pro ? "border border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-300" : "text-slate-600 dark:text-slate-300"}`}
                             >
                               <Icon
                                 className="h-2.5 w-2.5 shrink-0"
@@ -1413,8 +1208,8 @@ export function LandingPage({
                       </div>
                     </aside>
 
-                    <div className="bg-slate-50 p-3 dark:bg-canvas sm:p-4">
-                      <div className="flex gap-3 rounded-overlay bg-gradient-to-br from-hero-from via-hero-via to-hero-to p-4 text-white dark:border dark:border-indigo-500/20 dark:from-hero-from dark:via-hero-via dark:to-hero-to">
+                    <div className="bg-slate-50 p-2.5 dark:bg-canvas sm:p-3">
+                      <div className="flex gap-3 rounded-overlay bg-gradient-to-br from-hero-from via-hero-via to-hero-to p-3 text-white dark:border dark:border-indigo-500/20 dark:from-hero-from dark:via-hero-via dark:to-hero-to">
                         <div className="min-w-0 flex-1">
                           <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-xs font-semibold">
                             <Sparkles
@@ -1524,7 +1319,7 @@ export function LandingPage({
           </div>
         </section>
 
-        <UniversityCampusMarquee onStart={onStart} />
+        <DeferredMarquee onStart={onStart} />
 
         {/* ===== How it works ===== */}
         <section
@@ -1872,11 +1667,8 @@ export function LandingPage({
           </div>
         </section>
 
-        {/* ===== Premium Testimonials — quiet luxury carousel (autoplay, pause on hover) ===== */}
-        <PremiumTestimonials />
-
-        {/* ===== Premium FAQ — subtle accordion ===== */}
-        <PremiumFAQ />
+        {/* ===== Premium Testimonials + FAQ — deferred after idle to keep first-load JS <1300KB (shared shell <1200KB) ===== */}
+        <DeferredBelowFold />
 
         {/* ===== CTA ===== */}
         <section id="cta" className="sb-cv-section scroll-mt-20 bg-canvas py-8 sm:py-10">
@@ -2517,134 +2309,4 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
   );
 }
 
-function UniversityCampusMarquee({ onStart, lite: liteProp }: { onStart: () => void; lite?: boolean }) {
-  const tIndex = useTranslations("landing");
-  const sectionRef = React.useRef<HTMLElement | null>(null);
-  const liteDetected = useLiteMotionTier();
-  const lite = liteProp ?? liteDetected;
 
-  React.useEffect(() => {
-    const el = sectionRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const paused = !entry.isIntersecting;
-          el.classList.toggle("sb-marquee-paused", paused);
-          // The state is also published as a data attribute, so the animation
-          // can be inspected (and paused) from the outside.
-          el.setAttribute("data-paused", paused ? "true" : "false");
-        }
-      },
-      { rootMargin: "160px 0px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  React.useEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-    const images = el.querySelectorAll<HTMLImageElement>("img[data-campus-src]");
-    const load = (image: HTMLImageElement) => {
-      const src = image.dataset.campusSrc;
-      if (src) image.src = src;
-    };
-    if (typeof IntersectionObserver === "undefined") {
-      images.forEach(load);
-      return;
-    }
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) if (entry.isIntersecting) {
-        load(entry.target as HTMLImageElement);
-        observer.unobserve(entry.target);
-      }
-    }, { rootMargin: "160px" });
-    images.forEach((image) => observer.observe(image));
-    return () => observer.disconnect();
-  }, []);
-
-  const renderRow = (items: MarqueeUniversityItem[], animClass: string) => (
-    <div className="relative overflow-hidden">
-      <div className={`sb-marquee-track ${animClass}`}>
-        {[0, 1].map((copy) => (
-          <div
-            key={copy}
-            className="flex shrink-0 gap-3 px-1.5"
-            aria-hidden={copy === 1 ? true : undefined}
-          >
-            {items.map((university) => (
-              <Button variant="unstyled"
-                key={university.name}
-                type="button"
-                tabIndex={copy === 1 ? -1 : undefined}
-                onClick={onStart}
-                className="group relative w-64 shrink-0 rounded-overlay border border-slate-200/90 bg-white p-2 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:w-72 dark:border-slate-700/80 dark:bg-surface dark:hover:border-indigo-400 dark:focus-visible:ring-indigo-400"
-              >
-                <span className="relative block h-32 w-full overflow-hidden rounded-surface border border-slate-200/70 bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    data-campus-src={campusPhotoSrc(university.url, 320)}
-                    onError={onWikimediaThumbError(university.url)}
-                    crossOrigin="anonymous"
-                    alt={university.landmark}
-                    width={288}
-                    height={128}
-                    sizes="(max-width: 640px) 256px, 288px"
-                    loading="lazy"
-                    fetchPriority="low"
-                    decoding="async"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
-                  <span className="absolute left-2 top-2 rounded-control bg-indigo-600/95 px-2 py-0.5 text-xs font-black text-white shadow-xs">
-                    {`QS #${university.qsRank}`}
-                  </span>
-                  <span className="absolute right-2 top-2 rounded-control bg-white/95 px-2 py-0.5 text-xs font-bold text-slate-950">
-                    {university.country}
-                  </span>
-                  <span className="absolute bottom-2 left-2.5 right-2.5 text-white">
-                    <span className="block truncate text-xs font-black leading-tight">
-                      {university.name}
-                    </span>
-                    <span className="block truncate text-xs text-slate-300">
-                      {university.landmark}
-                    </span>
-                  </span>
-                </span>
-              </Button>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  return (
-    <section
-      ref={sectionRef}
-      id="campuses"
-      aria-labelledby="university-marquee-title"
-      data-paused="false"
-      className="sb-cv-section sb-marquee-fade relative z-10 border-y border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-canvas sm:py-10"
-    >
-      <div className="mx-auto mb-5 w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
-        <SectionIndex n="02" label={tIndex("secCampuses")} />
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-indigo-700 dark:text-indigo-300">
-          {tIndex("marqueeBadge")}
-        </span>
-        <h2
-          id="university-marquee-title"
-          className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950 dark:text-white sm:text-3xl"
-        >
-          {tIndex("marqueeTitle")}
-        </h2>
-      </div>
-      <div className="space-y-3 overflow-hidden">
-        {renderRow(MARQUEE_ROW_1, "sb-marquee-right")}
-        {renderRow(MARQUEE_ROW_2, "sb-marquee-left")}
-        {!lite && renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
-      </div>
-    </section>
-  );
-}
