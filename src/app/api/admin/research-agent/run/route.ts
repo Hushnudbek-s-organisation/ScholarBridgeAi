@@ -2,9 +2,8 @@ import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { runBatch } from "@/lib/research-agent/run-batch";
-import { createRun, setRun, appendProgress } from "@/lib/research-agent/registry";
-import { AGENT_CONFIG } from "@/lib/research-agent/config";
-import type { RunRequest } from "@/lib/research-agent/types";
+import { createRun, setRun, appendProgress, ResearchCapacityError } from "@/lib/research-agent/registry";
+import { parseResearchRequest } from "@/lib/research-agent/request";
 
 /**
  * Start a research-agent run (admin only). Runs sequentially server-side;
@@ -23,21 +22,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const ids = Array.isArray(body.universityIds)
-      ? body.universityIds.map(Number).filter((n: number) => Number.isFinite(n) && n > 0)
-      : body.universityId
-        ? [Number(body.universityId)]
-        : [];
-    if (ids.length === 0) {
-      return NextResponse.json({ error: "universityId(s) required" }, { status: 400 });
-    }
-
-    const request: RunRequest = {
-      universityIds: ids.slice(0, 50), // batch cap (spec §17)
-      scopes: Array.isArray(body.scopes) && body.scopes.length > 0 ? body.scopes : (AGENT_CONFIG as any).defaultScopes ?? [],
-      dryRun: body.dryRun === true,
-      maxPages: body.maxPages ? Number(body.maxPages) : undefined,
-    };
+    const parsed = parseResearchRequest(body);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const request = parsed.request;
+    const ids = request.universityIds;
 
     const runId = createRun(ids[0]);
     setRun(runId, { state: "running" });
@@ -60,10 +48,15 @@ export async function POST(req: Request) {
         finishedAt: Date.now(),
       });
       appendProgress(runId, errors.length > 0 ? `Finished with errors: ${errors.join("; ")}` : "Finished.");
-    })();
+    })().catch((error: unknown) => {
+      // Catch the entire detached task, including progress/report callbacks.
+      console.error("[research-run] background task failed:", error instanceof Error ? error.name : "unknown");
+      setRun(runId, { state: "error", error: "Research run failed. Check server logs.", finishedAt: Date.now() });
+    });
 
     return NextResponse.json({ runId, queued: ids.length });
   } catch (error) {
+    if (error instanceof ResearchCapacityError) return NextResponse.json({ error: error.message, code: "research_busy" }, { status: 429, headers: { "Retry-After": "30" } });
     console.error("POST /api/admin/research-agent/run error:", error);
     return NextResponse.json({ error: "Failed to start research run" }, { status: 500 });
   }

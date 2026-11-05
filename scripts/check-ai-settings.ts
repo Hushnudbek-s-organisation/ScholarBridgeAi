@@ -901,7 +901,7 @@ check("admin AI route: audit, rate limit, gemini rejected for chat tasks, no key
 check("specialized OpenRouter calls enforce bounded responses and log metadata only", () => {
   const src = readFileSync(join(ROOT, "src/lib/ai/openrouterModels.ts"), "utf8");
   assert.match(src, /MAX_SPECIALIZED_RESPONSE_BYTES/);
-  assert.match(src, /reader\.cancel/);
+  assert.match(src, /fetchBoundedResponse\(/);
   assert.match(src, /costStatus: "usage_unreported"/);
   assert.doesNotMatch(src, /console\.(info|warn)\([^\n]*(state|questions|input|apiKey)/i);
 });

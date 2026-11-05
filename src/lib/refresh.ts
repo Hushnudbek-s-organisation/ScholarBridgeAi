@@ -1,3 +1,5 @@
+import { invalidateCatalogCache } from "@/lib/catalogCache";
+import { boundedPageInteger } from "@/lib/pagination";
 import { db } from "@/db";
 import { refreshJobs, scholarships, universities } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -101,6 +103,8 @@ export async function runRefresh(scope: "all" | "scholarships" | "universities")
   } catch (err: any) {
     result.errors.push(String(err?.message || err));
     await finishRefreshJob(job.id, result, String(err?.message || err));
+  } finally {
+    if (result.changed > 0) invalidateCatalogCache(scope === "all" ? "all" : scope);
   }
 
   return result;
@@ -108,5 +112,5 @@ export async function runRefresh(scope: "all" | "scholarships" | "universities")
 
 /** List recent jobs for the admin refresh center. */
 export async function listRefreshJobs(limit = 30) {
-  return db.select().from(refreshJobs).orderBy(desc(refreshJobs.createdAt)).limit(limit);
+  return db.select().from(refreshJobs).orderBy(desc(refreshJobs.createdAt)).limit(boundedPageInteger(limit, 30, 1, 100));
 }

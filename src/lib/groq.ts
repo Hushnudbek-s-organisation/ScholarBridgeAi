@@ -1,3 +1,4 @@
+import { fetchBoundedResponse } from "@/lib/boundedBody";
 /**
  * Direct Groq client (server-side ONLY — never import from Client
  * Components). Powers the Visa Speaking Assistant interview + analysis.
@@ -59,6 +60,8 @@ export interface GroqChatOptions {
   reasoningEffort?: "low" | "medium" | "high";
   /** Defaults to getGroqModelName(). */
   model?: string;
+  /** Whole response deadline; capped at 60 seconds. */
+  timeoutMs?: number;
 }
 
 export interface GroqChatResult {
@@ -90,7 +93,8 @@ export async function groqChatComplete(
   if (!apiKey) throw new GroqApiError("GROQ_API_KEY is not configured.");
 
   const model = options.model || getGroqModelName();
-  const res = await fetch(GROQ_API_URL, {
+  const timeout = Number.isFinite(options.timeoutMs) && options.timeoutMs! > 0 ? Math.min(options.timeoutMs!, 60_000) : 60_000;
+  const res = await fetchBoundedResponse(GROQ_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -108,7 +112,7 @@ export async function groqChatComplete(
         ? { reasoning_effort: options.reasoningEffort }
         : {}),
     }),
-  });
+  }, timeout, 2 * 1024 * 1024);
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -120,7 +124,7 @@ export async function groqChatComplete(
       // keep raw body
     }
     throw new GroqApiError(
-      `Groq API error (${res.status}): ${detail.slice(0, 300)}`,
+      `Groq API error (${res.status}): ${redactGroqSecrets(detail).split(apiKey).join("[REDACTED]").slice(0, 300)}`,
       res.status,
     );
   }

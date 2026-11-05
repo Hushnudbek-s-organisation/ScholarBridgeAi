@@ -1,3 +1,4 @@
+import { BodyLimitError, cancelBody, readBoundedBytes } from "@/lib/boundedBody";
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { OPENROUTER_MODEL_REGISTRY } from "@/lib/ai/openrouterModelIds";
@@ -21,31 +22,9 @@ const MAX_TEXT_LENGTH = 4096;
 const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = OPENROUTER_MODEL_REGISTRY.speech.timeoutMs;
 
-async function readBoundedAudio(body: ReadableStream<Uint8Array>, maxBytes: number): Promise<Uint8Array | null> {
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel().catch(() => undefined);
-        return null;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const audio = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    audio.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return audio.byteLength ? audio : null;
+async function readBoundedAudio(body: ReadableStream<Uint8Array>, maxBytes: number, signal: AbortSignal): Promise<Uint8Array | null> {
+  try { const audio = await readBoundedBytes(body, maxBytes, signal); return audio.byteLength ? audio : null; }
+  catch (error) { if (error instanceof BodyLimitError) return null; throw error; }
 }
 
 export async function POST(req: Request) {
@@ -97,7 +76,7 @@ export async function POST(req: Request) {
       try {
         const upstream = await fetch("https://openrouter.ai/api/v1/audio/speech", {
           method: "POST",
-          signal: controller.signal,
+          signal: AbortSignal.any([controller.signal, req.signal]),
           headers: {
             authorization: `Bearer ${apiKey}`,
             "content-type": "application/json",
@@ -111,6 +90,7 @@ export async function POST(req: Request) {
           }),
         });
         if (!upstream.ok || !upstream.body) {
+          cancelBody(upstream.body);
           // Never log provider response bodies: they can contain sensitive data.
           console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: `http_${upstream.status}${upstream.ok ? "_empty_body" : ""}`, latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
           if (retryableStatuses.has(upstream.status) || (upstream.ok && !upstream.body)) continue;
@@ -118,16 +98,17 @@ export async function POST(req: Request) {
         }
         const contentType = upstream.headers.get("content-type")?.toLowerCase() ?? "";
         if (contentType && !contentType.startsWith("audio/") && contentType !== "application/octet-stream") {
+          cancelBody(upstream.body);
           console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: "invalid_content_type", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
           continue;
         }
         const lengthHeader = upstream.headers.get("content-length");
         if (lengthHeader && Number(lengthHeader) > MAX_AUDIO_BYTES) {
-          await upstream.body.cancel().catch(() => undefined);
+          cancelBody(upstream.body);
           console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: "audio_too_large", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
           continue;
         }
-        const audio = await readBoundedAudio(upstream.body, MAX_AUDIO_BYTES);
+        const audio = await readBoundedAudio(upstream.body, MAX_AUDIO_BYTES, AbortSignal.any([controller.signal, req.signal]));
         if (!audio) {
           console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider, model, status: "error", category: "empty_or_oversize_audio", latencyMs: Date.now() - upstreamStartedAt, costStatus: "usage_unreported" }));
           continue;

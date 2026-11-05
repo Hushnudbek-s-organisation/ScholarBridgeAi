@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
@@ -27,6 +28,7 @@ import {
   getCachedProfileForMatching,
   getCachedScholarshipsBundle,
   getCachedUniversitiesBundle,
+  universityDetailCacheGeneration,
   getCachedUniversityDetailBase,
   setCachedUniversityDetailBase,
 } from "@/lib/catalogCache";
@@ -236,8 +238,10 @@ function providerMatchesInstitution(
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const detailGeneration = universityDetailCacheGeneration();
     const { id } = await params;
-    const uniId = parseInt(id, 10);
+    const uniId = postgresId(id);
+    if (uniId === null) return privateNoStoreJson({ error: "Invalid university id" }, { status: 400 });
 
     let uni;
     try {
@@ -1009,7 +1013,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       campuses: [],
       images: [],
     };
-    setCachedUniversityDetailBase(uniId, basePayload);
+    setCachedUniversityDetailBase(uniId, basePayload, detailGeneration);
 
     // Localize the OUTGOING copy — the cache keeps canonical English rows.
     return privateNoStoreJson(

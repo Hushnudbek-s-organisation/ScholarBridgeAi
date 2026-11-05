@@ -11,7 +11,7 @@ Reflect.set(env, "NODE_ENV", "test");
 env.NEXT_TELEMETRY_DISABLED = "1";
 mkdirSync("test-results/backend", { recursive: true });
 let failed = false;
-for (const name of ["backend-resilience", "dashboard-cache", "security", "ai-settings", "integration", "payments"]) {
+for (const name of ["backend-resilience", "backend-second-pass", "dashboard-cache", "security", "ai-settings", "integration", "payments", "journey", "ownership", "telegram", "channel", "portability", "schema-repair", "groq", "growth", "streak", "referral", "university-rank"]) {
   const file = `scripts/check-${name}.ts`;
   const result = spawnSync(process.execPath, [join(process.cwd(), "node_modules/tsx/dist/cli.mjs"), file], {
     env, timeout: 300_000, maxBuffer: 16 * 1024 * 1024, encoding: "utf8",

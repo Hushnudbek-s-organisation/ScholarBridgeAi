@@ -1,3 +1,4 @@
+import { boundedPageInteger } from "@/lib/pagination";
 import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 import { desc, eq, and } from "drizzle-orm";
@@ -101,12 +102,12 @@ export async function getAuditLogs(opts: {
   limit?: number;
   offset?: number;
 }) {
-  const limit = opts.limit ?? 100;
-  const offset = opts.offset ?? 0;
+  const limit = boundedPageInteger(opts.limit, 100, 1, 500);
+  const offset = boundedPageInteger(opts.offset, 0, 0, 100_000);
 
   const conditions = [];
   if (opts.entityType) conditions.push(eq(auditLogs.entityType, opts.entityType));
-  if (opts.entityId) conditions.push(eq(auditLogs.entityId, opts.entityId));
+  if (opts.entityId !== undefined) conditions.push(eq(auditLogs.entityId, opts.entityId));
   if (opts.actor) conditions.push(eq(auditLogs.actor, opts.actor));
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;

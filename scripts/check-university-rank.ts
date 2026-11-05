@@ -228,7 +228,7 @@ check("the detail API corrects before it caches or localizes", () => {
   // property this gate protects is unchanged: the correction runs on the raw
   // row, before anything is cached or localized.
   const correction = route.indexOf('localizeUniversityDescription(uni.description, "en", qsRank)');
-  const cacheWrite = route.indexOf("setCachedUniversityDetailBase(uniId, basePayload)");
+  const cacheWrite = route.indexOf("setCachedUniversityDetailBase(uniId, basePayload, detailGeneration)");
   const cacheRead = route.indexOf("getCachedUniversityDetailBase(uniId)");
   assert.ok(correction > 0, "the API does not correct the description");
   assert.ok(cacheWrite > correction, "the cache is written before the correction");

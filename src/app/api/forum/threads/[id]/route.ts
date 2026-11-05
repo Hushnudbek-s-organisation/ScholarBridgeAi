@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumThreads, studentProfiles, forumCategories, forumLikes } from "@/db/schema";
@@ -22,7 +23,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const member = await requireFeatureSession(req, "forum");
     if (!member.ok) return member.response;
     const { id } = await params;
-    const threadId = parseInt(id, 10);
+    const threadId = postgresId(id);
+    if (threadId === null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
     // Increment view count.
     await db
@@ -70,7 +72,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const threadId = parseInt(id, 10);
+    const threadId = postgresId(id);
+    if (threadId === null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     // Size-capped parse: even an authenticated community write must never
     // hand an unbounded body to the JSON parser.
     const parsed = await readJsonBody<Record<string, any>>(req, 32 * 1024);
@@ -112,7 +115,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const threadId = parseInt(id, 10);
+    const threadId = postgresId(id);
+    if (threadId === null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     const requester = await getRequester(req);
 
     if (!requester) {

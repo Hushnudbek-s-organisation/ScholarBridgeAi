@@ -1,10 +1,11 @@
+import { postgresId } from "@/lib/pagination";
 import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
 import { db } from "@/db";
 import { quizzes, quizQuestions, quizAttempts, lessons, courseModules, courses } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and } from "drizzle-orm";
 import { maybeIssueCertificate } from "@/lib/certificates";
 import { awardPoints, recordDailyActivity } from "@/lib/gamification";
 import { percentage } from "@/lib/calculations";
@@ -25,11 +26,16 @@ export async function POST(req: Request) {
     const locked = await premiumGate(access.session.profile.id, "courses_full");
     if (locked) return locked;
 
-    if (!quizId || !profileId || !Array.isArray(answers)) {
+    if (!postgresId(quizId) || !postgresId(profileId) || !Array.isArray(answers) || answers.length > 500 || answers.some((answer: unknown) => typeof answer !== "number" || !Number.isSafeInteger(answer) || answer < 0 || answer > 100)) {
       return NextResponse.json({ error: "quizId, profileId and answers are required" }, { status: 400 });
     }
 
-    const [quiz] = await db.select().from(quizzes).where(eq(quizzes.id, Number(quizId)));
+    const [context] = await db.select({ quiz: quizzes, courseId: courses.id }).from(quizzes)
+      .innerJoin(lessons, eq(lessons.id, quizzes.lessonId))
+      .innerJoin(courseModules, eq(courseModules.id, lessons.moduleId))
+      .innerJoin(courses, eq(courses.id, courseModules.courseId))
+      .where(and(eq(quizzes.id, Number(quizId)), eq(courses.isPublished, true)));
+    const quiz = context?.quiz;
     if (!quiz) {
       return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
     }
@@ -76,14 +82,8 @@ export async function POST(req: Request) {
         console.error("Failed to award quiz points:", err);
       }
 
-      // Attempt certificate issuance (all lessons + quizzes required).
-      const [lesson] = await db.select().from(lessons).where(eq(lessons.id, quiz.lessonId));
-      if (lesson) {
-        const [module] = await db.select().from(courseModules).where(eq(courseModules.id, lesson.moduleId));
-        if (module) {
-          certificate = await maybeIssueCertificate(Number(profileId), module.courseId);
-        }
-      }
+      try { certificate = await maybeIssueCertificate(Number(profileId), context.courseId); }
+      catch (err) { console.error("Certificate issuance failed:", err); }
     }
 
     return NextResponse.json({

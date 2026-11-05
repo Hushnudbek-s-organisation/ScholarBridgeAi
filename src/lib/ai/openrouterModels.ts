@@ -1,3 +1,4 @@
+import { fetchBoundedResponse } from "@/lib/boundedBody";
 import { resolveProviderCredential } from "@/lib/ai/credentials";
 import { getStoredConfig } from "@/lib/config";
 import { DISABLED_PROVIDERS_CONFIG_KEY, parseDisabledProviders } from "@/lib/ai/settings";
@@ -10,39 +11,6 @@ const DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_SPECIALIZED_RESPONSE_BYTES = 2 * 1024 * 1024;
 const OPENROUTER_MODEL_ID_RE = /^[A-Za-z0-9._:/@+-]{1,200}$/;
-
-async function readLimitedJson<T>(response: Response): Promise<T> {
-  const declaredLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_SPECIALIZED_RESPONSE_BYTES) {
-    await response.body?.cancel().catch(() => undefined);
-    throw new Error("OpenRouter response exceeded the size limit");
-  }
-  if (!response.body) throw new Error("OpenRouter returned an empty response");
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_SPECIALIZED_RESPONSE_BYTES) {
-        await reader.cancel().catch(() => undefined);
-        throw new Error("OpenRouter response exceeded the size limit");
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return JSON.parse(new TextDecoder().decode(bytes)) as T;
-}
 
 /** Metadata-only telemetry for specialized OpenRouter paths (never state, text, image, or key). */
 function logSpecializedRequest(task: string, model: string, startedAt: number, status: "ok" | "error", category?: string): void {
@@ -96,25 +64,21 @@ export async function callOpenRouterDecision<T = Record<string, unknown>>(args: 
     logSpecializedRequest(task, args.model, startedAt, "error", "not_configured");
     throw new Error("OpenRouter is not configured");
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(250, Math.min(args.timeoutMs ?? REQUEST_TIMEOUT_MS, 30_000)));
+  const timeout = Number.isFinite(args.timeoutMs) && args.timeoutMs! > 0 ? Math.max(250, Math.min(args.timeoutMs!, 30_000)) : REQUEST_TIMEOUT_MS;
   try {
-    const response = await fetch(DECISIONS_URL, {
+    const response = await fetchBoundedResponse(DECISIONS_URL, {
       method: "POST",
-      signal: controller.signal,
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({ model: args.model, state: args.state, questions: args.questions }),
-    });
+    }, timeout, MAX_SPECIALIZED_RESPONSE_BYTES);
     if (!response.ok) throw new Error(`OpenRouter decision request failed (${response.status})`);
-    const result = await readLimitedJson<T>(response);
+    const result = await response.json() as T;
     logSpecializedRequest(task, args.model, startedAt, "ok");
     return result;
   } catch (error) {
-    const category = (error as Error)?.name === "AbortError" ? "timeout" : "provider_error";
+    const category = ["AbortError", "TimeoutError"].includes((error as Error)?.name) ? "timeout" : "provider_error";
     logSpecializedRequest(task, args.model, startedAt, "error", category);
     throw error;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -136,19 +100,17 @@ export async function callOpenRouterEmbeddings(args: {
     logSpecializedRequest(task, args.model, startedAt, "error", "not_configured");
     throw new Error("OpenRouter is not configured");
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(250, Math.min(args.timeoutMs ?? REQUEST_TIMEOUT_MS, 30_000)));
+  const timeout = Number.isFinite(args.timeoutMs) && args.timeoutMs! > 0 ? Math.max(250, Math.min(args.timeoutMs!, 30_000)) : REQUEST_TIMEOUT_MS;
   try {
-    const response = await fetch(`${API_V1}/embeddings`, {
+    const response = await fetchBoundedResponse(`${API_V1}/embeddings`, {
       method: "POST",
-      signal: controller.signal,
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({ model: args.model, input: args.input, encoding_format: "float" }),
-    });
+    }, timeout, MAX_SPECIALIZED_RESPONSE_BYTES);
     if (!response.ok) throw new Error(`OpenRouter embedding request failed (${response.status})`);
-    const result = await readLimitedJson<{ data?: Array<{ embedding?: number[]; index?: number; object?: string }>; model?: string }>(response);
-    if (!Array.isArray(result.data) || result.data.length > 64 || result.data.some((row) =>
-      !Array.isArray(row.embedding) || row.embedding.length < 1 || row.embedding.length > 8_192 ||
+    const result = await response.json() as { data?: Array<{ embedding?: number[]; index?: number; object?: string }>; model?: string };
+    if (!result || !Array.isArray(result.data) || result.data.length > 64 || result.data.some((row) =>
+      !row || !Array.isArray(row.embedding) || row.embedding.length < 1 || row.embedding.length > 8_192 ||
       row.embedding.some((value) => !Number.isFinite(value))
     )) {
       throw new Error("OpenRouter returned an invalid embedding response");
@@ -156,11 +118,9 @@ export async function callOpenRouterEmbeddings(args: {
     logSpecializedRequest(task, result.model || args.model, startedAt, "ok");
     return { data: result.data as Array<{ embedding: number[]; index?: number; object?: string }>, model: result.model };
   } catch (error) {
-    const category = (error as Error)?.name === "AbortError" ? "timeout" : "provider_error";
+    const category = ["AbortError", "TimeoutError"].includes((error as Error)?.name) ? "timeout" : "provider_error";
     logSpecializedRequest(task, args.model, startedAt, "error", category);
     throw error;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

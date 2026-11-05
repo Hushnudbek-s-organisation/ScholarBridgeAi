@@ -8,7 +8,9 @@
  * Values are read straight from the table with a short memo (not the shared
  * config cache) so every server instance sees an admin change within seconds.
  */
-import { eq } from "drizzle-orm";
+import { AsyncTtlCache } from "@/lib/asyncTtlCache";
+import { setConfig } from "@/lib/config";
+import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { appConfig } from "@/db/schema";
 import { decryptWithRotation, encryptApiKey } from "@/lib/ai/settings";
@@ -20,7 +22,7 @@ const SETTINGS_KEY = "telegram_settings";
 const TOKEN_KEY = "telegram_bot_token";
 const MEMO_MS = 10_000;
 
-let memo: { at: number; settings: TelegramSettings; storedToken: string | null } | null = null;
+const memo = new AsyncTtlCache<string, { settings: TelegramSettings; storedToken: string | null }>(MEMO_MS, 1);
 
 async function readKey(key: string): Promise<string | null> {
   const [row] = await db.select().from(appConfig).where(eq(appConfig.key, key)).limit(1);
@@ -28,37 +30,31 @@ async function readKey(key: string): Promise<string | null> {
 }
 
 async function writeKey(key: string, value: string, description: string) {
-  const [existing] = await db.select().from(appConfig).where(eq(appConfig.key, key)).limit(1);
-  if (existing) {
-    await db.update(appConfig).set({ value, updatedAt: new Date() }).where(eq(appConfig.key, key));
-  } else {
-    await db.insert(appConfig).values({ key, value, description });
-  }
+  await setConfig(key, value, description);
 }
 
 async function load() {
-  if (memo && Date.now() - memo.at < MEMO_MS) return memo;
-  let settings = parseTelegramSettings(null);
-  let storedToken: string | null = null;
-  try {
-    settings = parseTelegramSettings(await readKey(SETTINGS_KEY));
-    // Rotation-aware (AI_KEYS_ENCRYPTION_SECRET_PREVIOUS): a token encrypted
-    // with an old secret keeps working and is re-encrypted with the current one.
-    const { key, rotated } = decryptWithRotation(await readKey(TOKEN_KEY));
-    storedToken = key;
-    if (key && rotated) {
-      await writeKey(TOKEN_KEY, encryptApiKey(key), "Telegram bot token (encrypted)").catch(() => undefined);
+  return memo.getOrCreate("settings", async () => {
+    let settings = parseTelegramSettings(null);
+    let storedToken: string | null = null;
+    try {
+      const [rawSettings, encryptedToken] = await Promise.all([readKey(SETTINGS_KEY), readKey(TOKEN_KEY)]);
+      settings = parseTelegramSettings(rawSettings);
+      const { key, rotated } = decryptWithRotation(encryptedToken);
+      storedToken = key;
+      if (key && rotated && encryptedToken) {
+        // Rotation may race an admin replacing the token. Never overwrite it.
+        await db.update(appConfig).set({ value: encryptApiKey(key), updatedAt: new Date() })
+          .where(and(eq(appConfig.key, TOKEN_KEY), eq(appConfig.value, encryptedToken))).catch(() => undefined);
+      }
+    } catch (err) {
+      console.warn("[telegram] settings read failed, using defaults:", err instanceof Error ? err.message : err);
     }
-  } catch (err) {
-    console.warn("[telegram] settings read failed, using defaults:", err instanceof Error ? err.message : err);
-  }
-  memo = { at: Date.now(), settings, storedToken };
-  return memo;
+    return { settings, storedToken };
+  });
 }
 
-export function invalidateTelegramSettings() {
-  memo = null;
-}
+export function invalidateTelegramSettings() { memo.clear(); }
 
 export async function getTelegramSettings(): Promise<TelegramSettings> {
   return (await load()).settings;

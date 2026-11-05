@@ -1,3 +1,4 @@
+import { parsePagination, postgresId } from "@/lib/pagination";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getAuditLogs } from "@/lib/audit";
@@ -13,12 +14,16 @@ export async function GET(req: Request) {
         { status: access.status }
       );
     }
+    const page = parsePagination(searchParams);
+    const rawEntityId = searchParams.get("entityId");
+    const entityId = rawEntityId === null ? undefined : rawEntityId === "0" ? 0 : postgresId(rawEntityId);
+    if (!page.ok || entityId === null) return NextResponse.json({ error: !page.ok ? page.error : "Invalid entityId" }, { status: 400 });
     const logs = await getAuditLogs({
       entityType: searchParams.get("entityType") || undefined,
-      entityId: searchParams.get("entityId") ? Number(searchParams.get("entityId")) : undefined,
+      entityId,
       actor: searchParams.get("actor") || undefined,
-      limit: Number(searchParams.get("limit") || 100),
-      offset: Number(searchParams.get("offset") || 0),
+      limit: page.limit,
+      offset: page.offset,
     });
     return NextResponse.json({ logs });
   } catch (error) {

@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumReplies, forumLikes, studentProfiles, forumThreads } from "@/db/schema";
@@ -23,7 +24,8 @@ export async function GET(req: Request) {
     if (!threadIdStr) {
       return NextResponse.json({ error: "threadId is required" }, { status: 400 });
     }
-    const threadId = parseInt(threadIdStr, 10);
+    const threadId = postgresId(threadIdStr);
+    if (threadId === null) return NextResponse.json({ error: "Invalid threadId" }, { status: 400 });
 
     const likeCounts = db
       .select({

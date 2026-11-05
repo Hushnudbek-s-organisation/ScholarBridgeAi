@@ -95,3 +95,29 @@ export function paginatedPayload<T>(
     totalPages: paged.totalPages,
   };
 }
+
+/** Normalize trusted/internal pagination without allowing NaN or unbounded SQL. */
+export function boundedPageInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(n) && n >= min ? Math.min(n, max) : fallback;
+}
+
+/** URL inputs are validated, not silently coerced to a different request. */
+export function parsePagination(params: URLSearchParams, defaultLimit = 100) {
+  const rawLimit = params.get("limit");
+  const rawOffset = params.get("offset");
+  const limit = rawLimit === null ? defaultLimit : Number(rawLimit);
+  const offset = rawOffset === null ? 0 : Number(rawOffset);
+  if (rawLimit?.trim() === "" || rawOffset?.trim() === "" || !Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(offset) || offset < 0 || offset > 100_000) {
+    return { ok: false as const, error: "limit must be a positive integer; offset must be an integer from 0 to 100000" };
+  }
+  return { ok: true as const, limit: Math.min(limit, 500), offset };
+}
+
+/** PostgreSQL serial/integer IDs, never booleans, arrays or partial strings. */
+export function postgresId(value: unknown): number | null {
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (typeof value === "string" && !/^[0-9]+$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 && id <= 2_147_483_647 ? id : null;
+}

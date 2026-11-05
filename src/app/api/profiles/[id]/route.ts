@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
@@ -22,7 +23,8 @@ import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRec
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const profileId = parseInt(id, 10);
+    const profileId = postgresId(id);
+    if (profileId === null) return privateNoStoreJson({ error: "Invalid id" }, { status: 400 });
 
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
@@ -118,7 +120,8 @@ function jsonListField(value: unknown): string | null | undefined {
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const profileId = parseInt(id, 10);
+    const profileId = postgresId(id);
+    if (profileId === null) return privateNoStoreJson({ error: "Invalid id" }, { status: 400 });
 
     // Authorization: session owner or live admin. `requesterId` in the body is
     // ignored — it was forgeable.
@@ -365,7 +368,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const profileId = parseInt(id, 10);
+    const profileId = postgresId(id);
+    if (profileId === null) return privateNoStoreJson({ error: "Invalid id" }, { status: 400 });
 
     // Only a live admin may delete a profile (deleting is destructive).
     const access = await requireAdmin(req);

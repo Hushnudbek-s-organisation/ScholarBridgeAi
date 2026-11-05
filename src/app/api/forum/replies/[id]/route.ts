@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumReplies, studentProfiles } from "@/db/schema";
@@ -7,7 +8,8 @@ import { authenticate } from "@/lib/auth";
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const replyId = parseInt(id, 10);
+    const replyId = postgresId(id);
+    if (replyId === null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     // Authenticate the requester from the signed session cookie — the
     // `requesterId` query parameter was forgeable and is ignored.
     const auth = await authenticate(req);

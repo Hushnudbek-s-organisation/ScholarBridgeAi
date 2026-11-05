@@ -25,19 +25,20 @@ export function generateReferralCode(): string {
 }
 
 /** Ensure a points row exists for a profile. */
-export async function ensureUserPoints(profileId: number) {
-  const [existing] = await db
-    .select()
-    .from(userPoints)
-    .where(eq(userPoints.profileId, profileId));
+type Executor = Pick<typeof db, "select" | "insert" | "update" | "execute">;
+async function withProfileLock<T>(profileId: number, run: (tx: Executor) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM student_profiles WHERE id = ${profileId} FOR NO KEY UPDATE`);
+    return run(tx);
+  });
+}
 
+export async function ensureUserPoints(profileId: number, executor: Executor = db) {
+  const [existing] = await executor.select().from(userPoints).where(eq(userPoints.profileId, profileId));
   if (existing) return existing;
-
-  const [created] = await db
-    .insert(userPoints)
-    .values({ profileId, totalPoints: 0, currentLevel: 1 })
-    .returning();
-  return created;
+  await executor.insert(userPoints).values({ profileId, totalPoints: 0, currentLevel: 1 }).onConflictDoNothing({ target: userPoints.profileId });
+  const [row] = await executor.select().from(userPoints).where(eq(userPoints.profileId, profileId));
+  return row;
 }
 
 export async function getTotalPoints(profileId: number): Promise<number> {
@@ -53,12 +54,17 @@ const DEFAULT_LEVELS: { name: string; minPoints: number; iconUrl: string }[] = [
 ];
 
 /** Fetch levels ordered by minPoints ascending (seeding defaults if empty). */
-export async function getLevels() {
-  const existing = await db.select().from(levels).limit(1);
-  if (existing.length === 0) {
-    await db.insert(levels).values(DEFAULT_LEVELS);
-  }
-  return db.select().from(levels).orderBy(levels.minPoints);
+export async function getLevels(executor?: Executor): Promise<(typeof levels.$inferSelect)[]> {
+  const connection = executor ?? db;
+  const existing = await connection.select().from(levels).orderBy(levels.minPoints);
+  if (existing.length > 0) return existing;
+  if (!executor) return db.transaction((tx) => getLevels(tx));
+  // Only the empty-table path locks. Different students cannot seed duplicates.
+  await executor.execute(sql`SELECT pg_advisory_xact_lock(73624, 1)`);
+  const again = await executor.select().from(levels).orderBy(levels.minPoints);
+  if (again.length > 0) return again;
+  await executor.insert(levels).values(DEFAULT_LEVELS);
+  return executor.select().from(levels).orderBy(levels.minPoints);
 }
 
 /** Compute the current level name/object from a point total. */
@@ -124,10 +130,11 @@ interface AwardResult {
  *
  * Returns true when a new marker was written.
  */
-export async function recordDailyActivity(profileId: number): Promise<boolean> {
+export async function recordDailyActivity(profileId: number, executor?: Executor): Promise<boolean> {
   if (!Number.isFinite(profileId) || profileId <= 0) return false;
   try {
-    const result = await db.execute(sql`
+    if (!executor) return await withProfileLock(profileId, (tx) => recordDailyActivity(profileId, tx));
+    const result = await executor.execute(sql`
       INSERT INTO points_ledger (profile_id, points, reason)
       SELECT ${profileId}, 0, ${DAILY_ACTIVITY_REASON}
       WHERE NOT EXISTS (
@@ -159,91 +166,94 @@ export async function awardPoints(
   reason: string,
   relatedEntityId?: number | null
 ): Promise<AwardResult> {
-  if (!points || points <= 0) {
+  if (!Number.isSafeInteger(points) || points <= 0 || points > 2_147_483_647) {
     throw new Error("points must be a positive integer");
   }
 
-  // A repeat action still means the student studied today: record the day
-  // BEFORE the duplicate check below, which would otherwise return early and
-  // leave a re-watched lesson uncounted.
-  if (isStreakActivity(reason)) {
-    await recordDailyActivity(profileId);
-  }
-
-  // Idempotency: skip if this exact grant already exists in the ledger.
-  if (relatedEntityId != null) {
-    const dup = await db
-      .select()
-      .from(pointsLedger)
-      .where(
-        and(
-          eq(pointsLedger.profileId, profileId),
-          eq(pointsLedger.reason, reason),
-          eq(pointsLedger.relatedEntityId, relatedEntityId)
-        )
-      );
-    if (dup.length > 0) {
-      const row = await ensureUserPoints(profileId);
-      const levelRows = await getLevels();
-      return {
-        points,
-        newTotal: row.totalPoints,
-        level: computeLevel(row.totalPoints, levelRows),
-        newlyAwardedBadges: [],
-      };
+  return withProfileLock(profileId, async (tx) => {
+    // A repeat action still means the student studied today: record the day
+    // BEFORE the duplicate check below, which would otherwise return early and
+    // leave a re-watched lesson uncounted.
+    if (isStreakActivity(reason)) {
+      await recordDailyActivity(profileId, tx);
     }
-  }
 
-  await db.insert(pointsLedger).values({
-    profileId,
-    points,
-    reason,
-    relatedEntityId: relatedEntityId ?? null,
+    // Idempotency: skip if this exact grant already exists in the ledger.
+    if (relatedEntityId != null) {
+      const dup = await tx
+        .select()
+        .from(pointsLedger)
+        .where(
+          and(
+            eq(pointsLedger.profileId, profileId),
+            eq(pointsLedger.reason, reason),
+            eq(pointsLedger.relatedEntityId, relatedEntityId)
+          )
+        );
+      if (dup.length > 0) {
+        const row = await ensureUserPoints(profileId, tx);
+        const levelRows = await getLevels(tx);
+        return {
+          points,
+          newTotal: row.totalPoints,
+          level: computeLevel(row.totalPoints, levelRows),
+          newlyAwardedBadges: [],
+        };
+      }
+    }
+
+    await tx.insert(pointsLedger).values({
+      profileId,
+      points,
+      reason,
+      relatedEntityId: relatedEntityId ?? null,
+    });
+
+    await ensureUserPoints(profileId, tx);
+    // Atomic increment: two simultaneous legitimate rewards must not overwrite
+    // each other's totals (the old read + write sequence could lose one grant).
+    const [updatedPoints] = await tx
+      .update(userPoints)
+      .set({ totalPoints: sql`${userPoints.totalPoints} + ${points}`, updatedAt: new Date() })
+      .where(eq(userPoints.profileId, profileId))
+      .returning({ totalPoints: userPoints.totalPoints });
+    const newTotal = updatedPoints.totalPoints;
+    const levelRows = await getLevels(tx);
+    const currentLevel = computeLevel(newTotal, levelRows);
+
+    await tx
+      .update(userPoints)
+      .set({ currentLevel: currentLevel.id, updatedAt: new Date() })
+      .where(eq(userPoints.profileId, profileId));
+
+    const newlyAwardedBadges = await grantBadges(profileId, tx);
+
+    return {
+      points,
+      newTotal,
+      level: currentLevel,
+      newlyAwardedBadges,
+    };
   });
-
-  await ensureUserPoints(profileId);
-  // Atomic increment: two simultaneous legitimate rewards must not overwrite
-  // each other's totals (the old read + write sequence could lose one grant).
-  const [updatedPoints] = await db
-    .update(userPoints)
-    .set({ totalPoints: sql`${userPoints.totalPoints} + ${points}`, updatedAt: new Date() })
-    .where(eq(userPoints.profileId, profileId))
-    .returning({ totalPoints: userPoints.totalPoints });
-  const newTotal = updatedPoints.totalPoints;
-  const levelRows = await getLevels();
-  const currentLevel = computeLevel(newTotal, levelRows);
-
-  await db
-    .update(userPoints)
-    .set({ currentLevel: currentLevel.id, updatedAt: new Date() })
-    .where(eq(userPoints.profileId, profileId));
-
-  const newlyAwardedBadges = await grantBadges(profileId);
-
-  return {
-    points,
-    newTotal,
-    level: currentLevel,
-    newlyAwardedBadges,
-  };
 }
 
 /** Evaluate a single badge's criteria for a profile. */
 export async function evaluateBadge(
   profile: typeof studentProfiles.$inferSelect,
-  badge: typeof badges.$inferSelect
+  badge: typeof badges.$inferSelect,
+  executor: Executor = db
 ): Promise<boolean> {
   const criteria = badge.criteria.trim();
 
   if (criteria.startsWith("points:")) {
     const min = parseInt(criteria.split(":")[1], 10);
-    const row = await ensureUserPoints(profile.id);
+    const row = await ensureUserPoints(profile.id, executor);
     return row.totalPoints >= min;
   }
 
   if (criteria.startsWith("referral:")) {
     const min = parseInt(criteria.split(":")[1], 10) || 1;
-    const [count] = await db
+    const [count] = await executor
       .select({ c: sql<number>`count(*)::int` })
       .from(referrals)
       .where(
@@ -257,7 +267,7 @@ export async function evaluateBadge(
 
   if (criteria.startsWith("course:")) {
     const min = parseInt(criteria.split(":")[1], 10) || 1;
-    const [count] = await db
+    const [count] = await executor
       .select({ c: sql<number>`count(*)::int` })
       .from(certificates)
       .where(eq(certificates.profileId, profile.id));
@@ -272,24 +282,25 @@ export async function evaluateBadge(
 }
 
 /** Auto-grant any badges whose criteria are now satisfied. Returns newly awarded. */
-export async function grantBadges(profileId: number): Promise<(typeof badges.$inferSelect)[]> {
-  const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
+export async function grantBadges(profileId: number, executor?: Executor): Promise<(typeof badges.$inferSelect)[]> {
+  if (!executor) return withProfileLock(profileId, (tx) => grantBadges(profileId, tx));
+  const [profile] = await executor.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
   if (!profile) return [];
 
-  const allBadges = await db.select().from(badges);
-  const ownedRows = await db.select().from(userBadges).where(eq(userBadges.profileId, profileId));
+  const allBadges = await executor.select().from(badges);
+  const ownedRows = await executor.select().from(userBadges).where(eq(userBadges.profileId, profileId));
   const ownedIds = new Set(ownedRows.map((r) => r.badgeId));
 
   const toGrant: (typeof badges.$inferSelect)[] = [];
   for (const badge of allBadges) {
     if (ownedIds.has(badge.id)) continue;
-    if (await evaluateBadge(profile, badge)) {
+    if (await evaluateBadge(profile, badge, executor)) {
       toGrant.push(badge);
     }
   }
 
   if (toGrant.length > 0) {
-    await db.insert(userBadges).values(
+    await executor.insert(userBadges).values(
       toGrant.map((b) => ({ profileId, badgeId: b.id }))
     );
   }

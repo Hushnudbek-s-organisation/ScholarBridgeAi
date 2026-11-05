@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { db, pool } from "@/db";
-import { appConfig, savedScholarships, scholarships, studentProfiles, universities, userDocuments } from "@/db/schema";
+import { appConfig, savedScholarships, scholarships, studentProfiles, universities, userDocuments, courses, courseModules, lessons, auditLogs } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
 
 async function main() {
@@ -105,9 +105,17 @@ async function main() {
     status: "uploaded",
   });
 
+  const [course] = await db.insert(courses).values({ title: "Second-pass E2E course", description: "Disposable learning-concurrency fixture", isPublished: true }).returning();
+  const [module] = await db.insert(courseModules).values({ courseId: course.id, title: "Fixture module" }).returning();
+  const [lesson] = await db.insert(lessons).values({ moduleId: module.id, title: "Fixture lesson", videoUrl: "https://example.invalid/local-fixture", durationSeconds: 100 }).returning();
+
+  await db.insert(auditLogs).values([{ entityType: "config", entityId: 0, fieldChanged: "e2e_zero_filter" }, { entityType: "config", entityId: student.id, fieldChanged: "e2e_nonzero_filter" }]);
+
   const fixturePath = process.env.E2E_FIXTURE_FILE;
   if (!fixturePath) throw new Error("E2E_FIXTURE_FILE must point to the disposable fixture manifest");
   writeFileSync(fixturePath, JSON.stringify({
+    courseId: course.id,
+    lessonId: lesson.id,
     adminEmail: admin.email,
     adminPassword: password,
     studentId: student.id,

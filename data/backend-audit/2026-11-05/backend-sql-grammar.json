@@ -1,0 +1,1665 @@
+{
+  "summary": {
+    "files": 236,
+    "passed": 236,
+    "failed": 0,
+    "active": 112,
+    "archived": 124,
+    "parser": "pglast v8.7",
+    "method": "Read-only PostgreSQL grammar parse; no SQL execution, production access or PL/pgSQL body compilation."
+  },
+  "files": [
+    {
+      "path": "supabase/add_ai_cost_accounting.sql",
+      "sha256": "efbba14ad37013a1e6d877b92b19991df302ac20a3c638be8f8e7ecc8d6e390e",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/add_ai_usage_quota_index.sql",
+      "sha256": "3021e888a52ad2179bb855c070fea690730982067c08ac425db9f7de8f75cc1f",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/add_analytics.sql",
+      "sha256": "dbcc8de31439cb361a19cc55aab7a9c54af87904a0949bcf2309906568289142",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/add_application_system.sql",
+      "sha256": "ecd92e6ca125e63e044a810f92571da46a2a781b64ebc8831f4cc7cdeaa4a0d9",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/add_channel.sql",
+      "sha256": "89950020983fcb3ae7cbee00e9388213661173e4bac56a1b8a0e7ebf31fb1c63",
+      "archived": false,
+      "ok": true,
+      "statements": 35
+    },
+    {
+      "path": "supabase/add_core_repair.sql",
+      "sha256": "a84303cddb1301a827428441a2908cdfd8bf5ccd4f7366db2108c8549069016e",
+      "archived": false,
+      "ok": true,
+      "statements": 342
+    },
+    {
+      "path": "supabase/add_data_integrity.sql",
+      "sha256": "a071aa74306ebd1f4a1d7b540b3ae7245d9fadb6313eedde986c2cc0e4eecbe5",
+      "archived": false,
+      "ok": true,
+      "statements": 16
+    },
+    {
+      "path": "supabase/add_documents_essays.sql",
+      "sha256": "acd310da057b9f8e56bd4b75abc91fdade4c7068ba599832c96e9e2f0e7a9547",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/add_essay_rubric_context.sql",
+      "sha256": "30f5d4f5627664d7b29a5b6318c07705571b25953fb88364e770d2684052179d",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/add_generic_tuition_columns.sql",
+      "sha256": "c5d66969e4c7678ca5f5e036b8441c922ee0724ca9420b82f35cb3666ae6fe6e",
+      "archived": false,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "supabase/add_growth_features.sql",
+      "sha256": "2f600fb994a5bbc7b4f142c08108dd4d152749b0b3b37fc395a6aa699186efee",
+      "archived": false,
+      "ok": true,
+      "statements": 14
+    },
+    {
+      "path": "supabase/add_journey_core.sql",
+      "sha256": "45efb347e411e1bdbb7af569aee7bd61b509aae35295a8130848f880df531674",
+      "archived": false,
+      "ok": true,
+      "statements": 46
+    },
+    {
+      "path": "supabase/add_mentors_parent.sql",
+      "sha256": "5e678c338236bba298a214c0aa56085172d1a7801dcdf226409b2e83fabbecd6",
+      "archived": false,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "supabase/add_opportunities_essay_reviews.sql",
+      "sha256": "605d6d745a5334ccb838d35ce233d223db24c3cddcfdb9dda8fb70afe9d78167",
+      "archived": false,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "supabase/add_ownership.sql",
+      "sha256": "a3ae42dbb130292c29a5b3039c72a24dbe4279b3c376da7d3ddfbb94e4a825c9",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/add_password_hash.sql",
+      "sha256": "36ed8197c3bf8bb4063031b5ee252078b5adbd0ba6dd2f12c20aa9d982b6f02e",
+      "archived": false,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "supabase/add_payment_provider_lifecycle.sql",
+      "sha256": "89749170197067224ecd2ea1283cbab943b295ef4ca4a23d9de81613e7b58d01",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/add_profile_chancing_applications.sql",
+      "sha256": "0a09584de86516b6e820e9c92102e4a9ce6eaf8c58d569a30625f78c14552cea",
+      "archived": false,
+      "ok": true,
+      "statements": 14
+    },
+    {
+      "path": "supabase/add_referral_columns.sql",
+      "sha256": "39baa515009571e3f3d84429ed5d2f4159ac9a07ba00b30c711d1007f4a4659f",
+      "archived": false,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "supabase/add_study_interests.sql",
+      "sha256": "f5da2cf601962c26db14b4a726cae7977f04f96ff41ec9bcd990972bdd03c009",
+      "archived": false,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "supabase/add_telegram.sql",
+      "sha256": "63bef5cfb2a22500dd5f5d018199168e42b0535c091dbbf3522e2899d117428b",
+      "archived": false,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "supabase/add_university_discovery.sql",
+      "sha256": "c5efae658ca348a4b0293b53587d5359f89d87083ad5a75b5298afcecabdaf25",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/campus_images_wikimedia_2026-10-23.sql",
+      "sha256": "f80f08878a223fb4f883cbaad949ddac0c9c04f03c26665ac381a7f5501d342d",
+      "archived": false,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "supabase/catalog_and_integrity_2026_patch.sql",
+      "sha256": "806c7b767e17d8109d2a5ea4ef8e767e3158855c914f849d516f8e0c5c847ca9",
+      "archived": false,
+      "ok": true,
+      "statements": 29
+    },
+    {
+      "path": "supabase/catalogue_evidence_repair_2026-11-02.sql",
+      "sha256": "6366cccaf1510e26c70c1f1130cdf4cf57c0106f7565bd9d6cad9322a492e8e3",
+      "archived": false,
+      "ok": true,
+      "statements": 16
+    },
+    {
+      "path": "supabase/catalogue_verification_flags_2026-11-02.sql",
+      "sha256": "a0e0048b93d0cbd5e9705ff23874c1982973a7fb287974fb420f876301ba6278",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/deadline_correctness_sweep_2026-10-23.sql",
+      "sha256": "11bee521ef8e65d684cab160acafb20ce383ac7f05f79824b524d02f24db4229",
+      "archived": false,
+      "ok": true,
+      "statements": 14
+    },
+    {
+      "path": "supabase/deadline_fill_remaining_countries_2026-10-23.sql",
+      "sha256": "0abf18ef3090b0ddfae495361ed33d4eda82451ab79247486a4dd4db7d7bffaf",
+      "archived": false,
+      "ok": true,
+      "statements": 15
+    },
+    {
+      "path": "supabase/deadline_research_pass_2026-10-23.sql",
+      "sha256": "d2efd1a834cf921e9dcb2c292130d06c4acfd20364712173b183ccf8e704310a",
+      "archived": false,
+      "ok": true,
+      "statements": 14
+    },
+    {
+      "path": "supabase/deadline_verification_eu_asia_2026-10-23.sql",
+      "sha256": "2a1bbc64cd9b7a1ece31219b7a38d58a6a927c3e5c1257188d1dbe133169a3be",
+      "archived": false,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "supabase/deadline_verification_us_2026-10-23.sql",
+      "sha256": "697b1e1391ea0af1562a09ef65277edfc8ab09d41404ad388a9e2e2e754beb13",
+      "archived": false,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "supabase/delete_israel_2026-10-25.sql",
+      "sha256": "8a6a038d2a296b01dd86154dcc4352fde683ae040064fc12c08335705d737225",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/enable_rls.sql",
+      "sha256": "fdcb809cdd64f93667afc8f6d0399f05283feeec3c573d8e6d62643394ec0c1b",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/fill_data_gaps_official_sources_2026-10-23.sql",
+      "sha256": "86b51b6dbf2d87810bce59430f4f7ef4d34f2bf092831f9a1a22ec361a75cce2",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/fix_align_schema.sql",
+      "sha256": "06af07261b4eac9e74d7a086a6482ff888894ffb0a6fe886ec3e3de5ea9143bc",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/full_data_audit_2026-10-23.sql",
+      "sha256": "9745568ab7e9a45424b4cab7ec66a02ef456de4ec07eefa1a888f5e351dddaf0",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/full_schema.sql",
+      "sha256": "476b8042f7f166271b4faa684ea554991fc299aabd2221d048b8fa79163c4856",
+      "archived": false,
+      "ok": true,
+      "statements": 1482
+    },
+    {
+      "path": "supabase/integrity_repair_2026-10-23.sql",
+      "sha256": "aed3b309e08df97e4ae03dd5c69dcfb2bad157c966cd178af1e4476236a9f0cd",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/international_scholarships_batch1_2026-10-23.sql",
+      "sha256": "4d6515fec8b7fdeb926d700970f8ca6b3004ad8434e228cfdabfc875ad9cf09e",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/link_university_scholarships_2026-10-23.sql",
+      "sha256": "184cb2f37ad091d1695ac76ea1d07a1322fc2e1d3e78d68f7b4fba934da133b3",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/merge_duplicate_universities_2026-10-23.sql",
+      "sha256": "83d10f39f148b07a43ece082787bad77511a8b890edaf6b885bcb2a64118efba",
+      "archived": false,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "supabase/official_source_review_2026-11-02_batch_01.sql",
+      "sha256": "d1a28bc9edb733660bc82ab3ad60c3fbcb1db2093adc7f03ca4aa6ade9a1fe31",
+      "archived": false,
+      "ok": true,
+      "statements": 24
+    },
+    {
+      "path": "supabase/official_uk_visa_review_2026-11-03.sql",
+      "sha256": "9d33c89164f9d805cb9ed232a3aaf49bd5865dbc37735c519bac989698a3bb12",
+      "archived": false,
+      "ok": true,
+      "statements": 12
+    },
+    {
+      "path": "supabase/official_uk_visa_source_url_correction_2026-11-03.sql",
+      "sha256": "be218b6b4ab137592ba9c180f4b874252f88c634755e3f3a6d2dc4e44562f1a0",
+      "archived": false,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "supabase/password_reset_tokens_2026-10-31.sql",
+      "sha256": "7d6fc22119ba210a472064bbadb05f51c7404aa4ddbe0e10941f9ca0d52e0f1d",
+      "archived": false,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "supabase/qs_2026_rank_correction.sql",
+      "sha256": "6f456a35aa09a7a32f1fa2f756ed6e786edf2e7493445bbe1c46f0fac3941f0f",
+      "archived": false,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "supabase/qs_2026_rank_correction_pass2_2026-10-30.sql",
+      "sha256": "dd659fc18aa597ec474dce3d2806d899f86e8e33d30d23ad4093774d56e9c36a",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/qs_2027_top5_universities.sql",
+      "sha256": "831ad71ced296e1e4afd8a63991ab2ed14d2a7ea885baca5db94c6196ab1f580",
+      "archived": false,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "supabase/relax_profile_fabricated_defaults.sql",
+      "sha256": "129619ae081ce6e85b61d3db3c33e0b3b9f86702decd54a86d4807116bce3b5d",
+      "archived": false,
+      "ok": true,
+      "statements": 19
+    },
+    {
+      "path": "supabase/remove_profile_match_tiers.sql",
+      "sha256": "c926d7d0a6e619d78bbde95c988fd59076a8c473538cc9661b8ca9e9c5023d9a",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/repair_seeded_fabricated_values.sql",
+      "sha256": "3cba16c01ce9e9c8352eaec5c6f493c8ddce87a9ca5f05b827243449149451e9",
+      "archived": false,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "supabase/scholarship_accuracy_and_linking_pass4_2026-10-23.sql",
+      "sha256": "766280a5eefceecbb2a19ac8a7d0f6effce04cc21f497d7e0598cac0a87e0bc1",
+      "archived": false,
+      "ok": true,
+      "statements": 12
+    },
+    {
+      "path": "supabase/scholarship_accuracy_fixes_2026-10-23.sql",
+      "sha256": "4bc050b3ca8a05722477ac2a07543a494499d2ec6055e3974041857274027311",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/scholarship_accuracy_pass5_2026-10-23.sql",
+      "sha256": "f897c1329317f4bcb1c00bb2cd7fd184556f33ec5877057a2f50a776ce474f5a",
+      "archived": false,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "supabase/scholarship_correctness_sweep_2_2026-10-23.sql",
+      "sha256": "88c4a585356f1cf024780824b40f58b65ff34d35d7d977895146321a9aacdfc6",
+      "archived": false,
+      "ok": true,
+      "statements": 15
+    },
+    {
+      "path": "supabase/scholarship_data_quality_sweep_3_2026-10-23.sql",
+      "sha256": "772a362a534103c3ad51ffcf9d04a5f4e3f3cccb344eec55b18b839647e39528",
+      "archived": false,
+      "ok": true,
+      "statements": 29
+    },
+    {
+      "path": "supabase/scholarship_detail_backfill_2026-10-23.sql",
+      "sha256": "cf23d0f9a8d31f12104437b8252f84998f70d9d3deb53df920ab7e3394587026",
+      "archived": false,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch10_2026-10-26.sql",
+      "sha256": "bc30f2d92df17fabc259135bb4e22f1a8e2584f61c293ebf99072057402f3387",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch11_2026-10-26.sql",
+      "sha256": "25b69f51ca5ab255b4fbf3008053a44800c23726a7909688054fabd7cbe4e666",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch12_2026-10-26.sql",
+      "sha256": "a8ac03568b10fb86aef0b4137c8665c6f44d4b879751112a37839148675fdb2d",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch13_2026-10-27.sql",
+      "sha256": "9b7ca78d3bae2fa0c3e8419ddac5ea7d6fc777e07a4cb0ed999f121912f62c49",
+      "archived": false,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch14_2026-10-27.sql",
+      "sha256": "7ece12b33d4654b2538203408b1f18b3c138d2160c47806ba0f3b15bb232e639",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch15_2026-10-27.sql",
+      "sha256": "4941c24b41d9079d6021a4ed3dc347388766f35441b41b113f50dad825d7c5d4",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch16_2026-10-27.sql",
+      "sha256": "50a658ff6925451f168b7147efa755dd7dd233a9798648483d64dfb799bbb401",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch17_2026-10-27.sql",
+      "sha256": "451f941adbf4b7a2b0bf0851033ed0d9d25b307e6a4f4d86b57d7988b353b7d3",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch18_2026-10-27.sql",
+      "sha256": "4ead9c1cc10bd577445dd12b8655256af519c844c069f860e3927689a2395bff",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch19_2026-10-28.sql",
+      "sha256": "75bee9a182d3b439bc6f1fe43608a1702b9693eb0cf8a28a61fc175806c7c70e",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch20_2026-10-28.sql",
+      "sha256": "384c7c436f5c62b37dfee605b26195f62be252cf98e761eea3a745af1a520f7c",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch21_2026-10-28.sql",
+      "sha256": "233875625f26d9de9df91ad89f2f41d88f553c8f0fdefa5eb3a3f4dcc04724b6",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch22_2026-10-28.sql",
+      "sha256": "c6c828a5cdddb4e245c488638d48db454ad1d395caf88b5ef8d947fdbf874567",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch23_2026-10-28.sql",
+      "sha256": "65cf59bbbd03453d566d74cdac7bccc03528961ecd9d8a22033bccc855d1eb53",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch24_2026-10-28.sql",
+      "sha256": "ffe4e4a8374372014134d89b0202a902fbe4424c7b6f15f60356dc0e49633f50",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch25_2026-10-28.sql",
+      "sha256": "c031050f87355a5d71b5d1e2938809a6c939ba64ead5d921536d14b8cd9bb0f5",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch26_2026-10-28.sql",
+      "sha256": "0ea62a3496888b1de4c600fb5ee1ad8da2a3e97bbed868a627db6cbad9270a5d",
+      "archived": false,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch27_2026-10-28.sql",
+      "sha256": "7ae7a85584430647392bc8c1ae79dcdf4fd067c88a1eadc5be32d23bd434101d",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch28_2026-10-28.sql",
+      "sha256": "737a48988284eeca02d06f2263bd3555b6347c3526b337aa426ba968037d9f47",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch29_2026-10-28.sql",
+      "sha256": "bdf62b0f931fc177f7dc4501c1cccec5bf49b98dcaa201a89d3507e6e7480e45",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch2_2026-10-23.sql",
+      "sha256": "e0cf398c601c10b3c9acfbc26a6221c5a9ecfbbdb40b2192492edf7ed15bca4f",
+      "archived": false,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch30_2026-10-28.sql",
+      "sha256": "24b53ed906fa588660ef23191d18d565cb812b0efbad3cb3466bc3adc540b4b6",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch31_2026-10-28.sql",
+      "sha256": "30e4d189d25022d3eef9d7015e5ccb07f0a81daa6724ca1a8850df8f404c7527",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch32_2026-10-29.sql",
+      "sha256": "06e98345a1efb8deece409b0ea8541af399832ca9ae746884c3a8eb169c19bb7",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch33_2026-10-29.sql",
+      "sha256": "91d531f5daf5cfcb82915738e273d3728a6cec1965642adb85e5017126fbe9ea",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch34_2026-10-29.sql",
+      "sha256": "208356c5d21ad7f051fd4d8c19889e8f73858f007856b2995e2f71c7a5d5c355",
+      "archived": false,
+      "ok": true,
+      "statements": 12
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch35_2026-10-29.sql",
+      "sha256": "0b697c982461ad98a41bd4a8134c382ee80bd1653419d814db5fd9b811ff0e67",
+      "archived": false,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch36_2026-10-29.sql",
+      "sha256": "7ca5ea6083b6297615814b2ab19b5730232de2daf96b0119b706ab659b98ae90",
+      "archived": false,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch37_2026-10-29.sql",
+      "sha256": "15c3ff3197fc9a54581aa2cc84e89cdb09f0b9f9ebee52c50cf7c08999fb1580",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch38_2026-10-29.sql",
+      "sha256": "fff42897f5898f58eb40227a5d23d022fef218d5f15f0d2e7344bc6cd49c1cb4",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch39_2026-10-30.sql",
+      "sha256": "3de6d449a856197aba8dc9d5c50c5043d23b3a5d322ef2aaa2a33eda22d0da96",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch40_2026-10-30.sql",
+      "sha256": "f5995c82880637dfd670159bd360ffadef2bbb1e33193670c4d553b6c66f31b6",
+      "archived": false,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch41_2026-10-30.sql",
+      "sha256": "8e98d6ed5b5440bdbeba6398149c6656bf4c69c38610f534253cc29825668626",
+      "archived": false,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch42_2026-10-30.sql",
+      "sha256": "2e810f88df4a8c04c2582c15341319e4979db2a12e361bcaf8511654e6d553c0",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch43_2026-10-30.sql",
+      "sha256": "5913024e3297023e785e2186ebbeb646eef653fd6bbfbb9c115f6f59cc8e828d",
+      "archived": false,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch44_2026-11-01.sql",
+      "sha256": "afa47f28c50105b3632904da01086aa03ce70c7d66768ac6b5627d107e3a6ade",
+      "archived": false,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch5_2026-10-26.sql",
+      "sha256": "203fe194c1d65477e799f838ed9da28bfc45b188a4b75be690063b7fe4e70a05",
+      "archived": false,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch6_2026-10-26.sql",
+      "sha256": "6ca064fbaec872b831e5f3b2fa57c31458adf73b4206ff14dcaa074f5f79ffe1",
+      "archived": false,
+      "ok": true,
+      "statements": 12
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch7_2026-10-26.sql",
+      "sha256": "43b482b13c08e7926db804d80249c5a1a754c2eadbfb672e6c7728e116fdc2df",
+      "archived": false,
+      "ok": true,
+      "statements": 17
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch8_2026-10-26.sql",
+      "sha256": "22b9d66c6bae1b5a702e7ca13db8112f8724165e1c3ffa1a19b25d552ee52211",
+      "archived": false,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "supabase/scholarship_enrichment_batch9_2026-10-26.sql",
+      "sha256": "670eb4e30f50db5d954f78fc8dde75f92c34f6b3477ddf5483a80b9d83334d91",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/scholarship_format_alignment_2026-11-02.sql",
+      "sha256": "74f008c6eeb8ff3e71a83c0116891b06306dfb117548c563056df9b8fc3ec269",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/scholarship_format_audit.sql",
+      "sha256": "217da07e5e54bf1daa745705d6a5e3b5726d53e524d384d9763ada4bc1e96f6a",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/scholarship_quality_pass6_2026-10-23.sql",
+      "sha256": "064ddca4ffba195842b5301449aac5ade4f0132727e55099f0fadfb7d8f46f8c",
+      "archived": false,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "supabase/step3_restore_all.sql",
+      "sha256": "0ee4d34e62aa30349182e7c3519bcda46d9a37ed6b6a39f1176f2c1912a42e76",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/top300_pdf_import.sql",
+      "sha256": "d03caed4e88a4ec3ac5ee4e0ab04d63f078fbd1505448353bfa5e7decb6afa1b",
+      "archived": false,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "supabase/university_cost_mirror_alignment_2026-10-30.sql",
+      "sha256": "387118c5d4966ea61b499926161a7648091c39ef3fd8bb79f1169ece1456d7d0",
+      "archived": false,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "supabase/university_program_integrity_audit.sql",
+      "sha256": "bf221fee2ac26d3c8da431166f5abe9fe634f17b7dc4c6558aab13af7fa0d518",
+      "archived": false,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "supabase/university_schema_data_audit.sql",
+      "sha256": "d6e0b97e0b97ea4ed8ba13714b8f8094982a7dc185311ee59a069a470731ae6d",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/university_schema_preflight.sql",
+      "sha256": "7a9dcc02258572e56f1f1cff7d410efc0d30855fb42e293209ee699a1a027e25",
+      "archived": false,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "supabase/university_schema_v2.sql",
+      "sha256": "02afa379559296fe0b058f48e2e2eeecc92a578164d9d40def1d3f58b82d659f",
+      "archived": false,
+      "ok": true,
+      "statements": 119
+    },
+    {
+      "path": "supabase/university_scholarships_usd_sync_2026-10-26.sql",
+      "sha256": "2b71ad0c857ac85d9b7a9d2072d1759a8144afeb852eb3a9c4a21e8694f3ff28",
+      "archived": false,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "supabase/uzbek_13c_pdf_import.sql",
+      "sha256": "bbd2120f22b1d776602fb3fb68288655553a736674ecc1738a6984fdd56fe966",
+      "archived": false,
+      "ok": true,
+      "statements": 1
+    },
+    {
+      "path": "supabase/visa_practice_evidence_repair_2026-11-02.sql",
+      "sha256": "14d16d14d8a894e4d2e729f968ebc03497279a1f5fa828a4719a5aaeeb5b3360",
+      "archived": false,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "supabase/visa_verified_evidence_guard_2026-11-02.sql",
+      "sha256": "9684ec123d0db14fc1d468da567b71b4e688e7d80f1051ef1eb01e3e586323f2",
+      "archived": false,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass100_2026-10-26.sql",
+      "sha256": "68712fcceccfbfbf2adf079a590c9ab7171558e4f84b3512a4fb6901e530f909",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass101_2026-10-26.sql",
+      "sha256": "3bb39415929c87f8ed07df01c22e9a59810563c822a8629c46eb40d09690cd33",
+      "archived": true,
+      "ok": true,
+      "statements": 14
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass102_2026-10-26.sql",
+      "sha256": "67801841d43b97c9e27905ba86dac5402e0b94b9871591a94f0f617d3fac17fd",
+      "archived": true,
+      "ok": true,
+      "statements": 15
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass103_2026-10-26.sql",
+      "sha256": "0929841a9a85a86c4fd5dbc89f94acb26fbb72e736c49f4d519b950b30120961",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass104_2026-10-26.sql",
+      "sha256": "12fee5324dcf1dd8dad4a4167025ea7690cb9fc35ebc015030e9902db73dba86",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass105_2026-10-26.sql",
+      "sha256": "e3ee61e7720babb03311ab8b980679633eced2d1b10bc9843675de64510a76c2",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass106_2026-10-27.sql",
+      "sha256": "25534fd77a97dd0069012a7abe855e8a07e288cdf93a1073a69e00a7093fe9ea",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass107_2026-10-27.sql",
+      "sha256": "94d0adcf78ffc45470ecb8af0efcfc1661e3e5273a65227e96a81d711f3b0e7b",
+      "archived": true,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass108_2026-10-27.sql",
+      "sha256": "cf0ec672b08550c33ed84d40ab094a88a62d8a1074f756efdee952b97ad70de6",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass109_france_2026-10-27.sql",
+      "sha256": "8618d7acd1233320e742c9cf46e7e852bd6909778076c0da8c3be48dd4d354c5",
+      "archived": true,
+      "ok": true,
+      "statements": 13
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass110_finland_2026-10-27.sql",
+      "sha256": "b5bcf642d428c453ee5aee826e8e18f8cb691c8297eb4f44b6c8234d23c8187c",
+      "archived": true,
+      "ok": true,
+      "statements": 12
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass111_sweden_2026-10-27.sql",
+      "sha256": "3bcf4b3cd81b06f75d14e638306a0c85f02fcefe4eba3a2209a88afc829f4f38",
+      "archived": true,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass112_austria_2026-10-28.sql",
+      "sha256": "f24530deaf8dd5e93ca62de22c6ccd688a4302f92d3bab5979057a0282aa5640",
+      "archived": true,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass113_denmark_2026-10-28.sql",
+      "sha256": "b30ecb255bc6a94201d144067c811fbf76aa6fb41fd532bb18a0694855704b5f",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass114_hong_kong_2026-10-28.sql",
+      "sha256": "fdddd876a0385665120da96910d60e52e98f2b8e1fda7d93f989388a7d98da1d",
+      "archived": true,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass115_ireland_2026-10-28.sql",
+      "sha256": "59e7e5a3484cdc290b3ae7bcc9ae399c002387cb9b5a5b531b07e635766a9d6d",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass116_saudi_2026-10-28.sql",
+      "sha256": "a9ad88285f03873d2812698266deee06f1701ed5dd96eda75736105fae7e8016",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass117_uae_2026-10-28.sql",
+      "sha256": "8fbc7bd60f0bdff85cc2f53b52346bf82be16952a3c4d6f6c54f5fc2f9602217",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass118_norway_2026-10-28.sql",
+      "sha256": "90be02cf2a08454c54d0cc1f0e03c10d488a51c0167a47107d08dac00258aad1",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass119_india_2026-10-28.sql",
+      "sha256": "4c1cedbcfbc5ddebd3bbd742fab3892282105254c73b17f088c8a0ed3dd56c29",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass120_mexico_2026-10-28.sql",
+      "sha256": "f1562147a07a5bf706e0dd49f25619280502c81154d3cb90b992ca6e7f8cd995",
+      "archived": true,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass121_chile_2026-10-28.sql",
+      "sha256": "6a0ac07b198ea742d951ab4b16586b568dfc6189f81f9ae31cb92abacc5e824d",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass122_argentina_brazil_2026-10-28.sql",
+      "sha256": "c593e3eb1679271ee9f0b1dcf80f44277d87cee5dd2efb61f6aea91cbf5ea275",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass123_colombia_slovenia_2026-10-28.sql",
+      "sha256": "c3f0e454106040e62e20ddda1ea7eff674ba839512e39fda4e6e79c352a88a73",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass124_indonesia_malaysia_2026-10-28.sql",
+      "sha256": "8cbece409b901168a235186cbe9aa6b121ef6ae795fb45e7816844b64a9c0ecf",
+      "archived": true,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass125_2026-10-28.sql",
+      "sha256": "361fb1f92fc49ae55fbcceab3b920e2a55c26cda1a93451d38f5ebf120d8abf6",
+      "archived": true,
+      "ok": true,
+      "statements": 12
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass126_2026-10-29.sql",
+      "sha256": "4e31370c3e0e7ab1f0ca61f93d14847538cf85e363e1dbab9857859819fc009b",
+      "archived": true,
+      "ok": true,
+      "statements": 14
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass127_2026-10-29.sql",
+      "sha256": "776d8993aa0e3aae495312c33d4550cb5a9099d9065b3462a149ce53954a12a2",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass128_2026-10-29.sql",
+      "sha256": "d79794a2d5cf4adb412e45e64d748bbea032df1122be94fc9f62d5ac2887c4d8",
+      "archived": true,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass129_2026-10-29.sql",
+      "sha256": "974a26585e6736a6a9259c7dedc70a71fe1de9c88c26bc9f6c14412193c7e781",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass130_2026-10-29.sql",
+      "sha256": "043468f603eb403bd0c46c6f510978d0376cf421575b0b65f63aa39aec746be6",
+      "archived": true,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass131_2026-10-29.sql",
+      "sha256": "11834dcfc580f738e45909f9dda9fec915068742ced1adf4a1324d648d3155d8",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass132_2026-10-30.sql",
+      "sha256": "aa76e8edec3b2a20652a5ef3895e510df4cc871aac0f610b43c47f341744b100",
+      "archived": true,
+      "ok": true,
+      "statements": 12
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass133_2026-10-30.sql",
+      "sha256": "9f576ca01d354ec4a9b756bdced75eb013254adf586929c65b409d4da8ecc377",
+      "archived": true,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass134_2026-10-30.sql",
+      "sha256": "523895b449408a5196ffd61c8bac6ed5d9f0dc79b3c0b382a5346509dff0558d",
+      "archived": true,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass135_2026-10-30.sql",
+      "sha256": "c500054fc9ae2ca1dfe01f51cdc64d78064bf56fa808f3d76d4bf709bfd28e8b",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass136_2026-10-30.sql",
+      "sha256": "e49c745e73dce5035b422f1d1dc55df47542446bc276bdd4e370e1391caef879",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass137_2026-11-01.sql",
+      "sha256": "9b85aaef973c5369e58bca022fcf532846b994f9b9c0be3e6ab9ec22c167fd16",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass14_2026-10-23.sql",
+      "sha256": "cfb67dbe78bbc58b7ee546617159df52216d29b45785084b64f7094c01fcef37",
+      "archived": true,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass15_2026-10-23.sql",
+      "sha256": "490f3288c878266aa249b81ee5a0ddef55169a3a7802ad7fc06d807ce1973c58",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass16_2026-10-23.sql",
+      "sha256": "3f5498d746fb6878b94d4e1212cdd98a0595878f896d6e940c65fbd6bf32f77f",
+      "archived": true,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass17_2026-10-23.sql",
+      "sha256": "bf38d55df94331e6045cb42afa19d5626b553b5e5f42e164d9801ece2d1914af",
+      "archived": true,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass18_2026-10-23.sql",
+      "sha256": "05e4ec91351d41909e1ca5ec64903aeb5acd8dbc070bb191f5e0c6a472474c52",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass19_2026-10-23.sql",
+      "sha256": "6eb2e1891d741896525813d59006e691e172399ac6d01e6eaea88f1f0a033c10",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass20_2026-10-23.sql",
+      "sha256": "ac861c48540f5411f84aa2c9099b92d5bf13458ad7db043f898d504b579337df",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass21_2026-10-23.sql",
+      "sha256": "1a87a0b7f51916c04cdb4522a6d2a8fa93eceb23af600271faeb712eb669dd74",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass22_2026-10-23.sql",
+      "sha256": "2149119c7b8e53a382e5295c76b797d5c64a7cebcef848a6f96d6aebe24c073b",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass23_2026-10-23.sql",
+      "sha256": "7ad8c3c2f640b47aa5744e50074dd84690c548cc30109c702de67750567805fd",
+      "archived": true,
+      "ok": true,
+      "statements": 0
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass24_2026-10-23.sql",
+      "sha256": "fa5ab9d89faeb521809633ca58b5dd337ddd2f7fd00691799482c8aadadf1fbf",
+      "archived": true,
+      "ok": true,
+      "statements": 0
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass25_2026-10-23.sql",
+      "sha256": "16ce4e4b4af6e4d634d51d20fe74efc30b95ce3f4a27a1f2724d1690cdc1e473",
+      "archived": true,
+      "ok": true,
+      "statements": 0
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass26_2026-10-23.sql",
+      "sha256": "33e3c61e97f3bc1860f37b55db55081c9f7fea35c6d34023f125c7a677bbdcf9",
+      "archived": true,
+      "ok": true,
+      "statements": 0
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass27_2026-10-23.sql",
+      "sha256": "c73e66b5d992b606a5739c507f03a36d7b1a4acf2e3e82fea550622474e549a2",
+      "archived": true,
+      "ok": true,
+      "statements": 0
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass28_2026-10-23.sql",
+      "sha256": "210a4713cc8e040b449009bbaf1095df0818d34f5d921612307859111818f2da",
+      "archived": true,
+      "ok": true,
+      "statements": 0
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass29_2026-10-23.sql",
+      "sha256": "2f9f74bd000c221c7c8c05b45ebe319cc5366ccedf029a284b1302d14adeb78f",
+      "archived": true,
+      "ok": true,
+      "statements": 0
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass30_2026-10-23.sql",
+      "sha256": "ae82dd2f863f78444049d473ef02c42738912009da8c2b0762136fbe01285768",
+      "archived": true,
+      "ok": true,
+      "statements": 14
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass31_2026-10-23.sql",
+      "sha256": "3a381cadb5457d4d9d393df4073826ab1f81bc2940e961ae3d5fd5fee60a6fbe",
+      "archived": true,
+      "ok": true,
+      "statements": 13
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass32_2026-10-23.sql",
+      "sha256": "9a5ab27e39a1e1c448cbdd3717615ee678f631fe6322de6f3c220058d5b24961",
+      "archived": true,
+      "ok": true,
+      "statements": 11
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass33_2026-10-23.sql",
+      "sha256": "34fea1cf79e0ef4d71bbe8a7c740f4a230953b0bbd97579418e0ce3713146e91",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass34_2026-10-23.sql",
+      "sha256": "df1b3fb2eb06cdc831287a75664895c06f284cf40b31e2ee98689c71967f6063",
+      "archived": true,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass35_2026-10-23.sql",
+      "sha256": "1df88ea3bc82a19a8f9fcf84d8b0f579484a798a6b78cb04688ddd72f02aa4ef",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass36_2026-10-23.sql",
+      "sha256": "4856ce96ab302118218fd0301b64b6bc1d810124816c526e77ff25afda38b62b",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass37_2026-10-23.sql",
+      "sha256": "48ac99488ada760ffcbe920d92d4e3afa9623e74ad3dc130b7824802747b94b1",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass38_2026-10-23.sql",
+      "sha256": "bbf6706a469e1921f377ce1784713926dfdb4ea38ce5d147b5b8ccfb8c5a0fb5",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass39_2026-10-23.sql",
+      "sha256": "ef470cc0e52d225b642199aa2892028c25fc7d40a7d8605cf084f2a645a469ee",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass40_2026-10-23.sql",
+      "sha256": "6f5adb7404e2075002aef2aea9311957771a42e5f57acbe65f8edc2fd88b3bbe",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass41_2026-10-23.sql",
+      "sha256": "59ab2c482876ebefd7fb844f99bb1d4bfea62c02264af8d8e042438081f1883b",
+      "archived": true,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass42_2026-10-23.sql",
+      "sha256": "4a59a14785b7024d4258fa2729307c646b0c4197134b82a9b4aae8fbd3a35460",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass43_2026-10-23.sql",
+      "sha256": "b458f62d0615065d141dde8870025995c375a3f304ebc4d38e1ab261d20aabea",
+      "archived": true,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass44_2026-10-23.sql",
+      "sha256": "0157a6104b7cbc7fc6ab635d390267818a9a783970e768162bfb1adb58d1b547",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass45_2026-10-23.sql",
+      "sha256": "7b5cda42802a4803b3d725855c3b7a86ec39a6864a7022595d7790ed9b96d2cb",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass46_2026-10-23.sql",
+      "sha256": "d7d3333678736f52a37c351bee1d1225477858d5f70cc577397f3f85540a4a18",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass47_2026-10-23.sql",
+      "sha256": "8e71362401b30f829f0239e3598f61dd83b215507bb5308a55c777e1ee752732",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass48_2026-10-23.sql",
+      "sha256": "7c58cb74ecf07bb0f87b5783203bea5d2c6d93870c4c3b6a1cd063e0984cb105",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass49_2026-10-23.sql",
+      "sha256": "38a917e19f2a387b9241dfd31303c2240ffd79ffc6f26115ea47b6f1121e221f",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass50_2026-10-23.sql",
+      "sha256": "e8f4f83d1bbb59589818b8b19b2bde9d4bab090b7cbaa1ae61fbe8307ded5039",
+      "archived": true,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass51_2026-10-23.sql",
+      "sha256": "2a5698048018133bb34ee0438b7d8dbd7d7b3b8f70b49a018d33bd3a0d34d838",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass52_2026-10-23.sql",
+      "sha256": "9e8cf6ccce048d3b81d501e887a4a40037bc974a1523d2d6a55076dfbbe77224",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass53_2026-10-23.sql",
+      "sha256": "64a3b315c9888f703c54ff96bfd2b39a5e19b1e758367640b335a833a0dca579",
+      "archived": true,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass54_2026-10-23.sql",
+      "sha256": "0671dd738f055a480342f5996480fcac21a6b94fdc576ca857df24dc2f29b74e",
+      "archived": true,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass55_2026-10-23.sql",
+      "sha256": "7188792b517ce5dfd09f57473f060fa7c961a652ca5e982ce15fc7bbcb9aa72d",
+      "archived": true,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass56_2026-10-23.sql",
+      "sha256": "adc6c2329a1171a46f59b55174ffa0459e5b7431bbbb80296065897818285078",
+      "archived": true,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass57_2026-10-23.sql",
+      "sha256": "aef0e505f338740e2c779da1f1a4982c974d85e581aa8a94177b9548bb1664e6",
+      "archived": true,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass58_2026-10-23.sql",
+      "sha256": "22b5a3fbae35d0c615af41e2253c678ab3b39ae1a39eeeade8214ff31ac37be6",
+      "archived": true,
+      "ok": true,
+      "statements": 2
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass59_2026-10-23.sql",
+      "sha256": "607c4628ef048b39cc073ee6f81031a2571f50ad266c8b29bf102bd702b3faab",
+      "archived": true,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass60_2026-10-23.sql",
+      "sha256": "abf8c2868ac6a65d1d1544e529736ed6a66937c08f08b7b348620add3d2cf8c6",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass61_2026-10-23.sql",
+      "sha256": "35907514c0a769b0c91f0f0072fb74de7a76ec2faaa199495e1eb4a71c534c88",
+      "archived": true,
+      "ok": true,
+      "statements": 17
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass62_2026-10-23.sql",
+      "sha256": "76f8b0645302c95102f50e19e238a123f13d8f0bf6c9c5256f8273276c0a134c",
+      "archived": true,
+      "ok": true,
+      "statements": 13
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass63_2026-10-23.sql",
+      "sha256": "6a7bb301b770f644c7f52cf5eefad82e351ae599cc9207aa9aff2337e1f772f5",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass64_2026-10-23.sql",
+      "sha256": "430cefaae6cb43b6a42f981e5e061f9b23c3bc91232b66d5cd811714fd46e5d9",
+      "archived": true,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass65_2026-10-23.sql",
+      "sha256": "f1f289aecb1d142d4c737bbb635a581868a2b51042f9e9779804429f3f470c01",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass66_2026-10-23.sql",
+      "sha256": "c82459f29efac006a6cf7ac0603ba7bc872bdb7eef9e4baee78c0b2258292da3",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass67_2026-10-23.sql",
+      "sha256": "18f5e114310f9b7eea451155c373fd670c89184e17f3d8d5bad817d0e80dcdd7",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass68_2026-10-23.sql",
+      "sha256": "3aea0cc9d14699d33292cf7e6e6658d2519b873f45c7a7d0054421b7b8f3d8d1",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass69_2026-10-23.sql",
+      "sha256": "1921eb188776f3a60ce68d7fc9c31ba2c746243d297da0126e6c2dc9a56538e8",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass70_2026-10-23.sql",
+      "sha256": "866b7356ede0262859763173b7135aac9b5fbcf3b0b827c830a725b5620b696f",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass71_2026-10-23.sql",
+      "sha256": "53e557314d44e77d25da658c90acf9e0df7a264f8ecf5ded0455f39f2816cd6a",
+      "archived": true,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass72_2026-10-23.sql",
+      "sha256": "1a6baba8dc45d1ab23f7be0f9acfc9f5c068d90902b3ddb23513eed86186f0ae",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass73_2026-10-23.sql",
+      "sha256": "972ad428482309df02f65b2e1fb1faa44e20792d28fa30de8104455f60728e90",
+      "archived": true,
+      "ok": true,
+      "statements": 3
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass74_2026-10-23.sql",
+      "sha256": "77b624232a463b7afc0b189875e229c7c57a67f8ffde64edee46ca422b9defac",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass75_2026-10-23.sql",
+      "sha256": "b1defdd158f6c09a7e083b0670bbd28b33dc279342b7803d15f536733c0fc16e",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass76_2026-10-23.sql",
+      "sha256": "f9c3794eddea9dac28075d14af5c166027f81a5691cb60c6a34a784f2ac051a0",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass77_2026-10-23.sql",
+      "sha256": "65f192ee7588c065e1f0e4081ce9c9f985312fe448556fb31878d29e3c33f572",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass78_2026-10-23.sql",
+      "sha256": "2ec2cbffe229ddfdeeccd58240d8b6377e5ff453d3de8361421d25f9d6aba3f1",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass79_2026-10-23.sql",
+      "sha256": "57af0c644fc86d896d508796da373bb427c6ac6a73681a3f88b7d6087f163394",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass80_2026-10-23.sql",
+      "sha256": "baf349d79d65120ceccd7f9e8192a6813f6347319e090a2407942993957b2e6f",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass81_2026-10-23.sql",
+      "sha256": "f77df430f72ac95c7749ba164a288b64980e9ddc267a3c017e9d707dee5b078a",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass82_2026-10-23.sql",
+      "sha256": "ec8c7d4c8af286f5af45ddc4b7ed53efcafbe6afc4fdba179d37c78c5fadf165",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass83_2026-10-23.sql",
+      "sha256": "8ab2d14bd5758dd9377e05db33ae4471a4becf3dde3543de280156f1039a06a1",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass84_2026-10-23.sql",
+      "sha256": "e5c311e0ca6e57fd04fdfe75db3055245e5bf6e1ef58db1c007885cab0c7a200",
+      "archived": true,
+      "ok": true,
+      "statements": 7
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass85_2026-10-23.sql",
+      "sha256": "229e67cbc5551c0aa24d83a56a697b6cdefba49fac19ea6033c027e338e8de4c",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass86_2026-10-23.sql",
+      "sha256": "a9484bf2c5448c894a6959b4b680b6a9522c71effa6e10f9b4e7a346b37ddafa",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass87_2026-10-26.sql",
+      "sha256": "8fa90537e3fbd487ec6b94aeab75272e53fb939d8fb005c65bdc7a1fc54e5143",
+      "archived": true,
+      "ok": true,
+      "statements": 16
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass88_2026-10-26.sql",
+      "sha256": "dda635b7dee9daeb244b14d243b55db536fadd8efc8a06b7ef87133f7a426da3",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass89_2026-10-26.sql",
+      "sha256": "1cb697c3354b0a9bffc98b9d8f63fe1f35b7082861b9cc4076ba7fead6d9c0c7",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass90_2026-10-26.sql",
+      "sha256": "3f9b3693a9aa7d0aa522f3274dd33dfcdad2c054c8ed904d6ad23821b845bd06",
+      "archived": true,
+      "ok": true,
+      "statements": 10
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass91_2026-10-26.sql",
+      "sha256": "0df25459cc2745982471a833bedd1faecbf5abe666f7a7e0c354b640caab1bb6",
+      "archived": true,
+      "ok": true,
+      "statements": 8
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass92_2026-10-26.sql",
+      "sha256": "1c42f9331371e6634eabdba454804850598acc28b565f324aceafe39ece9b6ff",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass93_2026-10-26.sql",
+      "sha256": "e94fb567f57e11297fa77b4c029cf14bde4823b509c06dd522ab719849295eff",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass94_2026-10-26.sql",
+      "sha256": "d13992060c4da22d8ea770a9e55a5b70d78df8f6772ac0e01d2bb81ee6be9e06",
+      "archived": true,
+      "ok": true,
+      "statements": 6
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass95_2026-10-26.sql",
+      "sha256": "ebda17aac56a97b297290f45d972b5bfa938dfd84008707e87bc1b59ab7f247a",
+      "archived": true,
+      "ok": true,
+      "statements": 4
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass96_2026-10-26.sql",
+      "sha256": "ba1dfd4d2dad0e8d1a8c2a25e38f96b542b9d0e85c33be479f72854a6675a8d8",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass97_2026-10-26.sql",
+      "sha256": "3bda52c8075eaf094fdba94414ed0fa59f7bd52a5faeca52a49812f372895f02",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass98_2026-10-26.sql",
+      "sha256": "db49dfbe6ec646da9a1565bffcd1ff98e3de29b027ee8709738aee2baff2ef12",
+      "archived": true,
+      "ok": true,
+      "statements": 9
+    },
+    {
+      "path": "archive/supabase/scholarship_rewrite_pass99_2026-10-26.sql",
+      "sha256": "51f4761f937cf686023864d3e5de2f4ece40cb0e11ab586912dbe7e4d20de3e0",
+      "archived": true,
+      "ok": true,
+      "statements": 5
+    }
+  ]
+}

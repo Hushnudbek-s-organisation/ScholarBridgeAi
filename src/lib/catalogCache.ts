@@ -134,12 +134,17 @@ type ProfileMatch = {
 
 const profileMatchCache = new AsyncTtlCache<number, ProfileMatch | null>(Math.max(1, PROFILE_MATCH_TTL_MS), 500);
 const universityDetailCache = new Map<number, CacheEntry<Record<string, unknown>>>();
+// A read that began before an admin invalidation must not repopulate old data.
+let universityDetailGeneration = 0;
+export function universityDetailCacheGeneration(): number { return universityDetailGeneration; }
+function clearUniversityDetails(): void { universityDetailGeneration++; universityDetailCache.clear(); }
 
 export function getCachedUniversityDetailBase(uniId: number): Record<string, unknown> | null {
   return fresh(universityDetailCache.get(uniId) ?? null);
 }
 
-export function setCachedUniversityDetailBase(uniId: number, payload: Record<string, unknown>): void {
+export function setCachedUniversityDetailBase(uniId: number, payload: Record<string, unknown>, generation: number): void {
+  if (generation !== universityDetailGeneration) return;
   if (universityDetailCache.size >= 250 && !universityDetailCache.has(uniId)) {
     const oldest = universityDetailCache.keys().next().value;
     if (oldest !== undefined) universityDetailCache.delete(oldest);
@@ -435,11 +440,11 @@ async function loadProfileForMatching(profileId: number): Promise<ProfileMatch |
 export function invalidateCatalogCache(kind: "universities" | "scholarships" | "opportunities" | "all" = "all") {
   if (kind === "universities" || kind === "all") {
     universitiesCache.clear();
-    universityDetailCache.clear();
+    clearUniversityDetails();
   }
   if (kind === "scholarships" || kind === "all") {
     scholarshipsCache.clear();
-    universityDetailCache.clear();
+    clearUniversityDetails();
   }
   if (kind === "opportunities" || kind === "all") {
     opportunitiesCache.clear();
@@ -471,7 +476,7 @@ export function resetCatalogCacheForTests() {
   scholarshipsCache.clear();
   opportunitiesCache.clear();
   profileMatchCache.clear();
-  universityDetailCache.clear();
+  clearUniversityDetails();
 }
 
 /** Diagnostics for the operations dashboard / tests. */
