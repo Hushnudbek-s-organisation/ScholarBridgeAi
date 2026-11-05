@@ -29,7 +29,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MARQUEE_ROW_1, MARQUEE_ROW_2, MARQUEE_ROW_3 } from "../src/components/LandingPage";
+import { MARQUEE_ROW_1, MARQUEE_ROW_2, MARQUEE_ROW_3 } from "../src/components/landing/marqueeRows";
 
 const ROOT = join(__dirname, "..");
 let passed = 0;

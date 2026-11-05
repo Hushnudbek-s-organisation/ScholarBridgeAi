@@ -49,6 +49,15 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
     ],
   },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "next-intl"],
+  },
+  modularizeImports: {
+    "lucide-react": {
+      transform: "lucide-react/dist/esm/icons/{{kebabCase member}}",
+    },
+  },
+  compiler: { removeConsole: true },
   allowedDevOrigins: ["*.e2b.app", "*.e2b.dev"],
   // Type-checking runs in CI on every pull request (`npm run typecheck`) and in
   // the `verify` job that must be green before a merge. Running it a second
