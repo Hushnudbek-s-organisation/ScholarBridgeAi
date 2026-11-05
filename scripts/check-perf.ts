@@ -120,7 +120,8 @@ check("public visits do not mount closed auth/profile dialogs or heavyweight loa
 
 check("the hero is visible in server HTML, without waiting for animation hydration", () => {
   const landing = read("src/components/LandingPage.tsx");
-  assert.match(landing, /<motion.div initial=\{false\} animate="visible" variants=\{heroGroup\}>/);
+  // Extra layout attributes do not change the SSR-visible hero contract.
+  assert.match(landing, /<motion.div initial=\{false\} animate="visible" variants=\{heroGroup\}[^>]*>/);
   assert.doesNotMatch(landing, /initial=\{\{ opacity: 0, y: 28/);
 });
 

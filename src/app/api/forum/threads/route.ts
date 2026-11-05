@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumThreads, forumReplies, forumLikes, studentProfiles, forumCategories } from "@/db/schema";
@@ -31,7 +32,10 @@ export async function GET(req: Request) {
     const authorIdStr = searchParams.get("authorId");
     const sort = searchParams.get("sort") || "latest"; // latest | replies | likes
     const pageStr = searchParams.get("page") || "1";
-    const page = Math.max(1, parseInt(pageStr, 10));
+    const page = Number(pageStr);
+    if (!Number.isSafeInteger(page) || page < 1 || page > 10_001) return NextResponse.json({ error: "page must be an integer from 1 to 10001" }, { status: 400 });
+    if (categoryIdStr && categoryIdStr !== "all" && postgresId(categoryIdStr) === null) return NextResponse.json({ error: "Invalid categoryId" }, { status: 400 });
+    if (authorIdStr && postgresId(authorIdStr) === null) return NextResponse.json({ error: "Invalid authorId" }, { status: 400 });
 
     const filters = [];
     if (categoryIdStr && categoryIdStr !== "all") {

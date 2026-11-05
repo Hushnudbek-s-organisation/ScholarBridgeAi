@@ -1,3 +1,4 @@
+import { boundedPageInteger } from "@/lib/pagination";
 /**
  * Database accessors for the channel publisher's configuration: runtime
  * settings, the country table and the authored Uzbek copy.
@@ -207,7 +208,7 @@ export async function writeChannelAudit(entry: ChannelAuditEntry): Promise<void>
 
 export async function recentChannelAudit(limit = 100) {
   try {
-    return await db.select().from(channelAudit).orderBy(desc(channelAudit.createdAt)).limit(Math.min(500, limit));
+    return await db.select().from(channelAudit).orderBy(desc(channelAudit.createdAt)).limit(boundedPageInteger(limit, 100, 1, 500));
   } catch (err) {
     console.error("[channel] audit read failed:", err);
     return [];

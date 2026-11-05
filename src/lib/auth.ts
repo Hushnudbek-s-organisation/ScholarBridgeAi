@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 /**
  * Server-side session authentication (security baseline).
  *
@@ -700,13 +701,11 @@ export async function requireProfileAccess(
   const auth = await authenticate(req);
   if (!auth.ok) return { ...auth, targetId: null };
 
-  const target = Number(claimedId);
-  const hasTarget = claimedId !== null && claimedId !== undefined && claimedId !== "" && Number.isFinite(target) && target > 0;
-
-  if (!hasTarget) {
-    // No id supplied → act on the caller's own profile.
+  if (claimedId === null || claimedId === undefined || claimedId === "") {
     return { ...auth, targetId: auth.session.profile.id };
   }
+  const target = postgresId(claimedId);
+  if (target === null) return { ok: false, status: 400, code: "invalid_profile_id", error: "profileId must be a positive PostgreSQL integer", targetId: null };
   if (target === auth.session.profile.id || auth.session.isAdmin) {
     return { ...auth, targetId: target };
   }
@@ -734,17 +733,9 @@ export async function optionalProfileAccess(
   req: Request,
   claimedId: unknown
 ): Promise<OptionalAccessResult> {
-  const target = Number(claimedId);
-  const hasTarget =
-    claimedId !== null &&
-    claimedId !== undefined &&
-    claimedId !== "" &&
-    Number.isFinite(target) &&
-    target > 0;
-
-  if (!hasTarget) {
-    return { ok: true, targetId: null, session: null };
-  }
+  if (claimedId === null || claimedId === undefined || claimedId === "") return { ok: true, targetId: null, session: null };
+  const target = postgresId(claimedId);
+  if (target === null) return { ok: false, status: 400, code: "invalid_profile_id", error: "profileId must be a positive PostgreSQL integer", targetId: null };
   const access = await requireProfileAccess(req, target);
   if (!access.ok) {
     return { ok: false, status: access.status, error: access.error, code: access.code, targetId: null };

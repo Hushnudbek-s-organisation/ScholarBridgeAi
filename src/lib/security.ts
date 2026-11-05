@@ -173,10 +173,9 @@ export function isCrossSiteApiWrite(req: {
  *
  * Every route that reads its body through `readJsonBody`/`readBody` already
  * enforces its own (smaller) cap — the biggest legitimate payload in the app is
- * the admin config import at 512 KB. This global ceiling exists for the routes
- * that still call `await request.json()` directly: it is enforced in the
- * Proxy, BEFORE the route runs, so an attacker cannot make the server
- * buffer an arbitrarily large JSON document.
+ * the admin config import at 512 KB. This global declared-length ceiling is
+ * enforced in Proxy before the route runs. Shared bounded readers also count
+ * actual streamed bytes when Content-Length is absent or dishonest.
  *
  * `multipart/form-data` (the branding logo upload) is exempt — that path has
  * its own file-type and size validation.

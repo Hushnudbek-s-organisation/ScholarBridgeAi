@@ -3868,6 +3868,169 @@ async function main() {
     } finally { await limited.end(); await Promise.all(disconnected); }
   }
 
+  section("Second pass: concurrent learning writes, rewards, certificates and strict inputs");
+  {
+    const assert = (await import("node:assert/strict")).default;
+    const { ensureUserPoints, awardPoints, recordDailyActivity } = await import("../src/lib/gamification");
+    const { maybeIssueCertificate } = await import("../src/lib/certificates");
+    const { POST: progressPost } = await import("../src/app/api/courses/progress/route");
+    const { POST: quizPost } = await import("../src/app/api/quizzes/attempt/route");
+    const [learner] = await db.insert(schema.studentProfiles).values({ name: "Second pass learner", email: "second-pass-learner@example.com", isPremium: true, premiumUntil: new Date(Date.now() + 86400000) }).returning();
+    const learnerToken = signSessionToken({ id: learner.id, passwordHash: learner.passwordHash });
+    const post = async (handler: (r: Request) => Promise<Response>, data: unknown) => handler(new Request("http://localhost/api/courses/progress", { method: "POST", headers: { cookie: `sb_session=${learnerToken}`, "content-type": "application/json" }, body: JSON.stringify(data) }));
+    const [course] = await db.insert(schema.courses).values({ title: "Second pass local-only course", description: "Disposable test fixture", isPublished: true }).returning();
+    const [module] = await db.insert(schema.courseModules).values({ courseId: course.id, title: "Fixture module" }).returning();
+    const [lesson] = await db.insert(schema.lessons).values({ moduleId: module.id, title: "Fixture lesson", videoUrl: "https://example.invalid/test", durationSeconds: 100 }).returning();
+    const [badge] = await db.insert(schema.badges).values({ name: "Second pass fixture badge", criteria: "points:1" }).returning();
+    try {
+      const cold = await Promise.all(Array.from({ length: 12 }, () => ensureUserPoints(learner.id)));
+      check("12 cold points initializations create exactly one row", new Set(cold.map((row) => row.id)).size === 1);
+      const markers = await Promise.all(Array.from({ length: 12 }, () => recordDailyActivity(learner.id)));
+      check("12 concurrent daily markers record exactly one activity", markers.filter(Boolean).length === 1);
+      const partial = await post(progressPost, { profileId: learner.id, lessonId: lesson.id, watchedSeconds: 5 });
+      check("a first partial lesson save is incomplete", partial.status === 200 && (await partial.json()).progress.isCompleted === false);
+      const writes = await Promise.all([100, 70, 120, 20, 110, 1, 80, 101, 100, 25, 105, 99].map((watchedSeconds) => post(progressPost, { profileId: learner.id, lessonId: lesson.id, watchedSeconds })));
+      check("parallel progress retries all return 200", writes.every((r) => r.status === 200), writes.map((r) => r.status).join(","));
+      const progress = await db.select().from(schema.lessonProgress).where(and(eq(schema.lessonProgress.profileId, learner.id), eq(schema.lessonProgress.lessonId, lesson.id)));
+      check("parallel first writes do not create duplicate progress", progress.length === 1);
+      check("watched time remains monotonic under out-of-order requests", progress[0]?.watchedSeconds === 120);
+      check("previous false completion transitions to true", progress[0]?.isCompleted === true);
+      const rewards = await db.select().from(schema.pointsLedger).where(and(eq(schema.pointsLedger.profileId, learner.id), eq(schema.pointsLedger.reason, "lesson_complete")));
+      check("parallel completion grants exactly one 10-point reward", rewards.length === 1 && rewards[0].points === 10);
+      const badges = await db.select().from(schema.userBadges).where(and(eq(schema.userBadges.profileId, learner.id), eq(schema.userBadges.badgeId, badge.id)));
+      check("parallel completions grant a qualifying badge once", badges.length === 1);
+      const certificates = await Promise.all(Array.from({ length: 12 }, () => maybeIssueCertificate(learner.id, course.id)));
+      check("concurrent certificate calls return the same certificate", certificates.every(Boolean) && new Set(certificates.map((c) => c?.id)).size === 1);
+      const certRows = await db.select().from(schema.certificates).where(and(eq(schema.certificates.profileId, learner.id), eq(schema.certificates.courseId, course.id)));
+      check("the database contains one certificate per learner/course", certRows.length === 1);
+      await Promise.all(Array.from({ length: 12 }, () => awardPoints(learner.id, 5, "second_pass_reward", lesson.id)));
+      const extras = await db.select().from(schema.pointsLedger).where(and(eq(schema.pointsLedger.profileId, learner.id), eq(schema.pointsLedger.reason, "second_pass_reward")));
+      check("12 concurrent duplicate reward requests append one ledger row", extras.length === 1);
+      check("the total agrees with the committed reward ledger", (await ensureUserPoints(learner.id)).totalPoints === 15);
+      await db.update(schema.userPoints).set({ totalPoints: 2147483645 }).where(eq(schema.userPoints.profileId, learner.id));
+      await assert.rejects(() => awardPoints(learner.id, 10, "second_pass_rollback", lesson.id));
+      const failedReward = await db.select().from(schema.pointsLedger).where(and(eq(schema.pointsLedger.profileId, learner.id), eq(schema.pointsLedger.reason, "second_pass_rollback")));
+      check("a failed total increment rolls back the reward ledger atomically", failedReward.length === 0);
+      check("a failed reward leaves the previous total intact", (await ensureUserPoints(learner.id)).totalPoints === 2147483645);
+      await db.update(schema.userPoints).set({ totalPoints: 15 }).where(eq(schema.userPoints.profileId, learner.id));
+      for (const watchedSeconds of [-1, 1e100, null, "100"]) check(`invalid watchedSeconds ${String(watchedSeconds)} is 400`, (await post(progressPost, { profileId: learner.id, lessonId: lesson.id, watchedSeconds })).status === 400);
+      for (const lessonId of [true, [], "1oops", 2147483648]) check(`invalid lesson ID ${String(lessonId)} is 400`, (await post(progressPost, { profileId: learner.id, lessonId, watchedSeconds: 10 })).status === 400);
+      const [quiz] = await db.insert(schema.quizzes).values({ lessonId: lesson.id }).returning();
+      await db.insert(schema.quizQuestions).values({ quizId: quiz.id, question: "Fixture question", options: '["A","B"]', correctOptionIndex: 0 });
+      for (const answer of [null, false, "", "0", [], {}]) check(`quiz coercion ${JSON.stringify(answer)} is rejected`, (await post(quizPost, { profileId: learner.id, quizId: quiz.id, answers: [answer] })).status === 400);
+      const quizRows = await db.select().from(schema.quizAttempts).where(eq(schema.quizAttempts.profileId, learner.id));
+      check("invalid quiz payloads do not create attempts or rewards", quizRows.length === 0);
+      const validQuiz = await post(quizPost, { profileId: learner.id, quizId: quiz.id, answers: [0] });
+      check("a genuine numeric quiz choice still grades correctly", validQuiz.status === 200 && (await validQuiz.json()).score === 100);
+      await db.update(schema.courses).set({ isPublished: false }).where(eq(schema.courses.id, course.id));
+      check("unpublished lesson progress cannot be written", (await post(progressPost, { profileId: learner.id, lessonId: lesson.id, watchedSeconds: 10 })).status === 404);
+      check("unpublished quiz answers cannot be harvested", (await post(quizPost, { profileId: learner.id, quizId: quiz.id, answers: [0] })).status === 404);
+    } finally {
+      await db.delete(schema.studentProfiles).where(eq(schema.studentProfiles.id, learner.id));
+      await db.delete(schema.courses).where(eq(schema.courses.id, course.id));
+      await db.delete(schema.badges).where(eq(schema.badges.id, badge.id));
+    }
+  }
+
+  section("Second pass: Telegram atomic writes, singleflight and token rotation races");
+  {
+    const tg = await import("../src/lib/telegram/settings");
+    const { encryptApiKey, decryptWithRotation } = await import("../src/lib/ai/settings");
+    const { setConfig } = await import("../src/lib/config");
+    const originalQuery = pool.query;
+    const oldSecret = process.env.AI_KEYS_ENCRYPTION_SECRET;
+    const oldPrevious = process.env.AI_KEYS_ENCRYPTION_SECRET_PREVIOUS;
+    const tokens = Array.from({ length: 12 }, (_, i) => `123456789:${"A".repeat(33)}${String(i).padStart(2, "0")}`);
+    try {
+      await Promise.all(tokens.map((token) => tg.saveBotToken(token)));
+      tg.invalidateTelegramSettings();
+      let reads = 0;
+      pool.query = function (...args: unknown[]) {
+        const config = args[0] as { text?: string };
+        const text = typeof args[0] === "string" ? args[0] : config.text ?? "";
+        if (text.includes('from "app_config"')) reads++;
+        return Reflect.apply(originalQuery, pool, args);
+      } as typeof pool.query;
+      const resolved = await Promise.all(Array.from({ length: 12 }, () => tg.getBotToken()));
+      check("12 concurrent token saves remain valid and produce one config row", resolved.every((r) => r.source === "admin" && tokens.includes(r.token ?? "")));
+      check("12 cold Telegram reads share the same token snapshot", new Set(resolved.map((r) => r.token)).size === 1);
+      check("12 cold Telegram loads issue just two settings/token SELECTs", reads === 2, `reads=${reads}`);
+      pool.query = originalQuery;
+      process.env.AI_KEYS_ENCRYPTION_SECRET = "second-pass-old-encryption-secret-0123456789";
+      const encryptedOld = encryptApiKey(tokens[0]);
+      await setConfig("telegram_bot_token", encryptedOld);
+      process.env.AI_KEYS_ENCRYPTION_SECRET_PREVIOUS = process.env.AI_KEYS_ENCRYPTION_SECRET;
+      process.env.AI_KEYS_ENCRYPTION_SECRET = "second-pass-new-encryption-secret-0123456789";
+      tg.invalidateTelegramSettings();
+      let release!: () => void, intercepted!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      const began = new Promise<void>((resolve) => { intercepted = resolve; });
+      let first = true;
+      pool.query = function (...args: unknown[]) {
+        const result = Reflect.apply(originalQuery, pool, args);
+        if (first && Array.isArray(args[1]) && args[1].includes("telegram_bot_token")) {
+          first = false;
+          return Promise.resolve(result).then(async (rows) => { intercepted(); await gate; return rows; });
+        }
+        return result;
+      } as typeof pool.query;
+      try {
+        const staleLoad = tg.getBotToken();
+        await began;
+        await tg.saveBotToken(tokens[11]);
+        check("a fresh read sees the newly saved token while an old read is pending", (await tg.getBotToken()).token === tokens[11]);
+        release(); await staleLoad;
+        check("the old pending load cannot repopulate the Telegram memo", (await tg.getBotToken()).token === tokens[11]);
+        const [stored] = await db.select().from(schema.appConfig).where(eq(schema.appConfig.key, "telegram_bot_token"));
+        check("old-key rotation cannot overwrite a concurrently replaced token", decryptWithRotation(stored.value).key === tokens[11]);
+      } finally { release(); pool.query = originalQuery; }
+    } finally {
+      pool.query = originalQuery;
+      if (oldSecret === undefined) delete process.env.AI_KEYS_ENCRYPTION_SECRET; else process.env.AI_KEYS_ENCRYPTION_SECRET = oldSecret;
+      if (oldPrevious === undefined) delete process.env.AI_KEYS_ENCRYPTION_SECRET_PREVIOUS; else process.env.AI_KEYS_ENCRYPTION_SECRET_PREVIOUS = oldPrevious;
+      tg.invalidateTelegramSettings();
+    }
+  }
+
+  section("Second pass: admin pagination rejects malformed inputs before SQL");
+  {
+    const { GET: auditGet } = await import("../src/app/api/admin/audit/route");
+    const { GET: channelGet } = await import("../src/app/api/admin/channel/audit/route");
+    for (const [handler, path] of [[auditGet, "/api/admin/audit"], [channelGet, "/api/admin/channel/audit"]] as const) {
+      for (const query of ["limit=NaN", "limit=-1", "limit=1.5", "offset=-1", "offset=100001"]) {
+        const response = await handler(adminRequest("GET", undefined, `http://localhost${path}?${query}`));
+        check(`${path} ${query} is 400, not a SQL 500`, response.status === 400, `status=${response.status}`);
+      }
+      const valid = await handler(adminRequest("GET", undefined, `http://localhost${path}?limit=99999`));
+      check(`${path} clamps a large valid page and returns normally`, valid.status === 200, `status=${valid.status}`);
+    }
+  }
+
+  section("Second pass: invalid identity claims cannot silently select a profile");
+  {
+    const { requireProfileAccess, optionalProfileAccess } = await import("../src/lib/auth");
+    const { GET: threadsGet } = await import("../src/app/api/forum/threads/route");
+    for (const id of [NaN, Infinity, -1, 0, 1.5, true, [], {}, "abc", 2147483648]) {
+      const required = await requireProfileAccess(adminRequest("GET"), id);
+      check(`invalid claimed profile ${String(id)} fails even for an admin`, !required.ok && required.status === 400);
+      const optional = await optionalProfileAccess(new Request("http://localhost/"), id);
+      check(`invalid optional profile ${String(id)} cannot fall back to anonymous`, !optional.ok && optional.status === 400);
+    }
+    const { writeAudit } = await import("../src/lib/audit");
+    await writeAudit({ entityType: "config", entityId: 0, fieldChanged: "second_pass_zero_id" });
+    await writeAudit({ entityType: "config", entityId: profile.id, fieldChanged: "second_pass_nonzero_id" });
+    const { GET: auditGet } = await import("../src/app/api/admin/audit/route");
+    for (const id of [0, profile.id]) {
+      const response = await auditGet(adminRequest("GET", undefined, `http://localhost/api/admin/audit?entityId=${id}`));
+      const data = await response.json();
+      check(`audit entityId=${id} is an exact filter, not a truthy fallback`, response.status === 200 && data.logs.length > 0 && data.logs.every((row: { entityId: number }) => row.entityId === id));
+    }
+    for (const query of ["page=NaN", "page=-1", "page=1000000000", "categoryId=oops", "authorId=1oops"]) {
+      const response = await threadsGet(adminRequest("GET", undefined, `http://localhost/api/forum/threads?${query}`));
+      check(`forum ${query} is rejected before SQL`, response.status === 400, `status=${response.status}`);
+    }
+  }
+
   // Close the app's own pool before the server goes away. Killing Postgres
   // under a live pool makes node-postgres report 57P01 admin_shutdown, which
   // surfaces as an unhandled fatal and fails the run even though every

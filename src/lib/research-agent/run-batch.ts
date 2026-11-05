@@ -21,13 +21,13 @@ export async function runBatch(
     }
     progress(id, `Starting university #${id}...`);
     try {
-      const report = await runUniversity(id, request.scopes, request.dryRun ?? false, (m) => progress(id, m));
+      const report = await runUniversity(id, request.scopes, request.dryRun ?? false, (m) => progress(id, m), request.maxPages);
       reports.push(report);
     } catch (err: any) {
       errors.push(`#${id}: ${err?.message || err}`);
     }
     // Sequential + rate limit (spec §17, §21)
-    await sleep(AGENT_CONFIG.batchDelayMs);
+    if (id !== request.universityIds[request.universityIds.length - 1] && !isCancelled()) await sleep(AGENT_CONFIG.batchDelayMs);
   }
 
   return { reports, errors };

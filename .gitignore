@@ -57,3 +57,6 @@ __pycache__/
 
 # desktop app self-test scratch folder
 /.desktop-test-data/
+
+# Disposable audit tooling and local test caches (never runtime dependencies)
+/.cache/

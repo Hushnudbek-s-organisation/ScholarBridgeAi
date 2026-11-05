@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { hasFeature } from "@/lib/premium";
@@ -18,7 +19,8 @@ import { completionSummary } from "@/lib/calculations";
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const courseId = parseInt(id, 10);
+    const courseId = postgresId(id);
+    if (courseId === null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     const { searchParams } = new URL(req.url);
     const profileIdStr = searchParams.get("profileId");
     const profileId = profileIdStr ? parseInt(profileIdStr, 10) : null;

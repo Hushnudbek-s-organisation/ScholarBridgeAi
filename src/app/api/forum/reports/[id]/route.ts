@@ -1,3 +1,4 @@
+import { postgresId } from "@/lib/pagination";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumReports } from "@/db/schema";
@@ -8,7 +9,8 @@ import { readJsonBody } from "@/lib/request";
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const reportId = parseInt(id, 10);
+    const reportId = postgresId(id);
+    if (reportId === null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     // Size-capped parse: even an authenticated community write must never
     // hand an unbounded body to the JSON parser.
     const parsed = await readJsonBody<Record<string, any>>(req, 16 * 1024);

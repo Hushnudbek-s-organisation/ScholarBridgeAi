@@ -49,7 +49,7 @@ jobs:
         run: bash ci/run-step.sh "Full-schema apply safety guard" npm run test:schema-apply-safety
 
       - name: Backend timeout, body and cache resilience (offline)
-        run: bash ci/run-step.sh "Backend timeout, body and cache resilience (offline)" npm run test:backend-resilience
+        run: bash ci/run-step.sh "Backend timeout, body and cache resilience (offline)" bash -c 'npm run test:backend-resilience && npm run test:backend-second-pass && node scripts/inventory-backend.mjs'
 
       - name: Security regression tests
         run: bash ci/run-step.sh "Security regression tests" npm run test:security

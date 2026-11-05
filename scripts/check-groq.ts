@@ -62,12 +62,7 @@ async function withStubbedFetch(
     capturedUrl = String(url);
     capturedInit = init;
     const r = responder(capturedUrl, init);
-    return {
-      ok: r.ok,
-      status: r.status,
-      text: async () => JSON.stringify(r.body),
-      json: async () => r.body,
-    } as unknown as Response;
+    return Response.json(r.body, { status: r.status });
   }) as typeof fetch;
   try {
     await run();

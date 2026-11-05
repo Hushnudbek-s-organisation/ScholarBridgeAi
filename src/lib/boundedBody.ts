@@ -64,7 +64,20 @@ export async function fetchBoundedResponse(
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new RangeError("Invalid fetch deadline");
   const deadline = AbortSignal.timeout(Math.ceil(timeoutMs));
   const signal = init.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
-  const response = await fetch(url, { ...init, signal });
+  signal.throwIfAborted();
+  const pending = fetch(url, { ...init, signal });
+  // Even an instrumented fetch that ignores AbortSignal cannot pin the route.
+  // If it resolves late, release its body without awaiting peer cancellation.
+  void pending.then((late) => { if (signal.aborted) cancelBody(late.body); }, () => undefined);
+  let onAbort = () => {};
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+  });
+  let response: Response;
+  try { response = await Promise.race([pending, aborted]); }
+  finally { signal.removeEventListener("abort", onAbort); }
   const bytes = await readBoundedBytes(response.body, limitBytes, signal);
   // fetch has already decoded compressed bytes; don't retain wire-length/encoding.
   const headers = new Headers(response.headers);

@@ -1,0 +1,256 @@
+{
+  "date": "2026-11-05",
+  "branch": "arena/d2e097dd-scholarbridgeai",
+  "baseCommit": "aba817fc561fc4703794b241cd8028b2b4d681f9",
+  "status": "backend-regressions-passed; frontend-bundle-budget-still-fails",
+  "inventory": {
+    "files": 702,
+    "typescriptFiles": 464,
+    "jsonFiles": 2,
+    "sqlFiles": 236,
+    "activeSqlFiles": 112,
+    "archivedSqlFiles": 124,
+    "lines": 135133,
+    "apiRouteFiles": 157,
+    "handlers": 280,
+    "syntaxErrors": 0,
+    "directRequestReaderFiles": []
+  },
+  "sqlGrammar": {
+    "files": 236,
+    "passed": 236,
+    "failed": 0,
+    "active": 112,
+    "archived": 124,
+    "parser": "pglast v8.7",
+    "method": "Read-only PostgreSQL grammar parse; no SQL execution, production access or PL/pgSQL body compilation."
+  },
+  "backendSuites": [
+    {
+      "name": "backend-resilience",
+      "checks": 30,
+      "status": "passed",
+      "log": "test-results/backend/backend-resilience.log",
+      "logSha256": "92a463a7902416765df5004fea987febeff046c81f31c263494cd7a76963aaf9"
+    },
+    {
+      "name": "backend-second-pass",
+      "checks": 20,
+      "status": "passed",
+      "log": "test-results/backend/backend-second-pass.log",
+      "logSha256": "6cffa403b7bb8025d14d5e098d57c377e87cfbaa03a5b3baaeeab27e230eca2e"
+    },
+    {
+      "name": "dashboard-cache",
+      "checks": 13,
+      "status": "passed",
+      "log": "test-results/backend/dashboard-cache.log",
+      "logSha256": "ddb649988b0f332d138097452cd2352fbb56c8c6cc16618ff965cbafbaeea6b2"
+    },
+    {
+      "name": "security",
+      "checks": 107,
+      "status": "passed",
+      "log": "test-results/backend/security.log",
+      "logSha256": "7455202916b28b8d61d7ab65e986b751d9db9ffd12c541c380046e4f58bda0c5"
+    },
+    {
+      "name": "ai-settings",
+      "checks": 98,
+      "status": "passed",
+      "log": "test-results/backend/ai-settings.log",
+      "logSha256": "4acde701c80dc1fab603d5e8ee2bc25379e80a398ba66c41c6f26b380218ac0f"
+    },
+    {
+      "name": "integration",
+      "checks": 499,
+      "status": "passed",
+      "log": "test-results/backend/integration.log",
+      "logSha256": "a53d06d76ccd022d57c249b097384a1773036e64fa83593698b52140f2c2bcdd"
+    },
+    {
+      "name": "payments",
+      "checks": 114,
+      "status": "passed",
+      "log": "test-results/backend/payments.log",
+      "logSha256": "a2fcfd4c531ffe678e7e6d9acd840254eeee243e950ebd48e12b1154a0554ece"
+    },
+    {
+      "name": "journey",
+      "checks": 115,
+      "status": "passed",
+      "log": "test-results/backend/journey.log",
+      "logSha256": "c83ccfa74aa4121632334e744ad3eb500c247b297ce65579c9c4f40df78cdd9a"
+    },
+    {
+      "name": "ownership",
+      "checks": 83,
+      "status": "passed",
+      "log": "test-results/backend/ownership.log",
+      "logSha256": "7c7ea459d2487feb30486bbe2392a43aa1c0d48c606f2376dbec0a0dda1de0ef"
+    },
+    {
+      "name": "telegram",
+      "checks": 40,
+      "status": "passed",
+      "log": "test-results/backend/telegram.log",
+      "logSha256": "99ed7f1d769f428b579fd6c708770b46ad3d39bca9ee569e3ea0acc6c603f987"
+    },
+    {
+      "name": "channel",
+      "checks": 196,
+      "status": "passed",
+      "log": "test-results/backend/channel.log",
+      "logSha256": "c2398843be02b9f6731a0ed89311dc4f095e7e4edd9204f3eda490228eef2cde"
+    },
+    {
+      "name": "portability",
+      "checks": 57,
+      "status": "passed",
+      "log": "test-results/backend/portability.log",
+      "logSha256": "5b98dcd6e02ae40826642950e0a4d89294cce86a7fa4cb8f0b7980bc5b4e8643"
+    },
+    {
+      "name": "schema-repair",
+      "checks": 18,
+      "status": "passed",
+      "log": "test-results/backend/schema-repair.log",
+      "logSha256": "b5c51e8bda4c9419edf51c238cb86e17cc17d187685b35ae0377f58729e57600"
+    },
+    {
+      "name": "groq",
+      "checks": 27,
+      "status": "passed",
+      "log": "test-results/backend/groq.log",
+      "logSha256": "c242cfca3c81d0e2d2eb8d8b2072823b4d4df123a4a67de18163c4a22853c0a4"
+    },
+    {
+      "name": "growth",
+      "checks": 39,
+      "status": "passed",
+      "log": "test-results/backend/growth.log",
+      "logSha256": "840154523bba6c212dfef77d036454cd08ad7e8951e88f58542da64d96808768"
+    },
+    {
+      "name": "streak",
+      "checks": 29,
+      "status": "passed",
+      "log": "test-results/backend/streak.log",
+      "logSha256": "4af992e3ebaa4c8fb9dad21ac101aa0be8c7c6c17e9124e4c48bb9e6fe3cd3e7"
+    },
+    {
+      "name": "referral",
+      "checks": 56,
+      "status": "passed",
+      "log": "test-results/backend/referral.log",
+      "logSha256": "0fb1e635314e9abacda55274f01fae4d2959bbba7d53716a2bc01e3cfdef4712"
+    },
+    {
+      "name": "university-rank",
+      "checks": 17,
+      "status": "passed",
+      "log": "test-results/backend/university-rank.log",
+      "logSha256": "f37eafa027aeaf5cfa5e9c26d11ea6387b2c8ae3843cb948f11d81938949c31b"
+    }
+  ],
+  "backendChecks": 1558,
+  "functionalProductionTests": {
+    "passed": 21,
+    "failed": 0,
+    "mode": "next start; isolated fictional PostgreSQL; Chromium desktop/mobile viewports",
+    "timing": "Broader 21-test production regression before final audit-filter/canonical-ID adjustments; followed by a fresh focused 7-test rerun."
+  },
+  "apiSecurity": {
+    "handlers": 280,
+    "routeFiles": 157,
+    "fixtureProbes": 49,
+    "unexpectedAnonymousSuccesses": 0,
+    "classificationNotes": [
+      "PUT /api/goals -> 404",
+      "DELETE /api/goals -> 404",
+      "GET /api/health/diagnostics -> 404",
+      "DELETE /api/saved-programs -> 404"
+    ],
+    "limitation": "Anonymous probe payloads plus fixture scenarios, not exhaustive authorization proof.",
+    "logSha256": "968f4fb1a0d4dbdd233f23a287d34a8c0c79ca4e25d21bd4d05ae64a5663893d",
+    "timing": "Rerun after final source changes; process exited 0."
+  },
+  "quality": {
+    "typecheck": "passed",
+    "lintBaseline": "passed: 0 errors, 0 warnings",
+    "productionBuild": "passed",
+    "stage3Performance": "passed",
+    "auditSafety": "passed",
+    "isolatedEnvironment": "passed",
+    "visa": "passed",
+    "offlineSchema": "passed: 113 tables, 1228 column names documented",
+    "schemaApplySafety": "passed",
+    "catalogueMigrations": "passed: disposable fictional database only",
+    "officialSourceReviewRegression": "passed: disposable fictional database only",
+    "sqlGrammar": "passed: 236 files; not SQL execution or PL/pgSQL compilation",
+    "dependencyAudit": {
+      "critical": 0,
+      "high": 0,
+      "moderate": 12,
+      "status": "high/critical gate passed; moderate advisories remain"
+    },
+    "performanceGate": {
+      "passed": 14,
+      "failed": 1,
+      "landingJsBytes": 1332243,
+      "roundedLandingKiB": 1301,
+      "requiredRoundedLandingKiB": "<1300",
+      "thresholdRaised": false,
+      "status": "failed"
+    }
+  },
+  "safety": {
+    "productionMutations": false,
+    "productionMigrationsReplayed": false,
+    "paidProviderCalls": false,
+    "channelPublishing": false,
+    "newAdmissionsFactsInvented": false,
+    "deployed": false,
+    "newPrCreated": false
+  },
+  "limitations": [
+    "Automated per-file inventory/grammar checks are not manual line-by-line security review.",
+    "Research jobs/cache/schedulers remain process-local; no durable/serverless/fleet scheduling guarantee.",
+    "Historical duplicate learning/reward/certificate records were not deduplicated; application locks protect tested new writes, not direct SQL.",
+    "Legacy parseInt call sites remain; central strict guards cannot reconstruct already-coerced strings.",
+    "No live provider, payment, storage, SMTP, fleet-load or production DB proof.",
+    "SQL grammar parsing does not validate migration ordering, data semantics or function bodies.",
+    "Frontend landing JavaScript performance budget remains failed; no threshold increase or frontend redesign was made.",
+    "Broader browser regression and focused final HTTP rerun are separate executions; there is no single all-tests-live-production proof."
+  ],
+  "countMethod": "Sum of each suite's reported checks/assertions; suites use different assertion granularity, not a coverage percentage.",
+  "finalFocusedProductionTests": {
+    "passed": 7,
+    "failed": 0,
+    "mode": "fresh production build + disposable PostgreSQL",
+    "purpose": "After final audit entityId=0 and canonical decimal ID fixes; reruns seven cases already included in the broader 21-test regression, not seven additional unique cases."
+  },
+  "verificationLogs": {
+    "second-pass-typecheck.log": {
+      "sha256": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f"
+    },
+    "second-pass-lint-baseline.log": {
+      "sha256": "dfef5ea029c8c9d9454b2397c5f6b28d87c73ba377f67e73bf3e358a3aea18e2"
+    },
+    "second-pass-build.log": {
+      "sha256": "1219eab9fc58c59c33435a4b8d77445560d048aaa545766094b46719e5715ee8"
+    },
+    "second-pass-functional.log": {
+      "sha256": "d875b0239650a74b637a6e2aa26826b17b74d82127538b4636defacbe911d7a1"
+    },
+    "second-pass-focused-functional.log": {
+      "sha256": "51bcc11db6e0d83af10751b0a084686698d055fe99ff7e726571e9013761c3ab"
+    },
+    "second-pass-perf.log": {
+      "sha256": "3faf139a3a032055f707817ab97fe6bf03a86d6c92bc98f17c4a578389216000"
+    },
+    "second-pass-audit.log": {
+      "sha256": "ac30a304afe5abce84ebf5759adaab615fc94beaf7ede65bb908ed5d60168a48"
+    }
+  }
+}

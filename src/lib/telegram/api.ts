@@ -1,3 +1,4 @@
+import { fetchBoundedResponse } from "@/lib/boundedBody";
 /**
  * Minimal Telegram Bot API client (fetch, no SDK). The API base can be
  * overridden with TELEGRAM_API_BASE (env only — never from admin input, so it
@@ -27,24 +28,19 @@ export const MAX_RETRY_AFTER_SEC = 5;
 export const MAX_TG_ATTEMPTS = 3;
 
 async function tgCallOnce<T>(token: string, method: string, params: Record<string, unknown>, timeoutMs: number): Promise<TgResult<T>> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${telegramApiBase()}/bot${token}/${method}`, {
+    const res = await fetchBoundedResponse(`${telegramApiBase()}/bot${token}/${method}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
-      signal: controller.signal,
       cache: "no-store",
-    });
+    }, timeoutMs, 1024 * 1024);
     const data = (await res.json().catch(() => null)) as TgResult<T> | null;
     if (!data) return { ok: false, description: `HTTP ${res.status}`, error_code: res.status };
     return data;
   } catch (err) {
-    const aborted = err instanceof Error && err.name === "AbortError";
+    const aborted = err instanceof Error && ["AbortError", "TimeoutError"].includes(err.name);
     return { ok: false, description: aborted ? "Telegram API timeout" : "Telegram API unreachable", error_code: 0 };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -67,11 +63,16 @@ export async function tgCall<T = unknown>(
   params: Record<string, unknown> = {},
   timeoutMs = 8000
 ): Promise<TgResult<T>> {
-  let res: TgResult<T> = { ok: false, description: "not sent", error_code: 0 };
+  const budget = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.min(30_000, timeoutMs) : 8000;
+  const deadline = Date.now() + budget;
+  let res: TgResult<T> = { ok: false, description: "Telegram API timeout", error_code: 0 };
   for (let attempt = 1; attempt <= MAX_TG_ATTEMPTS; attempt++) {
-    res = await tgCallOnce<T>(token, method, params, timeoutMs);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return { ok: false, description: "Telegram API timeout", error_code: 0 };
+    res = await tgCallOnce<T>(token, method, params, remaining);
     const delay = attempt < MAX_TG_ATTEMPTS ? retryDelayMs(res, attempt) : null;
     if (delay === null) return res;
+    if (delay >= deadline - Date.now()) return res;
     await sleep(delay);
   }
   return res;
