@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div lang="en" className="min-h-screen bg-slate-50 font-sans">
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
         <div className="bg-white rounded-overlay border border-slate-200 shadow-sm p-6 sm:p-10">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Privacy Policy</h1>
-          <p className="mt-2 text-sm text-slate-500">Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • ScholarBridgeAI respects your privacy</p>
+          <p className="mt-2 text-sm text-slate-500">Last updated: <time dateTime="2026-11-04">November 4, 2026</time> • ScholarBridgeAI respects your privacy</p>
 
           <div className="mt-8 space-y-8 text-sm text-slate-700 leading-relaxed">
             <section>
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
                 <li><strong>Preferences & financial:</strong> Budget annual USD, need-scholarship flag, preferred countries list.</li>
                 <li><strong>Usage data:</strong> Saved universities/scholarships, application tasks, deadlines, documents, forum posts, course progress, AI chat history and SOP drafts.</li>
                 <li><strong>Payment info:</strong> Amount, currency, provider (Payme / Click), transaction status, and subscription period. We do not store full card numbers — payments are processed by Payme and Click.</li>
-                <li><strong>Technical:</strong> Preferred locale (en/uz/ru), referral code, device-linked profile IDs stored in localStorage for sign-in persistence.</li>
+                <li><strong>Technical:</strong> Preferred locale (en/uz/ru), referral code, device-linked profile IDs stored in localStorage as interface hints. Authentication uses a signed, HttpOnly session cookie, not those IDs.</li>
               </ul>
               <p className="mt-2">
                 We do not intentionally collect sensitive categories like ethnicity, health, or political views.
@@ -99,11 +99,11 @@ export default function PrivacyPage() {
                 We use minimal cookies / localStorage:
               </p>
               <ul className="mt-2 list-disc pl-5 space-y-1">
-                <li><strong>Essential:</strong> scholarbridge_active_profile, scholarbridge_device_profiles, scholarbridge_ref (48h referral attribution), scholarbridge_locale.</li>
-                <li><strong>Analytics (first-party, anonymous):</strong> we count visits with our own <code>sb_vid</code> cookie (a random id, valid 1 year) so we can see how many people visited, which sections they opened and where they came from. We store the page/section name, a shortened referrer domain, the browser user-agent string (only to separate bots and mobile/desktop) and — if you are signed in — your profile id. <strong>We never store your IP address</strong>, we use no third-party advertising cookies, and the counters are only visible to site administrators in aggregated form. Blocking the <code>sb_vid</code> cookie simply opts you out of the visit counter; the app keeps working normally.</li>
+                <li><strong>Essential:</strong> The HttpOnly <code>sb_session</code> cookie authenticates your session. LocalStorage keys such as <code>scholarbridge_active_profile</code> and <code>scholarbridge_device_profiles</code> help restore the interface; they do not authorize access. Referral attribution and <code>scholarbridge_locale</code> store referral and language preferences.</li>
+                <li><strong>Analytics (first-party, pseudonymous):</strong> we count visits with our own <code>sb_vid</code> cookie (a random id, valid 1 year) so we can see how many people visited, which sections they opened and where they came from. We store the page/section name, a shortened referrer domain, the browser user-agent string (only to separate bots and mobile/desktop) and — if you are signed in — your profile id. The visit analytics table does not store your IP address. Security and rate-limit systems process connection information separately, we use no third-party advertising cookies, and the counters are only visible to site administrators in aggregated form. Blocking the <code>sb_vid</code> cookie does not by itself disable analytics requests or individual visit counting.</li>
               </ul>
               <p className="mt-2">
-                You can block cookies in your browser settings, but essential localStorage is needed to stay signed in and resume onboarding.
+                The session cookie is required for authenticated features. Clearing localStorage removes local interface hints, not your account or server-side data; signing out clears the active session cookie.
               </p>
             </section>
 

@@ -1,3 +1,4 @@
+import { fetchBoundedResponse } from "@/lib/boundedBody";
 /**
  * AI provider abstraction — the ONE path every AI feature uses
  * (website, Telegram bot and Mini App all reach it through the same API
@@ -187,6 +188,15 @@ function usdAmount(v: unknown): number | undefined {
 }
 
 const REQUEST_TIMEOUT_MS = 60_000;
+// One budget per logical call, shared by model candidates, retries and fallback.
+const requestDeadlines = new WeakMap<AIRequest, number>();
+function requestBudgetMs(req: AIRequest): number {
+  return Number.isFinite(req.timeoutMs) ? Math.max(1000, Math.min(req.timeoutMs!, REQUEST_TIMEOUT_MS)) : REQUEST_TIMEOUT_MS;
+}
+function remainingBudgetMs(req: AIRequest): number {
+  const until = requestDeadlines.get(req);
+  return until === undefined ? requestBudgetMs(req) : Math.max(0, until - Date.now());
+}
 
 export function categorizeStatus(status: number): AIErrorCategory {
   if (status === 401 || status === 403) return "auth";
@@ -227,18 +237,14 @@ async function readError(provider: string, res: Response, apiKey: string): Promi
 }
 
 async function timedFetch(provider: string, url: string, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
-  const timeout = Math.max(1_000, Math.min(timeoutMs, REQUEST_TIMEOUT_MS));
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
+  const timeout = Number.isFinite(timeoutMs) ? Math.max(1, Math.min(timeoutMs, REQUEST_TIMEOUT_MS)) : REQUEST_TIMEOUT_MS;
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetchBoundedResponse(url, init, timeout, 2 * 1024 * 1024);
   } catch (err) {
-    if ((err as Error)?.name === "AbortError") {
+    if (["AbortError", "TimeoutError"].includes((err as Error)?.name)) {
       throw new AIProviderError(provider, "timeout", `Timed out after ${timeout / 1000}s`);
     }
-    throw new AIProviderError(provider, "network", "Network error reaching the provider");
-  } finally {
-    clearTimeout(timer);
+    throw new AIProviderError(provider, "network", "Provider response failed or exceeded its size limit");
   }
 }
 
@@ -276,7 +282,10 @@ function openAICompatible(name: AIProviderName): AIProviderAdapter {
       let data: any;
       let usedModel = model;
       let fallbackError: AIProviderError | undefined;
+      const deadline = requestDeadlines.get(req) ?? Date.now() + requestBudgetMs(req);
       for (let index = 0; index < candidates.length; index++) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new AIProviderError(name, "timeout", "AI request deadline exceeded");
         const candidateModel = candidates[index];
         const res = await timedFetch(name, `${base}/chat/completions`, {
           method: "POST",
@@ -291,7 +300,7 @@ function openAICompatible(name: AIProviderName): AIProviderAdapter {
             // OpenRouter returns the billed USD amount only when asked (usage accounting).
             ...(name === "openrouter" ? { usage: { include: true } } : {}),
           }),
-        }, req.timeoutMs);
+        }, remaining);
         if (res.ok) {
           data = await res.json();
           usedModel = candidateModel;
@@ -329,6 +338,8 @@ const anthropic: AIProviderAdapter = {
     const model = cfg.model || AI_PROVIDERS.anthropic.defaultModel;
     const messages = chatMessages(req);
     const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+    const remaining = remainingBudgetMs(req);
+    if (remaining <= 0) throw new AIProviderError("anthropic", "timeout", "AI request deadline exceeded");
     const res = await timedFetch("anthropic", `${providerBaseUrl("anthropic")}/messages`, {
       method: "POST",
       headers: {
@@ -343,7 +354,7 @@ const anthropic: AIProviderAdapter = {
         ...(system ? { system } : {}),
         messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
       }),
-    }, req.timeoutMs);
+    }, remaining);
     if (!res.ok) throw await readError("anthropic", res, cfg.apiKey);
     const data = await res.json();
     const usage = data?.usage && typeof data.usage === "object" ? data.usage : null;
@@ -591,6 +602,7 @@ async function callWithRetry(
     attempts = attempt;
     const started = Date.now();
     try {
+      if (remainingBudgetMs(req) <= 0) throw new AIProviderError(provider, "timeout", "AI request deadline exceeded");
       // Budget is re-checked before EVERY paid attempt: a retry chain must not
       // keep spending after the platform has crossed its limit mid-request.
       const budgetModel = (await resolveProviderCredential(provider)).model;
@@ -615,7 +627,7 @@ async function callWithRetry(
       logAiRequest({ task, provider, model: "", status: "error", latencyMs: Date.now() - started, category: last.category, fallback: isFallback, attempt });
       if (!isTransientCategory(last.category) || attempt === maxAttempts) break;
       const exp = base * 2 ** (attempt - 1);
-      await sleep(exp + Math.floor(Math.random() * exp * 0.5));
+      await sleep(Math.min(exp + Math.floor(Math.random() * exp * 0.5), remainingBudgetMs(req)));
     }
   }
   return { error: last, attempts };
@@ -681,6 +693,9 @@ async function recordUsage(entry: {
  * explain failures, e.g. the visa interview). Explicit fallback only.
  */
 export async function aiChat(req: AIRequest, opts: AIChatOptions = {}): Promise<AIChatResult> {
+  // Do not share deadline state when a caller reuses the same input object.
+  req = { ...req };
+  requestDeadlines.set(req, Date.now() + requestBudgetMs(req));
   const task = req.taskType || "general";
   const profileId = req.profileId ?? null;
   const cfg = await loadRuntimeAIConfig(task);
@@ -696,9 +711,9 @@ export async function aiChat(req: AIRequest, opts: AIChatOptions = {}): Promise<
   // bad_request would most likely fail the same way elsewhere; budget_exhausted
   // must not be bypassed by another paid provider unless the admin chose one.
   // Everything else may go to the fallback — but only one the admin chose explicitly.
-  let fb = cfg.fallback;
+  let fb = remainingBudgetMs(req) > 0 ? cfg.fallback : null;
   const openRouterModelUnavailable = error.category === "payment_required" || error.category === "model_not_found";
-  if (!fb && primary.name === "openrouter" && (isTransientCategory(error.category) || openRouterModelUnavailable) && !cfg.disabled.includes("groq")) {
+  if (!fb && remainingBudgetMs(req) > 0 && primary.name === "openrouter" && (isTransientCategory(error.category) || openRouterModelUnavailable) && !cfg.disabled.includes("groq")) {
     const groqCredential = await usableCredential("groq", cfg.disabled);
     if (groqCredential) fb = "groq";
   }

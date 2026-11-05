@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
@@ -23,7 +24,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "profileId is required" }, { status: 400 });
     }
     const unreadOnly = searchParams.get("unreadOnly") === "true";
-    const limit = Number(searchParams.get("limit") || 50);
+    const requestedLimit = Number(searchParams.get("limit") ?? 50);
+    if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1) {
+      return NextResponse.json({ error: "limit must be a positive integer" }, { status: 400 });
+    }
+    const limit = Math.min(requestedLimit, 200);
 
     const rows = unreadOnly
       ? await db
@@ -49,7 +54,9 @@ export async function GET(req: Request) {
 /** PATCH: mark notification(s) as read. */
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const { notificationId, profileId, all } = body;
     const access = await requireProfileAccess(req, profileId);
     if (!access.ok) {
@@ -84,7 +91,9 @@ export async function PATCH(req: Request) {
 /** PUT: update notification preferences. */
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     // Previously unauthenticated: anyone could rewrite anyone's preferences.
     const access = await requireProfileAccess(req, body.profileId);
     if (!access.ok || !access.targetId) {

@@ -3,10 +3,13 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
-import { Navbar, StudentProfile } from "@/components/Navbar";
+import { Navbar, type StudentProfile } from "@/components/Navbar";
 import type { SavedUniversityItem, SavedScholarshipItem } from "@/components/ApplicationTracker";
 import { PremiumGate } from "@/components/PremiumGate";
 import { LandingPage } from "@/components/LandingPage";
+// The front-door dialog is small and latency-critical. A first lazy/Suspense
+// mount delayed it even after prewarming; keep its code ready, but not mounted.
+import { ProfilePicker } from "@/components/ProfilePicker";
 import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
 import { defaultLocale, type Locale } from "@/i18n/config";
 import type { Messages } from "@/i18n/messages";
@@ -21,11 +24,11 @@ import {
   parseHiddenNav,
   resolveNavTarget,
 } from "@/lib/navSections";
-import { SectionIntro } from "@/components/SectionIntro";
 import { AppNote } from "@/components/AppNote";
+import { SectionIntro } from "@/components/SectionIntro";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { DailyStreakCard } from "@/components/DailyStreakCard";
-import { PanelSkeleton } from "@/components/ui/hubs";
+import { PanelSkeleton } from "@/components/ui/PanelSkeleton";
 import {
   SESSION_RESTORE_MAX_ATTEMPTS,
   sessionRestoreDelayMs,
@@ -41,7 +44,6 @@ import { Button } from "@/components/ui/Button";
  */
 const panelLoading = () => <PanelSkeleton rows={4} />;
 const ProfileModal = dynamic(() => import("@/components/ProfileModal").then((m) => m.ProfileModal), { loading: panelLoading });
-const ProfilePicker = dynamic(() => import("@/components/ProfilePicker").then((m) => m.ProfilePicker), { loading: panelLoading });
 const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").then((m) => m.OnboardingWizard), { loading: panelLoading });
 const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter), { loading: panelLoading });
 const PaymentsSection = dynamic(() => import("@/components/PaymentsSection").then((m) => m.PaymentsSection), { loading: panelLoading });
@@ -258,7 +260,6 @@ export function Home({
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  // Email carried from the sign-in form into the sign-up wizard ("" = none).
   const [wizardEmail, setWizardEmail] = useState("");
   const [pickerMessage, setPickerMessage] = useState("");
 
@@ -319,6 +320,10 @@ export function Home({
 
   const openPane = useCallback(
     (pane: string) => {
+      // An exiting hub can report its pane after a new destination is already
+      // in the URL. Never let that stale callback navigate the student back.
+      const linked = targetFromHash();
+      if (linked && linked.section !== activeTab) return;
       setActivePane(pane);
       const hash = `#${activeTab}/${pane}`;
       if (typeof window !== "undefined" && window.location.hash !== hash) {
@@ -966,7 +971,7 @@ export function Home({
     openProfilePicker();
   };
 
-  const profilePicker = (
+  const profilePicker = isPickerOpen ? (
     <ProfilePicker
       key={isPickerOpen ? "open" : "closed"}
       open={isPickerOpen}
@@ -977,7 +982,7 @@ export function Home({
       onAddNew={handleAddNewFromPicker}
       notice={pickerMessage}
     />
-  );
+  ) : null;
 
   // ---- Restore a returning student's session before showing the landing page ----
   if (view === "restoring") {
@@ -1353,13 +1358,13 @@ export function Home({
       </div>
 
       {/* Profile Create / Edit Modal */}
-      <ProfileModal
+      {isProfileModalOpen && <ProfileModal
         isOpen={isProfileModalOpen}
         isNew={isNewProfile}
         onClose={() => setIsProfileModalOpen(false)}
         profile={activeProfile}
         onSave={handleSaveProfile}
-      />
+      />}
 
       {/* Profile picker — this device's accounts plus email/password sign-in */}
       {profilePicker}

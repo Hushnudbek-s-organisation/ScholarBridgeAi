@@ -19,10 +19,16 @@ export class AsyncTtlCache<K, V> {
     if (current && current.expiresAt > now) return current.promise;
     if (current) this.entries.delete(key);
 
-    const promise = Promise.resolve().then(create);
-    this.entries.set(key, { expiresAt: now + this.ttlMs, promise });
+    // A slow load stays single-flight even when it takes longer than the TTL.
+    // Start freshness when it resolves, and never resurrect an invalidated key.
+    const promise = Promise.resolve().then(create).then((value) => {
+      if (this.entries.get(key) === entry) entry.expiresAt = this.now() + this.ttlMs;
+      return value;
+    });
+    const entry: Entry<V> = { expiresAt: Infinity, promise };
+    this.entries.set(key, entry);
     void promise.catch(() => {
-      if (this.entries.get(key)?.promise === promise) this.entries.delete(key);
+      if (this.entries.get(key) === entry) this.entries.delete(key);
     });
     this.prune(now);
     return promise;
@@ -48,6 +54,17 @@ export class AsyncTtlCache<K, V> {
 
   get size(): number {
     return this.entries.size;
+  }
+
+  hasFresh(key: K): boolean {
+    const entry = this.entries.get(key);
+    return !!entry && entry.expiresAt !== Infinity && entry.expiresAt > this.now();
+  }
+
+  get freshSize(): number {
+    let count = 0;
+    for (const key of this.entries.keys()) if (this.hasFresh(key)) count++;
+    return count;
   }
 
   private prune(now: number): void {

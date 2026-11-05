@@ -69,7 +69,7 @@ student's request. `/api/mentors`, `/api/chancing`, `/api/similar-profiles`,
 
 | Setting | Before | After |
 | --- | --- | --- |
-| `max` | 5 | 10 (`PG_POOL_MAX`, 1–20) |
+| `max` | 5 | 5, or 3 on Vercel (`PG_POOL_MAX`, 1–20) |
 | `idleTimeoutMillis` | 10 000 | 30 000 (`PG_IDLE_TIMEOUT_MS`) |
 | `connectionTimeoutMillis` | 8 000 | 8 000 (`PG_CONNECT_TIMEOUT_MS`) |
 | `maxUses` | — | 7 500 (`PG_MAX_USES`) |
@@ -77,8 +77,15 @@ student's request. `/api/mentors`, `/api/chancing`, `/api/similar-profiles`,
 
 A warm connection survives a normal traffic gap (no TLS handshake per request),
 and a connection is retired before a pooler/DNS has already forgotten it — the
-classic `57P03 cannot connect now`. Statement timeout in production is unchanged
-(`PG_QUERY_TIMEOUT_MS`, 20 s).
+classic `57P03 cannot connect now`. The 2026-11-04 resilience audit reduced the earlier 10-connection default to
+5 (3 with `VERCEL=1`). This is per process, not an aggregate deployment cap.
+Production applies the same 20 s budget to client queries and server statements
+(`PG_QUERY_TIMEOUT_MS`, 250–60,000 ms; invalid/zero values restore the default),
+a lock deadline of at most 5 s (`PG_LOCK_TIMEOUT_MS`, never above the query
+budget), and a 30 s idle-transaction limit (`PG_IDLE_TRANSACTION_TIMEOUT_MS`).
+Development/migration processes do not inherit these query deadlines.
+See [the backend resilience audit](BACKEND_AUDIT_2026-11-04.md) for failure and
+recovery tests and remaining deployment limitations.
 
 `src/db/retry.ts` keeps its tested defaults (two attempts, 120 ms) and gains
 `PG_RETRY_ATTEMPTS` (≤ 4) / `PG_RETRY_BASE_MS` for a busier install.

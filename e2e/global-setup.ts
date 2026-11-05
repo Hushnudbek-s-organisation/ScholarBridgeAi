@@ -1,4 +1,5 @@
 import EmbeddedPostgres from "embedded-postgres";
+import { isolatedServiceEnvironment } from "./isolated-env";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -44,16 +45,10 @@ export default async function globalSetup(_config: FullConfig) {
   const databaseName = `sb_e2e_${process.pid}`;
   const databaseUrl = `postgresql://e2e:e2e-only@127.0.0.1:${dbPort}/${databaseName}`;
   const embeddedLibrary = resolve(root, "node_modules/@embedded-postgres/linux-x64/native/lib");
-  const env: Record<string, string | undefined> = { ...process.env };
-  // These tests are strictly local and must never inherit a developer's paid
-  // provider credentials or external service keys.
-  for (const key of Object.keys(env)) {
-    if (/(API_KEY|APIKEY|OPENROUTER|OPENAI|ANTHROPIC|GEMINI|GOOGLE_GENERATIVE|GROQ|MISTRAL|DEEPSEEK|COHERE|XAI|AI_PROVIDER|TELEGRAM_BOT_TOKEN|PAYME|CLICK_SECRET)/i.test(key)) {
-      delete env[key];
-    }
-  }
+  const env = isolatedServiceEnvironment(process.env, root);
   env.DATABASE_URL = databaseUrl;
   env.SESSION_SECRET = "scholarbridge-e2e-local-session-secret-only-2026";
+  env.APP_PLAIN_HTTP = "1"; // Disposable loopback HTTP server, including next start.
   env.APP_URL = `http://127.0.0.1:${appPort}`;
   const nextMode = process.env.E2E_NEXT_MODE === "start" ? "start" : "dev";
   Reflect.set(env, "NODE_ENV", nextMode === "start" ? "production" : "development");
@@ -104,8 +99,7 @@ export default async function globalSetup(_config: FullConfig) {
       timeout: 120_000,
     });
 
-    const serverEnv = { ...process.env, ...env, PORT: String(appPort) };
-    Reflect.set(serverEnv, "NODE_ENV", nextMode === "start" ? "production" : "development");
+    const serverEnv = { ...env, PORT: String(appPort), NODE_ENV: nextMode === "start" ? "production" as const : "development" as const };
     const appServer = spawn(process.execPath, [join(root, "node_modules/next/dist/bin/next"), nextMode, "--hostname", "127.0.0.1", "--port", String(appPort)], {
       cwd: root,
       env: serverEnv,
@@ -131,6 +125,7 @@ export default async function globalSetup(_config: FullConfig) {
     }
     if (!ready) throw new Error(`E2E server did not become healthy at ${healthUrl}.\n${serverOutput}`);
     process.env.E2E_FIXTURE_FILE = fixtureFile;
+    process.env.E2E_DATABASE_URL = databaseUrl;
     console.log(`E2E server ready: ${healthUrl}; external AI credentials removed from its environment.`);
     return cleanup;
   } catch (error) {

@@ -48,6 +48,9 @@ jobs:
       - name: Full-schema apply safety guard
         run: bash ci/run-step.sh "Full-schema apply safety guard" npm run test:schema-apply-safety
 
+      - name: Backend timeout, body and cache resilience (offline)
+        run: bash ci/run-step.sh "Backend timeout, body and cache resilience (offline)" npm run test:backend-resilience
+
       - name: Security regression tests
         run: bash ci/run-step.sh "Security regression tests" npm run test:security
 
@@ -187,6 +190,9 @@ jobs:
       - name: Lint (baseline gate — fails on new or worsened problems)
         run: bash ci/run-step.sh "Lint (baseline gate — fails on new or worsened problems)" npm run lint:baseline
 
+      - name: Repository completeness, audit safety and design system
+        run: bash ci/run-step.sh "Repository completeness, audit safety and design system" bash -c 'npm run test:site-completeness && npm run test:audit-safety && npm run test:isolated-env && npm run audit:ui && npm run test:schema-repair'
+
       - name: Responsive source-level regression tests
         run: bash ci/run-step.sh "Responsive source-level regression tests" npm run test:responsive
 
@@ -201,8 +207,28 @@ jobs:
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
 
+      - name: Production browser routes, navigation and recovery
+        run: bash ci/run-step.sh "Production browser routes, navigation and recovery" npm run test:e2e
+        env:
+          E2E_NEXT_MODE: start
+
+      - name: Disposable provenance and Telegram mock integration
+        run: bash ci/run-step.sh "Disposable provenance and Telegram mock integration" npm run test:stack-integration
+
       # Runs against the freshly built bundle (the route stats file the build
       # writes): fails if the landing page starts shipping every language
       # again — it was 2.2 MB of JS, now ~1.2 MB.
       - name: Landing page weight budget
-        run: bash ci/run-step.sh "Landing page weight budget" npm run test:perf
+        run: bash ci/run-step.sh "Landing page weight budget" bash -c 'npm run test:idle-scheduling && npm run test:perf'
+
+      - name: Keep browser and inventory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-audit-evidence
+          path: |
+            test-results/e2e-report.json
+            test-results/e2e/
+            test-results/full-audit/file-inventory.json
+          if-no-files-found: ignore
+          retention-days: 7

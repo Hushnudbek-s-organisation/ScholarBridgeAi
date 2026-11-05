@@ -14,6 +14,7 @@
  * payload snippets are redacted (known key + key-shaped tokens) before they
  * reach the response.
  */
+import { fetchBoundedResponse } from "@/lib/boundedBody";
 import {
   AI_PROVIDERS,
   providerBaseUrl,
@@ -43,15 +44,8 @@ export interface ConnectionTestResult {
 const TIMEOUT_MS = 10_000;
 
 async function probe(url: string, init: RequestInit): Promise<{ status: number; body: string }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    const body = await res.text();
-    return { status: res.status, body };
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await fetchBoundedResponse(url, init, TIMEOUT_MS, 2 * 1024 * 1024);
+  return { status: res.status, body: await res.text() };
 }
 
 export function describeProbe(res: { status: number; body: string }, key?: string): string {

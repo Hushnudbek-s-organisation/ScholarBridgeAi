@@ -1,3 +1,4 @@
+import { AsyncTtlCache } from "@/lib/asyncTtlCache";
 /**
  * In-memory catalogue cache (Priority 1 — 20×–50× faster catalogue reads).
  *
@@ -113,12 +114,9 @@ export type OpportunitiesBundle = {
 
 type CacheEntry<T> = { expiresAt: number; value: T };
 
-let universitiesEntry: CacheEntry<UniversitiesBundle> | null = null;
-let universitiesInFlight: Promise<UniversitiesBundle> | null = null;
-let scholarshipsEntry: CacheEntry<ScholarshipsBundle> | null = null;
-let scholarshipsInFlight: Promise<ScholarshipsBundle> | null = null;
-let opportunitiesEntry: CacheEntry<OpportunitiesBundle> | null = null;
-let opportunitiesInFlight: Promise<OpportunitiesBundle> | null = null;
+const universitiesCache = new AsyncTtlCache<string, UniversitiesBundle>(CATALOG_TTL_MS, 1);
+const scholarshipsCache = new AsyncTtlCache<string, ScholarshipsBundle>(CATALOG_TTL_MS, 1);
+const opportunitiesCache = new AsyncTtlCache<string, OpportunitiesBundle>(CATALOG_TTL_MS, 1);
 
 type MatchProfile = Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
 type ChancingProfile = Awaited<ReturnType<typeof chancingProfileWithActivities>>;
@@ -134,7 +132,7 @@ type ProfileMatch = {
   chancingProfile: ChancingProfile;
 };
 
-const profileMatchCache = new Map<number, CacheEntry<ProfileMatch>>();
+const profileMatchCache = new AsyncTtlCache<number, ProfileMatch | null>(Math.max(1, PROFILE_MATCH_TTL_MS), 500);
 const universityDetailCache = new Map<number, CacheEntry<Record<string, unknown>>>();
 
 export function getCachedUniversityDetailBase(uniId: number): Record<string, unknown> | null {
@@ -264,22 +262,7 @@ async function buildUniversitiesBundle(): Promise<UniversitiesBundle> {
  * freely without mutating the cached snapshot.
  */
 export async function getCachedUniversitiesBundle(): Promise<UniversitiesBundle> {
-  const cached = fresh(universitiesEntry);
-  if (cached) return cached;
-  if (universitiesInFlight) return universitiesInFlight;
-
-  const run = buildUniversitiesBundle()
-    .then((value) => {
-      universitiesEntry = { value, expiresAt: Date.now() + CATALOG_TTL_MS };
-      universitiesInFlight = null;
-      return value;
-    })
-    .catch((err) => {
-      universitiesInFlight = null;
-      throw err;
-    });
-  universitiesInFlight = run;
-  return run;
+  return universitiesCache.getOrCreate("catalogue", buildUniversitiesBundle);
 }
 
 /* ------------------------------------------------------------- scholarships */
@@ -390,22 +373,7 @@ async function buildScholarshipsBundle(): Promise<ScholarshipsBundle> {
 
 /** Base active-scholarship dataset. Copies are handed out per call. */
 export async function getCachedScholarshipsBundle(): Promise<ScholarshipsBundle> {
-  const cached = fresh(scholarshipsEntry);
-  if (cached) return cached;
-  if (scholarshipsInFlight) return scholarshipsInFlight;
-
-  const run = buildScholarshipsBundle()
-    .then((value) => {
-      scholarshipsEntry = { value, expiresAt: Date.now() + CATALOG_TTL_MS };
-      scholarshipsInFlight = null;
-      return value;
-    })
-    .catch((err) => {
-      scholarshipsInFlight = null;
-      throw err;
-    });
-  scholarshipsInFlight = run;
-  return run;
+  return scholarshipsCache.getOrCreate("catalogue", buildScholarshipsBundle);
 }
 
 /* --------------------------------------------------------- opportunities */
@@ -432,22 +400,7 @@ async function buildOpportunitiesBundle(): Promise<OpportunitiesBundle> {
 
 /** Base opportunity feed dataset, cached with the same short TTL as catalogs. */
 export async function getCachedOpportunitiesBundle(): Promise<OpportunitiesBundle> {
-  const cached = fresh(opportunitiesEntry);
-  if (cached) return cached;
-  if (opportunitiesInFlight) return opportunitiesInFlight;
-
-  const run = buildOpportunitiesBundle()
-    .then((value) => {
-      opportunitiesEntry = { value, expiresAt: Date.now() + CATALOG_TTL_MS };
-      opportunitiesInFlight = null;
-      return value;
-    })
-    .catch((err) => {
-      opportunitiesInFlight = null;
-      throw err;
-    });
-  opportunitiesInFlight = run;
-  return run;
+  return opportunitiesCache.getOrCreate("catalogue", buildOpportunitiesBundle);
 }
 
 /* --------------------------------------------------------- profile matching */
@@ -457,9 +410,11 @@ export async function getCachedOpportunitiesBundle(): Promise<OpportunitiesBundl
  * Private data: callers MUST authorise the request before reading this.
  */
 export async function getCachedProfileForMatching(profileId: number): Promise<ProfileMatch | null> {
-  const cached = fresh(profileMatchCache.get(profileId) ?? null);
-  if (cached) return cached;
+  if (PROFILE_MATCH_TTL_MS === 0) return loadProfileForMatching(profileId);
+  return profileMatchCache.getOrCreate(profileId, () => loadProfileForMatching(profileId));
+}
 
+async function loadProfileForMatching(profileId: number): Promise<ProfileMatch | null> {
   const [row] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
   if (!row) return null;
   const [matchProfile, chancingProfile] = await Promise.all([
@@ -471,7 +426,6 @@ export async function getCachedProfileForMatching(profileId: number): Promise<Pr
     matchProfile,
     chancingProfile,
   };
-  profileMatchCache.set(profileId, { value, expiresAt: Date.now() + PROFILE_MATCH_TTL_MS });
   return value;
 }
 
@@ -480,18 +434,15 @@ export async function getCachedProfileForMatching(profileId: number): Promise<Pr
 /** Drop the university and/or scholarship catalogue snapshots. */
 export function invalidateCatalogCache(kind: "universities" | "scholarships" | "opportunities" | "all" = "all") {
   if (kind === "universities" || kind === "all") {
-    universitiesEntry = null;
-    universitiesInFlight = null;
+    universitiesCache.clear();
     universityDetailCache.clear();
   }
   if (kind === "scholarships" || kind === "all") {
-    scholarshipsEntry = null;
-    scholarshipsInFlight = null;
+    scholarshipsCache.clear();
     universityDetailCache.clear();
   }
   if (kind === "opportunities" || kind === "all") {
-    opportunitiesEntry = null;
-    opportunitiesInFlight = null;
+    opportunitiesCache.clear();
   }
   // The localized strings and the scores are derived from these rows: an admin
   // edit must never be served from a memo after the row changed.
@@ -511,17 +462,14 @@ export function invalidateProfileMatchCache(profileId?: number) {
     profileMatchCache.clear();
     return;
   }
-  profileMatchCache.delete(profileId);
+  profileMatchCache.invalidate(profileId);
 }
 
 /** Test hook: clear everything. */
 export function resetCatalogCacheForTests() {
-  universitiesEntry = null;
-  scholarshipsEntry = null;
-  opportunitiesEntry = null;
-  universitiesInFlight = null;
-  scholarshipsInFlight = null;
-  opportunitiesInFlight = null;
+  universitiesCache.clear();
+  scholarshipsCache.clear();
+  opportunitiesCache.clear();
   profileMatchCache.clear();
   universityDetailCache.clear();
 }
@@ -531,10 +479,10 @@ export function catalogCacheStats() {
   return {
     localization: localizeMemoStats(),
     matches: matchMemoStats(),
-    universitiesCached: fresh(universitiesEntry) !== null,
-    scholarshipsCached: fresh(scholarshipsEntry) !== null,
-    opportunitiesCached: fresh(opportunitiesEntry) !== null,
-    profileMatchEntries: [...profileMatchCache.values()].filter((e) => e.expiresAt > Date.now()).length,
+    universitiesCached: universitiesCache.hasFresh("catalogue"),
+    scholarshipsCached: scholarshipsCache.hasFresh("catalogue"),
+    opportunitiesCached: opportunitiesCache.hasFresh("catalogue"),
+    profileMatchEntries: profileMatchCache.freshSize,
   };
 }
 

@@ -1,0 +1,22 @@
+{
+  "capturedAt": "2026-11-04T17:54:54.359Z",
+  "head": "788d66c105d4fa7bd7a9d0d56426db7d58f76c40",
+  "branch": "arena/6db82aa0-scholarbridgeai",
+  "note": "Uncommitted post-optimization source fingerprints, not a clean HEAD build. Baseline was captured in the previously audited working tree before speed changes; no equivalent baseline source snapshot was recorded.",
+  "sha256": {
+    "src/app/HomeClient.tsx": "790d3baa74962ec92efdfee62fb3c401135393de72a45031f6ae4e7c636de63e",
+    "src/app/globals.css": "2e8c49e1b6b498bdeb02b2856f943131a736cb9c2843901775368fd0f60e1413",
+    "src/components/LandingPage.tsx": "40efcbbe56bbf8b5e9776f93e5b0a72a7a8de79c81778caa3b2ab0ea24792da4",
+    "src/components/motion/PageTransition.tsx": "7e0c2421a45f345b4671952d6be79293aa0c0f574bf69dade87a85c7e8428b87",
+    "src/components/ui/PanelSkeleton.tsx": "125a167b2ea4974f5175ecf7b737e13b9d442d786ecfea012f6558f6e14b20f8",
+    "src/components/SiteTracker.tsx": "f24011b016df99ca93e7c35930108e50fdad26b66cd897d628fc697b7fd7e136",
+    "src/components/SmartTimelineCalendar.tsx": "db6c2f1a606c64f8f0dda7f9aaa906d49aca2fe49cabfdae4d582e673a23fd31",
+    "src/lib/idle.ts": "5ad76117d51143033a18bf8610ca0faf080ed067e764171cc157d9f62d34344e",
+    "e2e/performance.spec.ts": "210e201e6e773b5da5b9dde92ea14ef9f35d55f75fcddc19469d857896f02364",
+    "scripts/run-browser-perf.mjs": "a0538059f61666fd4fd33c3d5f969826ad86021a892e7ff23e1ba8cb099d4009",
+    "scripts/run-e2e.mjs": "572b25ac426675c209300991cefe7369b664c86fa1d8ee15924dde34e3dc730a",
+    "playwright.config.ts": "2fd70e8c526ee927d583a5b9604b4acf5b2f0d4bbbd8cd9f980ac259e0dbac8a",
+    "package.json": "220992a9a47d5082ec53ca8319998371fe844f32f1eb179cd77fdc304712ec47",
+    "package-lock.json": "6b968fdd00dbfa1099c909b7022533009a6ebefbcf11ff1e44ae77033723da69"
+  }
+}

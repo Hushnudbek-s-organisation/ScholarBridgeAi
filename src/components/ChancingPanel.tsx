@@ -917,7 +917,7 @@ export function ChancingPanel({
                     </div>
 
                     <AdmissionsStatisticsCard statistics={baseItem.qsBenchmark?.admissionsStatistics} />
-                    <p className="rounded-control bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">{t("planningEstimateNotice")}</p>
+                    <p className="rounded-control bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">{t("planningEstimateNotice")}</p>
                     {/* Selectivity Comparison Metrics */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                       <div className="rounded-control bg-white p-2.5 border border-slate-200">

@@ -8,6 +8,7 @@
  * apart (the chancing copy omitted fields the strength copy passed, and both
  * needed a `as never` cast to satisfy the compiler).
  */
+import { AsyncTtlCache } from "@/lib/asyncTtlCache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { studentActivities, type studentProfiles, type universities } from "@/db/schema";
@@ -117,29 +118,25 @@ type ActivitiesRow = {
   achievements: string | null;
 };
 
-const ACTIVITIES_MEMO_KEY = "__sbSavedActivitiesMemo";
-
-function activitiesMemo(): Map<number, { expiresAt: number; rows: ActivitiesRow[] }> {
-  const g = globalThis as typeof globalThis & {
-    [ACTIVITIES_MEMO_KEY]?: Map<number, { expiresAt: number; rows: ActivitiesRow[] }>;
-  };
-  if (!g[ACTIVITIES_MEMO_KEY]) g[ACTIVITIES_MEMO_KEY] = new Map();
-  return g[ACTIVITIES_MEMO_KEY]!;
+const ACTIVITIES_MEMO_KEY = "__sbSavedActivitiesMemoV2";
+function activitiesMemo(): AsyncTtlCache<number, ActivitiesRow[]> {
+  const g = globalThis as typeof globalThis & { [ACTIVITIES_MEMO_KEY]?: AsyncTtlCache<number, ActivitiesRow[]> };
+  return g[ACTIVITIES_MEMO_KEY] ??= new AsyncTtlCache(Math.max(1, ACTIVITIES_MEMO_TTL_MS), 500);
 }
 
 /** Drop the memoized activity rows — one student, or everybody. */
 export function invalidateSavedActivities(profileId?: number): void {
   const memo = activitiesMemo();
   if (profileId == null) memo.clear();
-  else memo.delete(profileId);
+  else memo.invalidate(profileId);
 }
 
 export async function loadSavedActivities(profileId: number) {
-  const memo = activitiesMemo();
-  const now = Date.now();
-  const hit = memo.get(profileId);
-  if (hit && hit.expiresAt > now) return hit.rows;
+  if (ACTIVITIES_MEMO_TTL_MS === 0) return readSavedActivities(profileId);
+  return activitiesMemo().getOrCreate(profileId, () => readSavedActivities(profileId));
+}
 
+async function readSavedActivities(profileId: number): Promise<ActivitiesRow[]> {
   const rows = (await db
     .select({
       category: studentActivities.category,
@@ -149,7 +146,6 @@ export async function loadSavedActivities(profileId: number) {
     .from(studentActivities)
     .where(eq(studentActivities.profileId, profileId))) as ActivitiesRow[];
 
-  if (ACTIVITIES_MEMO_TTL_MS > 0) memo.set(profileId, { expiresAt: now + ACTIVITIES_MEMO_TTL_MS, rows });
   return rows;
 }
 

@@ -19,7 +19,7 @@ export function SiteTracker() {
     // the same page into many rows; the traffic source comes from `referrer`.
     const cancel = scheduleWhenIdle(() => {
       trackPageView(window.location.pathname);
-    }, 3000);
+    }, 3000, 3000);
     return cancel;
   }, []);
 

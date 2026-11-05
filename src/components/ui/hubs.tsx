@@ -442,35 +442,4 @@ export function ScrollRegion({
   );
 }
 
-/**
- * Lightweight placeholder for a lazily-loaded panel.
- *
- * The heavy panes (the visa studio, the AI studios, the admin panel) are
- * code-split, so this is what the student sees for the few hundred
- * milliseconds while the chunk arrives: the SHAPE of the panel, not a
- * spinner floating in an empty page.
- */
-export function PanelSkeleton({
-  rows = 3,
-  className = "",
-}: {
-  rows?: number;
-  className?: string;
-}) {
-  const widths = ["w-2/5", "w-full", "w-4/5", "w-3/5"];
-  return (
-    <div className={`space-y-3 ${className}`} aria-hidden="true">
-      <div className="sb-skeleton h-5 w-1/3" />
-      {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="sb-surface-card space-y-2.5 rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-surface"
-        >
-          <div className={`sb-skeleton h-4 ${widths[i % widths.length]}`} />
-          <div className="sb-skeleton h-3 w-full" />
-          <div className="sb-skeleton h-3 w-3/4" />
-        </div>
-      ))}
-    </div>
-  );
-}
+export { PanelSkeleton } from "./PanelSkeleton";

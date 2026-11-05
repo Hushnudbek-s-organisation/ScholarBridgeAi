@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { scholarships, universities } from "@/db/schema";
@@ -45,7 +46,9 @@ export async function GET(req: Request) {
 /** PATCH: mark a record as verified (with optional source note). */
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json();
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const access = await requireAdmin(req);
     if (!access.ok) {
       return NextResponse.json(

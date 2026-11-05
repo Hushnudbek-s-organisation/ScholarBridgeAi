@@ -66,6 +66,9 @@ const PUBLIC = new Map<string, string>([
   ["stories POST", "premium-gated story submission (401 for anonymous)"],
   ["auth/session GET", "tells the browser whether a session exists"],
   // --- authentication ------------------------------------------------------
+  ["auth/password-reset/request POST", "generic, rate-limited recovery email request"],
+  ["auth/password-reset/confirm POST", "single-use, hash-verified recovery token"],
+  ["image GET", "allowlisted public image proxy"],
   ["auth/sign-in POST", "password check + IP/account rate limit"],
   ["auth/sign-out POST", "clears the caller's own cookie"],
   ["auth/telegram/start POST", "IP rate limited, bot-issued code"],
@@ -112,14 +115,14 @@ function urlFor(file: string): string {
   );
 }
 
-async function probe(route: string, method: string): Promise<{ status: number | string; detail: string }> {
+async function probe(route: string, method: string, payload: Record<string, unknown> = {}): Promise<{ status: number | string; detail: string }> {
   const init: RequestInit = { method, redirect: "manual" };
   if (method !== "GET") {
     init.headers = { "content-type": "application/json" };
     // An empty JSON object: a correctly guarded route rejects it before doing
     // anything, a broken one may insert a blank row — which is exactly the
     // finding we want to see.
-    init.body = "{}";
+    init.body = JSON.stringify(payload);
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
@@ -144,6 +147,24 @@ async function main() {
   const findings: Finding[] = [];
   const review: Finding[] = [];
   let probed = 0;
+  let fixtureProbes = 0;
+  // Valid-looking mutations are forbidden against a live deployment. Only the
+  // isolated runner opts in, supplies its disposable fixture, and uses loopback.
+  let canary: Record<string, unknown> | null = null;
+  if (process.env.API_AUDIT_DISPOSABLE === "1") {
+    if (!["127.0.0.1", "localhost", "[::1]"].includes(new URL(BASE).hostname)) throw new Error("Fixture probes require loopback");
+    const fixture = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8")) as { studentId: number; verifiedUniversityId: number; scholarshipId: number };
+    if (!Number.isSafeInteger(fixture.studentId) || fixture.studentId <= 0) throw new Error("Disposable fixture profile is required");
+    canary = {
+      profileId: fixture.studentId, userId: fixture.studentId, authorId: fixture.studentId, reporterId: fixture.studentId,
+      id: 1, applicationId: 1, programId: 1, mentorId: 1, threadId: 1, categoryId: 1, targetId: 1,
+      universityId: fixture.verifiedUniversityId, scholarshipId: fixture.scholarshipId,
+      title: "Anonymous disposable audit", body: "Anonymous disposable audit", content: "Anonymous disposable audit",
+      message: "Anonymous disposable audit", prompt: "Anonymous disposable audit", targetType: "thread",
+      result: "accepted", provider: "payme", package: "pro_monthly",
+      reason: "spam", status: "preparing", referralCode: "AUDIT_CANARY", country: "Germany",
+    };
+  }
 
   console.log(`\nAnonymous-access audit of ${files.length} API routes against ${BASE}\n`);
 
@@ -157,7 +178,15 @@ async function main() {
     for (const method of methods) {
       const key = `${keyRoute} ${method}`;
       const isPublic = PUBLIC.has(key);
-      const { status, detail } = await probe(route, method);
+      let { status, detail } = await probe(route, method);
+      if (!isPublic && status === 400 && canary) {
+        const payload = { ...canary };
+        if (keyRoute === "saved-scholarships") payload.status = "Saved";
+        if (keyRoute === "saved-universities") payload.status = "Shortlisted";
+        const params = new URLSearchParams(Object.entries(payload).map(([key, value]) => [key, String(value)]));
+        ({ status, detail } = await probe(`${route}?${params.toString()}`, method, payload));
+        fixtureProbes++;
+      }
       probed += 1;
 
       if (status === "unreachable") {
@@ -179,15 +208,15 @@ async function main() {
     console.log("FAIL — routes reachable anonymously that must not be:\n");
     for (const f of findings) console.log(`  • ${f.method} ${f.route} → ${f.status} ${f.detail}`);
   } else {
-    console.log("OK — every non-public route refused an anonymous caller (401/403).");
+    console.log("OK — no non-public route returned 2xx to the anonymous probes (not proof for all payloads).");
   }
 
   if (review.length) {
-    console.log(`\nNote — ${review.length} protected route(s) answered a validation error before the auth check:`);
+    console.log(`\nNote — ${review.length} non-public handler(s) need response classification (not all are authorization verdicts):`);
     for (const f of review) console.log(`  · ${f.method} ${f.route} → ${f.status} ${f.detail}`);
   }
 
-  console.log(`\nprobed ${probed} handler(s) across ${files.length} route files`);
+  console.log(`\nprobed ${probed} handler(s) across ${files.length} route files; ${fixtureProbes} additional disposable-fixture probes`);
 
   if (findings.some((f) => f.status === "unreachable")) {
     console.log("\nThe server did not answer every request — is `npm run dev` running and healthy?");

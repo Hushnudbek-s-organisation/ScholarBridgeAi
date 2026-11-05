@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { and, asc, count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -117,12 +118,9 @@ export async function POST(req: Request) {
     if (locked) return locked;
     const me = profile.session.profile.id;
 
-    let body: Record<string, any>;
-    try {
-      body = await req.json();
-    } catch {
-      body = {};
-    }
+    const boundedJson = await readJsonBody<Record<string, any>>(req);
+    if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
+    const body = boundedJson.body;
     const versionId = Number(body.essayVersionId);
     if (!Number.isInteger(versionId) || versionId <= 0) {
       return NextResponse.json({ error: "essayVersionId is required" }, { status: 400 });

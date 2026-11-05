@@ -22,12 +22,20 @@ type IdleWindow = Window & {
 
 /**
  * @param task      The work to run once the browser is idle.
+ * @param minimumDelayMs Optional grace period BEFORE asking for an idle slot.
  * @param timeoutMs Upper bound in milliseconds — the task runs even if the
  *                  browser never reports an idle period (busy main thread).
  */
-export function scheduleWhenIdle(task: () => void, timeoutMs = 1800): () => void {
+export function scheduleWhenIdle(task: () => void, timeoutMs = 1800, minimumDelayMs = 0): () => void {
   if (typeof window === "undefined") return () => {};
 
+  // requestIdleCallback's timeout is an upper bound, NOT a grace period.
+  // Optional minimum delay keeps truly noncritical work out of first paint.
+  if (minimumDelayMs > 0) {
+    let cancelIdle = () => {};
+    const timer = window.setTimeout(() => { cancelIdle = scheduleWhenIdle(task, timeoutMs); }, minimumDelayMs);
+    return () => { window.clearTimeout(timer); cancelIdle(); };
+  }
   const idleWindow = window as IdleWindow;
   if (typeof idleWindow.requestIdleCallback === "function") {
     const handle = idleWindow.requestIdleCallback(() => {

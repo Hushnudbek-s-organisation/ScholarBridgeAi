@@ -1,12 +1,4 @@
-# GitHub Actions workflow — SECURITY CHECKS
-#
-# This file cannot be committed to .github/workflows/ by the automation
-# account (GitHub Apps need the extra `workflows` permission to create or
-# update workflow files). Copy it into place once, manually:
-#
-#   cp ci/security-ci.yml .github/workflows/ci.yml
-#   git add .github/workflows/ci.yml && git commit -m 'ci: add security checks'
-#
+# Portable mirror of .github/workflows/ci.yml. Keep workflow bodies identical.
 name: CI
 
 env:
@@ -51,11 +43,58 @@ jobs:
       - name: Full-schema apply safety guard
         run: bash ci/run-step.sh "Full-schema apply safety guard" npm run test:schema-apply-safety
 
+      - name: Backend timeout, body and cache resilience (offline)
+        run: bash ci/run-step.sh "Backend timeout, body and cache resilience (offline)" npm run test:backend-resilience
+
       - name: Security regression tests
         run: bash ci/run-step.sh "Security regression tests" npm run test:security
 
+      # Phase AG: the reset-link lifetime, the hash-only storage, and a real SMTP
+      # conversation against a throwaway server (no network, no credentials).
+      - name: Password reset tests (token lifetime, single use, SMTP)
+        run: bash ci/run-step.sh "Password reset tests (token lifetime, single use, SMTP)" npm run test:password-reset
+
+      # The apps open the hosted site: which address, does it answer, is the
+      # session kept, is the offline copy ever entered silently. Pure logic, no
+      # network, no Electron — it runs on every push so a change to
+      # desktop/remote.mjs or the baked address cannot slip through.
+      - name: Site mode (desktop + Android windows onto the site)
+        run: bash ci/run-step.sh "Site mode" npm run test:remote
+
+      # Phase 3: uz/ru coverage for every study field, degree level, study mode
+      # and programme language in the imported catalogue, plus the localization
+      # and score memos (correctness and speed).
+      - name: Catalogue localization coverage and memo tests
+        run: bash ci/run-step.sh "Catalogue localization coverage and memo tests" npm run test:localization
+
+      # Phase 4: the student-visa fact sheet (sourced, dated, trilingual) and the
+      # catalogue gap report (what is fillable from repository data and what is
+      # administrator work).
+      - name: Student-visa facts and catalogue gap gates
+        run: bash ci/run-step.sh "Student-visa facts and catalogue gap gates" npm run test:country-facts && npm run check:catalog-gaps
+
       - name: Discovery matcher tests — university/scholarship Match %
         run: bash ci/run-step.sh "Discovery matcher tests — university/scholarship Match %" npm run test:match
+
+      # Offline: the combined relevance number (fit + university + chance) the
+      # catalogue sorts by, and the two personal filters built on it.
+      - name: Combined ranking + personal filter tests (offline)
+        run: bash ci/run-step.sh "Combined ranking + personal filter tests (offline)" npm run test:ranking
+      - name: Scholarship degree alias regression (offline)
+        run: bash ci/run-step.sh "Scholarship degree alias regression (offline)" npm run test:scholarship-degrees
+      - name: Catalogue evidence and archived-cycle boundaries (offline)
+        run: bash ci/run-step.sh "Catalogue evidence and archived-cycle boundaries (offline)" npm run test:catalog-evidence
+      - name: Catalogue evidence migrations (isolated PostgreSQL)
+        run: bash ci/run-step.sh "Catalogue evidence migrations (isolated PostgreSQL)" npm run test:catalogue-migrations
+
+      - name: Official-source review batch (isolated PostgreSQL)
+        run: bash ci/run-step.sh "Official-source review batch (isolated PostgreSQL)" npm run test:official-source-review
+
+      - name: Uploaded document coverage and evidence boundaries
+        run: bash ci/run-step.sh "Uploaded document coverage and evidence boundaries" npm run test:document-coverage && npm run test:samples
+
+      - name: Primary-source follow-up and UK visa repair (isolated PostgreSQL)
+        run: bash ci/run-step.sh "Primary-source follow-up and UK visa repair" npm run test:source-followup
 
       - name: AI settings tests
         run: bash ci/run-step.sh "AI settings tests" npm run test:ai-settings
@@ -74,6 +113,11 @@ jobs:
 
       - name: Telegram integration tests (embedded Postgres)
         run: bash ci/run-step.sh "Telegram integration tests (embedded Postgres)" npm run test:telegram-integration
+
+      # Offline and deterministic: schema drift, config, publishability, every
+      # template variant, banks, poll deck, preferences and the daily plan.
+      - name: Channel publisher tests (offline)
+        run: bash ci/run-step.sh "Channel publisher tests (offline)" npm run test:channel
 
       - name: API integration tests — ownership, Premium, AI quota (embedded Postgres)
         run: bash ci/run-step.sh "API integration tests — ownership, Premium, AI quota (embedded Postgres)" npm run test:integration
@@ -141,13 +185,45 @@ jobs:
       - name: Lint (baseline gate — fails on new or worsened problems)
         run: bash ci/run-step.sh "Lint (baseline gate — fails on new or worsened problems)" npm run lint:baseline
 
+      - name: Repository completeness, audit safety and design system
+        run: bash ci/run-step.sh "Repository completeness, audit safety and design system" bash -c 'npm run test:site-completeness && npm run test:audit-safety && npm run test:isolated-env && npm run audit:ui && npm run test:schema-repair'
+
       - name: Responsive source-level regression tests
         run: bash ci/run-step.sh "Responsive source-level regression tests" npm run test:responsive
 
       - name: Dark-mode contrast audit
         run: bash ci/run-step.sh "Dark-mode contrast audit" npm run test:dark
 
+      - name: Deployment shape (build memory, live commit probe)
+        run: bash ci/run-step.sh "Deployment shape" npm run test:deploy
+
       - name: Build
         run: bash ci/run-step.sh "Build" npm run build
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+      - name: Production browser routes, navigation and recovery
+        run: bash ci/run-step.sh "Production browser routes, navigation and recovery" npm run test:e2e
+        env:
+          E2E_NEXT_MODE: start
+
+      - name: Disposable provenance and Telegram mock integration
+        run: bash ci/run-step.sh "Disposable provenance and Telegram mock integration" npm run test:stack-integration
+
+      # Runs against the freshly built bundle (the route stats file the build
+      # writes): fails if the landing page starts shipping every language
+      # again — it was 2.2 MB of JS, now ~1.2 MB.
+      - name: Landing page weight budget
+        run: bash ci/run-step.sh "Landing page weight budget" bash -c 'npm run test:idle-scheduling && npm run test:perf'
+
+      - name: Keep browser and inventory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-audit-evidence
+          path: |
+            test-results/e2e-report.json
+            test-results/e2e/
+            test-results/full-audit/file-inventory.json
+          if-no-files-found: ignore
+          retention-days: 7

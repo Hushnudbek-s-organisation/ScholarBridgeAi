@@ -1,16 +1,86 @@
-# Phase 12 browser E2E
-
-Run the browser tests locally with:
+# Browser and disposable-stack audits
 
 ```sh
 npm ci
-npm run test:e2e
+npm run build
+E2E_NEXT_MODE=start npm run test:e2e
+npm run test:stack-integration
+npm run test:api-security:isolated
 ```
 
-Requirements: Node.js/npm compatible with this repository, Linux x86_64 with the runtime libraries needed by `embedded-postgres` and packaged headless Chromium, and enough free disk/memory for a temporary PostgreSQL cluster and a Next.js dev server. On Debian/Ubuntu, install the Chromium system dependencies first (at minimum `libnspr4` and `libnss3`; other base image packages may also be required): `sudo apt-get update && sudo apt-get install -y libnspr4 libnss3`. No system browser, externally managed database, Supabase project, `.env.local`, production credentials, or paid AI provider is needed. The project pins Playwright and a Chromium binary in the lockfile.
+For development-server testing, omit `E2E_NEXT_MODE=start`. Production mode
+requires a successful build first; `npm run typecheck` is a separate gate because
+the production build intentionally does not run TypeScript checks.
 
-The runner allocates two loopback ports, refuses to start if either is already occupied, creates a temporary embedded PostgreSQL cluster and a uniquely named database, pushes only the app's current Drizzle schema to that disposable database, and seeds deterministic isolated profiles/university/scholarship/document fixtures via the app schema and password hasher. It starts the real Next.js development server against that database, waits for `/api/health`, and runs Playwright against the app. The app receives a local-only session secret; environment variables likely to contain external API/provider credentials are removed from the server environment. Fixtures and database files are removed when the Playwright run ends, including on a setup/test failure. The test signs in through the production email/password route and relies on the normal signed HttpOnly session; there is no test-auth endpoint or authentication bypass.
+## Runtime and isolation
 
-Scenarios exercise the public catalogue's verification-aware numeric disclosure, real authenticated university search/country filtering, profile-owned dashboard and saved scholarship/deadline state, and ownership of the document vault. These browser tests are separate from the repository's source-level responsive audit and Node integration scripts. Playwright traces/screenshots/videos on failures are stored under the ignored `test-results/` directory.
+Use compatible Node.js/npm on Linux x86_64, with enough disk/memory for embedded
+PostgreSQL, Next.js and headless Chromium. Browser and database packages are
+pinned in the lockfile. If NSS/NSPR libraries are absent, the runner extracts the
+already installed Chromium package's `al2023.tar.br` into a unique temporary
+folder, rechecks the executable, and cleans up afterward. Other missing system
+libraries still need to be installed by the runner administrator. There is no
+runtime browser download or system-browser requirement.
 
-The runner is deliberately for local Linux disposable testing only; it does not configure CI. CI should only be added once a runner with a reproducible compatible embedded-Postgres/Chromium runtime is provisioned. Do not point it at staging or production, and do not run any catalog/integrity migration as part of E2E.
+Two free loopback ports, a temporary PostgreSQL cluster and a unique database
+are allocated. Only this disposable database receives the current Drizzle
+schema and deterministic student/admin/catalogue/document fixtures. Never aim
+these tests at production or reapply catalogue migrations to support them.
+
+Provider credentials are blanked in the service environment, including matching
+keys discovered in `.env*` files so Next/dotenv cannot restore them. Sanitized
+values are not merged back with the parent's unsanitized environment. Database,
+session and app URL are then assigned local-only values. The parent environment
+is preserved. `npm run test:isolated-env` checks this with fake canary values and
+an actual dotenv reload; it never reads real credentials in its test fixtures.
+
+Sign-in uses the real email/password route and normal signed HttpOnly cookie,
+not an authentication bypass. Plain-HTTP cookies are enabled **only for this
+local test server**, including production-mode testing. The disposable database,
+server and temporary files are cleaned up on completion or failure.
+
+Chromium runs without Lambda's unstable `--single-process` mode, and without
+`--disable-web-security` or insecure-content overrides. Tests use one worker and
+no retries; failures are not hidden by automatic retries.
+
+## Coverage and its limits
+
+- Public routes in English, Uzbek and Russian at a phone viewport, intended
+  response statuses, certificate/parent-link errors, horizontal overflow and
+  unhandled browser errors. A literal percent-sign certificate code must not
+  crash the page through double URL decoding.
+- Student destination/pane navigation at desktop and phone widths; tab selection,
+  nonempty visible panels, boundary failures and server errors.
+- Read-only administrator section navigation. No publish, delete, reset, send or
+  payment action is pressed by this traversal.
+- Locale persistence, theme switching and missing reset-link recovery.
+- Catalogue search/filter disclosure, profile-owned dashboards, saved awards,
+  deadlines and document-vault isolation.
+
+A mounted panel is **not** proof that every control inside it works. Tests do
+not certify every account role, translated paragraph, external link, source
+fact, real purchase, live AI answer, delivery provider, desktop installer or
+mobile-native wrapper. The repository inventory checks are likewise static,
+not additional browser interactions.
+
+`npm run test:stack-integration` reuses the disposable stack for the public
+provenance check and Telegram publishing/approval rehearsal. The latter uses a
+local Telegram mock, never a real bot/channel. `test:api-security:isolated`
+probes the route surface anonymously and retries validation-first private
+handlers with plausible disposable fixture inputs. Such mutation-shaped
+retries require explicit disposable mode and loopback; ordinary
+`test:api-security` does not enable them. Remaining non-auth response statuses
+are reported honestly rather than described as 401/403 successes.
+
+## Evidence and CI
+
+Playwright writes `test-results/e2e-report.json`, route/pane coverage attachments,
+and failure traces/screenshots under ignored `test-results/`. Video is off by
+default; opt in with `npx playwright install ffmpeg` followed by
+`E2E_VIDEO=1 E2E_NEXT_MODE=start npm run test:e2e`.
+
+CI runs the production browser suite and disposable-stack rehearsal after a
+successful build, plus repository completeness, isolation, design-system and
+schema-repair checks. `.github/workflows/ci.yml` is the active workflow;
+`ci/security-ci.yml` is its portable mirror. Editing these files locally is not
+evidence that a GitHub Actions run has passed.

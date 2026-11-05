@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { appConfig } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { AsyncTtlCache } from "@/lib/asyncTtlCache";
+import { eq, sql } from "drizzle-orm";
 import { DEFAULT_HIDDEN_NAV_ITEMS } from "@/lib/navSections";
 
 /**
@@ -117,13 +118,8 @@ export const CONFIG_DEFAULTS: ConfigDefaults = {
  * immediately (setConfig).
  */
 export const CONFIG_CACHE_TTL_MS = 30_000;
-const cache = new Map<string, { value: string | null; at: number }>();
-/** Values an admin actually saved (no defaults) — null = never saved. */
-const storedCache = new Map<string, { value: string | null; at: number }>();
-
-function fresh<T extends { at: number }>(entry: T | undefined): entry is T {
-  return entry !== undefined && Date.now() - entry.at < CONFIG_CACHE_TTL_MS;
-}
+// Coalesce parallel boot/AI-setting reads without an unbounded key map.
+const storedCache = new AsyncTtlCache<string, string | null>(CONFIG_CACHE_TTL_MS, 256);
 
 /**
  * The value saved in app_config, or null when the key was never saved.
@@ -131,30 +127,22 @@ function fresh<T extends { at: number }>(entry: T | undefined): entry is T {
  * selection) instead of being masked by CONFIG_DEFAULTS.
  */
 export async function getStoredConfig(key: string): Promise<string | null> {
-  const hit = storedCache.get(key);
-  if (fresh(hit)) return hit.value;
-  const [row] = await db.select().from(appConfig).where(eq(appConfig.key, key));
-  const value = row?.value ?? null;
-  storedCache.set(key, { value, at: Date.now() });
-  return value;
+  return storedCache.getOrCreate(key, async () => {
+    const [row] = await db.select().from(appConfig).where(eq(appConfig.key, key));
+    return row?.value ?? null;
+  });
 }
 
 /** Remove a saved value (falls back to defaults/env again). */
 export async function deleteConfig(key: string): Promise<void> {
   await db.delete(appConfig).where(eq(appConfig.key, key));
-  cache.delete(key);
-  storedCache.delete(key);
+  storedCache.invalidate(key);
 }
 
 /** Get a config value (cached per process for CONFIG_CACHE_TTL_MS). */
 export async function getConfig(key: string): Promise<string> {
-  const hit = cache.get(key);
-  if (fresh(hit)) return hit.value ?? "";
   try {
-    const [row] = await db.select().from(appConfig).where(eq(appConfig.key, key));
-    const value = row?.value ?? CONFIG_DEFAULTS[key] ?? "";
-    cache.set(key, { value, at: Date.now() });
-    return value;
+    return (await getStoredConfig(key)) ?? CONFIG_DEFAULTS[key] ?? "";
   } catch {
     // DB unavailable — fall back to defaults so the app still works.
     return CONFIG_DEFAULTS[key] ?? "";
@@ -169,23 +157,12 @@ export async function getConfigNumber(key: string, fallback: number): Promise<nu
 
 /** Set a config value (admin only — caller must verify isAdmin). */
 export async function setConfig(key: string, value: string, description?: string) {
-  const [existing] = await db.select().from(appConfig).where(eq(appConfig.key, key));
-  if (existing) {
-    await db
-      .update(appConfig)
-      .set({ value, description: description ?? existing.description, updatedAt: new Date() })
-      .where(eq(appConfig.key, key));
-  } else {
-    await db.insert(appConfig).values({
-      key,
-      value,
-      // NOTE: the old expression here had broken operator precedence
-      // (`a ?? b ? c : d`), so a provided description was silently dropped.
-      description: description ?? undefined,
-    });
-  }
-  cache.set(key, { value, at: Date.now() });
-  storedCache.set(key, { value, at: Date.now() });
+  // A SELECT-then-INSERT races on simultaneous first writes (unique key 23505).
+  await db.insert(appConfig).values({ key, value, description: description ?? undefined })
+    .onConflictDoUpdate({ target: appConfig.key, set: {
+      value, description: description ?? sql`${appConfig.description}`, updatedAt: new Date(),
+    } });
+  storedCache.invalidate(key);
   return getConfig(key);
 }
 
@@ -202,11 +179,6 @@ export async function getAllConfig(): Promise<{ key: string; value: string; desc
 
 /** Invalidate the cache after a direct DB change. */
 export function invalidateConfigCache(key?: string) {
-  if (key) {
-    cache.delete(key);
-    storedCache.delete(key);
-  } else {
-    cache.clear();
-    storedCache.clear();
-  }
+  if (key !== undefined) storedCache.invalidate(key);
+  else storedCache.clear();
 }

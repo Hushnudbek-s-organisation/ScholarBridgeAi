@@ -1,0 +1,58 @@
+{
+  "capturedAt": "2026-11-04T17:52:21.929Z",
+  "functionalBrowser": {
+    "command": "E2E_NEXT_MODE=start npm run test:e2e -- e2e/phase12.spec.ts e2e/site-audit.spec.ts e2e/first-paint.spec.ts",
+    "stats": {
+      "startTime": "2026-11-04T17:47:19.811Z",
+      "duration": 220929.349,
+      "expected": 14,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "tests": [
+      "✓   1 e2e/first-paint.spec.ts:3:5 › landing hero and primary actions paint even before JavaScript runs (2.4s)",
+      "✓   2 e2e/first-paint.spec.ts:15:5 › campus photos are deferred, then load when their cards approach the viewport (2.5s)",
+      "✓   3 e2e/phase12.spec.ts:39:5 › public university catalogue searches and filters real seeded records (14.6s)",
+      "✓   4 e2e/phase12.spec.ts:74:5 › authenticated dashboard and saved scholarship/deadline state are profile-scoped (8.1s)",
+      "✓   5 e2e/phase12.spec.ts:97:5 › document vault renders only the signed-in profile's documents (14.3s)",
+      "✓   6 e2e/site-audit.spec.ts:25:7 › public routes, mobile overflow and recovery states (en) (11.8s)",
+      "✓   7 e2e/site-audit.spec.ts:25:7 › public routes, mobile overflow and recovery states (uz) (4.6s)",
+      "✓   8 e2e/site-audit.spec.ts:25:7 › public routes, mobile overflow and recovery states (ru) (5.5s)",
+      "✓   9 e2e/site-audit.spec.ts:52:7 › all student destinations and pane buttons (1440px) (46.5s)",
+      "✓  10 e2e/site-audit.spec.ts:52:7 › all student destinations and pane buttons (390px) (29.0s)",
+      "✓  11 e2e/site-audit.spec.ts:99:5 › public language/theme controls and missing reset link are usable (4.6s)",
+      "✓  12 e2e/site-audit.spec.ts:114:5 › all admin sections render and account support is readable (14.5s)",
+      "✓  13 e2e/site-audit.spec.ts:138:5 › mobile account utility buttons and logout work (34.2s)",
+      "✓  14 e2e/site-audit.spec.ts:164:5 › rapid destination changes cannot be undone by an exiting hub's pane callback (13.1s)"
+    ]
+  },
+  "otherChecks": {
+    "npm run build": "PASS (production, disposable/dummy DB configuration)",
+    "npm run typecheck": "PASS",
+    "npm run lint:baseline": "PASS: zero issues",
+    "npm run test:perf": "PASS: 15 guards, landing 1261 KiB; shared shell 1025 KiB",
+    "npm run test:idle-scheduling": "PASS: 10 assertions",
+    "npm run test:responsive": "PASS: 70 source checks, not browser screenshots",
+    "npm run test:dark": "PASS: 358 rules, 89 tokens, no unreadable pairs",
+    "npm run audit:ui": "PASS",
+    "npm run test:audit-safety": "PASS: 27 source assertions"
+  },
+  "note": "Performance timing evidence is recorded separately; no production deployment, paid calls or production DB mutation.",
+  "browserPerformance": {
+    "command": "npm run test:browser-perf",
+    "stats": {
+      "startTime": "2026-11-04T17:51:01.449Z",
+      "duration": 232835.941,
+      "expected": 2,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "profiles": [
+      "desktop",
+      "mobile"
+    ],
+    "samplesPerProfile": 3
+  }
+}

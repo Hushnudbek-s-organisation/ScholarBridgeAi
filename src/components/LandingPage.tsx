@@ -430,6 +430,15 @@ const scrollEngine = (() => {
     if (!raf) raf = requestAnimationFrame(step);
     return () => {
       subs.delete(fn);
+      if (subs.size === 0) {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        window.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onResize);
+        resizeObserver?.disconnect();
+        resizeObserver = null;
+        bound = false;
+      }
     };
   };
   return {
@@ -1205,7 +1214,8 @@ export function LandingPage({
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(68%_55%_at_78%_14%,rgba(99,102,241,0.12),transparent_62%),radial-gradient(52%_42%_at_14%_82%,rgba(124,58,237,0.10),transparent_58%)] dark:bg-[radial-gradient(68%_55%_at_78%_14%,rgba(99,102,241,0.18),transparent_62%),radial-gradient(52%_42%_at_14%_82%,rgba(124,58,237,0.14),transparent_58%)]"
           />
           <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:pr-14 xl:pr-40 2xl:pr-28 md:gap-10 lg:grid-cols-[0.96fr_1.04fr] lg:gap-8">
-            <motion.div initial="hidden" animate="visible" variants={heroGroup} className="min-w-0">
+            {/* Above-the-fold copy must paint in SSR, not wait for JS + stagger. */}
+            <motion.div initial={false} animate="visible" variants={heroGroup} className="min-w-0">
               <div>
                 <SectionIndex n="01" label={t("secOverview")} />
               </div>
@@ -1295,11 +1305,10 @@ export function LandingPage({
               )}
             </motion.div>
 
-            {/* Layered product shot — soft glow + desktop-only parallax */}
+            {/* Layered product shot — soft glow */}
             <motion.div
-              ref={heroMockRef}
-              className="relative mx-auto w-full max-w-[700px] md:max-w-[620px] will-change-transform"
-              initial={{ opacity: 0, y: 18, scale: 0.985 }}
+              className="relative mx-auto w-full max-w-[700px] md:max-w-[620px]"
+              initial={false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{
                 duration: 0.7,
@@ -2524,7 +2533,29 @@ function UniversityCampusMarquee({ onStart, lite: liteProp }: { onStart: () => v
     return () => observer.disconnect();
   }, []);
 
-  const renderRow = (items: MarqueeUniversityItem[], animClass: string, eagerCount = 0) => (
+  React.useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const images = el.querySelectorAll<HTMLImageElement>("img[data-campus-src]");
+    const load = (image: HTMLImageElement) => {
+      const src = image.dataset.campusSrc;
+      if (src) image.src = src;
+    };
+    if (typeof IntersectionObserver === "undefined") {
+      images.forEach(load);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        load(entry.target as HTMLImageElement);
+        observer.unobserve(entry.target);
+      }
+    }, { rootMargin: "160px" });
+    images.forEach((image) => observer.observe(image));
+    return () => observer.disconnect();
+  }, []);
+
+  const renderRow = (items: MarqueeUniversityItem[], animClass: string) => (
     <div className="relative overflow-hidden">
       <div className={`sb-marquee-track ${animClass}`}>
         {[0, 1].map((copy) => (
@@ -2533,7 +2564,7 @@ function UniversityCampusMarquee({ onStart, lite: liteProp }: { onStart: () => v
             className="flex shrink-0 gap-3 px-1.5"
             aria-hidden={copy === 1 ? true : undefined}
           >
-            {items.map((university, index) => (
+            {items.map((university) => (
               <Button variant="unstyled"
                 key={university.name}
                 type="button"
@@ -2544,17 +2575,16 @@ function UniversityCampusMarquee({ onStart, lite: liteProp }: { onStart: () => v
                 <span className="relative block h-32 w-full overflow-hidden rounded-surface border border-slate-200/70 bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={campusPhotoSrc(university.url, 320)}
+                    data-campus-src={campusPhotoSrc(university.url, 320)}
                     onError={onWikimediaThumbError(university.url)}
                     crossOrigin="anonymous"
                     alt={university.landmark}
                     width={288}
                     height={128}
                     sizes="(max-width: 640px) 256px, 288px"
-                    loading={copy === 0 && index < eagerCount ? "eager" : "lazy"}
-                    {...(copy === 0 && index < eagerCount
-                      ? { fetchPriority: "high" as const }
-                      : { fetchPriority: "low" as const, decoding: "async" as const })}
+                    loading="lazy"
+                    fetchPriority="low"
+                    decoding="async"
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <span className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
@@ -2602,9 +2632,9 @@ function UniversityCampusMarquee({ onStart, lite: liteProp }: { onStart: () => v
         </h2>
       </div>
       <div className="space-y-3 overflow-hidden">
-        {renderRow(MARQUEE_ROW_1, "sb-marquee-right", 2)}
-        {renderRow(MARQUEE_ROW_2, "sb-marquee-left", 0)}
-        {!lite && renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow", 0)}
+        {renderRow(MARQUEE_ROW_1, "sb-marquee-right")}
+        {renderRow(MARQUEE_ROW_2, "sb-marquee-left")}
+        {!lite && renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
       </div>
     </section>
   );

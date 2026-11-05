@@ -774,6 +774,40 @@ await checkAsync("aiChat: explicit fallback after the primary is unavailable, la
     });
 });
 
+await checkAsync("aiChat: retries do not restart an exhausted logical deadline", async () => {
+  const realNow = Date.now;
+  let now = realNow();
+  Date.now = () => now;
+  try {
+    await withRouter({ OPENAI_API_KEY: KEYS.openai, GROQ_API_KEY: KEYS.groq, AI_PROVIDER_GENERAL: "openai", AI_PROVIDER_FALLBACK: "groq" },
+      () => ({ status: 503, body: {} }), async (calls) => {
+        const r = await aiCore.aiChat({ taskType: "general", prompt: "offline", timeoutMs: 1000 }, { maxAttempts: 3, sleep: async () => { now += 1100; } });
+        assert.equal(r.ok, false);
+        if (!r.ok) assert.equal(r.error.category, "timeout");
+        assert.equal(calls.length, 1, "no extra retry or fallback may start after expiry");
+      });
+  } finally { Date.now = realNow; }
+});
+
+await checkAsync("aiChat: explicit provider fallback shares the primary body deadline", async () => {
+  const keepAlive = setInterval(() => {}, 1000);
+  try {
+    await withRouter({ OPENAI_API_KEY: KEYS.openai, GROQ_API_KEY: KEYS.groq, AI_PROVIDER_GENERAL: "openai", AI_PROVIDER_FALLBACK: "groq" },
+      () => ({ status: 503, body: {} }), async () => {
+        let calls = 0;
+        globalThis.fetch = async () => {
+          calls++;
+          if (calls === 1) { await new Promise((resolve) => setTimeout(resolve, 650)); return Response.json({ error: "offline" }, { status: 503 }); }
+          return new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('{"pending":')); } }));
+        };
+        const started = performance.now();
+        const r = await aiCore.aiChat({ taskType: "general", prompt: "offline", timeoutMs: 1000 }, { maxAttempts: 1 });
+        assert.equal(r.ok, false); assert.equal(calls, 2);
+        assert.ok(performance.now() - started < 1500, "fallback must not receive a fresh 1-second budget");
+      });
+  } finally { clearInterval(keepAlive); }
+});
+
 await checkAsync("aiChat: NO implicit fallback — without AI_PROVIDER_FALLBACK the error is returned", async () => {
   await withRouter({ OPENAI_API_KEY: KEYS.openai, GROQ_API_KEY: KEYS.groq, AI_PROVIDER_GENERAL: "openai" },
     (c) => (c.url.includes("api.openai.com") ? { status: 500, body: {} } : okReply("should not be called")), async (calls) => {
