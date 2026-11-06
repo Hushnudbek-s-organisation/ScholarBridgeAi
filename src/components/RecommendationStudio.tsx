@@ -39,6 +39,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
@@ -498,7 +499,10 @@ export function RecommendationStudio({
             portalUrl: r.nextCycle?.applicationUrl ?? r.program.applicationUrl ?? undefined,
           }),
         });
-        if (res.ok || res.status === 201) setPlannedIds((s) => new Set(s).add(r.program.id));
+        if (res.ok || res.status === 201) {
+          notifyApplicationsChanged(activeProfile.id);
+          setPlannedIds((s) => new Set(s).add(r.program.id));
+        }
         else throw new Error(`HTTP ${res.status}`);
       } catch {
         setError({ code: "plan_failed", message: t("planError") });

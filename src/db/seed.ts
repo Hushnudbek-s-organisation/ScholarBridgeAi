@@ -399,7 +399,7 @@ async function runSeedDatabase(force = false) {
         minSat: 1280,
         acceptanceRate: 22.5,
         postStudyWorkVisaYears: 1.5,
-        description: "Top German technical university (QS World University Rankings 2027 #25). For non-EU students, TUM's current published tuition is typically €2,000–€3,000 per semester for Bachelor's and €4,000–€6,000 per semester for Master's programmes. Programme-specific fees and waivers vary; TUM lists institutional waivers and scholarships. See official TUM fee and programme pages.",
+        description: "Top German technical university (QS World University Rankings 2026 #25). For non-EU students, TUM's current published tuition is typically €2,000–€3,000 per semester for Bachelor's and €4,000–€6,000 per semester for Master's programmes. Programme-specific fees and waivers vary; TUM lists institutional waivers and scholarships. See official TUM fee and programme pages.",
         highlights: JSON.stringify(["Ultra Low Tuition Fees", "18-Month Post-Study Job Seeker Visa", "Strong Tech Ecosystem", "DAAD Eligible"]),
         universityType: "Public",
         websiteUrl: "https://www.tum.de",

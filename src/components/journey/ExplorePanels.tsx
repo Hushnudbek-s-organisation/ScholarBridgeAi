@@ -13,7 +13,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { motion, useReducedMotion } from "framer-motion";
+import { m as Motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, GraduationCap, Search } from "lucide-react";
 import { CAREER_PATHS } from "@/lib/journey/careers";
 import { CareerDiscoveryFlow } from "@/components/journey/CareerDiscoveryFlow";
@@ -463,7 +463,7 @@ export function VisaCenterPanel({
         ) : (
           <ul className="space-y-2">
             {data.requirements.map((r: any, i: number) => (
-              <motion.li
+              <Motion.li
                 key={r.id}
                 initial={reduceMotion ? false : { opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -494,7 +494,7 @@ export function VisaCenterPanel({
                 ) : (
                   <p className="mt-1 text-sm text-slate-500">{t("uiNotSpecified")}</p>
                 )}
-              </motion.li>
+              </Motion.li>
             ))}
           </ul>
         )}
@@ -684,7 +684,7 @@ export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: str
               </div>
               {phase !== "idle" && !reduceMotion && (
                 <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/70 dark:bg-slate-800">
-                  <motion.div
+                  <Motion.div
                     className={`h-full ${phase === "record" ? "bg-rose-500" : "bg-indigo-500"}`}
                     initial={false}
                     animate={{

@@ -1,5 +1,6 @@
 import { postgresId } from "@/lib/pagination";
 import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
+import { legacyEvidence } from "@/lib/factPresentation";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import {
@@ -308,6 +309,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       description: localizeUniversityDescription(uni.description, "en", qsRank),
       highlights: localizeHighlights(uni.highlights, "en", qsRank),
     } as typeof uni;
+    // §4 field-level adaptation: keep the ORIGINAL legacy numbers in an
+    // evidence envelope before the response-local copy is sanitized below.
+    // They stay visible as `legacy_unknown` (never an official minimum), so no
+    // useful data is hidden during the transition, while filters/auto-reject
+    // still see nulls.
+    const legacyFactValues = {
+      minGpa: uni.minGpa as number | null | undefined,
+      minIelts: uni.minIelts as number | null | undefined,
+      minSat: uni.minSat as number | null | undefined,
+      acceptanceRate: uni.acceptanceRate as number | null | undefined,
+    };
+    const legacyFactVerified = uni.verificationStatus === "verified";
+    const legacyFactSource = (uni as { website?: string | null }).website ?? null;
+    const legacyFactCycle = (uni as { qsRankYear?: number | null }).qsRankYear != null
+      ? String((uni as { qsRankYear?: number | null }).qsRankYear) : null;
+
     // Do not return or use unverified institutional figures as factual data.
     // This is a response-local copy; persisted catalogue/user data is untouched.
     if (uni.verificationStatus !== "verified") {
@@ -1012,6 +1029,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       scholarships: uniScholarships,
       campuses: [],
       images: [],
+      // §4: the same field-level evidence envelope as the catalog API. The UI,
+      // comparison, finance plan and Telegram text all read this one shape.
+      evidence: legacyEvidence({
+        entityVerified: legacyFactVerified,
+        sourceUrl: legacyFactSource,
+        admissionCycle: legacyFactCycle,
+        fields: legacyFactValues,
+      }),
     };
     setCachedUniversityDetailBase(uniId, basePayload, detailGeneration);
 

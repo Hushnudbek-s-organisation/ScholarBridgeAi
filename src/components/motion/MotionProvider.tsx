@@ -1,6 +1,6 @@
 "use client";
 
-import { MotionConfig } from "framer-motion";
+import { LazyMotion, MotionConfig } from "framer-motion";
 import type { ReactNode } from "react";
 import { MOTION_TOKENS } from "@/components/ui/tokens";
 
@@ -13,14 +13,23 @@ import { MOTION_TOKENS } from "@/components/ui/tokens";
  * "reduce motion". Individual components additionally check `useReducedMotion()`
  * when they animate something that isn't a transform/opacity — e.g. the
  * counting numbers, which have no CSS equivalent to fall back on.
+ *
+ * `LazyMotion` keeps the 1.3 MB landing JS budget honest: components use the
+ * lightweight `m` proxy and the feature bundle is fetched on demand. `strict`
+ * makes any accidental `motion.*` import fail loudly instead of silently
+ * pulling the full bundle back into the first load.
  */
+const loadFeatures = () => import("./features").then((module) => module.default);
+
 export function MotionProvider({ children }: { children: ReactNode }) {
   return (
-    <MotionConfig
-      reducedMotion="user"
-      transition={{ duration: MOTION_TOKENS.duration.page, ease: MOTION_TOKENS.ease.out }}
-    >
-      {children}
-    </MotionConfig>
+    <LazyMotion features={loadFeatures} strict>
+      <MotionConfig
+        reducedMotion="user"
+        transition={{ duration: MOTION_TOKENS.duration.page, ease: MOTION_TOKENS.ease.out }}
+      >
+        {children}
+      </MotionConfig>
+    </LazyMotion>
   );
 }

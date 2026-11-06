@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Check, Flame, Info } from "lucide-react";
 import { AnimatedBar } from "@/components/motion";
 import { Confetti } from "@/components/ui/Confetti";
+import { Button } from "@/components/ui/Button";
 
 export interface StreakView {
   current: number;
@@ -88,7 +89,8 @@ export function DailyStreakCard({
   // alive.
   const streakLapsed = !activeToday && current === 0;
   const statusPill = (
-    <button
+    <Button
+      variant="unstyled"
       type="button"
       onClick={() => setShowInfo((v) => !v)}
       aria-expanded={showInfo}
@@ -105,7 +107,7 @@ export function DailyStreakCard({
           ? t("streakStartToday")
           : t("streakContinueToday")}
       <Info className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
-    </button>
+    </Button>
   );
 
   const week = (size: "sm" | "md") => (

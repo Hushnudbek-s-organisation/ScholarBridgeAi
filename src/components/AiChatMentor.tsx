@@ -15,7 +15,7 @@ import {
   Award
 } from "lucide-react";
 import { AiFormattedText } from "./AiFormattedText";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import { AppNote } from "@/components/AppNote";
 import { Button } from "@/components/ui/Button";
 
@@ -146,7 +146,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
       <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-slate-800/50">
         <AnimatePresence initial={false}>
         {messages.map((m) => (
-          <motion.div
+          <Motion.div
             key={m.id}
             layout="position"
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -180,12 +180,12 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
               )}
               {m.sender === "ai" && !m.error ? <AiFormattedText text={m.text} /> : m.text}
             </div>
-          </motion.div>
+          </Motion.div>
         ))}
         </AnimatePresence>
 
         {loading && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="flex gap-3 items-center text-xs text-slate-500"
@@ -195,7 +195,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
             <Bot className="h-5 w-5 text-indigo-600" />
             <span className="inline-flex gap-1" aria-label={t("chatTypingAria")}>
               {[0, 1, 2].map((i) => (
-                <motion.span
+                <Motion.span
                   key={i}
                   className="h-1.5 w-1.5 rounded-full bg-indigo-500"
                   animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
@@ -203,7 +203,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
                 />
               ))}
             </span>
-          </motion.div>
+          </Motion.div>
         )}
       </div>
 

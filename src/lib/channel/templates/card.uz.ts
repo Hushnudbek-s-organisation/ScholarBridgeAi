@@ -124,7 +124,10 @@ export function languageLabel(facts: Facts, content: ScholarshipContent | null):
   if (content?.languageReqUz) return esc(content.languageReqUz);
   const translated = translateEnglishRequirement(facts.englishRequirementRaw);
   if (translated) return esc(translated);
-  if (facts.minIelts !== null) return `IELTS ${facts.minIelts}+`;
+  // §4: a legacy IELTS column is not a verified official minimum. Print the
+  // honest evidence line ("tasdiqlanmagan qiymat, rasmiy minimum emas") rather
+  // than an asserted "IELTS 7+" floor.
+  if (facts.minIeltsEvidenceLine) return facts.minIeltsEvidenceLine;
   return null;
 }
 
@@ -140,7 +143,8 @@ export function eligibilityBullets(facts: Facts, content: ScholarshipContent | n
   const out: string[] = [];
   if (facts.degrees) out.push(cap(facts.degrees));
   if (facts.majors) out.push(cap(facts.majors));
-  if (facts.minGpa !== null) out.push(`GPA ${facts.minGpa}+`);
+  // §4: no unverified GPA floor. The number is kept with its trust label.
+  if (facts.minGpaEvidenceLine) out.push(facts.minGpaEvidenceLine);
   if (facts.eligibility === "uz_eligible") out.push("🇺🇿 O'zbekistonliklar uchun ochiq");
   /**
    * The English `requirements` prose, read for the facts it states and written
@@ -184,8 +188,9 @@ export function benefitBullets(facts: Facts, content: ScholarshipContent | null)
   if (specific) out.push(coverage as string);
   else if (facts.fullyFunded) out.push("To'liq moliyalashtirish");
   else if (coverage) out.push(coverage);
-  const living = facts.livingAllowance !== null ? moneyUsd(facts.livingAllowance) : null;
-  if (living) out.push(`Yashash uchun to'lov: ${living}`);
+  // §4: an allowance without a recorded period/source must not be printed as
+  // a bare guaranteed amount. Prefer the field-level evidence line.
+  if (facts.livingAllowanceEvidenceLine) out.push(facts.livingAllowanceEvidenceLine);
   const travel = facts.travelAllowance !== null ? moneyUsd(facts.travelAllowance) : null;
   if (travel) out.push(`Yo'l xarajatlari: ${travel}`);
   return out;

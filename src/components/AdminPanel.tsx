@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
-import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass, Menu, LayoutDashboard, MessageSquareQuote, Map as MapIcon, Target, Archive, Plane, Search, Send, Crown, Megaphone, Users } from "lucide-react";
+import { ShieldCheck, Building2, Video, Award, Gift, History, Settings2, RefreshCw, BadgeCheck, Headset, Bot, BarChart3, Flag, KeyRound, Compass, Menu, LayoutDashboard, MessageSquareQuote, Map as MapIcon, Target, Archive, Plane, Search, Send, Crown, Megaphone, Users, ClipboardList } from "lucide-react";
 import { StudentProfile } from "./Navbar";
 import { UniversitiesManager } from "./admin/UniversitiesManager";
 import { CoursesManager } from "./admin/CoursesManager";
@@ -16,6 +16,7 @@ import { AiSettingsManager } from "./admin/AiSettingsManager";
 import { AiCostPanel, PremiumPricePanel } from "./admin/AiCostPanel";
 import { OwnershipManager } from "./admin/OwnershipManager";
 import { RefreshCenter } from "./admin/RefreshCenter";
+import { ReviewQueue } from "./admin/ReviewQueue";
 import { VerificationManager } from "./admin/VerificationManager";
 import { ConsultingManager } from "./admin/ConsultingManager";
 import { AnalyticsDashboard } from "./admin/AnalyticsDashboard";
@@ -86,7 +87,8 @@ type AdminTab =
   | "telegram"
   | "channel"
   | "accounts"
-  | "ownership";
+  | "ownership"
+  | "reviewQueue";
 
 type AdminGroup = "home" | "content" | "community" | "growth" | "money" | "system";
 
@@ -100,6 +102,7 @@ const SECTIONS: { id: AdminTab; group: AdminGroup; icon: React.ComponentType<{ c
   { id: "verify", group: "content", icon: BadgeCheck },
   { id: "research", group: "content", icon: Bot },
   { id: "refresh", group: "content", icon: RefreshCw },
+  { id: "reviewQueue", group: "content", icon: ClipboardList, isNew: true },
   { id: "stories", group: "community", icon: MessageSquareQuote, isNew: true },
   { id: "reports", group: "community", icon: Flag },
   { id: "consulting", group: "community", icon: Headset },
@@ -236,6 +239,8 @@ export function AdminPanel({ activeProfile, onOpenProfileEditor }: AdminPanelPro
         return <AuditLogViewer adminProfileId={id} />;
       case "refresh":
         return <RefreshCenter adminProfileId={id} />;
+      case "reviewQueue":
+        return <ReviewQueue />;
       case "navigation":
         return <NavManager adminProfileId={id} />;
       case "config":

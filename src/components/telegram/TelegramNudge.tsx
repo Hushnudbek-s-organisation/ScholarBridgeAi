@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import { Send, X } from "lucide-react";
 import {
   localDayKey,
@@ -89,7 +89,7 @@ export function TelegramNudge({
   return (
     <AnimatePresence>
       {show && (
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, height: 0 }}
@@ -126,7 +126,7 @@ export function TelegramNudge({
               <X className="h-4 w-4" aria-hidden />
             </Button>
           </div>
-        </motion.div>
+        </Motion.div>
       )}
     </AnimatePresence>
   );

@@ -65,8 +65,14 @@ for (const profile of ["desktop", "mobile"] as const) {
           analyticsStartMs: resources.find((r) => r.name.includes("/api/track"))?.startTime ?? null };
       });
       const beforeClick = await page.evaluate(() => performance.now());
-      await page.getByRole("button", { name: /switch to dark mode/i }).click();
-      await expect(page.locator("html")).toHaveClass(/dark/);
+      // Playwright's default OS colour preference is not stable across hosts.
+      // Accept either accessible label and assert a REAL toggle, rather than
+      // hardcoding that the very first state must be light.
+      const themeSwitch = page.getByRole("banner").getByRole("button", { name: /switch to (?:dark|light) mode/i });
+      const darkBefore = await page.locator("html").evaluate((root) => root.classList.contains("dark"));
+      await themeSwitch.click();
+      const darkAfter = await page.locator("html").evaluate((root) => root.classList.contains("dark"));
+      expect(darkAfter).toBe(!darkBefore);
       await twoFrames(page);
       const themeClickMs = await page.evaluate(() => performance.now()) - beforeClick;
       if (profile === "mobile") await page.getByRole("button", { name: en.landing.navAria, exact: true }).click();
@@ -85,9 +91,16 @@ for (const profile of ["desktop", "mobile"] as const) {
       const transitions = [];
       for (const target of ["universities/search", "scholarships/browse", "universities/search"]) {
         const start = await page.evaluate((hash) => { const now = performance.now(); location.hash = hash; return now; }, `#${target}`);
-        const panel = page.locator(`#hub-panel-${target.split("/")[1]}`);
-        await expect(panel).toBeVisible();
-        await expect(panel.locator("input").first()).toBeVisible();
+        const pane = target.split("/")[1];
+        // A hash change is asynchronous (hashchange -> React state -> panel
+        // mount). Assert the tab selection first, then the panel, with a
+        // benchmark-appropriate timeout instead of the 12s default: a cold
+        // browser cache with CDP cache disabled can legitimately take longer.
+        await expect(page.locator(`#hub-tab-${pane}`))
+          .toHaveAttribute("aria-selected", "true", { timeout: 20_000 });
+        const panel = page.locator(`#hub-panel-${pane}`);
+        await expect(panel).toBeVisible({ timeout: 20_000 });
+        await expect(panel.locator("input").first()).toBeVisible({ timeout: 20_000 });
         await twoFrames(page);
         transitions.push({ target, readyMs: await page.evaluate(() => performance.now()) - start });
       }

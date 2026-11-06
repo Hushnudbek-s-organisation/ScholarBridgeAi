@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { motion } from "framer-motion";
+import { m as Motion } from "framer-motion";
 import { AlertTriangle, BellRing, CheckCircle2, KeyRound, Loader2, Send, ShieldAlert, Unlink, Zap } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
 import { api, EmptyState, ErrorNote, LoadingBlock, PageHeader, Toast, useToast } from "@/components/ui/growth";
@@ -199,7 +199,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
                     <Unlink className="h-3.5 w-3.5" /> {t("disconnect")}
                   </Button>
                 ) : (
-                  <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex w-full flex-wrap items-center gap-2 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2">
+                  <Motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex w-full flex-wrap items-center gap-2 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2">
                     <span className="flex-1 text-xs font-semibold text-rose-700">{placeholderEmail ? t("disconnectWarnTelegramOnly") : t("disconnectConfirm")}</span>
                     <Button variant="unstyled" onClick={unlink} disabled={busy === "unlink"} className="rounded-control bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-60">
                       {busy === "unlink" ? <Loader2 className="h-3 w-3 animate-spin" /> : t("disconnectYes")}
@@ -207,7 +207,7 @@ export function TelegramSettings({ activeProfile, onNavigate }: { activeProfile:
                     <Button variant="unstyled" onClick={() => setConfirmUnlink(false)} className="rounded-control bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">
                       {t("cancel")}
                     </Button>
-                  </motion.div>
+                  </Motion.div>
                 )}
               </div>
 

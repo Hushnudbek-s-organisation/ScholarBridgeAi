@@ -16,6 +16,7 @@ import {
   MapPin,
   Wallet,
 } from "lucide-react";
+import { parseEligibilityScope } from "@/lib/eligibilityScope";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
@@ -157,12 +158,28 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   const englishRequirement = localizeProse(s.englishRequirements, locale, localizeEnglishRequirement);
 
   const degrees = listValues(s.degreeLevels).map((v) => localizeDegreeLevel(v, locale));
-  const majors = listValues(s.eligibleMajors).map((v) =>
-    /^all( majors| fields)?$/i.test(v.trim()) ? t.allMajors : localizeMajorOrField(v, locale)
-  );
-  const countries = listValues(s.eligibleCountries).map((v) =>
-    /^(all|any)$/i.test(v.trim()) ? t.allCountries : localizeCountry(v, locale)
-  );
+  // Internal tokens (`[]`, `["*"]`, `["__not_applicable__"]`) are NEVER shown
+  // raw. The canonical parser turns each into a translated, honest label.
+  const scope = copy.eligibility?.scope;
+  const scopeValue = (raw: string | null | undefined, values: string[]) => {
+    const p = parseEligibilityScope(raw);
+    if (p.scope === "restricted") return values.join(", ");
+    if (p.scope === "unknown") return t.notPublished;
+    if (p.scope === "not_applicable") return scope?.not_applicable ?? t.notPublished;
+    return (p.evidence === "legacy" ? scope?.unrestricted_legacy : scope?.unrestricted) ?? t.notPublished;
+  };
+  const degreesParsed = parseEligibilityScope(s.degreeLevels);
+  const majors = degreesParsed.scope === "restricted"
+    ? listValues(s.eligibleMajors).map((v) =>
+        /^all( majors| fields)?$/i.test(v.trim()) ? t.allMajors : localizeMajorOrField(v, locale))
+    : listValues(s.eligibleMajors)
+        .filter((v) => v !== "*" && v !== "__not_applicable__")
+        .map((v) => localizeMajorOrField(v, locale));
+  const countries = listValues(s.eligibleCountries)
+    .filter((v) => v !== "*" && v !== "__not_applicable__")
+    .map((v) => /^(all|any)$/i.test(v.trim()) ? t.allCountries : localizeCountry(v, locale));
+  const majorsLabel = scopeValue(s.eligibleMajors, majors);
+  const countriesLabel = scopeValue(s.eligibleCountries, countries);
   const documents = listValues(s.requiredDocuments);
   const rounds = listValues(s.rounds);
 
@@ -327,8 +344,8 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
               />
               <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t border-slate-100 pt-3 text-xs sm:grid-cols-2">
                 <Fact label={t.level} value={degrees.length ? degrees.join(", ") : t.notPublished} />
-                <Fact label={t.eligibleMajors} value={majors.length ? majors.join(", ") : t.notPublished} />
-                <Fact label={t.eligibleCountries} value={countries.length ? countries.join(", ") : t.notPublished} />
+                <Fact label={t.eligibleMajors} value={majorsLabel} />
+                <Fact label={t.eligibleCountries} value={countriesLabel} />
                 <Fact label={t.minGpa} value={s.minGpa != null ? String(s.minGpa) : t.notPublished} />
                 <Fact label={t.minIelts} value={s.minIelts != null ? String(s.minIelts) : t.notPublished} />
               </dl>

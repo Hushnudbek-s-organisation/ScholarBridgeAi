@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import {
   Activity,
   Award,
@@ -633,7 +633,7 @@ export function Navbar({
         className={`relative flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-control px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${stateCls}`}
       >
         {isActive && (
-          <motion.span layoutId={layoutId} className={`absolute inset-0 rounded-control shadow-xs ${activeBg}`} transition={LAYOUT_SPRING} />
+          <Motion.span layoutId={layoutId} className={`absolute inset-0 rounded-control shadow-xs ${activeBg}`} transition={LAYOUT_SPRING} />
         )}
         <Icon className={`relative h-4 w-4 shrink-0 ${isActive ? "" : item.premium ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`} />
         <span className="relative min-w-0 flex-1 break-words whitespace-normal">{item.label}</span>
@@ -893,7 +893,7 @@ export function Navbar({
                 }`}
               >
                 {isActive && (
-                  <motion.span
+                  <Motion.span
                     layoutId="nav-active-tablet"
                     className="absolute inset-0 rounded-surface bg-indigo-50 dark:bg-indigo-500/10"
                     transition={LAYOUT_SPRING}
@@ -975,7 +975,7 @@ export function Navbar({
                 }`}
               >
                 {isActive && (
-                  <motion.span
+                  <Motion.span
                     layoutId="nav-active-bottom"
                     className="absolute top-0 h-0.5 w-10 rounded-full bg-indigo-600"
                     transition={LAYOUT_SPRING}
@@ -1003,14 +1003,14 @@ export function Navbar({
       {/* ================= PHONE / TABLET: SLIDE-IN MENU ================= */}
       <AnimatePresence>
         {drawerOpen && (
-          <motion.div
+          <Motion.div
             className="fixed inset-0 z-[60] lg:hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px]" onClick={() => setDrawerOpen(false)} />
-            <motion.aside
+            <Motion.aside
               ref={drawerRef}
               className="absolute inset-y-0 left-0 flex w-[88vw] max-w-sm flex-col bg-white shadow-2xl dark:bg-slate-900"
               initial={{ x: "-100%" }}
@@ -1040,8 +1040,8 @@ export function Navbar({
                 {renderUtility("nav-active-drawer")}
               </nav>
               <div className="border-t border-slate-100 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-slate-800">{SettingsRow}</div>
-            </motion.aside>
-          </motion.div>
+            </Motion.aside>
+          </Motion.div>
         )}
       </AnimatePresence>
 

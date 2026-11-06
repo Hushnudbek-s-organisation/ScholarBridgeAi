@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { auditRowChanges, writeAudit } from "@/lib/audit";
 import { notifyScholarshipDeadlineChanged, notifyScholarshipOpened } from "@/lib/notificationSweep";
 import { invalidateCatalogCache } from "@/lib/catalogCache";
+import { normalizeEligibilityScopeInput } from "@/lib/eligibilityScope";
 
 function toBool(value: any): boolean {
   return value === true || value === "true";
@@ -15,6 +16,13 @@ function toBool(value: any): boolean {
 function toJsonField(value: any, fallback: string): string {
   if (value == null || value === "") return fallback;
   return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+/** Eligibility arrays are scopes: [] = unknown, ["*"] = explicit unrestricted. */
+function toScopeField(value: any): string {
+  return normalizeEligibilityScopeInput(
+    value == null || value === "" ? "[]" : typeof value === "string" ? value : JSON.stringify(value)
+  );
 }
 
 function validateScholarshipInput(s: any): string | null {
@@ -59,8 +67,8 @@ function buildScholarshipValues(s: any) {
     awardBasis: s.awardBasis || null,
     deadline: s.deadline || null,
     universityId: s.universityId == null || s.universityId === "" ? null : Number(s.universityId),
-    degreeLevels: toJsonField(s.degreeLevels, "[]"),
-    eligibleMajors: toJsonField(s.eligibleMajors, "[]"),
+    degreeLevels: toScopeField(s.degreeLevels),
+    eligibleMajors: toScopeField(s.eligibleMajors),
     minGpa: s.minGpa === "" || s.minGpa == null ? null : Number(s.minGpa),
     minIelts: s.minIelts === "" || s.minIelts == null ? null : Number(s.minIelts),
     financialNeedBased: s.financialNeedBased == null ? null : toBool(s.financialNeedBased),
@@ -69,7 +77,7 @@ function buildScholarshipValues(s: any) {
     requirements: s.requirements || "",
     websiteUrl: s.websiteUrl || s.sourceUrl || "",
     // --- Dynamic lifecycle (spec §4) ---
-    eligibleCountries: toJsonField(s.eligibleCountries, "[]"),
+    eligibleCountries: toScopeField(s.eligibleCountries),
     fundingType: s.fundingType || "",
     tuitionCoverage: s.tuitionCoverage || "",
     livingAllowance: s.livingAllowance === "" || s.livingAllowance == null ? null : Number(s.livingAllowance),

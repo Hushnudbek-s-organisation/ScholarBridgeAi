@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { fadeUp, MOTION_TOKENS } from "./variants";
 
@@ -23,7 +23,7 @@ export function PageTransition({
   distance?: number;
 }) {
   return (
-    <motion.div
+    <Motion.div
       key={transitionKey}
       initial={{ opacity: 0, y: distance }}
       animate={{ opacity: 1, y: 0 }}
@@ -31,7 +31,7 @@ export function PageTransition({
       className={className}
     >
       {children}
-    </motion.div>
+    </Motion.div>
   );
 }
 
@@ -50,7 +50,7 @@ export function SectionTransition({
 }) {
   return (
     <AnimatePresence mode="wait" initial={false}>
-      <motion.div
+      <Motion.div
         key={transitionKey}
         variants={fadeUp}
         initial="hidden"
@@ -59,7 +59,7 @@ export function SectionTransition({
         className={className}
       >
         {children}
-      </motion.div>
+      </Motion.div>
     </AnimatePresence>
   );
 }

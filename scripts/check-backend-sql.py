@@ -18,7 +18,14 @@ results = []
 for root in ("supabase", "archive/supabase"):
     for path in sorted(Path(root).rglob("*.sql")):
         data = path.read_bytes()
-        result = {"path": str(path), "sha256": hashlib.sha256(data).hexdigest(), "archived": root.startswith("archive/"), "ok": True}
+        # role is explicit: recovery/rollback files are PARSED for grammar like
+        # everything else, but are NEVER applied by this tool. A grammar parse
+        # is not a migration run.
+        role = "grammar_only"
+        if "rollback" in path.name or "recovery" in path.name:
+            role = "recovery_grammar_only"
+        result = {"path": str(path), "sha256": hashlib.sha256(data).hexdigest(),
+                  "archived": root.startswith("archive/"), "role": role, "ok": True}
         try:
             result["statements"] = len(parse_sql(data.decode("utf8")))
         except Exception as error:

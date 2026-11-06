@@ -10,7 +10,26 @@
  * `scripts/check-documents.ts`.
  */
 
-export type DocStatus = "missing" | "uploaded" | "not_required";
+export type DocStatus =
+  | "missing"
+  | "uploaded"
+  | "not_required"
+  | "expired"
+  | "rejected"
+  | "needs_review";
+
+/**
+ * Whether the checklist came from an official, verified requirement list.
+ * `loading` / `error` are needed because a not-yet-loaded list is NOT the same
+ * state as "this programme requires nothing".
+ */
+export type DocumentRequirementsState = "confirmed" | "unknown" | "loading" | "error";
+export type ReadinessReason =
+  | "requirements_loading"
+  | "requirements_error"
+  | "requirements_unknown"
+  | "requirements_not_determined"
+  | null;
 
 export interface DocumentRow {
   id: number;
@@ -72,8 +91,11 @@ export interface DocumentIssue {
 
 export interface DocumentCheckResult {
   issues: DocumentIssue[];
-  /** 0–100 across required documents only. */
-  readiness: number;
+  /** 0–100 ONLY when the official requirement list is known and non-empty. */
+  readiness: number | null;
+  requirementsState: DocumentRequirementsState;
+  /** Stable code the UI translates, so an unknown is never rendered as 100%. */
+  readinessReason: ReadinessReason;
   requiredTotal: number;
   requiredUploaded: number;
   blockers: number;
@@ -87,6 +109,8 @@ export interface DocumentCheckOptions {
   intakeDate?: Date | null;
   /** Some portals cap upload size. Default 10 MB. */
   maxFileSizeBytes?: number;
+  /** Default `unknown`: an empty or unverified list is not a confirmed "none". */
+  requirementsState?: DocumentRequirementsState;
 }
 
 // --- Rule tables -----------------------------------------------------------
@@ -140,7 +164,19 @@ export function checkDocument(doc: DocumentRow, opts: DocumentCheckOptions): Doc
   const push = (severity: Severity, code: string, message: string) =>
     issues.push({ documentId: doc.id, severity, code, message });
 
-  // --- 1. Missing required documents are blockers -------------------------
+  // --- 1. Non-ready statuses are blockers, not "uploaded" -----------------
+  // An expired, rejected or review-pending file is NOT ready even though a
+  // file exists. The old model only had missing/uploaded/not_required, so a
+  // rejected upload silently counted as done.
+  const NOT_READY: Record<string, string> = {
+    expired: "expired_status",
+    rejected: "rejected_status",
+    needs_review: "needs_review_status",
+  };
+  if (doc.isRequired && NOT_READY[doc.status]) {
+    push("blocker", NOT_READY[doc.status], `${doc.label} is marked ${doc.status.replace(/_/g, " ")} and is not ready to submit.`);
+    return issues;
+  }
   if (doc.isRequired && doc.status === "missing") {
     push("blocker", "missing_required", `${doc.label} is required and has not been uploaded yet.`);
     return issues; // nothing else to say about a document that is not there
@@ -245,14 +281,29 @@ export function checkDocuments(docs: DocumentRow[], opts: DocumentCheckOptions):
   const warnings = issues.filter((i) => i.severity === "warning").length;
 
   // Readiness: uploaded share of required documents, minus blockers. A file
-  // that is uploaded but expired does not count as ready.
+  // that is uploaded but expired / rejected / needs review does not count.
+  // CRITICAL: a percentage is only meaningful when the OFFICIAL requirement
+  // list is known. An empty checklist means "requirements not determined", not
+  // "nothing is required"; unverified generic notes are preparation ideas,
+  // never official requirements.
   const blockedIds = new Set(issues.filter((i) => i.severity === "blocker").map((i) => i.documentId));
   const genuinelyReady = requiredUploaded.filter((d) => !blockedIds.has(d.id)).length;
-  const readiness = required.length === 0 ? 100 : Math.round((genuinelyReady / required.length) * 100);
+  const requirementsState = opts.requirementsState ?? "unknown";
+  const readinessReason: ReadinessReason =
+    requirementsState === "loading" ? "requirements_loading"
+    : requirementsState === "error" ? "requirements_error"
+    : requirementsState === "unknown" ? "requirements_unknown"
+    : required.length === 0 ? "requirements_not_determined"
+    : null;
+  const readiness = readinessReason === null
+    ? Math.round((genuinelyReady / required.length) * 100)
+    : null;
 
   return {
     issues,
     readiness,
+    requirementsState,
+    readinessReason,
     requiredTotal: required.length,
     requiredUploaded: requiredUploaded.length,
     blockers,

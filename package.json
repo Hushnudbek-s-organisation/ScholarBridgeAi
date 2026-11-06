@@ -26,7 +26,7 @@
     "test:ai-cost": "tsx scripts/check-ai-cost.ts",
     "test:stage3-performance": "tsx scripts/check-stage3-performance.ts",
     "test:groq": "tsx scripts/check-groq.ts",
-    "db:push": "drizzle-kit push  # manual only \u2014 app never runs this automatically",
+    "db:push": "drizzle-kit push  # manual only — app never runs this automatically",
     "test:schema": "tsx scripts/check-supabase-schema.ts",
     "db:verify": "tsx scripts/check-supabase-schema.ts --live",
     "db:gen:full-schema": "tsx scripts/gen-full-schema-sql.ts",
@@ -138,7 +138,41 @@
     "test:idle-scheduling": "tsx scripts/check-idle-scheduling.ts",
     "test:backend-resilience": "tsx scripts/check-backend-resilience.ts",
     "test:backend-audit": "tsx scripts/run-backend-audit.ts",
-    "test:backend-second-pass": "tsx scripts/check-backend-second-pass.ts"
+    "test:backend-second-pass": "tsx scripts/check-backend-second-pass.ts",
+    "test:chunk-recovery": "tsx scripts/check-chunk-recovery.ts",
+    "test:university-sort": "tsx scripts/check-university-sort.ts",
+    "test:budget-fit": "tsx scripts/check-budget-fit.ts",
+    "test:applications-state": "tsx scripts/check-applications-state.ts",
+    "test:documents-readiness": "tsx scripts/check-documents-readiness.ts",
+    "test:profile-recompute": "tsx scripts/check-profile-recompute.ts",
+    "prebuild": "npm run typecheck",
+    "test:landing-copy": "tsx scripts/check-landing-copy.tsx",
+    "test:source-recheck": "tsx scripts/check-source-recheck.ts",
+    "test:migration-dry-run": "tsx scripts/check-migration-dry-run.ts",
+    "test:evidence-policy": "tsx scripts/check-evidence-policy.ts",
+    "test:refresh-modes": "tsx scripts/check-refresh-modes.ts",
+    "test:research-durable": "tsx scripts/check-research-durable.ts",
+    "test:rendered-copy": "tsx scripts/check-rendered-copy.ts",
+    "test:internal-surfaces": "tsx scripts/check-internal-surfaces.ts",
+    "test:research-worker": "tsx scripts/check-research-worker.ts",
+    "test:official-source-adapter": "tsx scripts/check-official-source-adapter.ts",
+    "test:cache-revision": "tsx scripts/check-cache-revision.ts",
+    "test:finance-unified": "tsx scripts/check-finance-unified.ts",
+    "test:review-queue": "tsx scripts/check-review-queue.ts",
+    "test:review-queue-runtime": "tsx scripts/check-review-queue-runtime.ts",
+    "test:evidence-render": "tsx scripts/check-evidence-render.ts",
+    "test:admission-probability": "tsx scripts/check-admission-probability.ts",
+    "test:build-gates": "tsx scripts/check-build-gates.ts",
+    "test:typed-evidence": "tsx scripts/check-typed-evidence.ts",
+    "test:observability": "tsx scripts/check-observability.ts",
+    "test:research-runtime": "tsx scripts/check-research-runtime.ts",
+    "test:feature-inventory": "tsx scripts/check-feature-inventory.ts",
+    "test:feature-inventory:snapshot": "tsx scripts/check-feature-inventory.ts --snapshot",
+    "test:feature-inventory:verify": "tsx scripts/check-feature-inventory.ts",
+    "test:migration-runner": "tsx scripts/check-migration-runner.ts",
+    "test:migration-recovery": "tsx scripts/check-migration-recovery.ts",
+    "test:design-system": "tsx scripts/check-design-system.ts",
+    "validate:local": "bash scripts/validate-local.sh"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
@@ -182,6 +216,9 @@
     "sharp": "^0.35.5",
     "source-map-js": "^1.2.2",
     "js-yaml": "^4.3.2",
-    "zod": "^4.6.6"
+    "zod": "^4.6.6",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.5"
+    }
   }
 }

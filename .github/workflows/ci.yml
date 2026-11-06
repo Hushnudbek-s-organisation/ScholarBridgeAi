@@ -72,6 +72,11 @@ jobs:
       - name: Catalogue localization coverage and memo tests
         run: bash ci/run-step.sh "Catalogue localization coverage and memo tests" npm run test:localization
 
+      # P1 regressions: explicit sort, full annual budget, real application
+      # state, honest document readiness and profile-edit re-scoring.
+      - name: P1 product-correctness regressions
+        run: bash ci/run-step.sh "P1 product-correctness regressions" bash -c 'npm run test:university-sort && npm run test:budget-fit && npm run test:applications-state && npm run test:documents-readiness && npm run test:profile-recompute && npm run test:landing-copy && npm run test:source-recheck && npm run test:chunk-recovery && npm run test:evidence-policy && npm run test:refresh-modes && npm run test:research-durable && npm run test:research-worker && npm run test:rendered-copy && npm run test:internal-surfaces && npm run test:migration-dry-run && npm run test:official-source-adapter && npm run test:cache-revision && npm run test:finance-unified && npm run test:typed-evidence && npm run test:review-queue && npm run test:review-queue-runtime && npm run test:evidence-render && npm run test:admission-probability && npm run test:build-gates && npm run test:observability && npm run test:research-runtime && npm run test:migration-runner && npm run test:migration-recovery && npm run test:feature-inventory:verify'
+
       # Phase 4: the student-visa fact sheet (sourced, dated, trilingual) and the
       # catalogue gap report (what is fillable from repository data and what is
       # administrator work).

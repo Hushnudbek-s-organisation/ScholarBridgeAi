@@ -19,6 +19,15 @@ import { HubPage, HubEmpty, PanelSkeleton, usePaneSelection, type HubPaneDef } f
 import type { StudentProfile } from "@/components/Navbar";
 import { NAV_SECTIONS, NAV_SECTION_LABEL_KEYS, visiblePanes } from "@/lib/navSections";
 import { Button } from "@/components/ui/Button";
+import { fetchJsonWithTimeout } from "@/lib/clientFetch";
+import {
+  describeApplicationsFailure,
+  parseApplicationsResponse,
+  type ApplicationSummary,
+  type ApplicationsFailure,
+  type ApplicationsState,
+} from "@/lib/applicationsResponse";
+import { notifyApplicationsChanged, onApplicationsChanged } from "@/lib/applicationEvents";
 
 /**
  * The heavy panes are code-split: the visa studio pulls the whole speech
@@ -533,42 +542,68 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
   const active = useActivePane(pane, visible, hidden);
   const profileId = profile?.id ?? null;
 
-  // The list of applications the student can attach materials to. Local state
-  // only — it is a view filter, never a second source of truth.
-  const [applications, setApplications] = useState<{ id: number; universityId: number | null; universityName: string; programName: string | null }[]>([]);
+  // The list of applications the student can attach materials to is a VIEW of
+  // the API, never a second source of truth. Loading / empty / error / success
+  // are separate states: a 401, 429, 500, timeout or offline device must never
+  // be rendered as "you have not started an application yet".
+  // The whole payload is keyed by profileId: switching profiles derives a fresh
+  // loading state DURING RENDER, so the previous student's rows cannot appear
+  // even for one frame (and no setState-in-effect cascade is needed).
+  const [appsLoad, setAppsLoad] = useState<{
+    profileId: number | null;
+    state: ApplicationsState;
+    applications: ApplicationSummary[];
+    failure: ApplicationsFailure | null;
+  }>({ profileId: null, state: "loading", applications: [], failure: null });
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const current: typeof appsLoad = appsLoad.profileId === profileId
+    ? appsLoad
+    : { profileId, state: "loading", applications: [], failure: null };
   // De-stacked toolbars: the documents pane (vault + saved answers) and the
   // essays pane (four studios that used to form a ~4,000 px wall) each mount
   // ONE tool at a time. View state only — never a second source of truth.
   const [docsView, setDocsView] = useState<"vault" | "answers">("vault");
   const [essayTool, setEssayTool] = useState<"sop" | "rubric" | "recommendations" | "outreach">("sop");
+
   useEffect(() => {
     if (!profileId) return;
+    let activeController: AbortController | null = null;
     let live = true;
-    fetch(`/api/applications?profileId=${profileId}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { applications: [] }))
-      .then((d) => {
-        if (!live) return;
-        setApplications(
-          Array.isArray(d.applications)
-            ? d.applications.map((a: { id: number; universityId: number | null; universityName: string; programName: string | null }) => ({
-                id: a.id,
-                universityId: a.universityId,
-                universityName: a.universityName,
-                programName: a.programName,
-              }))
-            : []
+
+    const load = async () => {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+      setAppsLoad({ profileId, state: "loading", applications: [], failure: null });
+      try {
+        const payload = await fetchJsonWithTimeout<unknown>(
+          `/api/applications?profileId=${profileId}`,
+          { signal: controller.signal, timeoutMs: 12_000, fallbackMessage: "Applications could not be loaded." },
         );
-      })
-      .catch(() => {
-        /* the empty state below already explains what to do */
-      });
+        if (!live || controller.signal.aborted) return;
+        const parsed = parseApplicationsResponse(payload);
+        setAppsLoad({ profileId, state: parsed.length > 0 ? "success" : "empty", applications: parsed, failure: null });
+      } catch (error) {
+        if (!live || controller.signal.aborted) return;
+        setAppsLoad({ profileId, state: "error", applications: [], failure: describeApplicationsFailure(error) });
+      }
+    };
+    // Start in a microtask: the effect body itself must not write state.
+    void Promise.resolve().then(load);
+    // A create / status change / delete anywhere in the cabinet refreshes this
+    // list immediately; the profile filter prevents cross-account leakage.
+    const unsubscribe = onApplicationsChanged((detail) => {
+      if (detail.profileId == null || detail.profileId === profileId) void load();
+    });
     return () => {
       live = false;
+      activeController?.abort();
+      unsubscribe();
     };
-  }, [profileId]);
+  }, [profileId, loadAttempt]);
 
-  const effectiveId = workspaceId !== undefined ? workspaceId : applications[0]?.id ?? null;
-  const selectedApplication = applications.find((application) => application.id === effectiveId) ?? null;
+  const effectiveId = workspaceId !== undefined ? workspaceId : current.applications[0]?.id ?? null;
+  const selectedApplication = current.applications.find((application) => application.id === effectiveId) ?? null;
   const selectApplication = useCallback(
     (id: number | null) => {
       setWorkspaceId?.(id);
@@ -578,8 +613,40 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
 
   if (!profile) return <MissingProfile />;
 
+  const failureKey = (() => {
+    const kind = current.failure?.kind;
+    const map: Record<string, string> = {
+      unauthorized: "applicationsErrorUnauthorized",
+      forbidden: "applicationsErrorForbidden",
+      rate_limited: "applicationsErrorRateLimited",
+      server_error: "applicationsErrorServer",
+      offline: "applicationsErrorOffline",
+      timeout: "applicationsErrorTimeout",
+      bad_response: "applicationsErrorBadResponse",
+      network: "applicationsErrorNetwork",
+    };
+    return kind ? map[kind] ?? "applicationsError" : "applicationsError";
+  })();
+
   const context =
-    applications.length > 0 ? (
+    current.state === "loading" ? (
+      <div role="status" aria-live="polite" className="rounded-overlay border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("applicationsLoading")}</p>
+        <PanelSkeleton rows={2} />
+      </div>
+    ) : current.state === "error" ? (
+      <div role="alert" data-testid="applications-error" className="rounded-overlay border border-rose-300 bg-rose-50 px-4 py-3 dark:border-rose-500/40 dark:bg-rose-500/10">
+        <p className="text-sm font-bold text-rose-900 dark:text-rose-100">{t("applicationsErrorTitle")}</p>
+        <p className="mt-1 text-sm text-rose-800 dark:text-rose-200">
+          {t.has(failureKey as never) ? t(failureKey as never) : t("applicationsError")}
+        </p>
+        {current.failure?.retryable !== false && (
+          <Button variant="primary" size="sm" className="mt-3" onClick={() => setLoadAttempt((n) => n + 1)}>
+            {t("applicationsRetry")}
+          </Button>
+        )}
+      </div>
+    ) : current.applications.length > 0 ? (
       <div className="flex flex-wrap items-center gap-2 rounded-overlay border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900">
         <label htmlFor="materials-app" className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           {t("selectedApplication")}
@@ -591,7 +658,7 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
           className="min-h-10 min-w-0 flex-1 rounded-control border border-slate-200 bg-white px-2 py-1.5 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 sm:max-w-md"
         >
           <option value="">{t("noApplication")}</option>
-          {applications.map((a) => (
+          {current.applications.map((a) => (
             <option key={a.id} value={a.id}>
               {a.universityName}
               {a.programName ? ` — ${a.programName}` : ""}
@@ -609,7 +676,7 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
         )}
       </div>
     ) : (
-      <div className="rounded-overlay border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+      <div data-testid="applications-empty" className="rounded-overlay border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         <p className="font-bold text-slate-800 dark:text-slate-100">{t("noApplicationsYet")}</p>
         <p className="mt-1">{t("noApplicationsHint")}</p>
       </div>

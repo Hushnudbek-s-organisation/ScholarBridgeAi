@@ -18,7 +18,7 @@ works — see [Moving to another host](#moving-to-another-host-or-domain).
 
 1. Render dashboard → **New → Blueprint** → connect this GitHub repository.
 2. Render reads `render.yaml` and creates the managed PostgreSQL database and
-   the web service (`npm install && npm run build`, `npm start`, health check
+   the web service (`npm ci && npm run build`, `npm start`, health check
    `/api/health`).
 3. Open the web service → **Environment** and fill every variable marked
    `sync: false` (see the table below). At minimum: `SESSION_SECRET`,
@@ -71,7 +71,7 @@ claiming that the user's password is wrong.
 
 | Setting | Value |
 | --- | --- |
-| Build | `npm ci && npm run build` |
+| Build | `npm ci && npm run build` (`npm` runs the blocking `prebuild` → `npm run typecheck` gate; `next build` itself skips TypeScript to stay inside small-instance memory) |
 | Start | `npm start` (binds `$PORT`, default 3000) |
 | Node | 22 |
 | Health check | `GET /api/health` |

@@ -24,8 +24,8 @@ import { getTelegramSettings } from "@/lib/telegram/settings";
  *
  * Why it exists: every channel post links to `/go/<code>` → `/scholarships/<id>`,
  * and that page (plus the catalogue) is all a visitor ever sees. The site's real
- * product — fit scoring, admission chance, the deadline plan, documents, the AI
- * assistant, the bot — lives behind an account, so a reader arriving from
+ * product — fit scoring, transparent evidence notes, the deadline plan,
+ * documents, the AI assistant, the bot — lives behind an account, so a reader arriving from
  * Telegram had no way to learn it exists. This page is reachable from every
  * public page's header and from a promo strip on each catalogue page, and it
  * needs no session: it is a server component reading only bundled copy.

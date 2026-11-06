@@ -31,8 +31,9 @@ import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/re
 import { countActivities, profileStrength } from "@/lib/chancing";
 import { chancingProfileWithActivities, toMatchProfileWithActivities, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
+import { adaptLegacyField, eligibilityCutoff } from "@/lib/typedEvidence";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
-import { dashboardRecommendationCacheKey, getCachedDashboardRecommendations } from "@/lib/dashboardRecommendationCache";
+import { sharedDashboardRecommendationCacheKey, getCachedDashboardRecommendations } from "@/lib/dashboardRecommendationCache";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -554,11 +555,21 @@ function cachedRecommendedFor(
     chancingProfile: Awaited<ReturnType<typeof chancingProfileWithActivities>>;
   },
 ): Promise<Awaited<ReturnType<typeof recommendedFor>>> {
-  const key = dashboardRecommendationCacheKey(profileId, locale, todayIso);
-  return getCachedDashboardRecommendations(
-    key,
-    () => recommendedFor(profileId, profile, locale, todayIso, derivedProfiles),
-  );
+  // Every score-relevant profile edit changes the fingerprint. The 15 s TTL is
+  // a load-shedding bound, not a freshness promise. The key ALSO carries the
+  // shared DB revision, so a write handled by another instance (including
+  // application/document/catalogue-evidence writes that do not change this
+  // profile's fingerprint) changes the key here too — no stale cross-instance
+  // result. The function stays async because the revision is a cheap DB read.
+  return (async () => {
+    const key = await sharedDashboardRecommendationCacheKey(
+      profileId, locale, todayIso, profileMatchFingerprint(profile),
+    );
+    return getCachedDashboardRecommendations(
+      key,
+      () => recommendedFor(profileId, profile, locale, todayIso, derivedProfiles),
+    );
+  })();
 }
 
 async function recommendedFor(
@@ -811,7 +822,22 @@ async function recommendedFor(
       matchReasons: translateReasons(locale, "scholarship", match.reasonDetails, match.reasons),
       matchIssues: translateReasons(locale, "scholarship", match.issueDetails, match.potentialIssues),
       matchBreakdown: match.breakdown,
-      gpaOk: s.minGpa == null || gpa == null || gpa >= s.minGpa,
+      // A legacy/unverified minGpa must NEVER auto-reject a student. Only a
+      // field-level verified official minimum may produce a false cutoff; the
+      // number is still shown (gpaCutoffValue) so no useful data is hidden.
+      gpaOk: (() => {
+        const cutoff = eligibilityCutoff({
+          studentValue: gpa,
+          minimum: adaptLegacyField({
+            fieldKey: "min_gpa",
+            value: s.minGpa,
+            entityVerified: s.verificationStatus === "verified",
+          }),
+        });
+        return cutoff.canEvaluate ? cutoff.passes !== false : true;
+      })(),
+      /** False for every legacy column: no field-level official check exists. */
+      gpaCutoffTrusted: false,
       gpaProvided: gpa != null,
       /** "open-to-all" | "citizenship-match" | "unknown" — never a claim. */
       countryEligibility: scholarshipCountryVerdict(s.eligibleCountries, applicantCountry),

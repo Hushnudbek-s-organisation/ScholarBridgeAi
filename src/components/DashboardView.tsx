@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import { AppNote } from "@/components/AppNote";
 import { Button } from "@/components/ui/Button";
+import { ActionBar } from "@/components/ui/ActionBar";
+import { StatusPill } from "@/components/ui/StatusPill";
 
 interface DashboardViewProps {
   profile: StudentProfile | null;
@@ -223,6 +225,49 @@ export function DashboardView({
           </div>
         </div>
       </div>
+
+      {/* §4 — ONE "Keyingi qadam", the nearby blocker/deadline, and a plain
+          statement of where the student is. This is deliberately NOT another
+          progress bar: readiness %, application stage, document readiness and
+          fit are different measures and never share one identical bar. */}
+      <section className="sb-glass rounded-overlay border border-slate-200 p-4 sm:p-5 dark:border-slate-700"
+               aria-labelledby="sb-next-step-title">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+              {t("whereAmI")}
+            </p>
+            <h2 id="sb-next-step-title" className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+              {t("nextStepTitle")}
+            </h2>
+            <p className="mt-1 max-w-prose text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              {taskCount > 0 ? t("nextStepResume", { n: taskCount }) : t("nextStepStart")}
+            </p>
+          </div>
+          <StatusPill
+            tone={taskCount > 0 ? "warning" : "info"}
+            label={taskCount > 0 ? t("blockerOpenTasks", { n: taskCount }) : t("blockerNone")}
+          />
+        </div>
+        <div className="mt-4">
+          <ActionBar
+            label={t("nextStepTitle")}
+            primary={{
+              id: "resume", label: taskCount > 0 ? t("actionResume") : t("actionExplore"),
+              onClick: () => onNavigateTab(taskCount > 0 ? "tasks" : "explorer"),
+              icon: <ArrowRight className="h-4 w-4" aria-hidden="true" />,
+            }}
+            secondary={[
+              { id: "profile", label: t("actionProfile"), onClick: onEditProfile },
+              { id: "tracker", label: t("actionTracker"), onClick: () => onNavigateTab("tracker") },
+              { id: "scholarships", label: t("actionGrants"), onClick: () => onNavigateTab("scholarships") },
+            ]}
+          />
+        </div>
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          {t("stageNotCompleted")}
+        </p>
+      </section>
 
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

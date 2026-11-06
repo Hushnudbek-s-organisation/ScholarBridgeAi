@@ -5,6 +5,7 @@ import { scholarships, universities } from "@/db/schema";
 import { compareCountries, listCountries, type CountryComparison } from "@/lib/countryCompare";
 import { countryFactsFor, localizeCountryFacts, type LocalizedCountryFacts } from "@/lib/countryFacts";
 import { resolvedUsdScholarshipAmount, resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import { legacyEvidence } from "@/lib/factPresentation";
 
 export const dynamic = "force-dynamic";
 
@@ -76,9 +77,24 @@ export async function GET(req: Request) {
       const verified = countryFactsFor(comparison.country);
       if (verified) facts[comparison.country] = localizeCountryFacts(verified, locale);
     }
+    // §4: the compare averages are COMPUTED from published catalogue rows,
+    // never official minimums. Attach the same typed-evidence envelope used by
+    // catalog/grant APIs so the panel cannot present an average as a cutoff.
+    const withEvidence = comparisons.map((c) => ({
+      ...c,
+      evidence: legacyEvidence({
+        entityVerified: false,
+        admissionCycle: null,
+        fields: {
+          minIeltsAvg: c.minIelts.avg,
+          tuitionAvgUsd: c.tuition.avgUsd,
+          livingAvgUsd: c.living.avgUsd,
+        },
+      }),
+    }));
     return NextResponse.json({
       source: "database",
-      countries: comparisons,
+      countries: withEvidence,
       facts,
       available: listCountries(unis).slice(0, 40),
     });

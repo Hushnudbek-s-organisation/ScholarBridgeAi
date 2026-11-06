@@ -193,7 +193,7 @@ const rollup = checkDocuments(
     doc({ id: 3, isRequired: true, status: "uploaded", fileName: "cv.docx" }), // uploaded but blocked
     doc({ id: 4, isRequired: false, status: "missing", label: "Optional extra" }),
   ],
-  { today: TODAY }
+  { today: TODAY, requirementsState: "confirmed" }
 );
 check("requiredTotal counts required rows only", rollup.requiredTotal === 3, `got ${rollup.requiredTotal}`);
 check("requiredUploaded counts uploads", rollup.requiredUploaded === 2, `got ${rollup.requiredUploaded}`);
@@ -203,7 +203,24 @@ check(
   rollup.readiness === 33,
   `got ${rollup.readiness}`
 );
-check("an empty checklist reads as fully ready", checkDocuments([], { today: TODAY }).readiness === 100);
+check("an empty checklist is NOT 100% ready", checkDocuments([], { today: TODAY }).readiness === null);
+check("requirements not determined has a stable reason", checkDocuments([], { today: TODAY }).readinessReason === "requirements_unknown");
+check("a loading requirement list is not 100% ready", checkDocuments([], { today: TODAY, requirementsState: "loading" }).readinessReason === "requirements_loading");
+check("an errored requirement list is not 100% ready", checkDocuments([], { today: TODAY, requirementsState: "error" }).readinessReason === "requirements_error");
+check("a confirmed but still empty list is not 100% ready", checkDocuments([], { today: TODAY, requirementsState: "confirmed" }).readinessReason === "requirements_not_determined");
+check("a confirmed, non-empty checklist can produce a real percentage", checkDocuments([doc({ id: 1, status: "uploaded" })], { today: TODAY, requirementsState: "confirmed" }).readiness === 100);
+
+section("5b. Expired / rejected / needs-review documents are not ready");
+for (const [status, code] of [["expired", "expired_status"], ["rejected", "rejected_status"], ["needs_review", "needs_review_status"]] as const) {
+  const issues = checkDocument(doc({ id: 91, status }), { today: TODAY });
+  check(`${status} required document is a blocker`, issues.length === 1 && issues[0].severity === "blocker" && issues[0].code === code);
+}
+const notReadyRollup = checkDocuments([
+  doc({ id: 1, status: "uploaded" }),
+  doc({ id: 2, status: "rejected" }),
+], { today: TODAY, requirementsState: "confirmed" });
+check("a rejected upload does not count as ready", notReadyRollup.readiness === 50, `got ${notReadyRollup.readiness}`);
+check("optional generic preparation rows are never required", scholarshipChecklistDocuments(null).every((d) => !d.isRequired));
 
 section("6. Expected documents adapt to the destination");
 

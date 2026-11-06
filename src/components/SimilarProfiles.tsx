@@ -2,6 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import { presentRaw, type PresentedFact } from "@/lib/factPresentation";
+
 import {
   Users,
   CheckCircle2,
@@ -223,6 +226,7 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
                     </div>
 
                     {bench && (
+                      <>
                       <div className="rounded-surface bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 grid grid-cols-3 gap-2">
                         <div>
                           <span className="text-slate-500 block">{t("offerRate")}</span>
@@ -241,6 +245,20 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
                           </span>
                         </div>
                       </div>
+                      <div className="mt-1">
+                        <EvidenceNote compact label={t("minIelts")} fact={presentRaw({
+                          value: bench.minIelts, fieldLabel: t("minIelts"),
+                          trust: "observed", valueType: "observed_statistic",
+                          note: "Benchmark from similar accepted profiles — an observed cohort statistic, NOT an official minimum and NOT a personal admission probability.",
+                        })} />
+                        <EvidenceNote compact label={t("offerRate")} fact={presentRaw({
+                          value: bench.acceptRatePct, fieldLabel: t("offerRate"),
+                          trust: "observed", valueType: "historical_acceptance_rate",
+                          unit: "percent",
+                          note: "Historical cohort rate. It is not a personal admission probability.",
+                        })} />
+                      </div>
+                      </>
                     )}
 
                     <div className="flex items-center justify-between gap-2 text-xs text-slate-500 pt-1">

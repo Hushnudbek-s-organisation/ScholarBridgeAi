@@ -5,6 +5,10 @@ import { configuredAppUrl } from "@/lib/appUrl";
 export const AGENT_CONFIG = {
   /** Max pages fetched per university (cost control). */
   maxPagesDefault: 8,
+  /** Whole-run deadline; a timed-out run is surfaced, not left as "running". */
+  runTimeoutMs: 10 * 60_000,
+  /** Max whole-run attempts before the durable queue gives up. */
+  runMaxAttempts: 3,
   /** Fetch timeout per page (ms). */
   timeoutMs: 15000,
   /** Retry count for failed fetches (spec §18). */

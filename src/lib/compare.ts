@@ -1,3 +1,5 @@
+import { evaluateBudgetFit } from "./budgetFit";
+
 /**
  * University Comparison Tables (Phase 3).
  *
@@ -235,16 +237,21 @@ export function compareUniversities(
   if (ctx.budgetAnnualUsd != null && ctx.budgetAnnualUsd > 0) {
     const values: Record<number, string | null> = {};
     for (const u of list) {
-      // A budget comparison requires both annual tuition and living cost in
-      // USD. One known line is not the whole budget, and NULL is not $0.
-      if (u.annualTuitionUsd == null || u.annualLivingEstUsd == null) {
+      // The SAME shared budget engine as the card, recommendations and the
+      // financial plan: a full verdict needs tuition + living, and an unknown
+      // line is never treated as $0.
+      const fit = evaluateBudgetFit({
+        tuitionUsd: u.annualTuitionUsd,
+        livingUsd: u.annualLivingEstUsd,
+        budgetUsd: ctx.budgetAnnualUsd,
+      });
+      if (!fit.complete || fit.annualTotalUsd == null || fit.withinBudget == null) {
         values[u.id] = null;
         continue;
       }
-      const total = u.annualTuitionUsd + u.annualLivingEstUsd;
-      values[u.id] = total <= ctx.budgetAnnualUsd
-        ? `Within budget (${usd(ctx.budgetAnnualUsd - total)} spare)`
-        : `${usd(total - ctx.budgetAnnualUsd)} over budget`;
+      values[u.id] = fit.withinBudget
+        ? `Within budget (${usd((fit.totalGapUsd ?? 0) * -1)} spare)`
+        : `${usd(fit.totalGapUsd ?? 0)} over budget`;
     }
     rows.push({
       key: "budgetFit",

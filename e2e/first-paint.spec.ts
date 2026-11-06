@@ -24,9 +24,20 @@ test("campus photos are deferred, then load when their cards approach the viewpo
   expect(await page.locator("#campuses img[src]").count()).toBeLessThan(48);
   // The first DOM copy may be horizontally outside the animated track. Test
   // cards that actually approach the viewport, including relative proxy URLs.
-  await page.locator("#university-marquee-title").scrollIntoViewIfNeeded();
+  // Hydration can replace this node while goto() is still settling; a Locator
+  // action then fails with "Element is not attached to the DOM". Wait for the
+  // node to be attached, then scroll by id inside the page (no detached
+  // ElementHandle round-trip).
+  await expect(page.locator("#university-marquee-title")).toBeAttached();
+  // Scroll a LAZY IMAGE into view (not just its title): the first DOM copy can
+  // sit horizontally outside the animated track, and `scroll-behavior: smooth`
+  // can delay the IntersectionObserver past the default poll timeout.
+  await page.evaluate(() => {
+    const img = document.querySelector("#campuses img[data-campus-src]");
+    img?.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+  });
   const loaded = page.locator("#campuses img[src]");
-  await expect.poll(() => loaded.count()).toBeGreaterThan(0);
+  await expect.poll(() => loaded.count(), { timeout: 20_000 }).toBeGreaterThan(0);
   await expect(loaded.first()).toHaveAttribute("src", /^(https?:|\/api\/image)/);
   await expect.poll(() => loaded.first().evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   expect(await page.locator("#campuses img[src]").count()).toBeLessThan(48);

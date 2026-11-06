@@ -16,6 +16,7 @@ import { ExternalLink } from "lucide-react";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, StatusIcon, daysLabel, toneForDays } from "@/components/ui/journey";
 import { AppNote } from "@/components/AppNote";
+import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 import {
   DEFAULT_REQUIREMENT_TEMPLATES,
   REQUIREMENT_SECTIONS,
@@ -229,7 +230,10 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
                       });
                       const json = (await res.json().catch(() => ({}))) as { application?: { id?: number }; error?: string };
                       const appId = json.application?.id;
-                      if (res.ok && typeof appId === "number") onOpenWorkspace(appId);
+                      if (res.ok && typeof appId === "number") {
+                        notifyApplicationsChanged(profileId);
+                        onOpenWorkspace(appId);
+                      }
                       else setError(typeof json.error === "string" ? json.error : t("rbStartFromFailed"));
                     } catch {
                       setError(t("rbStartFromFailed"));

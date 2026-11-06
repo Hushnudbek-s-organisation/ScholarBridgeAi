@@ -1,6 +1,6 @@
 "use client";
 
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
+import { animate, m as Motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
 import { useEffect } from "react";
 
 /**
@@ -58,9 +58,9 @@ export function AnimatedNumber({
   }, [safeValue, duration, delay, reduceMotion, motionValue]);
 
   return (
-    <motion.span className={className} aria-label={`${prefix}${safeValue}${suffix}`}>
+    <Motion.span className={className} aria-label={`${prefix}${safeValue}${suffix}`}>
       {text}
-    </motion.span>
+    </Motion.span>
   );
 }
 
@@ -86,7 +86,7 @@ export function AnimatedBar({
 
   return (
     <div className={trackClassName} role="presentation">
-      <motion.div
+      <Motion.div
         className={`h-full rounded-full ${barClassName}`}
         initial={{ width: reduceMotion ? `${pct}%` : "0%" }}
         whileInView={{ width: `${pct}%` }}
@@ -132,7 +132,7 @@ export function AnimatedRing({
           strokeWidth={strokeWidth}
           className={trackClassName}
         />
-        <motion.circle
+        <Motion.circle
           cx={size / 2}
           cy={size / 2}
           r={radius}

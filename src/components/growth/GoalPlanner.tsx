@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import { BookOpen, Briefcase, Check, Clock, Flag, Plus, Sparkles, Trash2, Trophy, Wrench, X } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
@@ -138,7 +138,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
     const st = PILLAR_STYLE[g.pillar] ?? PILLAR_STYLE.academic;
     const Icon = st.icon;
     return (
-      <motion.li
+      <Motion.li
         key={g.id}
         layout
         initial={{ opacity: 0, y: 8 }}
@@ -200,7 +200,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
             </Button>
           </div>
         </div>
-      </motion.li>
+      </Motion.li>
     );
   };
 
@@ -287,7 +287,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
             <div className="space-y-3">
               <AnimatePresence>
                 {custom && (
-                  <motion.form
+                  <Motion.form
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
@@ -329,7 +329,7 @@ export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile |
                         {t("addGoal")}
                       </Button>
                     </div>
-                  </motion.form>
+                  </Motion.form>
                 )}
               </AnimatePresence>
 

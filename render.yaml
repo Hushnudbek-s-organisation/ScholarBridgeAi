@@ -18,6 +18,11 @@ services:
     # The Supabase database is the source of truth — the app must adapt to
     # it, NOT modify it automatically. Run db:push manually only when you
     # explicitly decide to change the database schema.
+    # `next build` intentionally skips its own TypeScript pass (see
+    # next.config.ts → typescript.ignoreBuildErrors, 512 MB Render instance).
+    # Typecheck is therefore a SEPARATE, blocking step here: a deploy with type
+    # errors must fail before any artifact replaces the running service. It runs
+    # before `next build`, not alongside it, so the two never share peak memory.
     buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /api/health

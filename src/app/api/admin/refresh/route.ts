@@ -2,6 +2,7 @@ import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { runRefresh, listRefreshJobs } from "@/lib/refresh";
+import { parseRefreshMode } from "@/lib/refreshModes";
 
 /** POST: trigger a manual refresh (admin). GET: list refresh jobs. */
 export async function POST(req: Request) {
@@ -17,7 +18,12 @@ export async function POST(req: Request) {
       );
     }
     const scope = body.scope === "universities" ? "universities" : body.scope === "scholarships" ? "scholarships" : "all";
-    const result = await runRefresh(scope);
+    const mode = parseRefreshMode(body.mode);
+    // No official source adapter is exposed over HTTP. For
+    // official_source_reverification, runRefresh builds the SSRF-safe SERVER
+    // adapter itself; a missing migration yields a clear failed_verification
+    // result and never changes a verified date.
+    const result = await runRefresh(scope, { mode });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     console.error("POST /api/admin/refresh error:", error);

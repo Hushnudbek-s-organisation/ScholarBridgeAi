@@ -29,21 +29,39 @@ function check(name: string, fn: () => void) {
 const nextConfig = read("next.config.ts");
 const pkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
 const ci = read(".github/workflows/ci.yml");
+const render = read("render.yaml");
 const health = read("src/app/api/health/route.ts");
 
 console.log("\nDeployment — build stays inside a small instance");
 
-check("the build does not type-check (CI owns that)", () => {
-  assert.match(nextConfig, /typescript:\s*\{\s*ignoreBuildErrors:\s*true\s*\}/, "typescript.ignoreBuildErrors must stay true");
-  // …which is only safe while CI type-checks every pull request.
+check("next build skips the DUPLICATE TypeScript pass only when npm prebuild already ran it", () => {
+  // A literal `ignoreBuildErrors: true` would let a direct `npx next build`
+  // ship TypeScript errors with no check at all. The flag must be conditional
+  // on the npm build lifecycle (whose prebuild is the hard typecheck gate).
+  assert.doesNotMatch(nextConfig, /ignoreBuildErrors:\s*true\s*\}/,
+    "a literal ignoreBuildErrors:true is a deploy bypass");
+  assert.match(nextConfig, /ignoreBuildErrors:\s*process\.env\.npm_lifecycle_event === ["']build["']/,
+    "ignoreBuildErrors must be true ONLY for npm run build");
+  // …which is only safe while CI type-checks every pull request too.
   assert.match(ci, /npm run typecheck/, "CI must run the typecheck step");
   assert.ok(pkg.scripts.typecheck, "package.json needs a typecheck script");
+});
+
+check("the hosted deploy still blocks on typecheck before swapping builds", () => {
+  assert.match(render, /buildCommand: npm ci && npm run build/, "Render uses npm run build, which runs the prebuild typecheck");
+  assert.equal(pkg.scripts.prebuild, "npm run typecheck", "Render cannot swap a build with TypeScript errors");
+  assert.match(render, /startCommand: npm start/, "start stays next start");
+  // Static assets of one build must be cached immutably, while the HTML that
+  // references them is never reused across a deploy swap.
+  assert.ok(nextConfig.includes('source: "/_next/static/:path*"'), "static assets need an explicit immutable cache rule");
+  assert.match(nextConfig, /max-age=31536000, immutable/);
 });
 
 check("linting stays in CI, not in the build", () => {
   // Next 16 removed built-in ESLint integration, so the build has no lint pass
   // to disable — but the gate must still exist in CI.
   assert.equal(pkg.scripts.build, "next build", "the build script stays plain");
+  assert.equal(pkg.scripts.prebuild, "npm run typecheck", "npm run build must typecheck before next build");
   assert.match(ci, /lint:baseline/, "CI must run the lint gate");
 });
 

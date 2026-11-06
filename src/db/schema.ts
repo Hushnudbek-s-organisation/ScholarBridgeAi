@@ -632,7 +632,7 @@ export const applicationDocuments = pgTable("application_documents", {
   documentType: text("document_type").notNull(), // passport | transcript | diploma | recommendation | statement | cv | test_score | financial | portfolio | custom
   label: text("label").notNull(),
   isRequired: boolean("is_required").notNull().default(false),
-  status: text("status").notNull().default("missing"), // missing | uploaded | not_required
+  status: text("status").notNull().default("missing"), // missing | uploaded | not_required | expired | rejected | needs_review
   fileUrl: text("file_url"),
   deadlineDate: date("deadline_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

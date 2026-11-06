@@ -21,6 +21,9 @@
  * are never counted on a number we do not have (spec §14).
  */
 import React from "react";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import { presentRaw, type PresentedFact } from "@/lib/factPresentation";
+
 import { useTranslations } from "next-intl";
 import {
   AlertCircle,
@@ -399,6 +402,11 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
             })}
             <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-600">
               {t("publishedFeeTotal", { amount: formatMoney(evaluation.totals.publishedFeeTotalUsd, "USD") })}
+              <EvidenceNote compact label={t("publishedFeeTotal", { amount: "" }).trim()} fact={presentRaw({
+                value: evaluation.totals.publishedFeeTotalUsd, fieldLabel: "Published fee total",
+                trust: "computed", valueType: "computed_fit", currency: "USD",
+                note: "Sum of published application fees for this shortlist. Unknown fees are excluded, so this is NOT an exact total and never means the full cost is covered.",
+              })} />
             </span>
           </div>
 

@@ -1213,6 +1213,9 @@ async function main() {
     // ever return another student's data — each is reviewed in SECURITY.md.
     const PUBLIC_READS = new Set([
       "config/boot GET",
+      // Non-secret build marker of the live process; used by old browser tabs
+      // to explain a failed chunk after a deploy swap. Never cached.
+      "config/build GET",
       "config/branding GET",
       "config/guide GET",
       "config/nav GET",
@@ -1238,7 +1241,17 @@ async function main() {
       "visa/requirements GET",
       "cron/refresh GET",
       "cron/notifications GET",
+      // §9 Research Agent scheduler: an external cron call, protected by a
+      // constant-time CRON_SECRET bearer check INSIDE the handler (see the
+      // dedicated assertion below), not by a session guard.
+      "cron/research-agent GET",
     ]);
+    // An allowlisted cron read must still refuse to run without its secret.
+    const agentCron = readFileSync(join(ROOT, "src/app/api/cron/research-agent/route.ts"), "utf8");
+    assert.match(agentCron, /CRON_SECRET/, "research-agent cron requires a shared secret");
+    assert.match(agentCron, /safeEqual\(auth, `Bearer \$\{secret\}`\)/, "constant-time bearer compare");
+    assert.match(agentCron, /status: 503/, "missing secret returns 503 and starts nothing");
+    assert.match(agentCron, /probeDurableMigration/, "missing migration returns a safe error");
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const name of readdirSync(dir)) {

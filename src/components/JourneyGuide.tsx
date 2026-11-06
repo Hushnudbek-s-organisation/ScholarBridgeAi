@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { motion } from "framer-motion";
+import { m as Motion } from "framer-motion";
 import {
   ArrowRight,
   Award,
@@ -111,7 +111,7 @@ export function JourneyGuide({ profileId, onNavigate }: { profileId: number | nu
 
           {/* The one thing to do now */}
           {current ? (
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               className="mt-4 flex flex-col gap-3 rounded-surface border border-indigo-200 bg-indigo-50 p-3 sm:flex-row sm:items-center"
@@ -132,7 +132,7 @@ export function JourneyGuide({ profileId, onNavigate }: { profileId: number | nu
               >
                 {t("start")} <ArrowRight className="h-3.5 w-3.5" />
               </Button>
-            </motion.div>
+            </Motion.div>
           ) : (
             <p className="mt-4 rounded-surface border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{t("allDone")}</p>
           )}

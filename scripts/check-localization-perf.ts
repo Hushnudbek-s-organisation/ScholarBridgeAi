@@ -37,6 +37,7 @@ import {
 import { invalidateLocalizeMemo, localizeMemoStats } from "../src/lib/localizeMemo";
 import { invalidateMatchMemo, matchMemoStats, memoizeMatch } from "../src/lib/matchMemo";
 import { profileMatchFingerprint } from "../src/lib/profileMatchFingerprint";
+import { AsyncTtlCache } from "../src/lib/asyncTtlCache";
 
 const ROOT = join(__dirname, "..");
 let passed = 0;
@@ -299,14 +300,43 @@ check("the scoring routes use the memo and admin writes invalidate it", () => {
   assert.ok(activities.includes("invalidateSavedActivities"), "editing the activity portfolio must drop the cached rows");
 });
 
-check("activity rows are memoized, not queried per scoring route", () => {
-  const mapping = readFileSync(join(ROOT, "src/lib/profileMapping.ts"), "utf8");
-  assert.ok(mapping.includes("ACTIVITIES_MEMO_TTL_MS"), "loadSavedActivities must have a TTL");
-  assert.match(mapping, /const hit = memo\.get\(profileId\)/, "…and read from the memo first");
-});
-
-console.log(`\n${passed} passed, ${failures.length} failed`);
-if (failures.length) {
-  for (const failure of failures) console.log(`  - ${failure}`);
-  process.exit(1);
-}
+// Behaviour test, not a source regex: the old assertion looked for
+// `const hit = memo.get(profileId)` and failed forever after profileMapping
+// correctly moved to the bounded AsyncTtlCache. Prove the ACTUAL semantics the
+// scoring routes depend on instead: one in-flight load per profile, a fresh
+// hit reused, expiry after the TTL, and explicit invalidation.
+void (async () => {
+  try {
+    const mapping = readFileSync(join(ROOT, "src/lib/profileMapping.ts"), "utf8");
+    assert.ok(mapping.includes("ACTIVITIES_MEMO_TTL_MS"), "loadSavedActivities must have a TTL");
+    assert.ok(mapping.includes("getOrCreate(profileId"), "loadSavedActivities must use the shared bounded cache");
+    let now = 0;
+    let calls = 0;
+    const cache = new AsyncTtlCache<number, string>(1_000, 10, () => now);
+    const create = async () => { calls += 1; return `rows-${calls}`; };
+    const first = cache.getOrCreate(7, create);
+    const second = cache.getOrCreate(7, create);
+    assert.strictEqual(first, second, "concurrent calls share one in-flight load");
+    assert.equal(await first, "rows-1");
+    assert.equal(calls, 1, "one DB-shaped load for two callers");
+    assert.ok(cache.hasFresh(7), "the row stays fresh for the TTL");
+    assert.strictEqual(cache.getOrCreate(7, create), first, "a fresh entry is reused");
+    now = 1_001;
+    const third = cache.getOrCreate(7, create);
+    assert.notStrictEqual(third, first, "an expired entry reloads");
+    assert.equal(await third, "rows-2");
+    cache.invalidate(7);
+    assert.equal(cache.size, 0, "an activity edit drops the cached rows");
+    passed++;
+    console.log("  ✓ activity rows are memoized, not queried per scoring route");
+  } catch (error) {
+    const message = (error as Error).message;
+    failures.push(`activity rows are memoized, not queried per scoring route: ${message}`);
+    console.log(`  ✗ activity rows are memoized, not queried per scoring route — ${message}`);
+  }
+  console.log(`\n${passed} passed, ${failures.length} failed`);
+  if (failures.length) {
+    for (const failure of failures) console.log(`  - ${failure}`);
+    process.exit(1);
+  }
+})();

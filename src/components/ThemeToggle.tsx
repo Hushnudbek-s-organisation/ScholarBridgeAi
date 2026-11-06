@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme, type ThemeChoice } from "@/components/ThemeProvider";
@@ -43,7 +43,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
             className="relative grid min-h-11 min-w-11 place-items-center rounded-full text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             {active && (
-              <motion.span
+              <Motion.span
                 layoutId="theme-toggle-pill"
                 className="absolute inset-0 rounded-full bg-white shadow-sm"
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
@@ -76,7 +76,7 @@ export function ThemeSwitch({ className = "" }: { className?: string }) {
       className={`relative grid min-h-11 min-w-11 place-items-center rounded-control border border-slate-200 bg-white text-slate-600 transition-colors hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${className}`}
     >
       <AnimatePresence initial={false} mode="wait">
-        <motion.span
+        <Motion.span
           key={isDark ? "moon" : "sun"}
           initial={{ opacity: 0, rotate: -90, scale: 0.6 }}
           animate={{ opacity: 1, rotate: 0, scale: 1 }}
@@ -89,7 +89,7 @@ export function ThemeSwitch({ className = "" }: { className?: string }) {
           ) : (
             <Sun className="h-4 w-4" aria-hidden="true" />
           )}
-        </motion.span>
+        </Motion.span>
       </AnimatePresence>
     </Button>
   );

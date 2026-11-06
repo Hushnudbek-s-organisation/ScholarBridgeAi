@@ -10,7 +10,7 @@
  */
 import React from "react";
 import { useTranslations } from "next-intl";
-import { motion, useReducedMotion } from "framer-motion";
+import { m as Motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, Circle, CircleDashed, Info, TriangleAlert, XCircle } from "lucide-react";
 import { AnimatedNumber, AnimatedRing, MOTION_TOKENS } from "@/components/motion";
 import { dictionaries } from "@/i18n/messages";
@@ -59,7 +59,7 @@ export function JourneyCard({
     well: "border-slate-200/80 bg-slate-50 dark:border-slate-800 dark:bg-slate-800",
   };
   return (
-    <motion.section
+    <Motion.section
       initial={reduceMotion ? false : { opacity: 0, y: 12 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px 0px -50px 0px" }}
@@ -90,7 +90,7 @@ export function JourneyCard({
       )}
       <div className="px-4 py-4 sm:px-5">{children}</div>
       </div>
-    </motion.section>
+    </Motion.section>
   );
 }
 

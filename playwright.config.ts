@@ -7,6 +7,10 @@ if (!executablePath) {
 
 export default defineConfig({
   testDir: "./e2e",
+  // §12 visual capture is a separate, slower browser pass (16 viewport/theme/
+  // locale combinations with screenshots). Keep the standard `test:e2e` fast;
+  // run it with E2E_VISUAL=1 and an explicit spec path.
+  testIgnore: process.env.E2E_VISUAL === "1" ? [] : ["**/visual-acceptance-2026.spec.ts"],
   globalSetup: "./e2e/global-setup.ts",
   fullyParallel: false,
   workers: 1,

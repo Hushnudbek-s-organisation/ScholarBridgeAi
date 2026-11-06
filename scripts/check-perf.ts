@@ -10,7 +10,7 @@
  * Run with `npm run test:perf` (the bundle-size part needs a build first).
  */
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(__dirname, "..");
@@ -121,7 +121,7 @@ check("public visits do not mount closed auth/profile dialogs or heavyweight loa
 check("the hero is visible in server HTML, without waiting for animation hydration", () => {
   const landing = read("src/components/LandingPage.tsx");
   // Extra layout attributes do not change the SSR-visible hero contract.
-  assert.match(landing, /<motion.div initial=\{false\} animate="visible" variants=\{heroGroup\}[^>]*>/);
+  assert.match(landing, /<(?:motion|Motion)\.div initial=\{false\} animate="visible" variants=\{heroGroup\}[^>]*>/);
   assert.doesNotMatch(landing, /initial=\{\{ opacity: 0, y: 28/);
 });
 
@@ -153,6 +153,28 @@ check("an exiting hub cannot overwrite a newer navigation target", () => {
 check("the analytics beacon stays out of the first three seconds", () => {
   const tracker = read("src/components/SiteTracker.tsx");
   assert.ok(/scheduleWhenIdle\([\s\S]*?\}, 3000, 3000\)/.test(tracker), "SiteTracker must be deferred by 3 s");
+});
+
+check("Framer Motion features are lazy, not part of the landing first load", () => {
+  const provider = read("src/components/motion/MotionProvider.tsx");
+  assert.match(provider, /LazyMotion/);
+  assert.match(provider, /strict/);
+  assert.match(provider, /import\("\.\/features"\)/);
+  const features = read("src/components/motion/features.ts");
+  assert.match(features, /domMax/, "layoutId shared-element pills need domMax");
+  // `strict` throws at runtime if any `motion.*` component is left inside the
+  // provider; catch it statically before the bundle creeps back up.
+  const queue = [join(root, "src/components")];
+  while (queue.length) {
+    const dir = queue.pop()!;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) queue.push(full);
+      else if (entry.name.endsWith(".tsx") && /<motion\./.test(readFileSync(full, "utf8"))) {
+        throw new Error(`${full} still imports the full motion bundle`);
+      }
+    }
+  }
 });
 
 /*

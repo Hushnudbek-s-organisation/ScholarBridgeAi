@@ -4,6 +4,9 @@ import { AdmissionsStatisticsCard } from "./AdmissionsStatisticsCard";
 import type { AdmissionsStatistics } from "@/lib/admissionsStatistics";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import { presentRaw, type PresentedFact } from "@/lib/factPresentation";
+
 import { gpaTo40Scale } from "@/lib/gpa";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
@@ -1048,6 +1051,11 @@ export function ChancingPanel({
                           <span>{t("medIeltsWord")} {activeProgram.medianIelts.toFixed(1)}</span>
                           <span>{t("toeflMinPlus", { value: activeProgram.effectiveMinToefl })}</span>
                         </div>
+                        <EvidenceNote compact label={t("minIeltsWord")} fact={presentRaw({
+                          value: activeProgram.effectiveMinIelts, fieldLabel: t("minIeltsWord"),
+                          trust: "computed", valueType: "computed_fit", unit: "IELTS band",
+                          note: "Effective/derived comparison value for this program, NOT an official published minimum. Median and effective values are computed from the catalogue; they never auto-reject an applicant.",
+                        })} />
                       </div>
                     </div>
                   </div>

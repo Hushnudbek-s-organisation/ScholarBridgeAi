@@ -1,5 +1,15 @@
-# Portable mirror of .github/workflows/ci.yml. Keep workflow bodies identical.
-name: CI
+# =============================================================================
+# PORTABLE REFERENCE MIRROR — NOT AUTO-DISCOVERED BY GITHUB ACTIONS.
+#
+# GitHub Actions only auto-loads YAML files inside `.github/workflows/`. This
+# file lives in `ci/`, so it does NOT run on its own. It is kept as a portable
+# copy for offline/review use; the SINGLE auto-discovered, enforced gate is
+# `.github/workflows/ci.yml`. Every `npm run` / audit command in this mirror is
+# present in that file, and scripts/check-build-gates.ts FAILS if the parity
+# ever breaks (so no security check can silently disappear). Do not rely on
+# this file to run in CI; wire new gates into `.github/workflows/ci.yml` too.
+# =============================================================================
+name: CI (portable mirror — not auto-discovered)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -66,6 +76,11 @@ jobs:
       # and score memos (correctness and speed).
       - name: Catalogue localization coverage and memo tests
         run: bash ci/run-step.sh "Catalogue localization coverage and memo tests" npm run test:localization
+
+      # P1 regressions: explicit sort, full annual budget, real application
+      # state, honest document readiness and profile-edit re-scoring.
+      - name: P1 product-correctness regressions
+        run: bash ci/run-step.sh "P1 product-correctness regressions" bash -c 'npm run test:university-sort && npm run test:budget-fit && npm run test:applications-state && npm run test:documents-readiness && npm run test:profile-recompute && npm run test:landing-copy && npm run test:source-recheck && npm run test:chunk-recovery && npm run test:evidence-policy && npm run test:refresh-modes && npm run test:research-durable && npm run test:research-worker && npm run test:rendered-copy && npm run test:internal-surfaces && npm run test:migration-dry-run && npm run test:official-source-adapter && npm run test:cache-revision && npm run test:finance-unified && npm run test:typed-evidence && npm run test:review-queue && npm run test:review-queue-runtime && npm run test:evidence-render && npm run test:admission-probability && npm run test:build-gates && npm run test:observability && npm run test:research-runtime && npm run test:migration-runner && npm run test:migration-recovery && npm run test:feature-inventory:verify'
 
       # Phase 4: the student-visa fact sheet (sourced, dated, trilingual) and the
       # catalogue gap report (what is fillable from repository data and what is

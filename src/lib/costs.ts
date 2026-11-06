@@ -8,9 +8,21 @@
  * not fill missing budget lines with zeroes or generic cost estimates.
  *
  * Pure module — asserted in `scripts/check-costs.ts`.
+ *
+ * The known-value, rounding, summing and period primitives are imported from
+ * the ONE canonical `financeModel.ts` that `budgetFit.ts` (the concise verdict
+ * shown on cards, compare and recommender) also imports. This is what makes the
+ * detailed plan and the concise verdict use a single calculation model.
  */
 
 import { normalizeScholarshipAwardPeriod } from "./usdCosts";
+import {
+  knownMoney,
+  roundMoney,
+  sumKnown as canonicalSumKnown,
+  classifyAid,
+  type AidKind,
+} from "./financeModel";
 
 export interface CostInputs {
   /** Published by the university; null means unknown. */
@@ -41,6 +53,12 @@ export interface ScholarshipInput {
   awardPeriod?: string | null;
   /** What it actually covers — a stipend does not pay tuition. */
   covers: "tuition" | "living" | "both" | "other";
+  /** Catalogue award basis / coverage wording, used to classify aid kind. */
+  basis?: string | null;
+  /** Explicit catalogue flag: a loan must never reduce net cost. */
+  repayable?: boolean | null;
+  /** Explicit catalogue flag: a reimbursement cannot pay an upfront bill. */
+  reimbursement?: boolean | null;
   /** Days until the date listed by the catalogue, when available. */
   deadlineDays?: number | null;
 }
@@ -73,6 +91,13 @@ export interface CostBreakdown {
     coveragePct: number | null;
     /** Scholarships that pay for something other than the shortfall. */
     misaligned: string[];
+    /**
+     * Field-level aid classification from the ONE canonical `financeModel`:
+     * grant / repayable_loan / tuition_waiver / cash_stipend / reimbursement /
+     * unknown are kept distinct. This is what stops a loan or a reimbursement
+     * from being presented as a reduction in what a family must pay up front.
+     */
+    byKind: { name: string; kind: AidKind; note: string; countsTowardNetCost: boolean }[];
   };
   net: {
     annualAfterScholarshipUsd: number | null;
@@ -90,11 +115,11 @@ export interface CostBreakdown {
 }
 
 const MAX_YEARS = 10;
-const money = (value: number) => Math.round(value);
-
-function knownNonNegative(value: number | null | undefined): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
-}
+// Canonical known-value / rounding / sum semantics, imported from the ONE
+// finance model that `budgetFit.ts` also uses. This removes the duplicated
+// definitions that previously let the plan and the verdict disagree.
+const money = roundMoney;
+const knownNonNegative = knownMoney;
 
 function programmeYears(value: number | null | undefined): number | null {
   const years = knownNonNegative(value);
@@ -102,12 +127,7 @@ function programmeYears(value: number | null | undefined): number | null {
 }
 
 function sumKnown(values: (number | null)[]): number | null {
-  let sum = 0;
-  for (const value of values) {
-    if (value == null) return null;
-    sum += value;
-  }
-  return money(sum);
+  return canonicalSumKnown(values);
 }
 
 function annualLine(key: string, label: string, amount: number | null, years: number | null): CostLine {
@@ -200,7 +220,33 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
   const oneTimeAwards: { amount: number; covers: ScholarshipInput["covers"] }[] = [];
   let annualAwardUnknown = false;
   let oneTimeAwardUnknown = false;
+  // Field-level aid classification from the canonical finance model. Loans and
+  // reimbursements are real awards but NEVER a reduction in what a family must
+  // pay up front; they are recorded separately, not summed into best-case aid.
+  const byKind: { name: string; kind: AidKind; note: string; countsTowardNetCost: boolean }[] = [];
   for (const award of input.scholarships ?? []) {
+    const classified = classifyAid({
+      key: award.name,
+      basis: award.basis,
+      covers: award.covers,
+      repayable: award.repayable,
+      reimbursement: award.reimbursement,
+      amountUsd: award.amountUsd,
+      period: award.awardPeriod,
+    });
+    const excluded = classified.repayable || classified.kind === "reimbursement";
+    byKind.push({
+      name: award.name,
+      kind: classified.kind,
+      note: classified.note,
+      countsTowardNetCost: !excluded,
+    });
+    if (excluded) {
+      // A repayable loan / after-the-fact reimbursement cannot cover an upfront
+      // bill. Report it honestly instead of silently folding it into "funding".
+      addUnknown(`${award.name}: ${classified.note}`);
+      continue;
+    }
     const period = normalizeScholarshipAwardPeriod(award.awardPeriod);
     const amount = knownNonNegative(award.amountUsd);
     if (period === "year" || period === "month") {
@@ -288,6 +334,7 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
       bestCaseOneTimeUsd: bestCaseOneTime,
       coveragePct,
       misaligned,
+      byKind,
     },
     net: {
       annualAfterScholarshipUsd: annualAfterScholarship,

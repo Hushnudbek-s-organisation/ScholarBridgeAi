@@ -16,7 +16,7 @@ import React, { useCallback, useState } from "react";
 import { CountryFlag } from "@/components/CountryFlag";
 import { useTranslations } from "next-intl";
 import { getJson, useResource } from "./useResource";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m as Motion, useReducedMotion } from "framer-motion";
 import { formatMoney } from "@/lib/format";
 import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
 import type { MatchBreakdown } from "@/lib/matching";
@@ -156,6 +156,8 @@ export interface JourneyDashboard {
       lastVerifiedAt: string | null;
       gpaOk: boolean;
       gpaProvided: boolean;
+      /** Field-level verified official minimum — false for every legacy column. */
+      gpaCutoffTrusted?: boolean;
       matchScore: number;
       matchReasons: string[];
       matchIssues: string[];
@@ -448,7 +450,15 @@ export function RecommendedPanel({
                     </ul>
                   )}
                   <p className={`text-sm ${s.gpaOk ? "text-slate-600 dark:text-slate-300" : "font-semibold text-amber-700 dark:text-amber-300"}`}>
-                    {s.minGpa == null ? t("ccGpaNotSpecified") : !s.gpaProvided ? t("ccGpaAdd", { gpa: s.minGpa }) : s.gpaOk ? t("ccGpaMeets", { gpa: s.minGpa }) : t("ccGpaBelow", { gpa: s.minGpa })}
+                    {s.minGpa == null
+                      ? t("ccGpaNotSpecified")
+                      : !s.gpaCutoffTrusted
+                        ? t("ccGpaUnverified", { gpa: s.minGpa })
+                        : !s.gpaProvided
+                          ? t("ccGpaAdd", { gpa: s.minGpa })
+                          : s.gpaOk
+                            ? t("ccGpaMeets", { gpa: s.minGpa })
+                            : t("ccGpaBelow", { gpa: s.minGpa })}
                   </p>
                   {/* Citizenship rule: stated when it is known, never assumed. */}
                   <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -608,10 +618,13 @@ export function DashboardFirstSteps({
 
 export function JourneyControlCenter({
   profileId,
+  profileVersion,
   onNavigateTab,
   onOpenWorkspace,
 }: {
   profileId: number | null;
+  /** Changes on every score-relevant profile edit; forces a fresh dashboard. */
+  profileVersion?: string | null;
   onNavigateTab: (tab: string) => void;
   onOpenWorkspace: (applicationId: number) => void;
 }) {
@@ -625,10 +638,14 @@ export function JourneyControlCenter({
   const [showAllDeadlines, setShowAllDeadlines] = useState(false);
   const [showAllReadiness, setShowAllReadiness] = useState(false);
   const [showAllPhases, setShowAllPhases] = useState(false);
-  const load = useCallback(async () => getJson<JourneyDashboard>(`/api/dashboard?profileId=${profileId}`, t("ccLoadError")), [profileId, t]);
+  // The version is part of the URL AND of the effect dependencies: the shared
+  // 15-second GET cache is keyed by URL, so an edited profile can never be
+  // answered with the previous GPA / IELTS / budget instead of a fresh read.
+  const versionParam = profileVersion ? `&v=${encodeURIComponent(profileVersion)}` : "";
+  const load = useCallback(async () => getJson<JourneyDashboard>(`/api/dashboard?profileId=${profileId}${versionParam}`, t("ccLoadError")), [profileId, versionParam, t]);
   const resource = useResource<JourneyDashboard | null>(
     () => profileId ? load() : Promise.resolve(null),
-    [profileId],
+    [profileId, profileVersion],
     { initial: null, errorFallback: t("ccLoadError") }
   );
   const { error, reload: refresh } = resource;
@@ -754,7 +771,7 @@ export function JourneyControlCenter({
           <div className="min-w-0">
             <p className="sb-journey-eyebrow text-sm font-bold uppercase tracking-wider">{t("ccEyebrow")}</p>
             <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
-              <motion.span
+              <Motion.span
                 aria-hidden
                 initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -762,7 +779,7 @@ export function JourneyControlCenter({
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-overlay bg-white/70 shadow-sm ring-1 ring-indigo-200/70 dark:bg-white/10 dark:ring-indigo-400/30"
               >
                 {journey.currentIcon}
-              </motion.span>
+              </Motion.span>
               <span className="sb-gradient-text min-w-0 break-words">{currentStageLabel}</span>
             </h1>
             <p className="mt-2 max-w-2xl break-words text-sm leading-relaxed text-slate-600 dark:text-slate-300">
@@ -837,7 +854,7 @@ export function JourneyControlCenter({
                 : "text-slate-500 dark:text-slate-400";
 
             return (
-              <motion.li
+              <Motion.li
                 key={s.id}
                 className="min-w-0"
                 initial={reduceMotion ? false : { opacity: 0, y: 6 }}
@@ -859,7 +876,7 @@ export function JourneyControlCenter({
                   </span>
                   <span className={`mt-1.5 text-xs font-semibold leading-tight ${statusClass}`}>{stageStatus}</span>
                 </MotionButton>
-              </motion.li>
+              </Motion.li>
             );
           })}
         </ol>
@@ -893,7 +910,7 @@ export function JourneyControlCenter({
           <>
           <ul className="space-y-2">
             {(showAllSteps ? nextSteps : nextSteps.slice(0, 3)).map((s, i) => (
-              <motion.li
+              <Motion.li
                 key={s.id}
                 initial={reduceMotion ? false : { opacity: 0, x: -8 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -917,7 +934,7 @@ export function JourneyControlCenter({
                 <Button size="sm" variant="outline" className="min-h-11 shrink-0" onClick={() => onNavigateTab(s.tab)}>
                   {actionLabelForStep(t, s.id, s.tab)}
                 </Button>
-              </motion.li>
+              </Motion.li>
             ))}
           </ul>
           <ShowMoreToggle
@@ -948,7 +965,7 @@ export function JourneyControlCenter({
             <>
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
               {(showAllDeadlines ? deadlines : deadlines.slice(0, 4)).map((d, i) => (
-                <motion.li
+                <Motion.li
                   key={d.id}
                   initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -966,7 +983,7 @@ export function JourneyControlCenter({
                   <Button size="sm" variant="ghost" className="min-h-11 shrink-0" onClick={() => onNavigateTab(d.tab)}>
                     {t("ccOpen")}
                   </Button>
-                </motion.li>
+                </Motion.li>
               ))}
             </ul>
             <ShowMoreToggle
@@ -1000,7 +1017,7 @@ export function JourneyControlCenter({
                   { label: t("ccStatSubmitted"), value: applications.submitted, tone: "text-sky-600 dark:text-sky-400" },
                   { label: t("ccStatDecision"), value: applications.decision, tone: "text-emerald-600 dark:text-emerald-400" },
                 ].map((s, i) => (
-                  <motion.div
+                  <Motion.div
                     key={s.label}
                     initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.97 }}
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
@@ -1012,7 +1029,7 @@ export function JourneyControlCenter({
                       <CountUp value={s.value} />
                     </p>
                     <p className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{s.label}</p>
-                  </motion.div>
+                  </Motion.div>
                 ))}
               </div>
               <Button className="mt-3 w-full" variant="outline" onClick={() => onNavigateTab("workspace")}>

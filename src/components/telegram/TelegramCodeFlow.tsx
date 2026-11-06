@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import { CheckCircle2, ExternalLink, Loader2, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
 import { Button } from "@/components/ui/Button";
@@ -425,7 +425,7 @@ function StepDot({ n }: { n: number }) {
 
 function ErrorBox({ text }: { text: string }) {
   return (
-    <motion.div
+    <Motion.div
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
@@ -433,6 +433,6 @@ function ErrorBox({ text }: { text: string }) {
       className="rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
     >
       {text}
-    </motion.div>
+    </Motion.div>
   );
 }

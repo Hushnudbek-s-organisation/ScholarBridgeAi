@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import {
   Archive,
   Bookmark,
@@ -177,7 +177,7 @@ export function ScholarshipAutopilot({
   };
 
   const card = (s: Item, i: number) => (
-    <motion.li
+    <Motion.li
       key={s.id}
       layout
       initial={{ opacity: 0, y: 8 }}
@@ -271,7 +271,7 @@ export function ScholarshipAutopilot({
           </a>
         )}
       </div>
-    </motion.li>
+    </Motion.li>
   );
 
   return (

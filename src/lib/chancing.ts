@@ -7,12 +7,17 @@
 
 import { gpaTo40Scale } from "./gpa";
 import { clamp, roundTo } from "./scoring";
+import {
+  ADMISSION_PROBABILITY as SHARED_ADMISSION_PROBABILITY,
+  type CatalogueFact,
+} from "./evidencePolicy";
 
-/** Shared API state: ScholarBridge does not currently calculate admission probability. */
-export const ADMISSION_PROBABILITY = {
-  available: false,
-  reason: "no-validated-methodology",
-} as const;
+/**
+ * Shared API state: one platform-wide policy, no personal admission
+ * probability until a validated/calibrated model exists.
+ */
+export const ADMISSION_PROBABILITY = SHARED_ADMISSION_PROBABILITY;
+export { ADMISSION_PROBABILITY_POLICY, type CatalogueFact, type MetricValueType } from "./evidencePolicy";
 
 // ---------------------------------------------------------------------------
 // Inputs
