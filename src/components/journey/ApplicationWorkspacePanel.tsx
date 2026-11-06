@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Check, ExternalLink, Lock, RefreshCw } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m as Motion, useReducedMotion } from "framer-motion";
 import { SectionTransition } from "@/components/motion";
 import { Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, daysLabel, toneForDays } from "@/components/ui/journey";
 import { Button } from "@/components/ui/Button";
@@ -345,7 +345,7 @@ export function ApplicationWorkspacePanel({
                 }`}
               >
                 {isActive && (
-                  <motion.span
+                  <Motion.span
                     layoutId="workspace-tab-pill"
                     className="absolute inset-0 rounded-control bg-indigo-600"
                     transition={{ type: "spring", stiffness: 420, damping: 34 }}

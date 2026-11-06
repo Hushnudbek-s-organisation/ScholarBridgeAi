@@ -18,6 +18,7 @@ import { db } from "@/db";
 import { savedUniversities, universities } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { getCachedScholarshipsBundle, getCachedProfileForMatching, getCachedUniversitiesBundle } from "@/lib/catalogCache";
+import { legacyEvidence } from "@/lib/factPresentation";
 import { paginatedPayload } from "@/lib/pagination";
 import { countriesMatch } from "@/lib/countries";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
@@ -608,7 +609,26 @@ export async function GET(req: Request) {
     const visible = results.map(({ covTier: _covTier, ...row }) => row);
     const paginated = paginatedPayload("scholarships", visible, searchParams);
     const pageRows = paginated.scholarships as typeof visible;
-    paginated.scholarships = pageRows.map((row) => localizeScholarshipRow(row, locale));
+    // §4: funding facts carry the same field-level evidence envelope. An
+    // amount without a verified official source stays `legacy_unknown`; it is
+    // never presented as a guaranteed stipend or an official minimum.
+    paginated.scholarships = pageRows.map((row) => {
+      const r = row as unknown as Record<string, unknown>;
+      return {
+        ...localizeScholarshipRow(row, locale),
+        evidence: legacyEvidence({
+          entityVerified: r.verificationStatus === "verified",
+          sourceUrl: typeof r.officialSourceUrl === "string" ? r.officialSourceUrl
+            : typeof r.sourceUrl === "string" ? r.sourceUrl : null,
+          fields: {
+            amountUsdValue: r.amountUsdValue as number | null,
+            awardAmount: r.awardAmount as number | null,
+            livingAllowance: r.livingAllowance as number | null,
+            minIelts: r.minIelts as number | null,
+          },
+        }),
+      };
+    });
     return privateNoStoreJson({
       ...paginated,
       ...(mercuryEligibilityReview ? { mercuryEligibilityReview } : {}),

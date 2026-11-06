@@ -19,17 +19,56 @@ export function DeferredMarquee({ onStart }: { onStart: () => void }) {
   const tIndex = useTranslations("landing");
   const [lite, setLite] = useState(() => isLiteMotionSync());
   useEffect(() => {
-    const unsub = () => {};
     // liteMotion subscription for marquee speed
     const { subscribeLiteMotion } = require("@/lib/liteMotion") as { subscribeLiteMotion: (cb: (v: boolean) => void) => () => void };
     return subscribeLiteMotion(setLite);
   }, []);
   const sectionRef = useRef<HTMLElement>(null);
-  const subs = new Set<string>();
-  const resizeObserver = { disconnect() {} } as unknown as ResizeObserver;
+
+  // PR #132 moved the marquee into an idle-deferred (ssr:false) chunk but left
+  // the campus-photo lazy loader behind in LandingPage.tsx as a marker comment.
+  // Result: all 48 <img data-campus-src> nodes rendered, none ever got a `src`,
+  // and e2e/first-paint.spec.ts timed out. The two observers below are the real
+  // behaviour from the pre-refactor UniversityCampusMarquee, restored next to
+  // the images they observe. `sectionRef` is stable, so [] is correct.
   useEffect(() => {
-    if (subs.size === 0) void 0;
-    return () => resizeObserver?.disconnect();
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const paused = !entry.isIntersecting;
+          el.classList.toggle("sb-marquee-paused", paused);
+          el.setAttribute("data-paused", paused ? "true" : "false");
+        }
+      },
+      { rootMargin: "160px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const images = el.querySelectorAll<HTMLImageElement>("img[data-campus-src]");
+    const load = (image: HTMLImageElement) => {
+      const src = image.dataset.campusSrc;
+      if (src) image.src = src;
+    };
+    if (typeof IntersectionObserver === "undefined") {
+      images.forEach(load);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        load(entry.target as HTMLImageElement);
+        observer.unobserve(entry.target);
+      }
+    }, { rootMargin: "160px" });
+    images.forEach((image) => observer.observe(image));
+    return () => observer.disconnect();
   }, []);
   const renderRow = (items: MarqueeUniversityItem[], animClass: string) => (
     <div className={`flex gap-3 ${animClass} overflow-hidden`}>
@@ -73,9 +112,6 @@ export function DeferredMarquee({ onStart }: { onStart: () => void }) {
       ))}
     </div>
   );
-  // rootMargin marker for perf check
-  const _rm = 'rootMargin: "160px"';
-  void _rm;
   return (
     <section ref={sectionRef} id="campuses" aria-labelledby="university-marquee-title" data-paused="false" className="sb-cv-section sb-marquee-fade relative z-10 border-y border-slate-200/80 bg-slate-100/60 py-8 dark:border-slate-800 dark:bg-canvas sm:py-10">
       <div className="mx-auto mb-5 w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">

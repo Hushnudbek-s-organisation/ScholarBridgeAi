@@ -18,6 +18,8 @@ import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { verifiedQsRank } from "@/lib/universityRank";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
+import { parseUniversitySort, semanticRerankAllowed, sortUniversities } from "@/lib/universitySort";
+import { legacyEvidence } from "@/lib/factPresentation";
 
 /**
  * University discovery API (spec §16).
@@ -307,54 +309,20 @@ export async function GET(req: Request) {
       };
     });
 
-    // ---------- Sorting (NULL tuition sorts after verified values) ----------
-    if (sort === "tuition_asc") {
-      results.sort((a, b) => {
-        if (a.annualTuitionUsd == null && b.annualTuitionUsd == null) return 0;
-        if (a.annualTuitionUsd == null) return 1;
-        if (b.annualTuitionUsd == null) return -1;
-        return a.annualTuitionUsd - b.annualTuitionUsd;
-      });
-    } else if (sort === "tuition_desc") {
-      results.sort((a, b) => {
-        if (a.annualTuitionUsd == null && b.annualTuitionUsd == null) return 0;
-        if (a.annualTuitionUsd == null) return 1;
-        if (b.annualTuitionUsd == null) return -1;
-        return b.annualTuitionUsd - a.annualTuitionUsd;
-      });
-    } else if (sort === "name_asc") {
-      results.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sort === "chance_desc" && profileData) {
-      // Admission chance first (QS/programme positioning engine), fit score
-      // as tie-break. Signed-out callers have no chance scores at all, so
-      // they fall through to the default ranking instead of an empty sort.
-      results.sort(
-        (a, b) =>
-          (b.chanceScore ?? -1) - (a.chanceScore ?? -1) ||
-          (b.matchScore ?? -1) - (a.matchScore ?? -1)
-      );
-    } else if (profileData) {
-      // NULL match scores sort last (no profile data -> never ranked by score).
-      results.sort((a, b) => {
-        if (a.matchScore == null && b.matchScore == null) return 0;
-        if (a.matchScore == null) return 1;
-        if (b.matchScore == null) return -1;
-        return b.matchScore - a.matchScore;
-      });
-    } else {
-      results.sort((a, b) => {
-        if (a.worldRanking == null && b.worldRanking == null) return a.name.localeCompare(b.name);
-        if (a.worldRanking == null) return 1;
-        if (b.worldRanking == null) return -1;
-        return a.worldRanking - b.worldRanking;
-      });
-    }
+    // ---------- Sorting (explicit, deterministic, profile-independent) -------
+    // The UI always sends the selected order. An explicit choice is applied as
+    // requested — a profile must NEVER turn "QS ranking" into "my match score".
+    // `relevance` is the legacy default for API clients that send no `sort`;
+    // it is also the only mode semantic search is allowed to nudge.
+    const parsedSort = parseUniversitySort(sort);
+    const ordering = sortUniversities(results, parsedSort, Boolean(profileData));
+    const ordered = ordering.rows;
 
-    // Best-effort multilingual semantic rerank: deterministic filters and
-    // profile relevance remain in force; vector similarity only nudges order.
-    if (search && search.trim().length >= 4 && results.length > 1 && !sort) {
+    // Best-effort multilingual semantic rerank: only in relevance mode, never
+    // over an explicitly requested QS / tuition / name / fit / position order.
+    if (search && search.trim().length >= 4 && ordered.length > 1 && semanticRerankAllowed(parsedSort)) {
       try {
-        const candidates = results.slice(0, 63).map((uni) => [
+        const candidates = ordered.slice(0, 63).map((uni) => [
           uni.name,
           uni.country,
           uni.city,
@@ -363,12 +331,12 @@ export async function GET(req: Request) {
         ].filter(Boolean).join(". "));
         const ranked = await rankSemanticTexts(search, candidates, { timeoutMs: 3_500, limit: candidates.length });
         const semanticPosition = new Map(ranked.flatMap((item, position) => {
-          const university = results[item.index];
+          const university = ordered[item.index];
           return university ? [[university.id, position] as const] : [];
         }));
-        const lexicalPosition = new Map(results.map((item, position) => [item.id, position]));
-        const count = Math.max(1, results.length - 1);
-        results.sort((a, b) => {
+        const lexicalPosition = new Map(ordered.map((item, position) => [item.id, position]));
+        const count = Math.max(1, ordered.length - 1);
+        ordered.sort((a, b) => {
           const posA = lexicalPosition.get(a.id) ?? count;
           const posB = lexicalPosition.get(b.id) ?? count;
           const semA = semanticPosition.get(a.id) ?? count;
@@ -387,9 +355,34 @@ export async function GET(req: Request) {
     //
     // Localize the PAGE, not the catalogue: this used to translate every row
     // and then throw all but 24 away.
-    const payload = paginatedPayload("universities", results, searchParams);
+    const payload = paginatedPayload("universities", ordered, searchParams);
+    // Echo the order actually applied. The UI can show it and tests can prove
+    // that a profile did not silently replace an explicit choice.
+    payload.sortApplied = ordering.applied;
+    payload.sortFellBackToRank = ordering.fellBackToRank;
     const rows = payload.universities as typeof results;
-    payload.universities = rows.map((u) => localizeUniversityRow(u, locale));
+    // §4: every catalog row carries a field-level evidence envelope. Legacy
+    // numbers are KEPT but never promoted to a verified official minimum by
+    // the entity-level `verified` flag. Clients/UI/Telegram consume the same
+    // shape instead of re-interpreting raw columns.
+    payload.universities = rows.map((u) => {
+      const localized = localizeUniversityRow(u, locale);
+      const raw = u as unknown as Record<string, unknown>;
+      return {
+        ...localized,
+        evidence: legacyEvidence({
+          entityVerified: raw.verificationStatus === "verified",
+          sourceUrl: typeof raw.website === "string" ? raw.website : null,
+          admissionCycle: typeof raw.qsRankYear === "number" ? String(raw.qsRankYear) : null,
+          fields: {
+            minGpa: raw.minGpa as number | null,
+            minIelts: raw.minIelts as number | null,
+            minSat: raw.minSat as number | null,
+            acceptanceRate: raw.acceptanceRate as number | null,
+          },
+        }),
+      };
+    });
     return privateNoStoreJson(payload);
   } catch (error) {
     console.error("GET /api/universities error:", error);

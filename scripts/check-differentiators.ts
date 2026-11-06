@@ -537,17 +537,23 @@ check("an unpublished work visa is never shown as 0 years", dBare.pills[2].state
 check("a TOEFL student is not compared against an IELTS minimum", dToefl.gaps.ielts.reason === "different_test");
 check("tuition above the budget reports a positive gap", evaluateUniversityDecision({ ...uniFull, annualTuitionUsd: 90000 }, strong).budget.gapUsd === 50000);
 check("a missing budget is not treated as zero", dAnon.budget.budgetUsd === null && dAnon.budget.withinBudget === null);
+check("a tuition-only figure never becomes a full-budget verdict", dStrong.pills[1].stateKey === "tuitionOnly" && dStrong.budget.withinBudget === null);
+check("3k tuition + 15k living is over a 3k budget", (() => {
+  const d = evaluateUniversityDecision({ id: 9, annualTuitionUsd: 3000, annualLivingEstUsd: 15000 }, { budgetAnnualUsd: 3000 });
+  return d.pills[1].stateKey === "gap" && d.budget.annualTotalUsd === 18000 && d.budget.withinBudget === false;
+})());
 
 section("4.1 Decision pill i18n (dynamic keys)");
 const eligibilityStates = ["notPublished", "short_gpa", "short_ielts", "short_sat", "allMet", "met_gpa", "met_ielts", "met_sat", "differentTest", "unknown_gpa", "unknown_ielts", "unknown_sat", "partiallyKnown"];
 const eligibilityHints = ["notPublishedHint", "short_gpaHint", "short_ieltsHint", "short_satHint", "allMetHint", "differentTestHint", "unknown_gpaHint", "unknown_ieltsHint", "unknown_satHint", "partiallyKnownHint"];
 checkKeys(expand("university.pills.eligibility.", eligibilityStates, [""]));
 checkKeys(expand("university.pills.eligibility.", eligibilityHints, [""]));
-checkKeys(expand("university.pills.budget.", ["tuitionUnknown", "budgetUnknown", "within", "gap"], ["", "Hint"]));
+checkKeys(expand("university.pills.budget.", ["tuitionUnknown", "budgetUnknown", "within", "gap", "tuitionOnly", "tuitionGap"], ["", "Hint"]));
 checkKeys(expand("university.pills.workVisa.", ["unknown", "years"], ["", "Hint"]));
 checkKeys(["university.pills.eligibility.fallback", "university.pills.budget.fallback", "university.pills.workVisa.fallback"]);
 checkKeys([
-  "university.decisionTitle", "university.decisionSubtitle", "university.pillFactGpa",
+  "university.decisionTitle", "university.decisionSubtitle", "university.catalogueFigureNote",
+  "university.budgetBreakdown", "university.pillFactGpa",
   "university.pillFactIelts", "university.pillFactTuition", "university.pillFactWorkVisa",
   "university.startApp", "university.startAppHint", "university.startAppNeedsProfile",
   "university.startAppFailed", "university.startAppDone", "university.startAppDoneShort",

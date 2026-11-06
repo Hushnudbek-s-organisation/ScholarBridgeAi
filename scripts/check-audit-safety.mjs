@@ -3,7 +3,15 @@ import assert from "node:assert/strict";
 import yaml from "js-yaml";
 import { readFileSync } from "node:fs";
 const read = (p) => readFileSync(p, "utf8");
-assert.deepEqual(yaml.load(read(".github/workflows/ci.yml")), yaml.load(read("ci/security-ci.yml")), "active and portable CI workflows must stay aligned");
+// The real workflow is auto-discovered under .github/workflows; the portable
+// mirror is NOT. Its display name says so explicitly, so compare every OTHER
+// key (env / on / jobs / steps) — command parity is what must never drift.
+const activeCi = yaml.load(read(".github/workflows/ci.yml"));
+const mirrorCi = yaml.load(read("ci/security-ci.yml"));
+assert.match(String(mirrorCi.name), /not auto-discovered/i, "mirror must be labelled as not auto-discovered");
+const { name: _activeName, ...activeRest } = activeCi;
+const { name: _mirrorName, ...mirrorRest } = mirrorCi;
+assert.deepEqual(mirrorRest, activeRest, "active and portable CI workflows must stay aligned on every executable key");
 const setup = read("e2e/global-setup.ts");
 assert.match(setup, /const serverEnv = \{ \.\.\.env, PORT:/, "do not merge unsanitized process.env back into the server");
 assert.doesNotMatch(setup, /const serverEnv = \{ \.\.\.process\.env/);

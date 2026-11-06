@@ -15,7 +15,7 @@ import { checkDocuments, expectedDocuments, scholarshipChecklistDocuments, type 
 import { matchMultimodalDocumentReadiness } from "@/lib/ai/embeddings";
 
 /** Valid `status` values — anything else is ignored rather than stored. */
-const DOC_STATUSES: readonly string[] = ["missing", "uploaded", "not_required"];
+const DOC_STATUSES: readonly string[] = ["missing", "uploaded", "not_required", "expired", "rejected", "needs_review"];
 
 /**
  * Document checklist (spec §24).
@@ -46,6 +46,16 @@ export async function GET(req: Request) {
       .select({ scholarshipId: savedScholarships.scholarshipId })
       .from(savedScholarships)
       .where(eq(savedScholarships.profileId, profileId));
+    const savedUni = await db
+      .select({ universityId: savedUniversities.universityId })
+      .from(savedUniversities)
+      .where(eq(savedUniversities.profileId, profileId));
+    // A readiness percentage is only allowed when every shortlisted entity has
+    // an OFFICIAL, verified document list. Universities currently have no
+    // document catalogue data at all, and unverified scholarships only produce
+    // optional preparation notes — neither may be counted as "nothing needed".
+    let confirmedRequirementSources = 0;
+    let unverifiedRequirementSources = savedUni.length;
     if (savedSch.length > 0) {
       await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT id FROM student_profiles WHERE id = ${profileId} FOR UPDATE`);
@@ -68,7 +78,13 @@ export async function GET(req: Request) {
             try { return ["https:", "http:"].includes(new URL(scholarship.sourceUrl ?? "").protocol); }
             catch { return false; }
           })();
-          for (const document of scholarshipChecklistDocuments(scholarship.requiredDocuments, verifiedSource)) {
+          const checklist = scholarshipChecklistDocuments(scholarship.requiredDocuments, verifiedSource);
+          if (checklist.some((document) => document.isRequired && !document.documentType.startsWith("suggested_scholarship_"))) {
+            confirmedRequirementSources += 1;
+          } else {
+            unverifiedRequirementSources += 1;
+          }
+          for (const document of checklist) {
             requiredEntries.set(`${scholarship.id}:${document.documentType}`, {
               scholarshipId: scholarship.id,
               documentType: document.documentType,
@@ -161,9 +177,13 @@ export async function GET(req: Request) {
     const intakeParam = searchParams.get("intakeDate");
     const intake = intakeParam && !Number.isNaN(new Date(intakeParam).getTime()) ? new Date(intakeParam) : null;
 
+    const requirementsState = confirmedRequirementSources > 0 && unverifiedRequirementSources === 0
+      ? "confirmed"
+      : "unknown";
     const check = checkDocuments(rows as DocumentRow[], {
       today: new Date(),
       intakeDate: intake,
+      requirementsState,
     });
 
     const existingTypes = new Set(rows.map((r) => r.documentType));
@@ -173,7 +193,14 @@ export async function GET(req: Request) {
       needsVisa: true,
     }).filter((d) => !existingTypes.has(d.documentType));
 
-    return privateNoStoreJson({ documents: docs, check, suggested });
+    return privateNoStoreJson({
+      documents: docs,
+      check,
+      suggested,
+      // Never present generic planning ideas as official requirements.
+      suggestedAreOfficial: false,
+      requirementSources: { confirmed: confirmedRequirementSources, unverified: unverifiedRequirementSources },
+    });
   } catch (error) {
     console.error("GET /api/documents error:", error);
     return privateNoStoreJson({ error: "Failed to load documents" }, { status: 500 });

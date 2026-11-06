@@ -6,10 +6,18 @@ import { AGENT_CONFIG } from "./config";
 import { sleep } from "./fetch";
 import type { AuditReport, RunRequest } from "./types";
 
+export interface RunBatchCallbacks {
+  /** Called after each university finishes, including when it produced errors. */
+  onUniversityComplete?: (report: AuditReport) => void | Promise<void>;
+  /** Called when a university throws before an audit report can be produced. */
+  onUniversityError?: (universityId: number, error: string) => void | Promise<void>;
+}
+
 export async function runBatch(
   request: RunRequest,
   progress: (universityId: number, message: string) => void,
-  isCancelled: () => boolean = () => false
+  isCancelled: () => boolean = () => false,
+  callbacks: RunBatchCallbacks = {}
 ): Promise<{ reports: AuditReport[]; errors: string[] }> {
   const reports: AuditReport[] = [];
   const errors: string[] = [];
@@ -23,8 +31,13 @@ export async function runBatch(
     try {
       const report = await runUniversity(id, request.scopes, request.dryRun ?? false, (m) => progress(id, m), request.maxPages);
       reports.push(report);
+      // Every university result is handed to the caller so it can be persisted
+      // in the durable batch report, not just the last one.
+      await callbacks.onUniversityComplete?.(report);
     } catch (err: any) {
-      errors.push(`#${id}: ${err?.message || err}`);
+      const message = `#${id}: ${err?.message || err}`;
+      errors.push(message);
+      await callbacks.onUniversityError?.(id, message);
     }
     // Sequential + rate limit (spec §17, §21)
     if (id !== request.universityIds[request.universityIds.length - 1] && !isCancelled()) await sleep(AGENT_CONFIG.batchDelayMs);

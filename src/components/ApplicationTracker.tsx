@@ -7,6 +7,9 @@ import confetti from "canvas-confetti";
 import { StudentProfile } from "./Navbar";
 import { University } from "./UniversityExplorer";
 import { Scholarship } from "./ScholarshipHub";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import { presentRaw, type PresentedFact } from "@/lib/factPresentation";
+
 import { 
   GraduationCap, 
   Award, 
@@ -178,6 +181,11 @@ export function ApplicationTracker({
                         <span>💵 {t("tuition")}: {formatMoney(u.annualTuitionUsd, "USD", { suffix: "/yr" })}</span>
                         <span>📍 {localizeCity(u.city, locale)}, {localizeCountry(u.country, locale)}</span>
                       </div>
+                      <EvidenceNote compact label={t("tuition")} fact={presentRaw({
+                        value: u.annualTuitionUsd ?? null, fieldLabel: t("tuition"),
+                        trust: "legacy_unknown", valueType: "unverified",
+                        currency: "USD", period: "year",
+                      })} />
 
                       {/* Notes Box */}
                       <div className="bg-slate-50 p-3 rounded-surface border border-slate-100 text-xs text-slate-700 mt-2">
@@ -307,6 +315,12 @@ export function ApplicationTracker({
                         <span>💵 {t("type")}: {localizeCoverageType(s.coverageType, locale)}</span>
                         <span>📅 {t("deadline")}: {s.deadline}</span>
                       </div>
+                      <EvidenceNote compact label={t("value")} fact={presentRaw({
+                        value: s.amountUsdValue ?? null, fieldLabel: t("value"),
+                        trust: "legacy_unknown", valueType: "unverified",
+                        currency: "USD", period: "year",
+                        note: "Award value from a legacy catalogue column. Unknown is not zero; check the official fellowship page.",
+                      })} />
 
                       {/* Notes Box */}
                       <div className="bg-slate-50 p-3 rounded-surface border border-slate-100 text-xs text-slate-700 mt-2">

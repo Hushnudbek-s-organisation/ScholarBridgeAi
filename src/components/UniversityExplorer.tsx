@@ -11,6 +11,7 @@ import { campusPhotoSrc, onWikimediaThumbError } from "@/lib/wikimediaThumb";
 import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
 import { CountryFlag } from "@/components/CountryFlag";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
+import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 
 const UniversityDetail = dynamic(
   () => import("./UniversityDetail").then((m) => m.UniversityDetail),
@@ -223,7 +224,7 @@ export function UniversityExplorer({
     setLastAutoOpenId(autoOpenUniversityId);
     setSelectedUniId(autoOpenUniversityId);
   }
-  const [sortBy, setSortBy] = useState("rank");
+  const [sortBy, setSortBy] = useState("rank_asc");
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
   // `grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3`, so 8 / 16 / 24 cards.
@@ -323,7 +324,9 @@ export function UniversityExplorer({
     if (effectiveLevel !== "All") params.set("degreeLevel", effectiveLevel);
     if (committedMaxTuition < 70000) params.set("maxTuition", committedMaxTuition.toString());
     if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
-    if (sortBy !== "rank") params.set("sort", sortBy);
+    // ALWAYS send the selected order. Omitting the default let the API apply
+    // "personal match" whenever a profile existed, which silently overrode QS.
+    params.set("sort", sortBy);
     if (maxRank != null) params.set("maxRank", maxRank.toString());
     if (ieltsMax != null) params.set("ielts", ieltsMax.toString());
     // Explicit locale: the API localizes the response AND the SWR cache key
@@ -450,6 +453,9 @@ export function UniversityExplorer({
     page,
     perPage,
     locale,
+    // GPA / IELTS / SAT / major / countries / budget edits change the score,
+    // so the cards must be fetched again — not just the SWR cache cleared.
+    profileFingerprint,
   ]);
 
   const filteredUniversities = universities;
@@ -489,6 +495,7 @@ export function UniversityExplorer({
         );
         return;
       }
+      notifyApplicationsChanged(activeProfile.id);
       const applicationId = Number(data?.application?.id);
       setNotice(t("startAppDone", { name: uni.name }));
       if (Number.isInteger(applicationId) && applicationId > 0) {
@@ -527,7 +534,7 @@ export function UniversityExplorer({
     selectedType !== "All" ||
     selectedLevel !== "All" ||
     debouncedSearch.trim() !== "" ||
-    sortBy !== "rank";
+    sortBy !== "rank_asc";
 
   /**
    * Phone (< 640px): the six filter controls used to stack above the first
@@ -557,7 +564,7 @@ export function UniversityExplorer({
     setSelectedLevel("All");
     setMaxRank(null);
     setIeltsMax(null);
-    setSortBy("rank");
+    setSortBy("rank_asc");
     setNotice("");
   };
 
@@ -671,12 +678,14 @@ export function UniversityExplorer({
               aria-label={t("exSortRank")}
               className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
-              <option value="rank">{t("exSortRank")}</option>
+              <option value="rank_asc">{t("exSortRank")}</option>
+              <option value="relevance">{t("exSortRelevance")}</option>
               <option value="tuition_asc">{t("exSortTuitionAsc")}</option>
               <option value="tuition_desc">{t("exSortTuitionDesc")}</option>
               <option value="name_asc">{t("exSortNameAsc")}</option>
-              {/* Module 4 — position first: my chances inside the admitted
-                  cohort, fit score as the tie-break (server-side sort). */}
+              <option value="match_desc">{t("exSortMatch")}</option>
+              {/* Experimental programme-positioning INDEX, not a validated
+                  personal admission probability (see programChancing.ts). */}
               <option value="chance_desc">{t("exSortChanceDesc")}</option>
             </select>
           </div>

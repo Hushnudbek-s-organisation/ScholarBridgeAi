@@ -9,6 +9,8 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { ScrollRegion } from "@/components/ui/hubs";
 import { AppNote } from "@/components/AppNote";
 import { Button } from "@/components/ui/Button";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import type { PresentedFact } from "@/lib/factPresentation";
 
 interface Comparison {
   country: string;
@@ -24,6 +26,8 @@ interface Comparison {
     totalUsd: number | null;
   };
   workRights: { avgYears: number; published: number } | null;
+  /** §4 computed averages are not an official IELTS/cost requirement. */
+  evidence?: { minIeltsAvg?: PresentedFact; tuitionAvgUsd?: PresentedFact; livingAvgUsd?: PresentedFact };
 }
 
 /**
@@ -66,6 +70,7 @@ function money(v: number | null): string {
  */
 export function CountryComparePanel() {
   const t = useTranslations("countryCompare");
+  const te = useTranslations("evidence");
   const locale = useLocale();
   const tCountry = useTranslations("countryNames");
   const tc = useTranslations("common");
@@ -249,6 +254,8 @@ export function CountryComparePanel() {
                       <dd className="mt-0.5 font-semibold text-slate-800 dark:text-slate-100">
                         {c.minIelts.avg ?? "—"} <span className="text-xs font-normal text-slate-500">({c.minIelts.published}/{c.universities})</span>
                       </dd>
+                      <EvidenceNote fact={c.evidence?.minIeltsAvg} compact />
+                      <span className="mt-0.5 block text-[10px] leading-tight text-slate-500">{te("observedAverage")}</span>
                     </div>
                     <div className="col-span-2 border-t border-slate-200 pt-3 dark:border-slate-700">
                       <dt className="text-xs font-bold text-slate-500">{t("potentialFunding")}</dt>

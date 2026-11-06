@@ -453,6 +453,13 @@ export function invalidateCatalogCache(kind: "universities" | "scholarships" | "
   // edit must never be served from a memo after the row changed.
   invalidateLocalizeMemo();
   invalidateMatchMemo();
+  // A catalogue edit is an evidence/row change, not just a local memo change.
+  // Bump the shared revision so the OTHER instances' dashboard/profile keys
+  // are recomputed too (the process-local clears above only fix this one).
+  // Imported lazily to avoid a hard DB dependency at module load for guards.
+  void import("@/lib/cacheRevision")
+    .then((m) => m.bumpCacheRevision("catalogue", `catalogue cache invalidation (${kind})`))
+    .catch(() => undefined);
 }
 
 /**

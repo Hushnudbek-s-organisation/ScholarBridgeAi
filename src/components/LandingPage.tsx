@@ -3,14 +3,21 @@
 import { BrandingImage } from "./BrandingImage";
 import React, { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { m as Motion } from "framer-motion";
 import { Reveal, RevealGroup, RevealItem } from "./motion";
 import { staggerParent } from "./motion/variants";
 import { ThemeSwitch } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { SVG_COLORS } from "@/components/ui/tokens";
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
+// main (PR #132) moved the testimonials/FAQ and the QS marquee into
+// idle-deferred chunks. The two direct imports below are intentionally NOT
+// restored: DeferredBelowFold renders both of them dynamically, so keeping
+// the eager imports would defeat the first-load budget and leave unused
+// imports (lint error). Our next/image fix is kept for the two photos that
+// still render inline in this file.
 const DeferredBelowFold = dynamic(
   () => import("./landing/DeferredBelowFold").then((m) => m.DeferredBelowFold),
   { ssr: false, loading: () => null },
@@ -91,7 +98,6 @@ export interface MarqueeUniversityItem {
   url: string;
 }
 // Marquee data lives in ./landing/marqueeRows.ts (idle-deferred) to keep first-load <1200KB.
-// data-campus-src={campusPhotoSrc  rootMargin: "160px"  if (subs.size === 0)  resizeObserver?.disconnect()
 // Badge must stay numeric: {`QS #${university.qsRank}`}
 
 export const LANDING_PHOTOS = {
@@ -1022,18 +1028,18 @@ export function LandingPage({
           />
           <div className="relative mx-auto grid w-[min(1180px,94%)] items-center gap-8 md:pr-14 xl:pr-40 2xl:pr-28 md:gap-10 lg:grid-cols-[0.96fr_1.04fr] lg:gap-8">
             {/* Above-the-fold copy must paint in SSR, not wait for JS + stagger. */}
-            <motion.div initial={false} animate="visible" variants={heroGroup}>
+            <Motion.div initial={false} animate="visible" variants={heroGroup}>
               <div className="min-w-0">
               <div>
                 <SectionIndex n="01" label={t("secOverview")} />
               </div>
-              <motion.span
+              <Motion.span
                 variants={heroStaticItem}
                 className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-indigo-600 dark:bg-indigo-300" />
                 {t("heroBadge")}
-              </motion.span>
+              </Motion.span>
               <h1
                 className="mt-4 max-w-[720px] text-[clamp(38px,5.2vw,64px)] font-black leading-[0.98] tracking-[-0.045em] text-slate-950 dark:text-white"
               >
@@ -1042,19 +1048,19 @@ export function LandingPage({
                   {t("heroTitleAccent")}
                 </span>
               </h1>
-              <motion.p
+              <Motion.p
                 variants={heroStaticItem}
                 className="mt-5 max-w-[620px] text-base leading-relaxed text-slate-600 dark:text-slate-300 sm:text-lg"
               >
                 {t("heroBody")}
-              </motion.p>
-              <motion.p
+              </Motion.p>
+              <Motion.p
                 variants={heroStaticItem}
                 className="mt-3 max-w-[620px] text-sm font-medium leading-relaxed text-slate-500 dark:text-slate-400"
               >
                 {t("heroAudienceNote")}
-              </motion.p>
-              <motion.div
+              </Motion.p>
+              <Motion.div
                 variants={heroStaticItem}
                 className="mt-6 flex flex-wrap items-center gap-3"
               >
@@ -1070,8 +1076,8 @@ export function LandingPage({
                 >
                   {t("ctaHow")}
                 </Button>
-              </motion.div>
-              <motion.div
+              </Motion.div>
+              <Motion.div
                 variants={heroStaticItem}
                 className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-slate-600 dark:text-slate-300"
               >
@@ -1084,8 +1090,8 @@ export function LandingPage({
                     {item}
                   </span>
                 ))}
-              </motion.div>
-              <motion.div
+              </Motion.div>
+              <Motion.div
                 variants={heroStaticItem}
                 className="mt-4 flex flex-wrap items-center gap-3"
               >
@@ -1101,7 +1107,7 @@ export function LandingPage({
                 >
                   {t("browsePublicGrants")} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                 </Link>
-              </motion.div>
+              </Motion.div>
               {onEnterApp && (
                 <MotionButton variant="unstyled"
                   variants={heroStaticItem}
@@ -1112,10 +1118,13 @@ export function LandingPage({
                 </MotionButton>
               )}
               </div>
-            </motion.div>
+            </Motion.div>
 
-            {/* Layered product shot — compact landscape, quiet luxury */}
-            <motion.div
+            {/* Layered product shot — compact landscape, quiet luxury
+                (main PR #132 sizing) + the lighter `m` component from this
+                branch. Both sides are kept: no visual regression, no full
+                framer-motion bundle pulled back into the first load. */}
+            <Motion.div
               className="relative mx-auto w-full max-w-[760px] md:max-w-[720px] lg:max-w-[820px]"
               initial={false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1315,7 +1324,7 @@ export function LandingPage({
               </div>
               {/* Floating badges removed — content now inline inside mock (no overflow) */}
               <div className="sr-only" aria-hidden="true" hidden />
-            </motion.div>
+            </Motion.div>
           </div>
         </section>
 
@@ -1345,10 +1354,14 @@ export function LandingPage({
                   key={step.num}
                   className="group flex flex-col overflow-hidden rounded-overlay border border-slate-200 bg-white p-0 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:border-slate-800 dark:bg-surface dark:hover:shadow-black/30"
                 >
-                  <img
+                  <Image
                     src={step.image}
                     alt=""
+                    width={700}
+                    height={438}
+                    sizes="(max-width: 640px) 94vw, (max-width: 1024px) 47vw, 25vw"
                     loading="lazy"
+                    unoptimized
                     className="aspect-[16/10] w-full object-cover"
                   />
                   <div className="p-2">{step.mini}</div>
@@ -1675,11 +1688,14 @@ export function LandingPage({
           <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <Reveal>
               <div className="sb-cta-banner relative overflow-hidden rounded-overlay border border-indigo-900/20 px-6 py-10 text-center shadow-xl shadow-indigo-900/15 dark:border-indigo-500/20 sm:px-14 sm:py-12">
-                <img
+                <Image
                   src={LANDING_PHOTOS.ctaAirplaneSunset}
                   alt=""
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.22]"
+                  fill
+                  sizes="100vw"
+                  unoptimized
+                  className="pointer-events-none object-cover opacity-[0.22]"
                 />
                 <div
                   aria-hidden="true"

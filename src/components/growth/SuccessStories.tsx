@@ -6,7 +6,7 @@ import { countryTranslationKey, withQsTop200Countries } from "@/lib/countries";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
 import CountryFlag from "@/components/CountryFlag";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import {
   Award,
   BadgeCheck,
@@ -215,7 +215,7 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const storyCard = (s: Story, i: number) => (
-    <motion.li
+    <Motion.li
       key={s.id}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
@@ -276,7 +276,7 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
           <BookOpen className="h-3.5 w-3.5" /> {t("read")}
         </Button>
       </div>
-    </motion.li>
+    </Motion.li>
   );
 
   return (
@@ -509,14 +509,14 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
       {/* Full story */}
       <AnimatePresence>
         {openStory && (
-          <motion.div
+          <Motion.div
             className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setOpenStory(null)}
           >
-            <motion.div
+            <Motion.div
               ref={dialogRef}
               role="dialog"
               tabIndex={-1}
@@ -597,8 +597,8 @@ export function SuccessStories({ activeProfile }: { activeProfile: StudentProfil
                 </p>
               )}
               <p className="mt-4 text-right text-sm text-slate-500">— {openStory.displayName}{openStory.homeCountry ? `, ${openStory.homeCountry}` : ""}</p>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
       <Toast message={toast} />

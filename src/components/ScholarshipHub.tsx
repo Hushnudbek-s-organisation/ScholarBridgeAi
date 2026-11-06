@@ -10,6 +10,8 @@ import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import type { Locale } from "@/i18n/config";
 import { CountryFlag } from "@/components/CountryFlag";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import type { PresentedFact } from "@/lib/factPresentation";
 import {
   localizeCountry,
   localizeCoverageType,
@@ -113,6 +115,8 @@ export interface Scholarship {
   sourceUrl?: string | null;
   sourceTitle?: string | null;
   sourceLastVerifiedAt?: string | null;
+  /** §4 field-level trust envelope from /api/scholarships. */
+  evidence?: Record<string, PresentedFact>;
 }
 
 type HubTranslator = (key: string, values?: Record<string, string | number>) => string;
@@ -896,6 +900,7 @@ export function ScholarshipHub({
                   <div className="min-w-0">
                     <span className="text-slate-500 block font-medium">{t("awardValue")}</span>
                     <strong className="break-words text-emerald-700 font-extrabold">{awardLabel(s, t, locale)}</strong>
+                    <EvidenceNote fact={s.evidence?.awardAmount ?? s.evidence?.amountUsdValue} compact />
                   </div>
 
                   <div className="min-w-0">

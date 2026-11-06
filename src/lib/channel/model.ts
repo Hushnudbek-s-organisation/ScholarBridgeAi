@@ -10,6 +10,7 @@
  * from the text — never guessed, never taken from free-text English columns.
  */
 import { calendarDaysUntil, localDay, reminderBucket } from "@/lib/telegram/reminders";
+import { parseEligibilityScope } from "@/lib/eligibilityScope";
 
 /** The channel runs on Uzbek time, independent of REMINDER_TIMEZONE. */
 export const CHANNEL_TZ = "Asia/Tashkent";
@@ -148,9 +149,28 @@ const UZ_ALIASES = /^(uzbekistan|o'zbekiston|ozbekiston|o‘zbekiston|узбек
  * names Uzbekistan lets a post say so.
  */
 export function eligibility(s: Pick<ScholarshipLike, "eligibleCountries">): Eligibility {
-  const list = parseList(s.eligibleCountries);
-  if (list.length === 0) return "open";
-  return list.some((v) => UZ_ALIASES.test(v.trim())) ? "uz_eligible" : "not_eligible";
+  // One shared scope definition with matching/recommendations/admin. An empty,
+  // malformed, legacy-All, "*" or "__not_applicable__" scope is NOT evidence
+  // that Uzbekistan is excluded — so it stays publishable ("open"), never
+  // "not_eligible". Only a genuinely RESTRICTED list can exclude a country.
+  // A restricted list that names Uzbekistan is explicitly "uz_eligible"; a
+  // restricted list that names only other countries is "not_eligible".
+  const parsed = parseEligibilityScope(s.eligibleCountries);
+  if (parsed.scope !== "restricted") return "open";
+  return parsed.values.some((v) => UZ_ALIASES.test(v.trim())) ? "uz_eligible" : "not_eligible";
+}
+
+/**
+ * Honest scope label for admin/UI surfaces. Mirrors `eligibilityScopeLabelKey`
+ * but is colocated here so the channel package has no cross-import cycle.
+ * "open" is a publishing decision, NOT a claim that the scope is unrestricted.
+ */
+export function eligibilityScopeLabel(s: Pick<ScholarshipLike, "eligibleCountries">): string {
+  const parsed = parseEligibilityScope(s.eligibleCountries);
+  if (parsed.scope === "unrestricted") {
+    return parsed.evidence === "legacy" ? "unrestricted_legacy" : "unrestricted";
+  }
+  return parsed.scope;
 }
 
 /** Coverage labels that actually mean "everything is covered". */

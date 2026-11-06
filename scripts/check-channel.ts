@@ -3480,9 +3480,14 @@ check("the standard card follows the published shape, in order", () => {
 check("the card prints stored facts and never English database prose", () => {
   const f = facts({ livingAllowance: 1400, travelAllowance: 500, eligibleCountries: '["Uzbekistan"]' });
   const text = plainText(renderScholarshipSingle(f, 0, cardChrome())?.html ?? "");
-  for (const expected of ["Moliyalashtirish: To'liq", "Til talabi: IELTS 6.5+", "Bakalavr", "GPA 3.5+", "Yashash uchun to'lov: $1,400", "Yo'l xarajatlari: $500", "🇺🇿 O'zbekistonliklar uchun ochiq", "17 kun qoldi"]) {
+  // §4: legacy numeric columns are KEPT but never asserted as official minimums.
+  // The old "IELTS 6.5+" / "GPA 3.5+" floors are gone; the same numbers now
+  // carry an explicit field-level trust label instead.
+  for (const expected of ["Moliyalashtirish: To'liq", "Bakalavr", "IELTS: 6.5", "GPA: 3.5", "tasdiqlanmagan qiymat, rasmiy minimum emas", "1400 USD", "Yo'l xarajatlari: $500", "🇺🇿 O'zbekistonliklar uchun ochiq", "17 kun qoldi"]) {
     assert.ok(text.includes(expected), `missing: ${expected}`);
   }
+  assert.ok(!/IELTS\s+6\.5\+/.test(text), "an unverified IELTS value must not be an asserted minimum");
+  assert.ok(!/GPA\s+3\.5\+/.test(text), "an unverified GPA value must not be an asserted minimum");
   // The row's `description`/`requirements` are English in production and must
   // never reach an Uzbek post. Both are *read* by the deterministic translator
   // and re-stated in Uzbek; neither is ever printed raw.

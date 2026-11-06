@@ -94,7 +94,7 @@ export function AdminOverview({ onOpen }: { onOpen: (section: string) => void })
       <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-200/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
       <span className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
-        <span className="grid h-7 w-7 place-items-center rounded-control bg-slate-50 text-slate-400 transition-colors group-enabled:group-hover:bg-indigo-50 group-enabled:group-hover:text-indigo-500 dark:bg-white/5">
+        <span className="grid h-7 w-7 place-items-center rounded-control bg-slate-50 text-slate-500 transition-colors group-enabled:group-hover:bg-indigo-50 group-enabled:group-hover:text-indigo-500 dark:bg-white/5 dark:text-slate-400">
           <Icon className="h-4 w-4" />
         </span>
       </span>

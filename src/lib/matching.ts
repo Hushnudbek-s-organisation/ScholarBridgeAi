@@ -1,4 +1,5 @@
 import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
+import { parseEligibilityScope } from "./eligibilityScope";
 import { gpaTo40Scale } from "./gpa";
 import { resolvedUsdUniversityCosts } from "./usdCosts";
 import { clamp, interpolate, meets, ratio, roundTo, saturatingCurve, shortfall } from "./scoring";
@@ -748,15 +749,15 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
     components.push(component("english", 0, null, false));
   }
 
-  // Degree Level alignment (NULL-safe: JSON.parse(null) returns null, not []).
-  let levels: string[] = [];
-  try {
-    const parsed = scholarship.degreeLevels ? JSON.parse(scholarship.degreeLevels) : [];
-    levels = Array.isArray(parsed) ? parsed : [];
-  } catch {
-    levels = [];
-  }
-  if (levels.length > 0) {
+  // Degree Level alignment. Scope semantics come from ONE module: `[]` and
+  // malformed JSON are UNKNOWN (never "all degrees"), `["*"]` is an explicitly
+  // unrestricted scope, `["__not_applicable__"]` means the dimension does not
+  // apply, and legacy "All" wording is readable but tagged `legacy`. Only a
+  // genuinely restricted, known list is compared against the profile; an
+  // unknown scope is neutral — it is neither a match nor a rejection.
+  const levelScope = parseEligibilityScope(scholarship.degreeLevels);
+  const levels: string[] = levelScope.scope === "restricted" ? levelScope.values : [];
+  if (levelScope.scope === "restricted" && levels.length > 0) {
     // Alias-aware comparison (src/lib/degreeLevels.ts): "Master's", "MSc",
     // "магистратура" and the catalogue's "Master" all compare equal. An
     // unrecognised label on either side is UNKNOWN — never a mismatch, and
@@ -789,10 +790,13 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   // Unknown major on either side is neutral: the student is not told their
   // field is eligible when we do not know it.
   try {
-    const parsed = scholarship.eligibleMajors ? JSON.parse(scholarship.eligibleMajors) : [];
-    const majors: string[] = Array.isArray(parsed) ? parsed : [];
+    // Same shared scope parser as degree levels. `[]`, `*`,
+    // `__not_applicable__`, malformed JSON and legacy "All" are NOT a claim that
+    // the student's field is eligible, and NOT a "limited to All" penalty.
+    const majorScope = parseEligibilityScope(scholarship.eligibleMajors);
+    const majors: string[] = majorScope.scope === "restricted" ? majorScope.values : [];
     const studentMajor = (profile.targetMajor ?? "").trim();
-    if (majors.length && !majors.some((m) => m.trim().toLowerCase() === "all")) {
+    if (majorScope.scope === "restricted" && majors.length) {
       // "Eligible" needs a real relation on either scale: a shared subject
       // word, or an exact/synonym hit on the synonym-aware affinity engine
       // ("Software Engineering" ↔ "Computer Science").

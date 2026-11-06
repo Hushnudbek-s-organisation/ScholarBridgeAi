@@ -62,6 +62,46 @@ function isInternalLiteralIp(hostname: string): boolean {
   return false;
 }
 
+/**
+ * True when a *resolved* IP address is private/loopback/link-local/reserved.
+ * `unsafeOutboundReason` only sees the literal hostname, so a public domain
+ * whose DNS answer is 127.0.0.1 (or a rebinding answer) would otherwise pass.
+ * The official-source adapter resolves first and checks EVERY returned address.
+ */
+export function isInternalIpAddress(rawIp: string): boolean {
+  const ip = String(rawIp ?? "").trim().toLowerCase().replace(/^\[|\]$/g, "");
+  if (!ip) return true; // an empty answer is not proof of a public address
+  // IPv4 mapped IPv6 such as ::ffff:169.254.169.254.
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
+  if (mapped) return isInternalLiteralIp(mapped[1]);
+  if (ip.includes(":")) {
+    if (ip === "::" || ip === "::1") return true;
+    if (ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe80")) return true;
+    return false; // global unicast IPv6; literal special cases handled above
+  }
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (!m) return true; // unparseable address → refuse, never allow
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  if (a > 255 || b > 255) return true;
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
+/** Refuse if any DNS answer is internal. Safe to call with an empty answer. */
+export function assertPublicResolvedAddresses(addresses: { address: string }[]): void {
+  if (!addresses.length) throw new Error("Refusing to fetch: DNS returned no addresses");
+  for (const { address } of addresses) {
+    if (isInternalIpAddress(address)) {
+      throw new Error(`Refusing to fetch: DNS resolved to an internal/reserved address`);
+    }
+  }
+}
+
 /** Reason a URL must not be fetched, or null when it is safe to fetch. */
 export function unsafeOutboundReason(rawUrl: string): string | null {
   let url: URL;

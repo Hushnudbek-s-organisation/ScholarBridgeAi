@@ -10,6 +10,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { MotionProvider } from "@/components/motion";
 import { DEFAULT_THEME, isThemeChoice, themeInitScript, THEME_COOKIE } from "@/lib/theme";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
+import { currentBuildId } from "@/lib/buildId";
+import { IdleVersionWatcher } from "@/components/IdleVersionWatcher";
 
 // Self-hosted Inter keeps the brand font available offline and avoids a
 // render-blocking third-party font request. Separate subsets let Russian and
@@ -147,6 +149,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <head>
         {/* Applies the saved theme before first paint — no light/dark flash. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+        {/* Which build rendered THIS document. An old tab compares it with the
+            live build id to explain a failed chunk after a deploy swap. The id
+            is already public in every /_next/static URL — never a secret. */}
+        <meta name="sb-build-id" content={currentBuildId()} />
         {/* Pre-warm DNS + TLS for the two image CDNs the landing page and
             catalogue cards load from, so the first image request is not
             stuck behind a cold connection. */}
@@ -159,6 +165,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             {/* Anonymous, first-party traffic counter for Admin → Analytics. */}
             <SiteTracker />
             {children}
+            {/* Deferred old-tab / deploy-swap recovery; no first-paint cost. */}
+            <IdleVersionWatcher />
           </MotionProvider>
         </ThemeProvider>
       </body>

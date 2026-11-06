@@ -4,7 +4,9 @@
  * becomes `null` (a dropped line) rather than a placeholder.
  */
 import { deadlineInfo, eligibility, isFullyFunded, type DeadlineInfo, type Eligibility, type ScholarshipLike } from "../model";
-import { countryUz, degreesUz, esc, majorsUz, coverageUz, safeHttpsUrl } from "./format";
+import { countryUz, degreesUz, esc, majorsUz, coverageUz, safeHttpsUrl, factEvidenceLineUz } from "./format";
+import { adaptLegacyField } from "@/lib/typedEvidence";
+import { presentFact } from "@/lib/factPresentation";
 
 export interface Facts {
   id: number;
@@ -44,6 +46,14 @@ export interface Facts {
   /** Internal path — the only thing a `/r/<code>` link may ever point at. */
   sitePath: string;
   providerUrl: string | null;
+  /**
+   * §4: field-level evidence lines for numbers that used to be printed as bare
+   * "GPA 3.9+" / "IELTS 7+" minimums. A legacy column is NEVER an official
+   * minimum; these lines say so explicitly and keep the number visible.
+   */
+  minGpaEvidenceLine: string | null;
+  minIeltsEvidenceLine: string | null;
+  livingAllowanceEvidenceLine: string | null;
 }
 
 export interface FactsRow extends ScholarshipLike {
@@ -101,5 +111,25 @@ export function buildFacts(row: FactsRow, opts: FactsOptions): Facts {
     siteUrl: opts.siteUrl.replace(/\/+$/, ""),
     sitePath: `/scholarships/${row.id}`,
     providerUrl: safeHttpsUrl(row.applicationUrl) ?? safeHttpsUrl(row.websiteUrl),
+    minGpaEvidenceLine: evidenceLine(row.minGpa, "GPA", "GPA", { unit: "GPA (4.0 shkala)" }),
+    minIeltsEvidenceLine: evidenceLine(row.minIelts, "IELTS", "IELTS", { unit: "band" }),
+    // A stored allowance is USD but has NO recorded period; keep the currency
+    // explicit and never invent "oylik"/"yillik".
+    livingAllowanceEvidenceLine: evidenceLine(row.livingAllowance, "Yashash uchun to'lov", "Yashash uchun to'lov", { currency: "USD" }),
   };
+}
+
+/** One honest evidence line from a legacy numeric column (never a minimum). */
+function evidenceLine(
+  value: number | null | undefined,
+  fieldLabel: string,
+  labelUz: string,
+  extra: { unit?: string; currency?: string; period?: string } = {},
+): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const trusted = adaptLegacyField({
+    fieldKey: fieldLabel, value,
+    unit: extra.unit ?? null, currency: extra.currency ?? null, period: extra.period ?? null,
+  });
+  return factEvidenceLineUz(presentFact(trusted, fieldLabel), labelUz);
 }

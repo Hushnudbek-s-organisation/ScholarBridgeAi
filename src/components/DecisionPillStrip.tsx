@@ -4,14 +4,13 @@
  * Priority 4.1 — the one-glance decision strip.
  *
  * Three pills, same everywhere (explorer card, university detail, compare
- * sheet): can I get in academically, does it fit my budget, and can I stay to
- * work afterwards. All three are computed by `src/lib/decisionPills.ts`, so a
- * card in the grid and the detail page can never disagree.
+ * sheet): academic fit, budget fit, and post-study work visa. All three are
+ * computed by `src/lib/decisionPills.ts`, so a card in the grid and the detail
+ * page can never disagree.
  *
- * Every pill has an honest "we do not know" state: a university that publishes
- * no IELTS minimum, or a student who has not entered a GPA, gets a neutral pill
- * that says exactly which side is missing and where to set it — never a green
- * tick and never a red cross.
+ * The budget pill now compares the FULL comparable annual cost (tuition +
+ * living). When living costs are unknown it says "only tuition fits — total
+ * cost unknown" instead of claiming the university fits the student's budget.
  */
 import React from "react";
 import { useTranslations } from "next-intl";
@@ -40,6 +39,25 @@ interface DecisionPillStripProps {
   className?: string;
 }
 
+/** Shows exactly which published annual lines produced the budget verdict. */
+function BudgetBreakdown({ decision }: { decision: ReturnType<typeof evaluateUniversityDecision> }) {
+  const t = useTranslations("university");
+  if (!decision.budget.complete || decision.budget.annualTotalUsd == null) return null;
+  const money = (value: number | null) => formatMoney(value ?? 0, "USD");
+  return (
+    <p
+      data-testid="budget-breakdown"
+      className="mt-1 break-words text-sm font-medium text-slate-600 dark:text-slate-300"
+    >
+      {t("budgetBreakdown", {
+        tuition: money(decision.budget.tuitionUsd),
+        living: money(decision.budget.livingUsd),
+        total: money(decision.budget.annualTotalUsd),
+      })}
+    </p>
+  );
+}
+
 export function DecisionPillStrip({ university, profile, compact = false, className = "" }: DecisionPillStripProps) {
   const t = useTranslations("university");
 
@@ -53,7 +71,7 @@ export function DecisionPillStrip({ university, profile, compact = false, classN
    * keeps the ICU messages free of currency symbols, so uz and ru can place the
    * amount wherever their own conventions put it.
    */
-  const MONEY_PARAMS = new Set(["tuition", "budget", "gap", "headroom"]);
+  const MONEY_PARAMS = new Set(["tuition", "budget", "gap", "headroom", "living", "total"]);
   const withMoney = (params: Record<string, string | number>): Record<string, string | number> => {
     const next: Record<string, string | number> = {};
     for (const [key, value] of Object.entries(params)) {
@@ -85,31 +103,34 @@ export function DecisionPillStrip({ university, profile, compact = false, classN
   };
 
   return (
-    <div
-      className={`flex flex-wrap items-center gap-1.5 ${className}`}
-      data-decision-eligibility={decision.eligibility}
-      data-decision-within-budget={
-        decision.budget.withinBudget == null ? "unknown" : decision.budget.withinBudget ? "yes" : "no"
-      }
-    >
-      {decision.pills.map((pill) => {
-        const Icon = PILL_ICON[pill.id];
-        const text = label(pill);
-        if (!text) return null;
-        return (
-          <span
-            key={pill.id}
-            title={hint(pill)}
-            className={`inline-flex max-w-full items-center gap-1 rounded-full border font-bold leading-snug ${
-              compact ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-xs"
-            } ${DECISION_PILL_CLASS[pill.tone]}`}
-          >
-            <Icon className={compact ? "h-3 w-3 shrink-0" : "h-3.5 w-3.5 shrink-0"} aria-hidden />
-            <span className="min-w-0 break-words whitespace-normal">{text}</span>
-          </span>
-        );
-      })}
-    </div>
+    <>
+      <div
+        className={`flex flex-wrap items-center gap-1.5 ${className}`}
+        data-decision-eligibility={decision.eligibility}
+        data-decision-within-budget={
+          decision.budget.withinBudget == null ? "unknown" : decision.budget.withinBudget ? "yes" : "no"
+        }
+      >
+        {decision.pills.map((pill) => {
+          const Icon = PILL_ICON[pill.id];
+          const text = label(pill);
+          if (!text) return null;
+          return (
+            <span
+              key={pill.id}
+              title={hint(pill)}
+              className={`inline-flex max-w-full items-center gap-1 rounded-full border font-bold leading-snug ${
+                compact ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-xs"
+              } ${DECISION_PILL_CLASS[pill.tone]}`}
+            >
+              <Icon className={compact ? "h-3 w-3 shrink-0" : "h-3.5 w-3.5 shrink-0"} aria-hidden />
+              <span className="min-w-0 break-words whitespace-normal">{text}</span>
+            </span>
+          );
+        })}
+      </div>
+      <BudgetBreakdown decision={decision} />
+    </>
   );
 }
 

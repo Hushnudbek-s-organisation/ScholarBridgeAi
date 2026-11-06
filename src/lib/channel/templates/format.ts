@@ -9,8 +9,10 @@
  *     template has to remember it.
  */
 import { escapeHtml } from "@/lib/telegram/core";
+import { parseEligibilityScope } from "@/lib/eligibilityScope";
+import type { PresentedFact } from "@/lib/factPresentation";
 import { resolveCountry } from "../countries";
-import { majorListUz } from "./fields.uz";
+import { majorListUz, ANY_FIELD_UZ } from "./fields.uz";
 
 export const MONTHS_UZ = [
   "yanvar",
@@ -201,7 +203,12 @@ function parseList(raw: string | null | undefined): string[] {
 
 /** ["Bachelor's"] → "bakalavr"; unknown labels are dropped, not guessed. */
 export function degreesUz(raw: string | null | undefined): string | null {
-  const mapped = parseList(raw)
+  // Scope tokens are metadata, not degree names. `[]` = unknown,
+  // `["*"]` = source says unrestricted, `["__not_applicable__"]` = dimension
+  // does not apply — none of them may be printed as a concrete degree.
+  const scope = parseEligibilityScope(raw);
+  if (scope.scope !== "restricted") return null;
+  const mapped = scope.values
     .map((d) => DEGREE_UZ[d.toLowerCase()] ?? null)
     .filter((d): d is string => d !== null);
   const unique = [...new Set(mapped)];
@@ -217,6 +224,14 @@ export function degreesUz(raw: string | null | undefined): string | null {
  * one Uzbek phrase, anything unknown is dropped rather than printed.
  */
 export function majorsUz(raw: string | null | undefined): string | null {
+  // One shared scope definition: `[]` is unknown (never "all majors"),
+  // `["*"]` is an EXPLICIT source-backed unrestricted scope, and
+  // `["__not_applicable__"]` means the dimension does not apply. Legacy
+  // "All Majors" prose stays readable (majorListUz) but is tagged `legacy`
+  // by the shared parser, so it is never treated as fresh evidence.
+  const scope = parseEligibilityScope(raw);
+  if (scope.scope === "unknown" || scope.scope === "not_applicable") return null;
+  if (scope.scope === "unrestricted" && scope.evidence === "explicit") return ANY_FIELD_UZ;
   return majorListUz(raw);
 }
 
@@ -330,4 +345,35 @@ export function safeHttpsUrl(raw: string | null | undefined): string | null {
 export function countryLine(raw: string | null | undefined): string | null {
   const label = countryUz(raw);
   return label ? `📍 ${label}` : null;
+}
+
+/**
+ * §4 — Telegram rendering of a typed-evidence fact.
+ *
+ * A channel post must NEVER turn an unverified legacy number into an official
+ * minimum, never print "unknown" as zero, and never claim a value is verified
+ * because the university row happens to be `verified`. It also must not print
+ * an arbitrary stored English sentence: only this curated, escaped wording is
+ * used. All numbers come from the ONE presentation envelope shared with the
+ * catalog API / detail / compare / admin screens.
+ */
+export function factEvidenceLineUz(fact: PresentedFact, fieldLabelUz: string): string | null {
+  const label = esc(fieldLabelUz);
+  if (fact.isUnknown) return `${label}: noma'lum (rasmiy manba yo'q)`;
+  const value = typeof fact.value === "number" ? String(fact.value) : esc(String(fact.value));
+  const unit = fact.unit ? ` ${esc(fact.unit)}` : "";
+  const currency = fact.currency ? ` ${esc(fact.currency)}` : "";
+  const period = fact.period ? ` / ${esc(fact.period)}` : "";
+  let trust: string;
+  switch (fact.displayAs) {
+    case "official_minimum": trust = "rasmiy minimum (tekshirilgan)"; break;
+    case "observed_value": trust = "kuzatilgan tarixiy ko'rsatkich, talab emas"; break;
+    case "estimate": trust = "uchinchi tomon taxmini"; break;
+    case "computed": trust = "hisoblangan ko'rsatkich"; break;
+    default: trust = "tasdiqlanmagan qiymat, rasmiy minimum emas"; break;
+  }
+  const scope = [fact.degreeLevel, fact.programName, fact.admissionCycle]
+    .filter(Boolean).map((x) => esc(String(x))).join(" · ");
+  const source = safeHttpsUrl(fact.sourceUrl);
+  return `${label}: ${value}${unit}${currency}${period} — ${trust}${scope ? ` [${scope}]` : ""}${source ? ` · ${esc(source)}` : ""}`;
 }

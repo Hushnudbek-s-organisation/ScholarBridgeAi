@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { RecLetterPanel } from "./RecLetterPanel";
 import { Button } from "@/components/ui/Button";
+import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 
 /**
  * Universal application tracker (#12) and private outcome history.
@@ -186,6 +187,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("addError"));
       await load();
+      notifyApplicationsChanged(activeProfileId);
       if (data.application?.id && onOpenWorkspace) onOpenWorkspace(data.application.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("addError"));
@@ -213,6 +215,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       setDraft({ universityName: "", programName: "", deadline: "", applicationRound: "RD" });
       setAdding(false);
       await load();
+      notifyApplicationsChanged(activeProfile.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("addError"));
     } finally {
@@ -229,6 +232,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       });
       if (!res.ok) throw new Error(t("statusError"));
       await load();
+      notifyApplicationsChanged(activeProfile?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("statusError"));
     }
@@ -236,8 +240,16 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
 
   const remove = async (id: number) => {
     try {
-      await fetch(`/api/applications?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/applications?id=${id}`, { method: "DELETE" });
+      // A failed delete is an error, NOT a success. The old code ignored
+      // res.ok and then reloaded, making the row briefly disappear and come
+      // back — and never telling the student that nothing was deleted.
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(typeof data?.error === "string" && data.error ? data.error : t("deleteError"));
+      }
       await load();
+      notifyApplicationsChanged(activeProfile?.id ?? null);
     } catch {
       setError(t("deleteError"));
     }
@@ -264,6 +276,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       setScholarship("");
       setConsent(false);
       await load();
+      notifyApplicationsChanged(activeProfile?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("resultError"));
     } finally {

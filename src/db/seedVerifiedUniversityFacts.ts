@@ -4,8 +4,8 @@ import { sources, universities, universitySources } from "./schema";
 import { normalizeUniversityName } from "./seedUniversityCatalog";
 
 const VERIFIED_AT = new Date("2026-10-22T00:00:00.000Z");
-const QS_2027 = "https://www.topuniversities.com/qs-top-uni-wur";
-export const VERIFIED_QS_2027 = [
+const QS_2026 = "https://www.topuniversities.com/world-university-rankings/2026";
+export const VERIFIED_QS_2026 = [
   { aliases: ["Massachusetts Institute of Technology", "Massachusetts Institute of Technology (MIT)", "MIT"], rank: 1, sourceUrl: "https://www.topuniversities.com/universities/massachusetts-institute-technology-mit" },
   { aliases: ["University of Oxford"], rank: 4, sourceUrl: "https://www.topuniversities.com/universities/university-oxford" },
   { aliases: ["Technical University of Munich", "Technical University of Munich (TUM)", "TUM"], rank: 25, sourceUrl: "https://www.topuniversities.com/universities/technical-university-munich" },
@@ -13,7 +13,7 @@ export const VERIFIED_QS_2027 = [
 ] as const;
 
 const TUM_TUITION_URL = "https://www.tum.de/en/studies/fees/tuition";
-const TUM_DESCRIPTION = "Top German technical university (QS World University Rankings 2027 #25). TUM's published non-EU tuition is programme-specific: currently typically €2,000–€3,000/semester for Bachelor's and €4,000–€6,000/semester for Master's programmes. TUM has announced higher fee bands for new entrants from winter semester 2027/28. Waivers and scholarships may be available; see the official TUM fee pages. Annual USD tuition is not stated because fees vary by programme, semester count, and exchange rate.";
+const TUM_DESCRIPTION = "Top German technical university (QS World University Rankings 2026 #25). TUM's published non-EU tuition is programme-specific: currently typically €2,000–€3,000/semester for Bachelor's and €4,000–€6,000/semester for Master's programmes. TUM has announced higher fee bands for new entrants from winter semester 2027/28. Waivers and scholarships may be available; see the official TUM fee pages. Annual USD tuition is not stated because fees vary by programme, semester count, and exchange rate.";
 
 async function ensureSource(url: string, title: string): Promise<number> {
   await db.insert(sources).values({
@@ -28,9 +28,9 @@ async function ensureSource(url: string, title: string): Promise<number> {
 export async function seedVerifiedUniversityFacts(): Promise<number> {
   const rows = await db.select().from(universities);
   let updated = 0;
-  const qsSourceId = await ensureSource(QS_2027, "QS World University Rankings 2027");
+  const qsSourceId = await ensureSource(QS_2026, "QS World University Rankings 2026");
   const tumSourceId = await ensureSource(TUM_TUITION_URL, "TUM tuition fees for international students");
-  for (const fact of VERIFIED_QS_2027) {
+  for (const fact of VERIFIED_QS_2026) {
     const aliases = new Set(fact.aliases.map(normalizeUniversityName));
     const row = rows.find((candidate) => aliases.has(normalizeUniversityName(candidate.name)) || aliases.has(normalizeUniversityName(candidate.canonicalName ?? "")) || aliases.has(normalizeUniversityName(candidate.shortName ?? "")));
     if (!row) continue;
@@ -39,7 +39,7 @@ export async function seedVerifiedUniversityFacts(): Promise<number> {
     const isLegacyTUMDescription = fact.rank === 25 && (/^Institution record; current programme/.test(row.description) || row.description.startsWith("Europe's leading technical university with virtually free/low tuition"));
     const changed = canRefreshRank || isLegacyTUMDescription
       ? await db.update(universities).set({
-          ...(canRefreshRank ? { worldRanking: fact.rank, qsRankYear: 2027, dataSource: "QS World University Rankings 2027", sourceUrl: fact.sourceUrl, lastVerifiedAt: VERIFIED_AT, verificationStatus: "verified" } : {}),
+          ...(canRefreshRank ? { worldRanking: fact.rank, qsRankYear: 2026, dataSource: "QS World University Rankings 2026", sourceUrl: fact.sourceUrl, lastVerifiedAt: VERIFIED_AT, verificationStatus: "verified" } : {}),
           ...(isLegacyTUMDescription ? { description: TUM_DESCRIPTION } : {}),
         }).where(and(
           eq(universities.id, row.id),

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { motion } from "framer-motion";
+import { m as Motion } from "framer-motion";
 import { ArrowRight, Banknote, Check, FileCheck2, Home, Luggage, MapPin, PartyPopper, Plane, Stamp } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
@@ -142,7 +142,7 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
             {phases.map((p, pi) => {
               const Icon = PHASE_ICON[p.phase] ?? Plane;
               return (
-                <motion.section
+                <Motion.section
                   key={p.phase}
                   id={`phase-${p.phase}`}
                   initial={{ opacity: 0, y: 8 }}
@@ -190,7 +190,7 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
                       </li>
                     ))}
                   </ul>
-                </motion.section>
+                </Motion.section>
               );
             })}
           </div>

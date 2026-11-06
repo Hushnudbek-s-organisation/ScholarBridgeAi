@@ -106,3 +106,17 @@ export function prefersReducedMotion(): boolean {
 export function preferredScrollBehavior(): ScrollBehavior {
   return prefersReducedMotion() ? "auto" : "smooth";
 }
+
+/**
+ * §3 — the shared design system is the ONLY place layout/interaction
+ * primitives are defined. Pages compose these; they do not invent per-page
+ * inline style piles. See `npm run test:design-system`.
+ */
+export const DESIGN_SYSTEM = {
+  surfaces: ["canvas", "surface", "well", "control"] as const,
+  text: ["display", "heading", "body", "secondary", "muted", "dim"] as const,
+  semantic: ["primary", "success", "warning", "error", "info", "danger"] as const,
+  radii: ["control", "surface", "overlay", "modal"] as const,
+  breakpoints: { sm: 640, md: 768, lg: 1024, xl: 1280, "2xl": 1536 } as const,
+  containerMaxPx: 1200,
+} as const;

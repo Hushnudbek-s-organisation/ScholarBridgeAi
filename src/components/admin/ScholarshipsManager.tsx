@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import type { PresentedFact } from "@/lib/factPresentation";
 
 interface ScholarshipsManagerProps {
   adminProfileId: number;
@@ -51,6 +53,8 @@ interface ScholarshipRow {
   verificationStatus?: string;
   eligibleCountries?: string;
   requiredDocuments?: string;
+  /** §4 field-level trust envelope; an admin edit must not hide it. */
+  evidence?: Record<string, PresentedFact>;
 }
 
 type TriState = "unknown" | "yes" | "no";
@@ -266,8 +270,8 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
     { key: "awardPeriod", label: "Award period", placeholder: "year | month | one_time | total | variable" },
     { key: "awardBasis", label: "Award basis", placeholder: "fixed | range | full_tuition | need_based | variable" },
     { key: "deadline", label: "Deadline", placeholder: "e.g. 2026-12-01; blank if unpublished" },
-    { key: "degreeLevels", label: "Degree Levels (JSON array)", placeholder: '["Bachelor"] — enter only when confirmed' },
-    { key: "eligibleMajors", label: "Eligible Majors (JSON array)", placeholder: "[] — leave empty if not specified" },
+    { key: "degreeLevels", label: "Degree Levels (JSON scope)", placeholder: '[] = unknown · ["*"] = source says unrestricted · ["Master"] = restricted' },
+    { key: "eligibleMajors", label: "Eligible Majors (JSON scope)", placeholder: '[] = unknown · ["*"] = source says unrestricted · ["Computer Science"] = restricted' },
     { key: "minGpa", label: "Min GPA (optional)", type: "number" },
     { key: "minIelts", label: "Min IELTS (optional)", type: "number" },
     { key: "websiteUrl", label: "Website URL", full: true },
@@ -280,7 +284,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
     { key: "applicationUrl", label: "Application URL", full: true },
     { key: "sourceUrl", label: "Official Source URL", full: true },
     { key: "verificationStatus", label: "Verification Status", placeholder: "unverified | verified | needs_verification | recently_verified" },
-    { key: "eligibleCountries", label: "Eligible Countries (JSON)", placeholder: '["All"]' },
+    { key: "eligibleCountries", label: "Eligible Countries (JSON scope)", placeholder: '[] = unknown · ["*"] = source says unrestricted · ["Uzbekistan"] = restricted' },
     { key: "requiredDocuments", label: "Required Documents (JSON)", placeholder: '["transcript","recommendation_letter"]' },
   ];
 
@@ -459,6 +463,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
                           : s.awardBasis === "full_tuition"
                             ? "Full tuition"
                             : formatMoney(s.amountUsdValue, "USD")}
+                      <EvidenceNote fact={s.evidence?.awardAmount ?? s.evidence?.amountUsdValue} compact />
                       {s.financialNeedBased && <span className="ml-1 text-xs text-emerald-600 font-bold">NEED</span>}
                       {s.meritBased && <span className="ml-1 text-xs text-indigo-600 font-bold">MERIT</span>}
                     </td>

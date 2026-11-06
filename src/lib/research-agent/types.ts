@@ -206,12 +206,24 @@ export interface AuditReport {
 export interface RunStatus {
   runId: string;
   universityId: number | null;
-  state: "idle" | "running" | "complete" | "error";
+  state: "idle" | "running" | "complete" | "error" | "cancelled" | "timed_out";
   progress: string[];
   report: AuditReport | null;
   error?: string;
   startedAt: number;
   finishedAt?: number;
+  /** Explicit cancellation / timeout / retry state for durable queues. */
+  cancelRequested?: boolean;
+  timeoutAt?: number;
+  attempts?: number;
+  idempotencyKey?: string;
+  /** Lease owner of this run in the current process (§8 fencing). */
+  workerId?: string | null;
+  checkpoint?: {
+    completedUniversityIds: number[];
+    reports: AuditReport[];
+    progress?: string[];
+  };
 }
 
 /** One fetched page — why it did or did not produce extracted values (debug). */

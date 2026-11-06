@@ -18,8 +18,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { motion, useReducedMotion } from "framer-motion";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { m as Motion, useReducedMotion } from "framer-motion";
+import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
 import { ArrowRight, ChevronDown, ChevronRight, ChevronUp, TriangleAlert } from "lucide-react";
 import { JourneyCard } from "@/components/ui/journey";
 import { Button } from "@/components/ui/Button";
@@ -214,32 +214,19 @@ export function HubPage({
   const t = useTranslations("hubs");
   const nav = useTranslations("nav");
   const reduceMotion = useReducedMotion();
-  // Bumping this key remounts the pane ErrorBoundary — the retry button after
-  // a crash without reloading the whole hub.
-  const [paneAttempt, setPaneAttempt] = useState(0);
   const visibleTabPanes = panes?.filter((pane) => !hiddenPanes.includes(pane.id)) ?? [];
   const hasTabPanels = visibleTabPanes.length > 1 && Boolean(activePane);
-  // A pane that throws on render (bad data, a missing library in some browser)
-  // must take down only itself: the boundary stays mounted around one pane at
-  // a time, the sidebar, hero and every sibling tab keep working, and the
-  // retry pill remounts exactly the failed pane.
+  // A pane that throws on render (bad data, a missing library, a stale chunk
+  // after a deploy swap) must take down only itself. ChunkErrorBoundary adds a
+  // BOUNDED retry, chunk-specific copy, uz/ru/en text and a guarded manual
+  // refresh; the old boundary here allowed unlimited retries and treated a
+  // missing chunk like an ordinary render crash.
   const animatedContent = (
-    <ErrorBoundary
-      key={`pane-${activePane ?? "single"}-${paneAttempt}`}
-      fallback={
-        <div className="rounded-overlay border border-amber-200 bg-amber-50 p-6 text-center dark:border-amber-500/40 dark:bg-amber-500/10">
-          <p className="text-sm font-bold text-amber-800 dark:text-amber-200">{t("sectionFailed")}</p>
-          <Button variant="unstyled"
-            type="button"
-            onClick={() => setPaneAttempt((n) => n + 1)}
-            className="mt-3 inline-flex min-h-11 items-center rounded-surface bg-amber-700 px-4 py-2 text-xs font-bold text-white hover:bg-amber-800"
-          >
-            {t("sectionRetry")}
-          </Button>
-        </div>
-      }
+    <ChunkErrorBoundary
+      resetKey={`pane-${activePane ?? "single"}`}
+      section={`pane:${activePane ?? "single"}`}
     >
-      <motion.div
+      <Motion.div
         key={activePane ?? "single"}
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -247,8 +234,8 @@ export function HubPage({
         className="space-y-4"
       >
         {children}
-      </motion.div>
-    </ErrorBoundary>
+      </Motion.div>
+    </ChunkErrorBoundary>
   );
   return (
     <div className="space-y-4">

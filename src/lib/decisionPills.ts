@@ -22,12 +22,15 @@
  *    85 with no scale is unknown, not 4.0 and not a failure.
  *  • IELTS and TOEFL are never cross-converted. A student with only a TOEFL
  *    score gets `unknown` against an IELTS minimum, plus the reason.
- *  • The budget pill compares tuition with the student's own annual budget and
- *    says so; it does not claim to know their net cost after aid.
+ *  • The budget pill compares the FULL comparable annual cost (tuition +
+ *    living) with the student's own annual budget, and reports an incomplete
+ *    calculation when a mandatory cost line is unknown; it never claims to
+ *    know their net cost after aid.
  *  • Pure and deterministic — no network, no AI, no Date.now().
  */
 
 import { gpaTo40Scale } from "./gpa";
+import { evaluateBudgetFit, type BudgetFitState } from "./budgetFit";
 
 /* -------------------------------------------------------------------------- */
 /* Inputs                                                                      */
@@ -98,9 +101,20 @@ export interface BudgetComparison {
   tuitionUsd: number | null;
   budgetUsd: number | null;
   livingUsd: number | null;
-  /** tuition − budget, positive when the student is short. */
+  /** tuition − budget, positive when the student is short (legacy field). */
   gapUsd: number | null;
+  /** Full annual verdict: null when a mandatory cost line is unknown. */
   withinBudget: boolean | null;
+  /** tuition + living + any extra known annual line; null when incomplete. */
+  annualTotalUsd: number | null;
+  /** total annual cost − budget; null when incomplete. */
+  totalGapUsd: number | null;
+  /** True only when every mandatory line is known (unknown is never $0). */
+  complete: boolean;
+  /** Which of the five honest states the pill must display. */
+  state: BudgetFitState;
+  /** The exact lines that were summed, so the UI can show the arithmetic. */
+  lines: { key: string; annualUsd: number }[];
 }
 
 export interface UniversityDecision {
@@ -276,20 +290,34 @@ export function compareSat(
 /* Budget                                                                      */
 /* -------------------------------------------------------------------------- */
 
-/** Published tuition versus the student's own annual budget. */
+/**
+ * The published annual cost versus the student's own annual budget.
+ *
+ * Uses the shared budget engine: a $3,000 tuition with $15,000 living and a
+ * $3,000 budget is NOT "fits your budget". Only a complete tuition + living
+ * calculation can produce a positive verdict; a missing line is unknown, not 0.
+ */
 export function compareBudget(
   profile: DecisionProfileInput,
   university: DecisionUniversityInput
 ): BudgetComparison {
-  const tuitionUsd = num(university.annualTuitionUsd);
-  const budgetUsd = num(profile.budgetAnnualUsd);
-  const livingUsd = num(university.annualLivingEstUsd);
-
-  if (tuitionUsd == null || budgetUsd == null || budgetUsd <= 0) {
-    return { tuitionUsd, budgetUsd, livingUsd, gapUsd: null, withinBudget: null };
-  }
-  const gapUsd = Math.round(tuitionUsd - budgetUsd);
-  return { tuitionUsd, budgetUsd, livingUsd, gapUsd, withinBudget: gapUsd <= 0 };
+  const fit = evaluateBudgetFit({
+    tuitionUsd: num(university.annualTuitionUsd),
+    livingUsd: num(university.annualLivingEstUsd),
+    budgetUsd: num(profile.budgetAnnualUsd),
+  });
+  return {
+    tuitionUsd: fit.tuitionUsd,
+    budgetUsd: fit.budgetUsd,
+    livingUsd: fit.livingUsd,
+    gapUsd: fit.tuitionGapUsd,
+    withinBudget: fit.withinBudget,
+    annualTotalUsd: fit.annualTotalUsd,
+    totalGapUsd: fit.totalGapUsd,
+    complete: fit.complete,
+    state: fit.state,
+    lines: fit.lines,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -384,24 +412,54 @@ function budgetPill(budget: BudgetComparison): DecisionPill {
       hintParams: { tuition: budget.tuitionUsd },
     };
   }
+  // Tuition alone already exceeds the budget: living costs can only make it
+  // worse, and they may be unknown. Do not wait for a "complete" total.
+  if (budget.state === "tuition_over") {
+    return {
+      id: "budget",
+      tone: "negative",
+      stateKey: "tuitionGap",
+      params: { gap: Math.max(0, budget.gapUsd ?? 0) },
+      hintKey: "tuitionGapHint",
+      hintParams: { tuition: budget.tuitionUsd, budget: budget.budgetUsd },
+    };
+  }
+  // The published contract fits, but a mandatory annual cost line is unknown.
+  // Never call this "fits your budget" — "to'liq hisoblanmagan".
+  if (!budget.complete) {
+    return {
+      id: "budget",
+      tone: "neutral",
+      stateKey: "tuitionOnly",
+      params: { tuition: budget.tuitionUsd },
+      hintKey: "tuitionOnlyHint",
+      hintParams: { tuition: budget.tuitionUsd, budget: budget.budgetUsd },
+    };
+  }
+  const total = budget.annualTotalUsd ?? 0;
+  const money = {
+    tuition: budget.tuitionUsd,
+    living: budget.livingUsd ?? 0,
+    total,
+    budget: budget.budgetUsd,
+  };
   if (budget.withinBudget === true) {
-    const headroom = Math.max(0, Math.round((budget.gapUsd ?? 0) * -1));
     return {
       id: "budget",
       tone: "positive",
       stateKey: "within",
-      params: { headroom },
+      params: { headroom: Math.max(0, -(budget.totalGapUsd ?? 0)) },
       hintKey: "withinHint",
-      hintParams: { tuition: budget.tuitionUsd, budget: budget.budgetUsd },
+      hintParams: money,
     };
   }
   return {
     id: "budget",
     tone: "caution",
     stateKey: "gap",
-    params: { gap: Math.max(0, budget.gapUsd ?? 0) },
+    params: { gap: Math.max(0, budget.totalGapUsd ?? 0) },
     hintKey: "gapHint",
-    hintParams: { tuition: budget.tuitionUsd, budget: budget.budgetUsd },
+    hintParams: money,
   };
 }
 

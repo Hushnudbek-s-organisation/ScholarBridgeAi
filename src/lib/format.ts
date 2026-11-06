@@ -71,6 +71,22 @@ export function formatMoney(
   return `${sym}${formatNumber(n, { placeholder, suffix: "" })}${suffix}`;
 }
 
+/**
+ * Safe calendar-year formatter. Admission cycles, QS editions and founding
+ * years must never be grouped as "2,026" or "1,861". Only a plausible integer
+ * year is rendered; everything else uses the placeholder.
+ */
+export function formatYear(
+  value: number | string | null | undefined,
+  options: { placeholder?: string } = {}
+): string {
+  const { placeholder = "Not specified" } = options;
+  if (value === null || value === undefined || value === "") return placeholder;
+  const n = typeof value === "string" ? Number(value) : value;
+  if (!isFiniteNumber(n) || !Number.isInteger(n) || n < 1000 || n > 9999) return placeholder;
+  return String(Math.trunc(n));
+}
+
 /** Safe percentage formatter. null/undefined/NaN → placeholder. */
 export function formatPercent(
   value: number | string | null | undefined,

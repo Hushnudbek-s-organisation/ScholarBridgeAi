@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { normalizeUniversityName, REGIONAL_UNIVERSITY_SEEDS, UNIVERSITY_NAME_ALIAS_GROUPS } from "../src/db/seedUniversityCatalog";
 import { VERIFIED_PROGRAM_SEEDS } from "../src/db/seedProgramCatalog";
 import { SEEDED_SCHOLARSHIP_CYCLES } from "../src/db/seedScholarshipCycles";
-import { VERIFIED_QS_2027 } from "../src/db/seedVerifiedUniversityFacts";
+import { VERIFIED_QS_2026 } from "../src/db/seedVerifiedUniversityFacts";
 
 const normal = normalizeUniversityName;
 assert.equal(normal("Massachusetts Institute of Technology (MIT)"), normal("Massachusetts Institute of Technology"));
@@ -19,7 +19,7 @@ assert.ok(VERIFIED_PROGRAM_SEEDS.every((row) => row.programUrl.startsWith("https
 assert.ok(VERIFIED_PROGRAM_SEEDS.every((row) => ["mit.edu", "ox.ac.uk", "tum.de"].some((domain) => new URL(row.programUrl).hostname.endsWith(domain))));
 assert.equal(VERIFIED_PROGRAM_SEEDS.filter((row) => "applicationCycle" in row).length, 2);
 assert.equal(VERIFIED_PROGRAM_SEEDS.find((row) => row.name === "MSc Advanced Computer Science")?.applicationCycle?.deadline, "2027-01-06");
-assert.equal(VERIFIED_QS_2027.map((row) => row.rank).join(","), "1,4,25,32");
+assert.equal(VERIFIED_QS_2026.map((row) => row.rank).join(","), "1,4,25,32");
 
 const byTitle = new Map(SEEDED_SCHOLARSHIP_CYCLES.map((row) => [row.title, row]));
 assert.equal(byTitle.size, SEEDED_SCHOLARSHIP_CYCLES.length);

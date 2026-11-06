@@ -1,4 +1,5 @@
 import { hasVerifiedProgramEvidence } from "./catalogEvidence";
+import { budgetVerdict, evaluateBudgetFit } from "./budgetFit";
 /**
  * Subject-to-program recommender engine (2026-10).
  *
@@ -38,6 +39,7 @@ import { ADMISSION_PROBABILITY } from "./chancing";
 import { gpaTo40Scale } from "./gpa";
 import { isStaleVerified } from "./provenance";
 import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
+import { evaluateEligibilityScope } from "./eligibilityScope";
 import { annualUsdAmount } from "./usdCosts";
 
 /** Re-exported for callers/tests that import from the recommender. */
@@ -377,12 +379,12 @@ export function assessAffordability(
         period: uni.livingCostPeriod,
       })
     : null;
-  // A full annual budget comparison requires both annual amounts in USD. Do
-  // not treat missing living costs as zero or expose foreign-currency tuition
-  // as though it were USD.
-  const annualCostUsd = tuitionUsd != null && livingUsd != null ? tuitionUsd + livingUsd : null;
-  const withinBudget: Affordability["withinBudget"] =
-    budget == null || annualCostUsd == null ? "unknown" : annualCostUsd <= budget ? "yes" : "no";
+  // A full annual budget comparison requires both annual amounts in USD and
+  // uses the SAME shared engine as the university card, compare sheet and
+  // financial plan. An unknown cost line is not $0 and cannot produce a verdict.
+  const budgetFit = evaluateBudgetFit({ tuitionUsd, livingUsd, budgetUsd: budget });
+  const annualCostUsd = budgetFit.annualTotalUsd;
+  const withinBudget: Affordability["withinBudget"] = budgetVerdict(budgetFit);
   // Family income is neither an annual budget nor a confirmed contribution.
   // Keep the legacy response fields for compatibility, but do not compare or
   // expose income as available funding.
@@ -405,12 +407,16 @@ export function assessAffordability(
     const levelOk =
       s.degreeLevels.length > 0 &&
       compareDegreeLevels(input.degreeLevel, JSON.stringify(s.degreeLevels)) === "match";
+    // An empty scope is unknown, not "open to all". Explicit ["*"] passes;
+    // a restricted list needs a known student interest to compare.
     const majorOk =
-      !s.eligibleMajors.length ||
-      s.eligibleMajors.includes("All") ||
-      interests.some((i) =>
-        s.eligibleMajors.some((m) => normalizeSubject(m).includes(i) || i.includes(normalizeSubject(m)))
-      );
+      evaluateEligibilityScope(JSON.stringify(s.eligibleMajors), (majors) =>
+        interests.length
+          ? interests.some((i) =>
+              majors.some((m) => normalizeSubject(m).includes(i) || i.includes(normalizeSubject(m)))
+            )
+          : null
+      ) === "eligible";
     // Funding need: a need-based scholarship only plausibly matches when the
     // student has explicitly said partial/full aid is needed. "none" is a
     // real answer and must not be treated like an unknown.

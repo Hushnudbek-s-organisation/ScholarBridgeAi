@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type HTMLMotionProps } from "framer-motion";
+import { m as Motion, type HTMLMotionProps } from "framer-motion";
 import type { ReactNode } from "react";
 import { MOTION_TOKENS, staggerParent } from "./variants";
 
@@ -25,7 +25,7 @@ export function Reveal({
   ...rest
 }: RevealProps) {
   return (
-    <motion.div
+    <Motion.div
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-60px 0px -60px 0px" }}
@@ -44,7 +44,7 @@ export function Reveal({
       {...rest}
     >
       {children}
-    </motion.div>
+    </Motion.div>
   );
 }
 
@@ -62,7 +62,7 @@ export function RevealGroup({
   delayChildren?: number;
 }) {
   return (
-    <motion.div
+    <Motion.div
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, margin: "-60px 0px -60px 0px" }}
@@ -70,7 +70,7 @@ export function RevealGroup({
       {...rest}
     >
       {children}
-    </motion.div>
+    </Motion.div>
   );
 }
 
@@ -87,7 +87,7 @@ export function RevealItem({
   distance?: number;
 }) {
   return (
-    <motion.div
+    <Motion.div
       variants={{
         hidden: { opacity: 0, y: distance },
         visible: {
@@ -99,6 +99,6 @@ export function RevealItem({
       {...rest}
     >
       {children}
-    </motion.div>
+    </Motion.div>
   );
 }

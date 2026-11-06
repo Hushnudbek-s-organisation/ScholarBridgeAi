@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import en from "../src/i18n/messages/en.json";
 import { readFileSync } from "node:fs";
 
 type Fixtures = {
@@ -17,10 +18,24 @@ type Fixtures = {
 const fixtures = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8")) as Fixtures;
 
 async function signIn(page: Page) {
-  await page.goto("/");
-  const signIn = page.getByRole("button", { name: /sign in/i }).first();
+  // Arriving from a public catalogue page, an in-flight navigation can abort
+  // the next goto (net::ERR_ABORTED). Wait for the previous document to settle,
+  // then tolerate a second abort rather than failing the whole suite.
+  await page.waitForLoadState("domcontentloaded").catch(() => {});
+  await page.goto("/", { waitUntil: "domcontentloaded" }).catch(async (error) => {
+    if (!/ERR_ABORTED/.test(String(error))) throw error;
+    await page.waitForLoadState("domcontentloaded");
+  });
+  // Match the visible, exact landing CTA. A loose /sign in/i .first() can
+  // resolve to a hidden/overlaid duplicate in the responsive header, which
+  // makes click() hang on "performing click action" even though the locator
+  // reports visible. On small viewports the nav drawer must be opened first.
+  if ((page.viewportSize()?.width ?? 1440) < 640) {
+    await page.getByRole("button", { name: en.landing.navAria, exact: true }).click();
+  }
+  const signIn = page.getByRole("button", { name: en.landing.signIn, exact: true }).first();
   await expect(signIn).toBeVisible();
-  await signIn.click();
+  await signIn.click({ timeout: 30_000 });
   const dialog = page.getByRole("dialog");
   await dialog.locator('input[type="email"]').fill(fixtures.studentEmail);
   await dialog.locator('input[type="password"]').fill(fixtures.studentPassword);

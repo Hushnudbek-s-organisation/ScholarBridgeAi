@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m as Motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, HelpCircle, Lightbulb, X } from "lucide-react";
 import { HELP_SECTIONS, type HelpSection, type SectionHelpOverride } from "@/lib/growth/defaults";
 import { invalidateBootConfig, loadBootConfig } from "@/lib/bootConfig";
@@ -126,7 +126,7 @@ export function SectionIntro({ section }: { section: string }) {
   return (
     <AnimatePresence initial={false} mode="wait">
       {isOpen ? (
-        <motion.div
+        <Motion.div
           key="banner"
           initial={reduceMotion ? false : { opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -172,9 +172,9 @@ export function SectionIntro({ section }: { section: string }) {
               <X className="h-4 w-4" aria-hidden />
             </Button>
           </div>
-        </motion.div>
+        </Motion.div>
       ) : (
-        <motion.div
+        <Motion.div
           key="chip"
           initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -189,7 +189,7 @@ export function SectionIntro({ section }: { section: string }) {
           >
             <HelpCircle className="h-3.5 w-3.5" aria-hidden /> {t("show")}
           </Button>
-        </motion.div>
+        </Motion.div>
       )}
     </AnimatePresence>
   );

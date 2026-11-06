@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as Motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useDialogFocusTrap } from "@/hooks/useDialogFocusTrap";
 import { NAV_GROUP_I18N, type NavGroupId } from "@/lib/navSections";
@@ -199,7 +199,7 @@ export function CommandPalette({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div
+        <Motion.div
           ref={dialogRef}
           tabIndex={-1}
           className="fixed inset-0 z-[70] flex items-start justify-center bg-slate-950/50 px-3 pt-[10vh] backdrop-blur-sm sm:pt-[14vh]"
@@ -213,7 +213,7 @@ export function CommandPalette({
           aria-modal="true"
           aria-label={t("searchTitle")}
         >
-          <motion.div
+          <Motion.div
             className="w-full max-w-lg overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-2xl"
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -291,8 +291,8 @@ export function CommandPalette({
               <span>{t("searchKeys")}</span>
               <span>Ctrl / ⌘ + K</span>
             </div>
-          </motion.div>
-        </motion.div>
+          </Motion.div>
+        </Motion.div>
       )}
     </AnimatePresence>
   );

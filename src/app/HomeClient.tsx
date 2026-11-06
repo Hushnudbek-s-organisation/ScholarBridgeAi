@@ -16,6 +16,8 @@ import type { Messages } from "@/i18n/messages";
 import { trackScreen } from "@/lib/tracker";
 import { scheduleWhenIdle } from "@/lib/idle";
 import { invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
+import { invalidateClientCache } from "@/lib/clientCache";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { loadBootConfig } from "@/lib/bootConfig";
 import { PageTransition } from "@/components/motion";
 import {
@@ -35,6 +37,7 @@ import {
   shouldRetrySessionRestore,
 } from "@/lib/sessionRestore";
 import { Button } from "@/components/ui/Button";
+import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
 
 /**
  * Every heavy screen is a separate chunk: the admin panel, the payments and
@@ -315,7 +318,18 @@ export function Home({
     if (!target) return;
     setActiveTabState(target.section);
     setActivePane(target.utility ? null : target.pane);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    if (typeof window !== "undefined") {
+      // Write the destination IMMEDIATELY, in the same task as the navigation.
+      // A late session/profile hydration callback that still holds "dashboard"
+      // must not be able to rewrite the URL back after a rapid deep-link change.
+      const want = target.utility || !target.pane
+        ? `#${target.section}`
+        : `#${target.section}/${target.pane}`;
+      if (window.location.hash !== want) {
+        window.history.pushState(null, "", `${window.location.pathname}${window.location.search}${want}`);
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, [openProfileModal]);
 
   const openPane = useCallback(
@@ -594,6 +608,12 @@ export function Home({
     // section the operator was working in.
     const adminDeepLink = activeTab === "admin" && window.location.hash.startsWith("#admin/");
     const want = activePane ? `#${activeTab}/${activePane}` : adminDeepLink ? window.location.hash : `#${activeTab}`;
+    // The URL is the source of truth. If it already names a DIFFERENT valid
+    // destination (rapid hash changes, browser Back/Forward, or a shared deep
+    // link arriving while state is still settling), never overwrite it with an
+    // older activeTab. `onNav` below syncs state to the URL on hashchange.
+    const linked = targetFromHash();
+    if (linked && linked.section !== activeTab && !adminDeepLink) return;
     if (window.location.hash === want) {
       hashSynced.current = true;
       return;
@@ -797,7 +817,11 @@ export function Home({
       }
       setProfiles((prev) => prev.map((p) => (p.id === data.profile.id ? data.profile : p)));
       setActiveProfile(data.profile);
+      // A profile edit changes GPA / scores / budget: drop BOTH the explorer
+      // slice cache and the shared GET cache used by the dashboard, otherwise
+      // the 15-second client TTL keeps showing the previous student's numbers.
       invalidateCatalogSwr();
+      invalidateClientCache();
     }
   };
 
@@ -810,6 +834,7 @@ export function Home({
     setProfiles((prev) => prev.map((profile) => (profile.id === updated.id ? updated : profile)));
     setActiveProfile(updated);
     invalidateCatalogSwr();
+    invalidateClientCache();
   };
 
   // University Handlers
@@ -1090,6 +1115,14 @@ export function Home({
           }
           distance={14}
         >
+          {/* A failed dynamic import (an old tab after a deploy swap) must not
+              replace the whole cabinet. This boundary contains it to the
+              current destination; the sidebar, session and every other tab
+              stay usable. Changing tab/pane/profile is a fresh attempt. */}
+          <ChunkErrorBoundary
+            resetKey={`${activeProfile?.id ?? "none"}:${activeTab}:${activePane ?? ""}`}
+            section={activeTab}
+          >
 
           {/* Onboarding wizard — shown for profiles that haven't completed
               the step-by-step setup yet. Resumes from the saved step. */}
@@ -1106,6 +1139,7 @@ export function Home({
                   and the ten study-plan phases, in that order. */}
               <JourneyControlCenter
                 profileId={activeProfile?.id ?? null}
+                profileVersion={activeProfile ? profileMatchFingerprint(activeProfile) : null}
                 onNavigateTab={handleNavigateTab}
                 onOpenWorkspace={(applicationId) => {
                   setWorkspaceId(applicationId);
@@ -1315,6 +1349,7 @@ export function Home({
               content leads, the explanation is one quiet chip away (opened
               sections expand it in place; it never pushes the page down). */}
           {!(activeProfile && !activeProfile.onboardingCompleted) && <SectionIntro section={activeTab} />}
+          </ChunkErrorBoundary>
         </PageTransition>
         </div>
       </main>

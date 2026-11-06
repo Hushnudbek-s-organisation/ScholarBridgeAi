@@ -37,7 +37,9 @@ interface DocIssue {
 
 interface DocCheck {
   issues: DocIssue[];
-  readiness: number;
+  readiness: number | null;
+  requirementsState?: "confirmed" | "unknown" | "loading" | "error";
+  readinessReason?: string | null;
   requiredTotal: number;
   requiredUploaded: number;
   blockers: number;
@@ -227,18 +229,27 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
         </div>
         {check && (
           <div className="ml-auto text-center">
-            <div
-              role="progressbar"
-              aria-label={t("readiness")}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={check.readiness}
-              className={`text-xl font-extrabold ${
-                check.readiness >= 80 ? "text-emerald-600" : check.readiness >= 40 ? "text-amber-600" : "text-rose-600"
-              }`}
-            >
-              {check.readiness}%
-            </div>
+            {check.readiness == null ? (
+              <>
+                <div role="status" aria-label={t("readiness")} className="text-xl font-extrabold text-slate-500 dark:text-slate-400">
+                  —
+                </div>
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("readinessUnknown")}</div>
+              </>
+            ) : (
+              <div
+                role="progressbar"
+                aria-label={t("readiness")}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={check.readiness}
+                className={`text-xl font-extrabold ${
+                  check.readiness >= 80 ? "text-emerald-600" : check.readiness >= 40 ? "text-amber-600" : "text-rose-600"
+                }`}
+              >
+                {check.readiness}%
+              </div>
+            )}
             <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("readiness")}</div>
           </div>
         )}
@@ -250,6 +261,17 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
           <RefreshCw className="h-3.5 w-3.5" /> {t("refresh")}
         </Button>
       </div>
+
+      {check && check.readiness == null && (
+        <p data-testid="requirements-unknown" role="note" className="rounded-overlay border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-200">
+          {t(
+            check.readinessReason === "requirements_loading" ? "requirementsLoadingHint"
+              : check.readinessReason === "requirements_error" ? "requirementsErrorHint"
+                : check.readinessReason === "requirements_unknown" ? "requirementsUnknownHint"
+                  : "requirementsNotDeterminedHint"
+          )}
+        </p>
+      )}
 
       {message && (() => {
         const isSuccess = [t("successAdded"), t("successRemoved"), t("successUpdated")].includes(message);
@@ -299,6 +321,7 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
           <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-600 dark:text-slate-300">
             {t("suggestedHeading")}
           </h3>
+          <p className="mt-1 text-sm font-semibold text-amber-800 dark:text-amber-200">{t("suggestionsNotOfficial")}</p>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
             {suggested.map((s) => {
               const key = suggestionKey(s);
@@ -357,6 +380,11 @@ export function DocumentChecklist({ profileId }: DocumentChecklistProps) {
                         <p className="text-sm text-slate-500 dark:text-slate-400">
                           {t(d.isRequired ? "required" : "optional")}
                           {d.deadlineDate ? ` · ${t("due", { date: new Date(d.deadlineDate).toLocaleDateString() })}` : ""}
+                          {d.status === "expired" || d.status === "rejected" || d.status === "needs_review" ? (
+                            <span className="ml-1 font-bold text-rose-700 dark:text-rose-300">
+                              · {t(d.status === "needs_review" ? "statusNeedsReview" : d.status === "expired" ? "statusExpired" : "statusRejected")}
+                            </span>
+                          ) : null}
                         </p>
                       </div>
                       {d.documentType === "custom" && (

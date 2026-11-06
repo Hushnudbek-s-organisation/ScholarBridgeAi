@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { ShowMoreToggle } from "@/components/ui/hubs";
+import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 import { useTranslations } from "next-intl";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import { presentRaw, type PresentedFact } from "@/lib/factPresentation";
+
 import { fitTier } from "@/lib/fitBadge";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
@@ -29,7 +33,7 @@ import {
   Target,
   Zap,
 } from "lucide-react";
-import { formatMoney, formatCount, formatNumber } from "@/lib/format";
+import { formatMoney, formatCount, formatNumber, formatYear } from "@/lib/format";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { isStaleVerified } from "@/lib/provenance";
 import { AppNote } from "@/components/AppNote";
@@ -275,7 +279,9 @@ function req(
   return NOT_SPECIFIED;
 }
 
-function Field({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+function Field({ label, value, icon, evidence }: {
+  label: string; value: string; icon?: React.ReactNode; evidence?: PresentedFact | null;
+}) {
   const t = useTranslations("university");
   // Missing-value sentinels are translated here so the muted styling follows
   // the per-locale wording.
@@ -291,6 +297,7 @@ function Field({ label, value, icon }: { label: string; value: string; icon?: Re
       <p className={`mt-1 text-sm font-bold ${isMissing ? "text-slate-500" : "text-slate-800"}`}>
         {display}
       </p>
+      {evidence !== undefined && <EvidenceNote compact label={label} fact={evidence} />}
     </div>
   );
 }
@@ -386,6 +393,7 @@ export function UniversityDetail({
         return;
       }
       setStartAppDone(true);
+      notifyApplicationsChanged(activeProfile.id);
       const applicationId = Number(data?.application?.id);
       if (Number.isInteger(applicationId) && applicationId > 0) {
         onApplicationStarted?.(applicationId, uni.name);
@@ -639,7 +647,7 @@ export function UniversityDetail({
                     {t("qsRanking")}
                     {/* The edition is data, not copy: the label used to hardcode
                         "2027" while every stored rank is the 2026 edition. */}
-                    {uni.qsRankYear ? ` ${uni.qsRankYear}` : ""}
+                    {uni.qsRankYear ? ` ${formatYear(uni.qsRankYear)}` : ""}
                   </span>
                   <span className="text-sm font-extrabold text-amber-300">#{formatNumber(uni.worldRanking, { placeholder: "—" })}</span>
                 </div>
@@ -717,14 +725,22 @@ export function UniversityDetail({
         {/* The published numbers behind the pills, so a verdict can be checked
             rather than trusted. NULL stays "not specified" (spec §19). */}
         <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <Field label={t("pillFactGpa")} value={uni.minGpa != null ? `${formatNumber(uni.minGpa, { decimals: 2 })} / 4.0` : NOT_SPECIFIED} />
-          <Field label={t("pillFactIelts")} value={uni.minIelts != null ? formatNumber(uni.minIelts, { decimals: 1 }) : NOT_SPECIFIED} />
+          <Field label={t("pillFactGpa")} value={uni.minGpa != null ? `${formatNumber(uni.minGpa, { decimals: 2 })} / 4.0` : NOT_SPECIFIED}
+            evidence={presentRaw({ value: uni.minGpa, fieldLabel: t("pillFactGpa"), trust: "legacy_unknown", valueType: "unverified", unit: "GPA / 4.0" })} />
+          <Field label={t("pillFactIelts")} value={uni.minIelts != null ? formatNumber(uni.minIelts, { decimals: 1 }) : NOT_SPECIFIED}
+            evidence={presentRaw({ value: uni.minIelts, fieldLabel: t("pillFactIelts"), trust: "legacy_unknown", valueType: "unverified", unit: "IELTS band" })} />
           <Field
             label={t("pillFactTuition")}
             value={fmtMoney(money?.annualTuition ?? uni.annualTuitionUsd, money?.tuitionCurrency ?? "USD", money?.tuitionPeriod ?? "year")}
           />
           <Field label={t("pillFactWorkVisa")} value={uni.postStudyWorkVisaYears != null ? t("pswYears", { years: uni.postStudyWorkVisaYears }) : NOT_SPECIFIED} />
         </div>
+        {/* MIT publishes no SAT/GPA cutoffs; the catalogue's 1520 / 3.9 are
+            reference figures from cohort/third-party data, NOT official
+            minimum requirements (verified against mitadmissions.org). */}
+        <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+          {t("catalogueFigureNote")}
+        </p>
 
         {startAppError && (
           <p role="alert" className="mt-3 break-words rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
@@ -903,8 +919,9 @@ export function UniversityDetail({
         </h2>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Field label={t("uniType")} value={fmtValue(uni.universityType)} icon={<Building2 className="h-3 w-3" />} />
-          <Field label={t("founded")} value={fmtValue(uni.foundedYear)} icon={<Calendar className="h-3 w-3" />} />
-          <Field label={t("acceptanceRate")} value={uni.acceptanceRate != null ? `${uni.acceptanceRate}%` : NOT_SPECIFIED} />
+          <Field label={t("founded")} value={formatYear(uni.foundedYear, { placeholder: NOT_SPECIFIED })} icon={<Calendar className="h-3 w-3" />} />
+          <Field label={t("acceptanceRate")} value={uni.acceptanceRate != null ? `${uni.acceptanceRate}%` : NOT_SPECIFIED}
+            evidence={presentRaw({ value: uni.acceptanceRate, fieldLabel: t("acceptanceRate"), trust: "observed", valueType: "historical_acceptance_rate", unit: "percent", note: "Historical cohort rate, NOT a personal admission probability and NOT a cutoff." })} />
           <Field label={t("address")} value={fmtValue(uni.address)} icon={<MapPin className="h-3 w-3" />} />
         </div>
         {uni.descriptionSourceLanguage === "en" && (
