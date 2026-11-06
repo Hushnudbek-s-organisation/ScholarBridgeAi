@@ -49,6 +49,15 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
     ],
   },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "next-intl"],
+  },
+  modularizeImports: {
+    "lucide-react": {
+      transform: "lucide-react/dist/esm/icons/{{kebabCase member}}",
+    },
+  },
+  compiler: { removeConsole: true },
   allowedDevOrigins: ["*.e2b.app", "*.e2b.dev"],
   // Type-checking runs BEFORE the build on every real build path:
   // `package.json` `prebuild` = `npm run typecheck`, and `npm run build` also

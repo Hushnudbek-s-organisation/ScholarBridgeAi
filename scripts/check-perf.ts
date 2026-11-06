@@ -133,9 +133,14 @@ check("theme switching does not animate every descendant and SVG", () => {
 
 check("below-fold campus images and detached scroll animations do not compete with startup", () => {
   const landing = read("src/components/LandingPage.tsx");
-  assert.match(landing, /data-campus-src=\{campusPhotoSrc/);
-  assert.match(landing, /rootMargin: "160px"/);
-  assert.doesNotMatch(landing, /fetchPriority: "high"|eagerCount/);
+  // PR #132 moved the campus images into an idle-deferred chunk. Assert the
+  // lazy loader against the file that actually renders/observes them, so a
+  // marker comment in LandingPage.tsx can never satisfy this guard again.
+  const marquee = read("src/components/landing/DeferredMarquee.tsx");
+  assert.match(marquee, /data-campus-src=\{campusPhotoSrc/);
+  assert.match(marquee, /rootMargin: "160px"/);
+  assert.doesNotMatch(marquee, /fetchPriority: "high"|eagerCount/);
+  // The shared scroll engine (and its teardown) still lives in LandingPage.
   assert.match(landing, /if \(subs.size === 0\)/);
   assert.match(landing, /resizeObserver\?\.disconnect\(\)/);
 });
