@@ -278,7 +278,10 @@ check("a 4.0-scale GPA passes through", gpaTo4(3.6, 4) === 3.6);
 check("a missing scale stays unknown", gpaTo4(3.2, null) === null);
 check("an invalid GPA above its stated scale stays unknown", gpaTo4(4.2, 4) === null);
 check("invalid or negative grading scales stay unknown", gpaTo4(3.2, 0) === null && gpaTo4(3.2, -5) === null);
-check("canonical profile GPA uses the shared scale-less normalization policy", gpaTo40Scale(3.2, null) === 3.2 && gpaTo40Scale(85, null) === null);
+// Original-scale policy: even a value <= 4 cannot establish its denominator.
+// Never restore the old implicit 4.0 scale just to satisfy a legacy assertion.
+check("canonical profile GPA never infers an unrecorded scale", gpaTo40Scale(3.2, null) === null && gpaTo40Scale(85, null) === null && gpaTo40Scale(3.2, undefined) === null && gpaTo40Scale(0, null) === null);
+check("canonical profile GPA preserves explicit scales, minima and recorded zero", gpaTo40Scale(3.2, 4) === 3.2 && gpaTo40Scale(80, 100, 50) === 2.4 && gpaTo40Scale(0, 4) === 0);
 const similarProfilesRoute = readFileSync("src/app/api/similar-profiles/route.ts", "utf8");
 check("the live profile uses canonical GPA normalization while snapshots stay strict", /gpa4: gpaTo40Scale\(profile\.gpa, profile\.gpaScale\)/.test(similarProfilesRoute) && /gpa4: gpaTo4\(row\.snapshotGpa, row\.snapshotGpaScale\)/.test(similarProfilesRoute));
 

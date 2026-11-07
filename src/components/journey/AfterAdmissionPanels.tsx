@@ -984,7 +984,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
           </Field>
           <Field label={t("fpFieldAmount")}>
             <input className={inputClass} type="number" min="0" step="any" aria-label={t("fpFieldAmount")} aria-describedby={amountDescriptionId} value={form.amountUsd} onChange={(e) => setForm({ ...form, amountUsd: e.target.value })} />
-            <p id={amountDescriptionId} className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{t("fpUsdRounding")}</p>
+            <p id={amountDescriptionId} className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t("fpUsdRounding")}</p>
           </Field>
           <Field label={t("fpFieldStatus")}>
             <select className={inputClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
