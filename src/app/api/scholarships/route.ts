@@ -1,3 +1,4 @@
+import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
 import {
@@ -616,6 +617,7 @@ export async function GET(req: Request) {
       const r = row as unknown as Record<string, unknown>;
       return {
         ...localizeScholarshipRow(row, locale),
+        resolvedFacts: presentedCatalogueFacts(bundle.facts?.get(row.id) ?? []),
         evidence: legacyEvidence({
           entityVerified: r.verificationStatus === "verified",
           sourceUrl: typeof r.officialSourceUrl === "string" ? r.officialSourceUrl

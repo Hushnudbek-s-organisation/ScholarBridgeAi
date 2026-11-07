@@ -61,7 +61,15 @@ check("official re-verification requires adapter, evidence and success before a 
   assert.match(source, /mayRefreshVerifiedDate/);
   assert.match(source, /if \(!allowed\)/);
   assert.match(source, /continue;/);
-  assert.match(source, /lastVerifiedAt: now/);
+  // Fact CAS and check insertion moved into one transaction in the adapter;
+  // follow that actual callgraph instead of requiring obsolete inline SQL.
+  assert.match(source, /persistOfficialSourceCheck\(field\)/);
+  assert.match(source, /!field.factApplied/);
+  const adapter=read("src/lib/officialSourceAdapter.server.ts");
+  assert.match(adapter, /UPDATE public\.catalogue_facts SET verified_at=/);
+  assert.match(adapter, /db.transaction/);
+  for(const field of ["check.factId","check.expectedVersion","check.fieldKey","check.verifiedFact","check.admissionCycle","check.programName","check.degreeLevel","check.applicantScope"]) assert.ok(adapter.includes(field), `exact scope missing: ${field}`);
+  assert.doesNotMatch(source, /\.update\((universities|scholarships)\)/,"one checked field cannot upgrade the entity");
   assert.match(source, /failedVerification = true/);
   assert.match(source, /verified date unchanged/);
   assert.equal(mayRefreshVerifiedDate({ officialPageReRead: true, verificationSucceeded: false, evidencePresent: true }), false);

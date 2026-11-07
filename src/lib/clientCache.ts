@@ -1,3 +1,4 @@
+import {readJsonWithSnapshotRecovery} from "./readFailure";
 /**
  * A 15-second in-memory GET cache shared by every client panel.
  *
@@ -55,8 +56,5 @@ export function cachedFetchJson<T>(url: string, fallback: string, ttlMs: number 
 }
 
 async function freshFetch(url: string, fallback: string): Promise<unknown> {
-  const res = await fetch(url, { cache: "no-store" });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((json as { error?: string })?.error || fallback);
-  return json;
+  return readJsonWithSnapshotRecovery(url,fallback);
 }

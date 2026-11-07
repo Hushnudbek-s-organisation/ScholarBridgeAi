@@ -1,0 +1,64 @@
+{
+  "branch": "arena/660f1392-scholarbridgeai",
+  "head": "1bd810bbb5a6e749488331fb60d452b425c1b918",
+  "buildId": "nt8aOokw9O64qMq_cmbZk",
+  "scopeComplete": false,
+  "releaseReady": false,
+  "hashMethod": "v3: scripts/capture-source-state.mjs: SHA256(JSON.stringify(sorted entries with path/sha256/bytes/symlink)); includes data/root configs/all CI. Not directly comparable with compact v2.",
+  "sourceIndex": "test-results/continuation-2026-11-07/detail-build6-source-state.json",
+  "groups": {
+    "runtime": {
+      "fileCount": 784,
+      "sha256": "ce9195bfae789333b274a7ef9564467f4c7d647e277642fe1fa59979279b5a3f",
+      "bytes": 18111584
+    },
+    "verification": {
+      "fileCount": 225,
+      "sha256": "a8d64f9b384b269bea78179a14ec030dfa9f983d256ab6ab005456282c1cc879",
+      "bytes": 2939378
+    },
+    "migrations": {
+      "fileCount": 123,
+      "sha256": "c98d6c54d12c7babe1da345b68024cf0a8607e156a64dd3b48be8c1b014f7458",
+      "bytes": 1964281
+    }
+  },
+  "build": {
+    "exit": 0,
+    "log": "detail-build6.log"
+  },
+  "diagnosticRun": {
+    "passed": 4,
+    "failed": 0,
+    "exit": 0,
+    "duration": "23.4s",
+    "log": "detail-build6-diagnostic-e2e.log",
+    "note": "Real admin/API/personas/EN-UZ-RU detail, independent native GPA shortfall and missing input. No fake fact response."
+  },
+  "fullRun": {
+    "passed": 39,
+    "failed": 0,
+    "skipped": 2,
+    "exit": 0,
+    "duration": "8.4m",
+    "log": "detail-build6-full-e2e.log",
+    "note": "Two existing opt-in performance tests skipped, not performance evidence."
+  },
+  "sharedRun": {
+    "command": "npm run validate:local",
+    "exit": 0,
+    "totalFails": 0,
+    "log": "detail-build6-shared.log"
+  },
+  "historicalFailure": {
+    "build": "detail-build4",
+    "failed": 1,
+    "cause": "dashboard HTTP500, underlying exception not established",
+    "note": "Did not recur in build5/build6 production full suites; no causal root-fix claim."
+  },
+  "screenshots": {
+    "build": "detail-build4",
+    "note": "docs detail-screens/native-scope-* are historical fictional fixtures, not build6 or real admissions facts."
+  },
+  "note": "Local validation only, not CI, deployment or production data evidence."
+}

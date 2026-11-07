@@ -9,6 +9,7 @@
  *
  * This is intentionally a small SQL adapter, not a new paid queue service.
  */
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { AGENT_CONFIG } from "./config";
 import { logSafe } from "@/lib/observability";
@@ -180,7 +181,8 @@ export async function createDurableRun(init: DurableRunInit): Promise<void> {
   const db = await getDb();
   try {
     const checkpoint = { completedUniversityIds: [], reports: [], progress: [] };
-    await db.execute(sql`
+    await db.transaction(async tx=>{
+    const created=await tx.execute(sql`
       INSERT INTO public.research_runs
         (id, status, idempotency_key, request, dry_run, university_ids, scopes,
          checkpoint, attempts, max_attempts, cancel_requested, timeout_at,
@@ -189,17 +191,19 @@ export async function createDurableRun(init: DurableRunInit): Promise<void> {
         (${init.runId}, 'running', ${init.idempotencyKey ?? null},
          ${JSON.stringify(init.request)}::jsonb, ${init.request.dryRun ?? false},
          ${JSON.stringify(init.universityIds)}::jsonb, ${JSON.stringify(init.scopes)}::jsonb,
-         ${JSON.stringify(checkpoint)}::jsonb, 1, ${AGENT_CONFIG.runMaxAttempts}, FALSE,
+         ${JSON.stringify(checkpoint)}::jsonb, 0, ${AGENT_CONFIG.runMaxAttempts}, FALSE,
          ${toIso(init.timeoutAt)}::timestamptz, now(), now(), now())
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (id) DO NOTHING RETURNING id
     `);
+    if(!created.rows.length)return;
     for (const universityId of init.universityIds) {
-      await db.execute(sql`
+      await tx.execute(sql`
         INSERT INTO public.research_run_items (run_id, university_id, status)
         VALUES (${init.runId}, ${universityId}, 'pending')
         ON CONFLICT (run_id, university_id) DO NOTHING
       `);
     }
+    });
   } catch {
     warn();
   }
@@ -234,7 +238,7 @@ export async function patchDurableRun(
 ): Promise<boolean> {
   if (!isDurableStoreEnabled()) return false;
   // FAIL CLOSED: untyped callers are never allowed to touch durable status.
-  if (!guard) return false;
+  if (!guard || guard.kind === "unclaimed") return false;
   const db = await getDb();
   try {
     const current = await loadDurableRun(runId);
@@ -263,17 +267,15 @@ export async function patchDurableRun(
     // callers without a lease (in-process run, admin cancel) omit the guard.
     const leaseGuard = guard.kind === "admin_cancel"
       ? sql` AND status IN ('queued','running')`
-      : guard.kind === "unclaimed"
-        ? sql` AND lease_owner IS NULL AND status IN ('queued','running')`
-        : sql` AND lease_owner = ${guard.workerId}::text AND lease_until > now()
-               AND status IN ('queued','running')`;
+      : sql` AND lease_owner = ${guard.workerId}::text AND lease_until > now()
+               AND status IN ('queued','running') AND NOT cancel_requested AND (timeout_at IS NULL OR timeout_at>now())`;
     const result = await db.execute(sql`
       UPDATE public.research_runs
       SET status = ${statusFromState(state)},
           checkpoint = ${JSON.stringify(normalizedCheckpoint)}::jsonb,
           report = ${report == null ? null : JSON.stringify(report)}::jsonb,
           error = ${error},
-          attempts = ${attempts},
+          attempts = GREATEST(attempts, ${attempts}),
           cancel_requested = ${cancelRequested},
           timeout_at = ${toIso(timeoutAt)}::timestamptz,
           finished_at = ${toIso(finishedAt)}::timestamptz,
@@ -309,11 +311,11 @@ export async function appendDurableItem(
       WITH live_lease AS (
         SELECT id FROM public.research_runs
         WHERE id = ${runId}
-          AND (${guard?.workerId ?? null}::text IS NULL
-               OR (lease_owner = ${guard?.workerId ?? null}::text
+          AND (lease_owner = ${guard?.workerId ?? null}::text
                    AND lease_until > now()
                    AND cancel_requested = FALSE
-                   AND status IN ('queued','running')))
+                   AND status IN ('queued','running'))
+        FOR UPDATE
       )
       INSERT INTO public.research_run_items
         (run_id, university_id, status, report, error, attempts, started_at, finished_at, created_at, updated_at)
@@ -505,7 +507,7 @@ export async function claimDurableRun(
     const result = await db.execute(sql`
       UPDATE public.research_runs
       SET status = 'running',
-          lease_owner = ${workerId},
+          lease_owner = ${`${workerId}:${randomUUID()}`},
           lease_until = now() + (${lease} || ' milliseconds')::interval,
           attempts = LEAST(attempts + 1, max_attempts),
           started_at = COALESCE(started_at, now()),
@@ -542,15 +544,16 @@ export async function releaseDurableRun(runId: string, workerId: string): Promis
 }
 
 /** Final state for an item that exhausted its retry budget. */
-export async function skipDurableItem(runId: string, universityId: number, reason: string): Promise<void> {
+export async function skipDurableItem(runId: string, universityId: number, reason: string, workerId?:string): Promise<void> {
   if (!isDurableStoreEnabled()) return;
   try {
     const db = await getDb();
     await db.execute(sql`
+      WITH live_lease AS (SELECT id FROM public.research_runs WHERE id=${runId} AND lease_owner=${workerId??null} AND lease_until>now() AND NOT cancel_requested AND status IN ('queued','running') FOR UPDATE)
       UPDATE public.research_run_items
       SET status = 'skipped', error = ${reason.slice(0, 2000)},
           finished_at = COALESCE(finished_at, now()), updated_at = now()
-      WHERE run_id = ${runId} AND university_id = ${universityId}
+      WHERE run_id = ${runId} AND university_id = ${universityId} AND EXISTS(SELECT 1 FROM live_lease)
     `);
   } catch {
     warn();
@@ -574,6 +577,7 @@ export async function renewDurableLease(
           updated_at = now()
       WHERE id = ${runId}
         AND lease_owner = ${workerId}
+        AND lease_until > now()
         AND status IN ('queued','running')
         AND cancel_requested = FALSE
     `);

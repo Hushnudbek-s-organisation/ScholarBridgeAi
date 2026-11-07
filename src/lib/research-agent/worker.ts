@@ -32,6 +32,7 @@ import { planResume, type ResumeItemState } from "./resumePolicy";
 import { runBatch } from "./run-batch";
 import {
   adoptDurableRun,
+  flushDurableRunWrites,
   appendProgress,
   isRunActiveLocally,
   isRunCancelled,
@@ -134,6 +135,8 @@ export async function resumeResearchRuns(
       continue;
     }
     summary.claimed++;
+    const claimToken = claimed.lease_owner;
+    if (!claimToken) { summary.errors.push(`${row.id}: missing lease token`); continue; }
 
     const timeoutAt = toMillis(claimed.timeout_at);
     if (timeoutAt && Date.now() >= timeoutAt) {
@@ -142,8 +145,8 @@ export async function resumeResearchRuns(
         cancelRequested: true,
         error: "Run deadline passed before a worker resumed it.",
         finishedAt: Date.now(),
-      }, { workerId });
-      await releaseDurableRun(row.id, workerId);
+      }, { workerId: claimToken });
+      await releaseDurableRun(row.id, claimToken);
       summary.finished++;
       continue;
     }
@@ -159,17 +162,17 @@ export async function resumeResearchRuns(
     );
 
     for (const id of plan.exhaustedIds) {
-      await skipDurableItem(row.id, id, "Retry budget exhausted; not shown as a successful report.");
+      await skipDurableItem(row.id, id, "Retry budget exhausted; not shown as a successful report.", claimToken);
     }
     if (plan.universityIds.length === 0) {
-      await markTerminalWithoutWork(row.id, workerId, plan.exhaustedIds);
+      await markTerminalWithoutWork(row.id, claimToken, plan.exhaustedIds);
       if (plan.exhaustedIds.length) summary.errors.push(`${row.id}: ${plan.exhaustedIds.length} exhausted item(s)`);
       summary.finished++;
       continue;
     }
 
-    if (!adoptDurableRun(toRunStatus(claimed))) {
-      await releaseDurableRun(row.id, workerId);
+    if (!adoptDurableRun({...toRunStatus(claimed),workerId:claimToken})) {
+      await releaseDurableRun(row.id, claimToken);
       summary.skipped++;
       continue;
     }
@@ -185,7 +188,7 @@ export async function resumeResearchRuns(
         plan.retryIds.length ? `Retrying ${plan.retryIds.length} previously failed item(s).` : "No prior item retries.",
       ],
     });
-    appendProgress(row.id, `Claimed by ${workerId.slice(0, 18)}; durable lease is renewed while active.`);
+    appendProgress(row.id, `Claimed by ${claimToken.slice(0, 18)}; durable lease is renewed while active.`);
 
     let cancelled = false;
     const heartbeat = setInterval(() => {
@@ -200,7 +203,7 @@ export async function resumeResearchRuns(
           }
         })
         .catch(() => {});
-      void renewDurableLease(row.id, workerId, leaseMs).catch(() => {});
+      void renewDurableLease(row.id, claimToken, leaseMs).then(ok => { if (!ok) cancelled = true; }).catch(() => { cancelled = true; });
     }, HEARTBEAT_MS);
     if (typeof heartbeat.unref === "function") heartbeat.unref();
 
@@ -213,8 +216,9 @@ export async function resumeResearchRuns(
       },
       () => cancelled || isRunCancelled(row.id),
       {
-        onUniversityComplete: (report) => recordUniversityResult(row.id, report, workerId),
-        onUniversityError: (universityId, error) => recordUniversityError(row.id, universityId, error, workerId),
+        lease:{runId:row.id,workerId:claimToken},
+        onUniversityComplete: (report) => recordUniversityResult(row.id, report, claimToken),
+        onUniversityError: (universityId, error) => recordUniversityError(row.id, universityId, error, claimToken),
       }
     )
       .then(({ reports, errors }) => {
@@ -234,9 +238,10 @@ export async function resumeResearchRuns(
       .catch(() => {
         setRun(row.id, { state: "error", error: "Restart worker failed. Check server logs.", finishedAt: Date.now() });
       })
-      .finally(() => {
+      .finally(async () => {
         clearInterval(heartbeat);
-        void releaseDurableRun(row.id, workerId).catch(() => {});
+        await flushDurableRunWrites(row.id);
+        await releaseDurableRun(row.id, claimToken);
       });
 
     summary.resumed++;

@@ -20,6 +20,9 @@
 import { getDb } from "@/lib/research-agent/durableStore";
 
 export type CacheScope =
+  | `profile:${number}`
+  | `applications:${number}`
+  | `documents:${number}`
   | "default"
   | "catalogue"
   | "scholarships"
@@ -66,7 +69,7 @@ export class DbCacheRevisionStore implements CacheRevisionStore {
     const result = await (db as any).execute(
       (await import("drizzle-orm")).sql`
         INSERT INTO public.cache_revisions (scope, revision, reason, updated_at)
-        VALUES (${scope}, 1, ${reason}, now())
+        VALUES (${scope}, 2, ${reason}, now())
         ON CONFLICT (scope) DO UPDATE
           SET revision = public.cache_revisions.revision + 1,
               reason = EXCLUDED.reason,
@@ -83,6 +86,7 @@ let store: CacheRevisionStore | null = null;
 /** Override the store (tests, or a deployment without the migration). */
 export function setCacheRevisionStore(next: CacheRevisionStore | null): void {
   store = next;
+  fallbackUntil = 0;
 }
 export function getCacheRevisionStore(): CacheRevisionStore {
   if (!store) store = new DbCacheRevisionStore();
@@ -96,11 +100,15 @@ export function getCacheRevisionStore(): CacheRevisionStore {
  */
 let localFallback: LocalCacheRevisionStore | null = null;
 let warned = false;
+let fallbackUntil = 0;
 export async function readCacheRevision(scope: CacheScope = "default"): Promise<{ revision: number; shared: boolean }> {
   const active = getCacheRevisionStore();
   try {
+    if (Date.now() < fallbackUntil) throw new Error("revision store cooling down");
     return { revision: await active.read(scope), shared: active instanceof DbCacheRevisionStore };
   } catch {
+    fallbackUntil ||= Date.now() + 5000;
+    if (Date.now() >= fallbackUntil) fallbackUntil = Date.now() + 5000;
     if (!warned) {
       warned = true;
       console.warn("cache_revisions unavailable — using process-local revision (NOT shared across instances)");
@@ -114,6 +122,7 @@ export async function readCacheRevision(scope: CacheScope = "default"): Promise<
 export async function bumpCacheRevision(scope: CacheScope, reason: string): Promise<{ revision: number; shared: boolean }> {
   const active = getCacheRevisionStore();
   try {
+    if (Date.now() < fallbackUntil) throw new Error("revision store cooling down");
     return { revision: await active.bump(scope, reason), shared: active instanceof DbCacheRevisionStore };
   } catch {
     if (!localFallback) localFallback = new LocalCacheRevisionStore();
@@ -131,7 +140,7 @@ export function cacheRevisionKeyPart(revision: number, shared: boolean): string 
  * AND the catalog-facing profile-match cache; evidence affects the catalogue.
  */
 export const INVALIDATION_SCOPES: Record<string, CacheScope[]> = {
-  profile: ["profile", "default", "catalogue"],
+  profile: ["profile"],
   application: ["applications", "default"],
   document: ["documents", "default"],
   catalogue: ["catalogue", "universities", "scholarships", "opportunities", "evidence", "default"],

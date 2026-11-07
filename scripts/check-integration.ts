@@ -4038,6 +4038,9 @@ async function main() {
   await pool.end();
 }
 
+// Keep the event loop alive until cleanup + the explicit final exit below;
+// async-exit-hook must not run its beforeExit(0) during an awaited shutdown.
+const lifecycleKeepAlive=setInterval(()=>{},30_000);
 main()
   .then(() => {
     console.log(`\n${failed === 0 ? "✅" : "❌"} ${passed} passed, ${failed} failed`);
@@ -4065,5 +4068,6 @@ main()
     // Exit explicitly: embedded-postgres registers async-exit-hook, whose
     // `beforeExit` handler calls process.exit(0) and would silently turn a
     // failed run (process.exitCode = 1) into a green one in CI.
+    clearInterval(lifecycleKeepAlive);
     process.exit(process.exitCode ?? 0);
   });

@@ -419,12 +419,16 @@ export function ApplicationWorkspacePanel({
               onClick={async () => {
                 setBusy(true);
                 try {
-                  await fetch("/api/requirements", {
+                  const response=await fetch("/api/requirements", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ profileId, applicationId: app.id }),
                   });
+                  const result=await response.json().catch(()=>({}));
+                  if(!response.ok)throw new Error(result.error||t("awLoadError"));
                   await reload();
+                } catch(error) {
+                  setError(error instanceof Error?error.message:t("awLoadError"));
                 } finally {
                   setBusy(false);
                 }
@@ -448,9 +452,10 @@ export function ApplicationWorkspacePanel({
                     >
                       <Button variant="unstyled"
                         type="button"
-                        disabled={busy}
+                        disabled={busy||r.itemKey==="published.requirement_group"}
                         onClick={() => patchRequirement(r.id, r.status === "done" ? "todo" : "done")}
-                        aria-label={r.status === "done" ? `Mark ${r.title} as not done` : `Mark ${r.title} as done`}
+                        aria-label={r.itemKey==="published.requirement_group"?t("awDerivedPolicy"):r.status === "done" ? `Mark ${r.title} as not done` : `Mark ${r.title} as done`}
+                        title={r.itemKey==="published.requirement_group"?t("awDerivedPolicy"):undefined}
                         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-control border ${
                           r.status === "done"
                             ? "border-emerald-500 bg-emerald-700 text-white sb-ink-on-bright"
@@ -471,7 +476,7 @@ export function ApplicationWorkspacePanel({
                           {r.title}
                           {!r.isRequired && <span className="ml-1 text-xs font-normal uppercase text-slate-500">{t("awOptional")}</span>}
                         </p>
-                        {r.instructions && <p className="text-sm text-slate-500 dark:text-slate-400">{r.instructions}</p>}
+                        {r.instructions && <p className="whitespace-pre-line text-sm text-slate-500 dark:text-slate-400">{r.instructions}</p>}
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <SourceTag
                             url={r.sourceUrl}

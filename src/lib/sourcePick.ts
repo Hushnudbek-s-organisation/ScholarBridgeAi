@@ -19,6 +19,8 @@ export interface PickableSource {
   url: string;
   title: string;
   accessedAt: Date | null;
+  isOfficial?: boolean;
+  scopeMatches?: boolean;
 }
 
 export function pickBestSource<T extends PickableSource>(
@@ -36,6 +38,8 @@ export function pickBestSource<T extends PickableSource>(
       bestId = link.sourceId;
       continue;
     }
+    if (Boolean(src.scopeMatches) !== Boolean(best.scopeMatches)) { if (src.scopeMatches) { best = src; bestId = src.id; } continue; }
+    if (Boolean(src.isOfficial) !== Boolean(best.isOfficial)) { if (src.isOfficial) { best = src; bestId = src.id; } continue; }
     const candidateAt = src.accessedAt ? src.accessedAt.getTime() : null;
     const bestAt = best.accessedAt ? best.accessedAt.getTime() : null;
     if (candidateAt != null && (bestAt == null || candidateAt > bestAt)) {
@@ -43,7 +47,7 @@ export function pickBestSource<T extends PickableSource>(
       bestId = link.sourceId;
       continue;
     }
-    if (candidateAt == null && bestAt == null && link.sourceId < bestId) {
+    if (candidateAt === bestAt && link.sourceId < bestId) {
       best = src;
       bestId = link.sourceId;
     }

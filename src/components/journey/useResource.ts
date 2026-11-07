@@ -31,64 +31,63 @@ function message(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback;
 }
 
+const sameDependencies=(a:React.DependencyList,b:React.DependencyList)=>a.length===b.length&&a.every((value,index)=>Object.is(value,b[index]));
+
 export function useResource<T>(
   fetcher: () => Promise<T>,
   deps: React.DependencyList,
-  options: { initial: T; errorFallback?: string }
+  options: { initial: T; errorFallback?: string; enabled?: boolean }
 ): Resource<T> {
-  const [data, setData] = useState<T>(options.initial);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // The latest fetcher is always used, but its identity is not a dependency —
-  // `deps` is the caller's explicit list, exactly like a hand-written effect.
-  // The ref is synced in an effect declared BEFORE the loading effect, so the
-  // loader always sees the fetcher that belongs to the current dependency set.
-  const fetcherRef = useRef(fetcher);
-  useEffect(() => {
-    fetcherRef.current = fetcher;
-  });
+  const [state,setState]=useState(()=>({data:options.initial,dataDeps:deps,error:null as string|null,errorDeps:deps,loading:true}));
+  const sequence=useRef(0);
+  const invalidateRequests=useCallback(()=>{sequence.current++;},[]);
+  const latest=useRef({fetcher,deps,options});
+  useEffect(()=>{latest.current={fetcher,deps,options};});
 
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      try {
-        const res = await fetcherRef.current();
-        if (!live) return;
-        setData(res);
-        setError(null);
-      } catch (e) {
-        if (!live) return;
-        setError(message(e, options.errorFallback ?? "Something went wrong"));
-      } finally {
-        if (live) setLoading(false);
+  useEffect(()=>{
+    const request=++sequence.current;
+    const current=latest.current;
+    // Disabled scopes (e.g. no authenticated owner) do not fetch or schedule
+    // a synthetic empty-success render. Enablement belongs in the caller deps.
+    if(current.options.enabled===false)return invalidateRequests;
+    let live=true;
+    void (async()=>{
+      try{
+        const data=await current.fetcher();
+        if(live&&request===sequence.current)setState({data,dataDeps:current.deps,error:null,errorDeps:current.deps,loading:false});
+      }catch(error){
+        if(live&&request===sequence.current)setState(previous=>({...previous,error:message(error,current.options.errorFallback??"Something went wrong"),errorDeps:current.deps,loading:false}));
       }
     })();
-    return () => {
-      live = false;
-    };
+    // Dependency changes and unmount invalidate reloads too, not just this read.
+    return ()=>{live=false;invalidateRequests();};
+    // The caller supplies the scope, as with React's own dependency list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  },deps);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    // reload() runs right after a mutation the caller just performed — it must
-    // read the server truth, so the shared GET cache is cleared first. (This
-    // also covers panels that POST/PATCH through raw fetch instead of
-    // sendJson, which clears the cache itself.)
+  const reload=useCallback(async()=>{
+    const request=++sequence.current,current=latest.current;
+    setState(previous=>({...previous,loading:true,error:null}));
     invalidateClientCache();
-    try {
-      const res = await fetcherRef.current();
-      setData(res);
-      setError(null);
-    } catch (e) {
-      setError(message(e, options.errorFallback ?? "Something went wrong"));
-    } finally {
-      setLoading(false);
+    try{
+      const data=await current.fetcher();
+      if(request===sequence.current)setState({data,dataDeps:current.deps,error:null,errorDeps:current.deps,loading:false});
+    }catch(error){
+      if(request===sequence.current)setState(previous=>({...previous,error:message(error,current.options.errorFallback??"Something went wrong"),errorDeps:current.deps,loading:false}));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return { data, loading, error, reload, setData };
+  },[]);
+  const setData=useCallback<React.Dispatch<React.SetStateAction<T>>>(action=>{
+    const current=latest.current;
+    setState(previous=>{
+      const data=sameDependencies(previous.dataDeps,current.deps)?previous.data:current.options.initial;
+      return {...previous,data:typeof action==="function"?(action as (value:T)=>T)(data):action,dataDeps:current.deps};
+    });
+  },[]);
+  const dataMatches=sameDependencies(state.dataDeps,deps);
+  const error=state.error&&sameDependencies(state.errorDeps,deps)?state.error:null;
+  // Mask on the first render of a new owner/application/scenario, before effects
+  // run. An old success/error must never appear under new scope controls.
+  return {data:dataMatches?state.data:options.initial,loading:state.loading||(!dataMatches&&!error),error,reload,setData};
 }
 
 /**

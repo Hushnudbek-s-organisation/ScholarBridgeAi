@@ -97,6 +97,7 @@ export async function GET(req: Request) {
             : null,
           funding: postAdmissionFunding({
             tuition,
+            tuitionBasis:recordedOfferTuition!=null?"offer_recorded_usd":"published_annual_usd",
             items,
             depositAmount: o.depositAmount,
             depositDueDate: o.depositDueDate ? String(o.depositDueDate).slice(0, 10) : null,

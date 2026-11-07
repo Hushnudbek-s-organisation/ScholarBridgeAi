@@ -203,7 +203,7 @@ export async function POST(req: Request) {
       verificationStatus: "unverified",
     });
     // A new university must be visible on the very next catalogue request.
-    invalidateCatalogCache("universities");
+    await invalidateCatalogCache("universities");
     return NextResponse.json({ university });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create university";
@@ -236,7 +236,7 @@ export async function PATCH(req: Request) {
     const [university] = await db.update(universities).set(values as Partial<typeof universities.$inferInsert>)
       .where(eq(universities.id, id)).returning();
     await auditRowChanges("university", id, existing, { ...existing, ...values }, { actor: "ADMIN" });
-    invalidateCatalogCache("universities");
+    await invalidateCatalogCache("universities");
     return NextResponse.json({ university });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update university";
@@ -258,7 +258,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "University id is required" }, { status: 400 });
     }
     await db.delete(universities).where(eq(universities.id, id));
-    invalidateCatalogCache("universities");
+    await invalidateCatalogCache("universities");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/admin/universities error:", error);

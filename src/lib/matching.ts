@@ -46,6 +46,7 @@ const toDetail = (reason: WeightedReason | ReasonDetail): ReasonDetail => {
 };
 
 export interface StudentProfileData {
+  applicantContext?:import("./applicantContext").ApplicantContext|null;
   id?: number;
   name?: string;
   /**
@@ -406,7 +407,7 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
 
   // Normalize GPA to 4.0 scale. An unknown scale with a value > 4 stays
   // unknown (never clamped to a perfect 4.0) — see src/lib/gpa.ts.
-  const normGpa = gpaTo40Scale(profile.gpa, profile.gpaScale);
+  const normGpa = gpaTo40Scale(profile.gpa, profile.gpaScale, profile.applicantContext?.gpa ? profile.applicantContext.gpa.minimum : 0);
 
   // GPA — only when the university officially specifies a minimum (spec §14)
   // AND the student's GPA is comparable (normGpa != null).
@@ -692,7 +693,7 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   // GPA: no comparison, no claim (see src/lib/gpa.ts). Meeting the bar starts
   // at a third of the award and is fully earned 0.4 above it; a shortfall is
   // charged progressively up to the full −25 at 0.8 below.
-  const normGpa = gpaTo40Scale(profile.gpa, profile.gpaScale);
+  const normGpa = gpaTo40Scale(profile.gpa, profile.gpaScale, profile.applicantContext?.gpa ? profile.applicantContext.gpa.minimum : 0);
   if (scholarship.minGpa && scholarship.minGpa > 0 && normGpa != null) {
     const gpaDiff = normGpa - scholarship.minGpa;
     const points = gpaDiff >= 0 ? meets(gpaDiff, 0, 0.4, 15, 0) : shortfall(gpaDiff, 0, 0.8, 25);

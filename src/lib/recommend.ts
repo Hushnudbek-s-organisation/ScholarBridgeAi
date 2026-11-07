@@ -1,3 +1,4 @@
+import {evaluateResolvedAcademicCriteria,type ResolvedAcademicDecisionInput} from "./academicDecision";
 import { hasVerifiedProgramEvidence } from "./catalogEvidence";
 import { budgetVerdict, evaluateBudgetFit } from "./budgetFit";
 /**
@@ -35,6 +36,9 @@ import { budgetVerdict, evaluateBudgetFit } from "./budgetFit";
  * The engine is pure and deterministic (unit-tested in scripts/check-recommend.ts).
  */
 
+import {evaluateApplicantRequirementGroup,type RequirementEvaluation} from "./requirementGroups";
+import type {ApplicantContext} from "./applicantContext";
+import {countriesMatch} from "./countries";
 import { ADMISSION_PROBABILITY } from "./chancing";
 import { gpaTo40Scale } from "./gpa";
 import { isStaleVerified } from "./provenance";
@@ -63,8 +67,13 @@ export interface RecommendationInput {
   gpa?: number | null;
   /** Scale the GPA is on (4.0, 5.0, 100, ...). Absent → GPA treated as 4.0 only if provided with no scale is unsafe: treated unknown. */
   gpaScale?: number | null;
+  gpaMinimum?:number|null;
   ielts?: number | null;
   toefl?: number | null;
+  toeflScale?: "120" | "6" | null;
+  citizenship?: string | null;
+  citizenships?:string[];
+  toeflRecord?:ApplicantContext["toefl"];
   duolingo?: number | null;
   sat?: number | null;
   act?: number | null;
@@ -122,6 +131,12 @@ export interface RecommendUniversity {
 }
 
 export interface RecommendRequirement {
+  /** Canonical, scoped original-unit envelope; raw row minima are not evidence. */
+  academicRequirements?:ResolvedAcademicDecisionInput;
+  requirementGroup?:unknown;
+  academicYear?: string | null;
+  englishOperator?: "AND" | "OR" | null;
+  toeflScale?: "120" | "6" | null;
   programId: number;
   minIelts: number | null;
   minToefl: number | null;
@@ -149,6 +164,10 @@ export interface RecommendCycle {
 }
 
 export interface RecommendScholarship {
+  universityId?: number | null;
+  eligibleCitizenships?: string[];
+  admissionCycle?: string | null;
+  eligibilityVerified?: boolean;
   id: number;
   title: string;
   country: string;
@@ -206,6 +225,7 @@ export interface RequirementAssessment {
 }
 
 export interface Eligibility {
+  group?:RequirementEvaluation;
   items: RequirementAssessment[];
   met: number;
   unmet: number;
@@ -223,14 +243,31 @@ export function assessEligibility(
   input: RecommendationInput,
   reqs: RecommendRequirement[],
   /** The programme's own level — SAT/ACT only apply to undergraduate entry. */
-  programDegreeLevel?: string | null
+  programDegreeLevel?: string | null,
+  academicYear?: string | null
 ): Eligibility {
   const items: RequirementAssessment[] = [];
   const textRequirements: { kind: string; text: string }[] = [];
   // A program can have multiple requirement rows (per academic year); use the
   // first row that carries each minimum — the catalog does not expose a
   // richer cycle mapping on these rows.
-  const first: RecommendRequirement | undefined = reqs[0];
+  const scoped = academicYear ? reqs.filter(row => row.academicYear === academicYear) : reqs;
+  // Without an exact cycle or with conflicting rows there is no arbitrary "first" rule.
+  const first: RecommendRequirement | undefined = scoped.length === 1 ? scoped[0] : undefined;
+
+  if(first?.academicRequirements){
+    const hasCriteria=Boolean(first.academicRequirements.requirementGroup)||Object.keys(first.academicRequirements.summary).length>0;
+    const group=hasCriteria?evaluateResolvedAcademicCriteria(first.academicRequirements,{...input,gpaScale:input.gpaMinimum==null?null:input.gpaScale},input.asOfDate??new Date().toISOString().slice(0,10)):undefined;
+    const textRequirements=[
+      ["ib",first.ibRequirement],["alevel",first.aLevelRequirement],["ap",first.apRequirement],["subject",first.subjectRequirements],["other",first.otherRequirements],
+    ].flatMap(([kind,text])=>text?[{kind:kind!,text}]:[]);
+    return {items:[],met:group?.state==="met"?1:0,unmet:group?.state==="unmet"?1:0,unknown:!group||group.state==="unknown"?1:0,textRequirements,group};
+  }
+
+  if(first?.requirementGroup){
+    const group=evaluateApplicantRequirementGroup(first.requirementGroup,input,input.asOfDate??new Date().toISOString().slice(0,10));
+    return {items:[],met:group.state==="met"?1:0,unmet:group.state==="unmet"?1:0,unknown:group.state==="unknown"?1:0,textRequirements:[],group};
+  }
 
   const add = (key: RequirementAssessment["key"], required: number | null | undefined, studentValue: number | null | undefined) => {
     if (required == null || !Number.isFinite(Number(required)) || Number(required) <= 0) return;
@@ -244,14 +281,17 @@ export function assessEligibility(
   };
 
   if (first) {
-    add("gpa", first.minGpa, gpaTo40Scale(input.gpa, input.gpaScale));
+    // Range-based conversion remains a planning score, never an official
+    // admissions equivalence. A native 4-point record compares directly;
+    // other original scales require a separately verified conversion policy.
+    add("gpa", first.minGpa, input.gpaScale===4&&(input.gpaMinimum??0)===0&&input.gpa!=null&&input.gpa>=0&&input.gpa<=4 ? input.gpa : null);
     // English proficiency: any one of IELTS/TOEFL/Duolingo satisfying the
     // program's published minimum counts as "met" for that test. If the
     // program sets an IELTS minimum, an equivalent the student holds on a
     // DIFFERENT test is NOT auto-substituted — that is an admission-office
     // decision, so we only mark it met when the same test is taken.
     add("ielts", first.minIelts, input.ielts);
-    add("toefl", first.minToefl, input.toefl);
+    add("toefl", first.minToefl, first.toeflScale && first.toeflScale === input.toeflScale && !(input.toeflRecord?.validUntil && input.toeflRecord.validUntil < (input.asOfDate??new Date().toISOString().slice(0,10))) ? input.toefl : null);
     add("duolingo", first.minDet, input.duolingo);
     // SAT/ACT are undergraduate-admission tests. A graduate programme (or a
     // graduate applicant) must not be scored against a stray SAT minimum —
@@ -268,11 +308,21 @@ export function assessEligibility(
     if (first.otherRequirements) textRequirements.push({ kind: "other", text: first.otherRequirements });
   }
 
+  const english = items.filter(item => ["ielts", "toefl", "duolingo"].includes(item.key));
+  let counted = items;
+  if (english.length > 1) {
+    if (first?.englishOperator === "OR") {
+      const status: RequirementStatus = english.some(item => item.status === "met") ? "met" : english.every(item => item.status === "unmet") ? "unmet" : "unknown";
+      counted = [...items.filter(item => !english.includes(item)), { ...english[0], status }];
+    } else if (first?.englishOperator !== "AND") {
+      english.forEach(item => { item.status = "unknown"; });
+    }
+  }
   return {
     items,
-    met: items.filter((i) => i.status === "met").length,
-    unmet: items.filter((i) => i.status === "unmet").length,
-    unknown: items.filter((i) => i.status === "unknown").length,
+    met: counted.filter((i) => i.status === "met").length,
+    unmet: counted.filter((i) => i.status === "unmet").length,
+    unknown: counted.filter((i) => i.status === "unknown").length,
     textRequirements,
   };
 }
@@ -396,10 +446,15 @@ export function assessAffordability(
   const matched: Affordability["scholarshipMatches"] = [];
   const interests = (input.interests || []).map(normalizeSubject);
   for (const s of scholarships) {
+    if (s.eligibilityVerified !== true) continue;
+    if (s.universityId == null || s.universityId !== program.universityId) continue;
+    if (!s.admissionCycle || !input.startYear || academicYearRank(s.admissionCycle) !== input.startYear) continue;
+    const citizenships=input.citizenships??(input.citizenship?[input.citizenship]:[]);
+    const citizenshipOk = evaluateEligibilityScope(JSON.stringify(s.eligibleCitizenships ?? []), countries => citizenships.length ? countries.some(country=>citizenships.some(citizenship=>countriesMatch(country,citizenship))) : null) === "eligible";
+    if (!citizenshipOk) continue;
     if (matched.length >= 5) break;
     const countryOk =
-      !s.country ||
-      !programCountry ||
+      !!s.country && !!programCountry &&
       s.country.trim().toLowerCase() === programCountry.trim().toLowerCase();
     // Degree level: unknown scholarship level → never claim a match (unknown
     // ≠ match). "All" always passes; otherwise the student's level must be
@@ -508,7 +563,8 @@ export function recommend(
     const reqs = catalog.requirements.get(program.id) ?? [];
     const cycles = catalog.cycles.get(program.id) ?? [];
     const fit = subjectAffinity(input.interests, program.field);
-    const eligibility = assessEligibility(input, reqs, program.degreeLevel);
+    const selectedCycle = selectNextCycle(cycles, input.asOfDate);
+    const eligibility = assessEligibility(input, reqs, program.degreeLevel, selectedCycle?.academicYear);
     const affordability = assessAffordability(input, program, university, catalog.scholarships, university.country);
 
     // ---- Match score (0–100) -------------------------------------------
@@ -517,13 +573,13 @@ export function recommend(
     let score = 10 + fit.score * 55; // 10–65
     if (fit.level === "unknown") score = 10 + 27; // neutral 0.5 → mid
     if (eligibility.items.length) {
-      const metShare = eligibility.met / eligibility.items.length;
-      const unmetShare = eligibility.unmet / eligibility.items.length;
+      const metShare = eligibility.met / Math.max(1, eligibility.met + eligibility.unmet);
+      const unmetShare = eligibility.unmet / Math.max(1, eligibility.met + eligibility.unmet);
       score += metShare * 20; // +0–20 for met requirements
       score -= unmetShare * 12; // −0–12 for unmet (known gaps only)
       // Unknowns: no change. Missing data is not a negative.
     } else {
-      score += 6; // no published minimums → nothing to miss; small neutral credit
+      // Unknown catalogue requirements do not imply absence of requirements.
     }
     if (affordability.withinBudget === "yes") score += 5;
     else if (affordability.withinBudget === "no") score -= 4;
@@ -547,7 +603,6 @@ export function recommend(
     const matchScore = Math.max(0, Math.min(100, Math.round(score)));
 
     // ---- Next cycle (only real rows; verified vs unverified) -------------
-    const selectedCycle = selectNextCycle(cycles, input.asOfDate);
     const nextCycle = selectedCycle
       ? { ...selectedCycle, isEstimated: selectedCycle.verificationStatus !== "verified" }
       : null;

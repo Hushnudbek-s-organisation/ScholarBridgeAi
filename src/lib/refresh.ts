@@ -176,10 +176,8 @@ async function reverifyOfficialSources(
   const checks = await adapter(scope);
   result.processed = checks.length;
   result.sourceChecks = checks as OfficialSourceCheckResult[];
-  const now = new Date();
-
+  result.sourcePagesRead=new Set(checks.filter(check=>check.officialPageReRead).map(check=>check.sourceUrl)).size;
   for (const check of checks) {
-    if (check.officialPageReRead) result.sourcePagesRead += 1;
     const allowed = mayRefreshVerifiedDate({
       officialPageReRead: check.officialPageReRead,
       verificationSucceeded: check.verificationSucceeded,
@@ -192,15 +190,14 @@ async function reverifyOfficialSources(
       );
       continue;
     }
-    const table = check.entityType === "university" ? universities : scholarships;
-    // Only the date and verification state change. Existing values, source URLs
-    // and administrator curation are never overwritten by a status check.
-    await db
-      .update(table)
-      .set({ lastVerifiedAt: now, verificationStatus: "verified" })
-      .where(eq(table.id, check.entityId));
-    result.verifiedDatesUpdated += 1;
-    result.changed += 1;
+    const field=check as OfficialSourceCheckResult;
+    if(!field.factApplied){
+      try{await (await import("./officialSourceAdapter.server")).persistOfficialSourceCheck(field);}
+      catch{result.failedVerification=true;result.errors.push("Exact fact/check transaction failed; no success was reported.");continue;}
+    }
+    if(!field.factApplied||!field.verificationSucceeded){result.failedVerification=true;result.errors.push(field.reason??"Exact fact was not applied.");continue;}
+    result.verifiedDatesUpdated+=1;
+    result.changed+=1;
   }
 }
 
@@ -248,7 +245,7 @@ export async function runRefresh(
     logSafe("refresh.error", { requestId, jobId: job.id, mode, reason: message });
     await finishRefreshJob(job.id, result, message);
   } finally {
-    if (result.changed > 0) invalidateCatalogCache(scope === "all" ? "all" : scope);
+    if (result.changed > 0) await invalidateCatalogCache(scope === "all" ? "all" : scope);
   }
 
   return result;

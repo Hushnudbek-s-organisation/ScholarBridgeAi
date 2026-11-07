@@ -124,7 +124,7 @@ check("mixed: known-met + known-unmet + unknown coexist", (() => {
 check("GPA 3.0/5.0 → 2.4 on 4.0 scale", gpaTo40Scale(3.0, 5.0) === 2.4);
 check("GPA 85/100 → 3.4 on 4.0 scale", Math.abs(gpaTo40Scale(85, 100)! - 3.4) < 0.001);
 check("GPA > 4 without a scale → unknown (no assumption)", gpaTo40Scale(8.5, null) === null);
-check("GPA ≤ 4 without a scale compared as-is (safe)", gpaTo40Scale(3.5, null) === 3.5);
+check("GPA ≤ 4 without a scale is unknown", gpaTo40Scale(3.5, null) === null);
 check("text requirements carried through, not scored as numbers", (() => {
   const e = assessEligibility({ gpa: 3.8, gpaScale: 4, ielts: 7, sat: 1400 }, baseReqs);
   return e.textRequirements.some((t) => t.kind === "subject" && t.text === "Two math subjects");
@@ -244,10 +244,11 @@ section("6. Affordability and funding");
 {
   const p = program({ id: 1, universityId: 1, name: "RECOMMEND-FIXTURE: CS", annualTuition: 8000 });
   const u = uni({ id: 1, name: "Fixture University", country: "Germany", annualLivingEst: 2000 });
+  const fundingScope = { universityId:1, eligibleCitizenships:["Uzbekistan"], admissionCycle:"2027/2028", eligibilityVerified:true };
   const sch: RecommendScholarship[] = [
-    { id: 1, title: "RECOMMEND-FIXTURE: DAAD-like", country: "Germany", degreeLevels: ["Bachelor"], coverageType: "tuition", minGpa: 3.0, minIelts: 6.0, financialNeedBased: false, meritBased: true, eligibleMajors: ["Computer Science"] },
-    { id: 2, title: "RECOMMEND-FIXTURE: Need-based", country: "Germany", degreeLevels: ["All"], coverageType: "full", minGpa: null, minIelts: null, financialNeedBased: true, meritBased: false, eligibleMajors: ["All"] },
-    { id: 3, title: "RECOMMEND-FIXTURE: US-only", country: "United States", degreeLevels: ["All"], coverageType: "tuition", minGpa: null, minIelts: null, financialNeedBased: false, meritBased: true, eligibleMajors: ["All"] },
+    { ...fundingScope, id: 1, title: "RECOMMEND-FIXTURE: DAAD-like", country: "Germany", degreeLevels: ["Bachelor"], coverageType: "tuition", minGpa: 3.0, minIelts: 6.0, financialNeedBased: false, meritBased: true, eligibleMajors: ["Computer Science"] },
+    { ...fundingScope, id: 2, title: "RECOMMEND-FIXTURE: Need-based", country: "Germany", degreeLevels: ["All"], coverageType: "full", minGpa: null, minIelts: null, financialNeedBased: true, meritBased: false, eligibleMajors: ["All"] },
+    { ...fundingScope, id: 3, title: "RECOMMEND-FIXTURE: US-only", country: "United States", degreeLevels: ["All"], coverageType: "tuition", minGpa: null, minIelts: null, financialNeedBased: false, meritBased: true, eligibleMajors: ["All"] },
   ];
   const cat: RecommendationCatalog = {
     programs: [p],
@@ -256,7 +257,7 @@ section("6. Affordability and funding");
     cycles: new Map(),
     scholarships: sch,
   };
-  const withBudget = assessAffordability({ interests: ["Computer Science"], budgetUsd: 10000, fundingNeed: "partial", degreeLevel: "Bachelor" }, p, u, sch, "Germany");
+  const withBudget = assessAffordability({ interests: ["Computer Science"], budgetUsd: 10000, fundingNeed: "partial", citizenship:"Uzbekistan", startYear:2027, degreeLevel: "Bachelor" }, p, u, sch, "Germany");
   const noBudget = assessAffordability({ interests: ["Computer Science"], degreeLevel: "Bachelor" }, p, u, sch, "Germany");
   const noFunding = assessAffordability({ interests: ["Computer Science"], budgetUsd: 10000 }, p, u, sch, "Germany");
 
@@ -279,7 +280,7 @@ section("6. Affordability and funding");
   check("country mismatch excluded", withBudget.scholarshipMatches.every((s) => s.title !== "RECOMMEND-FIXTURE: US-only"));
   check("degree-level match honoured", withBudget.scholarshipMatches.some((s) => s.title === "RECOMMEND-FIXTURE: DAAD-like"));
   const aliasAward: RecommendScholarship = { ...sch[0], degreeLevels: ["MSc"] };
-  check("scholarship degree aliases compare canonically", assessAffordability({ interests: ["Computer Science"], degreeLevel: "Master's" }, p, u, [aliasAward], "Germany").scholarshipMatches.length === 1);
+  check("scholarship degree aliases compare canonically", assessAffordability({ interests: ["Computer Science"], degreeLevel: "Master's", citizenship:"Uzbekistan", startYear:2027 }, p, u, [aliasAward], "Germany").scholarshipMatches.length === 1);
   check("non-USD tuition → unknown (no cross-currency fabrication)", (() => {
     const eur = program({ id: 1, universityId: 1, name: "x", annualTuition: 6000, tuitionCurrency: "EUR" });
     return assessAffordability({ interests: ["Computer Science"], budgetUsd: 50000 }, eur, u, [], "Germany").withinBudget === "unknown";
@@ -625,9 +626,9 @@ async function apiPart() {
     check("CS program ranked first (exact subject tier)", results[0]?.program?.name === "RECOMMEND-FIXTURE: BSc Computer Science", JSON.stringify(results.map((r: any) => r.program.name)));
     check("synonym program (Software Engineering) included", Boolean(byName("RECOMMEND-FIXTURE: BSc Software Engineering")));
     const csRes = byName("RECOMMEND-FIXTURE: BSc Computer Science");
-    check("eligibility: ielts met, gpa met (from profile, labelled)", (() => {
+    check("legacy row-level verification does not establish typed programme minima", (() => {
       const items: any[] = csRes?.eligibility?.items ?? [];
-      return items.some((i) => i.key === "ielts" && i.status === "met") && items.some((i) => i.key === "gpa" && i.status === "met");
+      return items.length === 0;
     })(), JSON.stringify(csRes?.eligibility));
     check("affordability: within budget (9000 ≤ 25000 USD)", csRes?.affordability?.withinBudget === "yes", JSON.stringify(csRes?.affordability?.withinBudget));
     check("next cycle: verified deadline surfaced with source", csRes?.nextCycle?.deadline === "2027-01-15" && csRes?.nextCycle?.isEstimated === false, JSON.stringify(csRes?.nextCycle));

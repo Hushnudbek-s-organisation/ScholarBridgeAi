@@ -172,7 +172,13 @@
     "test:migration-runner": "tsx scripts/check-migration-runner.ts",
     "test:migration-recovery": "tsx scripts/check-migration-recovery.ts",
     "test:design-system": "tsx scripts/check-design-system.ts",
-    "validate:local": "bash scripts/validate-local.sh"
+    "validate:local": "bash scripts/validate-local.sh",
+    "test:master-regressions": "tsx scripts/check-master-regressions.ts",
+    "test:master-database": "tsx scripts/check-master-database.ts",
+    "test:master-browser": "node scripts/run-e2e.mjs e2e/master-dashboard.spec.ts",
+    "test:catalogue-query-load": "tsx scripts/check-catalogue-query-load.ts",
+    "test:continuation": "tsx scripts/check-continuation.ts",
+    "test:snapshot-recovery": "tsx scripts/check-snapshot-recovery.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
@@ -213,6 +219,9 @@
     "node": ">=20 <23"
   },
   "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    },
     "sharp": "^0.35.5",
     "source-map-js": "^1.2.2",
     "js-yaml": "^4.3.2",

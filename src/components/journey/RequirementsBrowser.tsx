@@ -414,7 +414,7 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
                             {r.title}
                             {!r.isRequired && <span className="ml-1 text-xs uppercase text-slate-500">{t("rbOptional")}</span>}
                           </p>
-                          {r.instructions && <p className="text-sm text-slate-500 dark:text-slate-400">{r.instructions}</p>}
+                          {r.instructions && <p className="whitespace-pre-line text-sm text-slate-500 dark:text-slate-400">{r.instructions}</p>}
                           <div className="mt-0.5 flex flex-wrap items-center gap-2">
                             <SourceTag
                               url={r.sourceUrl}

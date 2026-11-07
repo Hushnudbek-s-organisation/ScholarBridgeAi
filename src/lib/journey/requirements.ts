@@ -1,3 +1,5 @@
+import {evaluateApplicantRequirementGroup,type RequirementEvaluation} from "../requirementGroups";
+import {recordedToefl,type ApplicantContext} from "../applicantContext";
 /**
  * Application Requirements Engine (spec §5).
  *
@@ -78,7 +80,13 @@ export interface RequirementItem extends RequirementSource {
 }
 
 /** What we know about the university (only sourced fields are used). */
-export interface RequirementUniversity {
+export type MinimumField = "minGpa"|"minIelts"|"minToefl"|"minSat"|"minAct"|"minDuolingo"|"minDet"|"applicationFee";
+export interface MinimumEvidence {
+  minGpaScale?:number|null;
+  minToeflScale?:string|null;
+  fieldSources?:Partial<Record<MinimumField,RequirementSource>>;
+}
+export interface RequirementUniversity extends MinimumEvidence {
   id: number;
   name: string;
   minGpa?: number | null;
@@ -98,6 +106,7 @@ export interface RequirementUniversity {
 
 /** The student's own facts. Missing values stay `null` — never defaulted. */
 export interface RequirementProfile {
+  applicantContext?:ApplicantContext|null;
   gpa?: number | null;
   gpaScale?: number | null;
   ieltsScore?: number | null;
@@ -107,7 +116,7 @@ export interface RequirementProfile {
   duolingoScore?: number | null;
 }
 
-export interface ProgramRequirementFacts {
+export interface ProgramRequirementFacts extends MinimumEvidence {
   minGpa?: number | null;
   minIelts?: number | null;
   minToefl?: number | null;
@@ -184,6 +193,8 @@ export function buildRequirements(input: {
     lastVerifiedAt?: Date | null;
     verificationStatus?: string | null;
   }[];
+  publishedGroup?:{value:unknown;source:RequirementSource}|null;
+  asOfDate?:string;
   progress: StudentProgressFacts;
   deadline?: string | null;
   /** Already-known item keys — these are returned as `in_progress`. */
@@ -203,7 +214,7 @@ export function buildRequirements(input: {
       sourceUrl?: string | null;
       sourceName?: string | null;
       sourceType?: string | null;
-      lastVerifiedAt?: Date | null;
+      lastVerifiedAt?: Date | string | null;
       verificationStatus?: string | null;
     } | null
   ): RequirementSource => ({
@@ -234,27 +245,41 @@ export function buildRequirements(input: {
     });
   }
 
+  const sourceFor=(field:MinimumField)=>{
+    const programmeValue=program?.[field as keyof ProgramRequirementFacts]!=null;
+    return sourceOf(programmeValue?(program?.fieldSources?.[field]??program):(u.fieldSources?.[field==="minDet"?"minDuolingo":field]??null));
+  };
+  if(input.publishedGroup){
+    const test=recordedToefl(profile.applicantContext,profile.toeflScore);
+    const group=evaluateApplicantRequirementGroup(input.publishedGroup.value,{gpa:profile.applicantContext?.gpa?profile.applicantContext.gpa.value:profile.gpa,gpaScale:profile.applicantContext?.gpa?profile.applicantContext.gpa.maximum:profile.gpaScale,gpaMinimum:profile.applicantContext?.gpa?.minimum,ielts:profile.ieltsScore,sat:profile.satScore,act:profile.actScore,duolingo:profile.duolingoScore,toefl:test.score,toeflScale:test.scale,toeflRecord:profile.applicantContext?.toefl},input.asOfDate??"");
+    const describe=(node:RequirementEvaluation,depth=0):string=>`${"  ".repeat(depth)}${node.label}: ${node.state} (${node.reason})${node.children.length?"\n"+node.children.map(child=>describe(child,depth+1)).join("\n"):""}`;
+    push({itemKey:"published.requirement_group",section:"academic",title:group.label==="unknown"?"Published programme requirements":group.label,instructions:describe(group),isRequired:group.state!=="not_applicable",state:group.state==="met"?"met":group.state==="unmet"?"not_met":"unknown",detail:"Published allOf / anyOf requirements; checklist completion is not admission eligibility.",dueDate:deadline??null,linkedType:"manual",...input.publishedGroup.source});
+  } else {
   // ---- Academic: GPA -------------------------------------------------------
   const minGpa = program?.minGpa ?? u.minGpa ?? null;
   if (minGpa != null) {
-    const studentGpa = profile.gpa ?? null;
-    const scale = profile.gpaScale && profile.gpaScale > 0 ? profile.gpaScale : 4;
-    const normalized = studentGpa != null ? (studentGpa / scale) * 4 : null;
-    // Compare on a 4.0 scale so a 5.0-scale GPA is not mis-read as "failing".
-    const requiredNorm = scale === 4 ? minGpa : (minGpa / scale) * 4;
+    const studentGpa = profile.applicantContext?.gpa?profile.applicantContext.gpa.value:profile.gpa??null;
+    const scale = profile.applicantContext?.gpa?profile.applicantContext.gpa.maximum:profile.gpaScale;
+    const requiredScale=program?.minGpa!=null?program.minGpaScale:u.minGpaScale;
+    // A student scale is not the publisher's scale. A planning conversion is
+    // never evidence of meeting an official minimum.
+    const comparable=scale===4&&requiredScale===4&&(profile.applicantContext?.gpa?.minimum??0)===0;
     push({
       itemKey: "academic.gpa",
       section: "academic",
-      title: `Minimum GPA — ${minGpa} on ${scale === 4 ? "4.0" : "the published scale"}`,
+      title: `Minimum GPA — ${minGpa} (${requiredScale==null?"published scale not recorded":`${requiredScale} scale`})`,
       isRequired: true,
-      state: normalized == null ? "unknown" : normalized >= requiredNorm ? "met" : "not_met",
-      detail: normalized == null ? "Add your GPA in Profile" : `Your ${studentGpa} (${scale === 4 ? "4.0" : scale} scale)`,
+      state: studentGpa==null||!comparable ? "unknown" : studentGpa>=minGpa ? "met" : "not_met",
+      detail: studentGpa==null?"Add your GPA in Profile":!comparable?"Original GPA and published minimum need comparable native scales; no planning conversion is used.":`Your ${studentGpa} (${scale} scale)`,
       dueDate: deadline ?? null,
       linkedType: "manual",
-      ...sourceOf(program ?? null),
+      ...sourceFor("minGpa"),
     });
   }
 
+  // Without a published group, simultaneous English minima do not establish
+  // AND versus OR. Do not auto-complete them or make each one a hard blocker.
+  const englishCount=[program?.minIelts??u.minIelts,program?.minToefl??u.minToefl,program?.minDet??u.minDuolingo].filter(value=>value!=null).length;
   // ---- English -------------------------------------------------------------
   const minIelts = program?.minIelts ?? u.minIelts ?? null;
   if (minIelts != null) {
@@ -263,27 +288,30 @@ export function buildRequirements(input: {
       itemKey: "english.ielts",
       section: "english",
       title: `IELTS — ${minIelts} minimum`,
-      isRequired: true,
-      state: mine == null ? "unknown" : mine >= minIelts ? "met" : "not_met",
-      detail: mine == null ? "No IELTS score on your profile yet" : `Current ${mine} · target ${minIelts}`,
+      isRequired: englishCount<=1,
+      state: englishCount>1||mine == null ? "unknown" : mine >= minIelts ? "met" : "not_met",
+      detail: englishCount>1?"Published English alternatives/operator need review; separate tests are not cumulative blockers":mine == null ? "No IELTS score on your profile yet" : `Current ${mine} · target ${minIelts}`,
       dueDate: deadline ?? null,
       linkedType: "test",
-      ...sourceOf(program ?? null),
+      ...sourceFor("minIelts"),
     });
   }
   const minToefl = program?.minToefl ?? u.minToefl ?? null;
   if (minToefl != null) {
-    const mine = profile.toeflScore ?? null;
+    const test=recordedToefl(profile.applicantContext,profile.toeflScore);
+    const requiredScale=program?.minToefl!=null?program.minToeflScale:u.minToeflScale;
+    const record=profile.applicantContext?.toefl;
+    const mine=test.scale&&test.scale===requiredScale&&record?.examDate&&record.validUntil&&input.asOfDate&&record.examDate<=input.asOfDate&&record.validUntil>=input.asOfDate?test.score:null;
     push({
       itemKey: "english.toefl",
       section: "english",
-      title: `TOEFL — ${minToefl} minimum`,
-      isRequired: true,
-      state: mine == null ? "unknown" : mine >= minToefl ? "met" : "not_met",
-      detail: mine == null ? "No TOEFL score on your profile yet" : `Current ${mine} · target ${minToefl}`,
+      title: `TOEFL — ${minToefl} minimum (${requiredScale??"scale not recorded"})`,
+      isRequired: englishCount<=1,
+      state: englishCount>1||mine == null ? "unknown" : mine >= minToefl ? "met" : "not_met",
+      detail: englishCount>1?"Published English alternatives/operator need review; separate tests are not cumulative blockers":mine == null ? "Record a comparable TOEFL scale, exam date and validity in Profile" : `Current ${mine} · target ${minToefl}`,
       dueDate: deadline ?? null,
       linkedType: "test",
-      ...sourceOf(program ?? null),
+      ...sourceFor("minToefl"),
     });
   }
 
@@ -300,7 +328,7 @@ export function buildRequirements(input: {
       detail: mine == null ? "No SAT score on your profile yet" : `Current ${mine} · target ${minSat}`,
       dueDate: deadline ?? null,
       linkedType: "test",
-      ...sourceOf(program ?? null),
+      ...sourceFor("minSat"),
     });
   }
   const minDet = program?.minDet ?? u.minDuolingo ?? null;
@@ -310,14 +338,16 @@ export function buildRequirements(input: {
       itemKey: "testing.duolingo",
       section: "testing",
       title: `Duolingo English Test — ${minDet} minimum`,
-      isRequired: true,
-      state: mine == null ? "unknown" : mine >= minDet ? "met" : "not_met",
-      detail: mine == null ? "No DET score on your profile yet" : `Current ${mine} · target ${minDet}`,
+      isRequired: englishCount<=1,
+      state: englishCount>1||mine == null ? "unknown" : mine >= minDet ? "met" : "not_met",
+      detail: englishCount>1?"Published English alternatives/operator need review; separate tests are not cumulative blockers":mine == null ? "No DET score on your profile yet" : `Current ${mine} · target ${minDet}`,
       dueDate: deadline ?? null,
       linkedType: "test",
-      ...sourceOf(program ?? null),
+      ...sourceFor("minDet"),
     });
   }
+
+  } // no full published requirement group
 
   // ---- Finance / application fee ------------------------------------------
   if (u.applicationFee != null) {
@@ -331,7 +361,7 @@ export function buildRequirements(input: {
       detail: progress.applicationFeePaid ? "Marked as paid" : "Not marked as paid yet",
       dueDate: deadline ?? null,
       linkedType: "payment",
-      ...sourceOf(),
+      ...sourceFor("applicationFee"),
     });
   }
 

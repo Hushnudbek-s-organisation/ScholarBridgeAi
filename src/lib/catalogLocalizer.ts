@@ -38,7 +38,7 @@
 
 import type { Locale } from "@/i18n/config";
 import { localizeUniversityNarrative, reconcileEmbeddedRank } from "@/lib/universityProse";
-import { dictionaries } from "@/i18n/messages.server";
+import countryNames from "@/i18n/staged/country-names.json";
 import { countryTranslationKey } from "@/lib/countries";
 import { memoizedLocalize, memoizedText, type LocalizedFields } from "@/lib/localizeMemo";
 
@@ -137,7 +137,7 @@ export function localizeCountry(country: string | null | undefined, locale: Loca
   if (!tl) return country;
   const key = countryTranslationKey(country);
   if (key) {
-    const names = dictionaries[locale].countryNames as Record<string, string | undefined>;
+    const names = countryNames[locale] as Record<string, string | undefined>;
     const translated = names[key];
     if (translated) return translated;
   }

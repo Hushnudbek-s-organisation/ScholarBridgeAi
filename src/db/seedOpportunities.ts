@@ -455,7 +455,7 @@ export async function seedOpportunities(): Promise<SeedOpportunitiesSummary> {
 
     return { inserted };
   });
-  if (result.inserted > 0) invalidateCatalogCache("opportunities");
+  if (result.inserted > 0) await invalidateCatalogCache("opportunities");
   return result;
 }
 

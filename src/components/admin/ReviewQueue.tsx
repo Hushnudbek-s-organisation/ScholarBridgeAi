@@ -1,5 +1,6 @@
 "use client";
 
+import { CatalogueFactsEditor } from "./CatalogueFactsEditor";
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, ClipboardList, AlertTriangle, CheckCircle2, ShieldAlert, ExternalLink } from "lucide-react";
@@ -93,6 +94,7 @@ export function ReviewQueue() {
 
   return (
     <div className="space-y-4">
+      <CatalogueFactsEditor/>
       <div className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-surface bg-slate-900 flex items-center justify-center">
@@ -112,10 +114,10 @@ export function ReviewQueue() {
         )}
         <div className="mt-3 flex flex-wrap gap-2">
           {(["open", "critical", "all"] as const).map((f) => (
-            <button key={f} type="button" onClick={() => setFilter(f)} aria-pressed={filter === f}
+            <Button variant="unstyled" key={f} type="button" onClick={() => setFilter(f)} aria-pressed={filter === f}
               className={`rounded-surface border px-3 py-1.5 text-xs font-bold transition ${filter === f ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
               {f === "open" ? t("open") : f === "critical" ? t("critical") : t("all")}
-            </button>
+            </Button>
           ))}
           <Button variant="unstyled" onClick={() => void load()} disabled={loading}
             className="rounded-surface border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
@@ -163,28 +165,28 @@ export function ReviewQueue() {
                 </span>
               </div>
               <p className="mt-2 text-sm font-semibold text-slate-800"><AlertTriangle className="mr-1 inline h-3.5 w-3.5 text-amber-500" />{item.reason}</p>
-              <p className="mt-1 text-xs text-slate-600">{t("nextAction")}: {item.nextAction}</p>
+              <p className="mt-1 text-sm text-slate-600">{t("nextAction")}: {item.nextAction}</p>
               {item.sourceUrl && (
                 <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer"
                   className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:underline">
                   <ExternalLink className="h-3 w-3" /> {t("source")}
                 </a>
               )}
-              {item.decisionReason && <p className="mt-1 text-xs text-slate-500">{t("decisionReason")}: {item.decisionReason}</p>}
+              {item.decisionReason && <p className="mt-1 text-sm text-slate-500">{t("decisionReason")}: {item.decisionReason}</p>}
               {(item.status === "open" || item.status === "in_review") && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <input type="text" value={reasonDraft[item.itemKey] ?? ""} onChange={(e) => setReasonDraft((d) => ({ ...d, [item.itemKey]: e.target.value }))}
                     placeholder={t("reasonPlaceholder")} maxLength={500}
-                    className="min-w-[220px] flex-1 rounded-surface border border-slate-200 px-2 py-1.5 text-xs" />
-                  <button type="button" disabled={busyKey === item.itemKey} onClick={() => void decide(item, "start_review")}
-                    className="rounded-surface border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60">{t("startReview")}</button>
-                  <button type="button" disabled={busyKey === item.itemKey} onClick={() => void decide(item, "resolve")}
-                    className="rounded-surface bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60">{t("resolve")}</button>
-                  <button type="button" disabled={busyKey === item.itemKey} onClick={() => void decide(item, "dismiss")}
-                    className="rounded-surface border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60">{t("dismiss")}</button>
+                    className="min-w-[220px] flex-1 rounded-surface border border-slate-200 px-2 py-1.5 text-sm" />
+                  <Button variant="unstyled" type="button" disabled={busyKey === item.itemKey} onClick={() => void decide(item, "start_review")}
+                    className="rounded-surface border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60">{t("startReview")}</Button>
+                  <Button variant="unstyled" type="button" disabled={busyKey === item.itemKey} onClick={() => void decide(item, "resolve")}
+                    className="rounded-surface bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60">{t("resolve")}</Button>
+                  <Button variant="unstyled" type="button" disabled={busyKey === item.itemKey} onClick={() => void decide(item, "dismiss")}
+                    className="rounded-surface border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60">{t("dismiss")}</Button>
                 </div>
               )}
-              <p className="mt-2 text-[11px] text-slate-400">{t("neverAutoVerified")}</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t("neverAutoVerified")}</p>
             </div>
           ))}
         </div>
@@ -196,7 +198,7 @@ export function ReviewQueue() {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-surface border border-slate-200 bg-slate-50 px-3 py-1.5">
-      <span className="block text-[11px] font-semibold text-slate-500">{label}</span>
+      <span className="block text-xs font-semibold text-slate-500">{label}</span>
       <span className="block text-sm font-extrabold text-slate-800">{value}</span>
     </div>
   );

@@ -1,4 +1,5 @@
 import { postgresId } from "@/lib/pagination";
+import { parseApplicantContext } from "@/lib/applicantContext";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
@@ -138,6 +139,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return privateNoStoreJson({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     }
     const body = parsed.body;
+    let applicantContext;
+    try{applicantContext=parseApplicantContext(body.applicantContext);}
+    catch(error){return privateNoStoreJson({error:error instanceof Error?error.message:"Invalid applicant context",code:"applicant_context_invalid"},{status:400});}
     const hasStudyInterests = body.studyInterests !== undefined;
     const submittedStudyInterests = hasStudyInterests
       ? parseStudyInterestSelections(body.studyInterests)
@@ -237,6 +241,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         // double column. Clearing a field (null/"") now stores NULL — the
         // column is nullable on purpose, so "I don't know this yet" is
         // representable and every engine reads it as unknown.
+        applicantContext,
         gpa: patchNumber(body.gpa, { min: 0, max: 100 }),
         gpaScale: patchNumber(body.gpaScale, { min: 1, max: 100 }),
         // Test scores: null/0/negative -> NULL (a 0 is not a real score).
@@ -325,7 +330,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     invalidateProfileMatchCache(profileId);
     if (updatedProfile) {
       invalidateAuthCacheForProfile(profileId);
-      invalidateDashboardRecommendationsForProfile(profileId);
+      await invalidateDashboardRecommendationsForProfile(profileId);
     }
     // An admin-changed password must also close the account's open sessions in
     // `user_sessions`, not only invalidate them by fingerprint: the student may
@@ -389,7 +394,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     await db.delete(studentProfiles).where(eq(studentProfiles.id, profileId));
-    invalidateDashboardRecommendationsForProfile(profileId);
+    await invalidateDashboardRecommendationsForProfile(profileId);
     await writeAudit({
       entityType: "admin_role",
       entityId: profileId,

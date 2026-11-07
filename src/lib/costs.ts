@@ -21,6 +21,7 @@ import {
   roundMoney,
   sumKnown as canonicalSumKnown,
   classifyAid,
+  usableUpfrontAid,
   type AidKind,
 } from "./financeModel";
 
@@ -46,6 +47,10 @@ export interface CostInputs {
 }
 
 export interface ScholarshipInput {
+  status?: "saved" | "applied" | "conditional" | "awarded" | "paid" | "rejected";
+  stacking?: "stackable" | "exclusive" | "unknown";
+  fundingYears?: number | null;
+  paymentMonths?: number | null;
   name: string;
   /** Resolved award value in USD; null means unknown or unsupported currency. */
   amountUsd: number | null;
@@ -86,6 +91,8 @@ export interface CostBreakdown {
   scholarship: {
     /** Best-case recurring awards in annual USD; null if any relevant award is unknown. */
     bestCaseAnnualUsd: number | null;
+    confirmedAnnualUsd: number | null;
+    conditionalAnnualUsd: number | null;
     /** Best-case non-recurring awards across the programme; null if unresolved. */
     bestCaseOneTimeUsd: number | null;
     coveragePct: number | null;
@@ -152,16 +159,11 @@ function oneTimeLine(key: string, label: string, amount: number | null): CostLin
   };
 }
 
-function bestCaseByCover(awards: { amount: number; covers: ScholarshipInput["covers"] }[]): number {
-  const tuitionAid = awards.filter((award) => award.covers === "tuition" || award.covers === "both");
-  const livingAid = awards.filter((award) => award.covers === "living");
-  const otherAid = awards.filter((award) => award.covers === "other");
-  // Avoid counting several full-tuition awards as if all could be stacked.
-  return (
-    (tuitionAid.length > 0 ? Math.max(...tuitionAid.map((award) => award.amount)) : 0) +
-    livingAid.reduce((sum, award) => sum + award.amount, 0) +
-    otherAid.reduce((sum, award) => sum + award.amount, 0)
-  );
+type ScopedAward = { amount: number; covers: ScholarshipInput["covers"]; confirmed: boolean; conditional?: boolean; stacking?: ScholarshipInput["stacking"]; fundingYears?: number | null };
+function allocatedAid(awards: ScopedAward[], tuition: number | null, living: number | null): number | null {
+  if (awards.length > 1 && awards.some(a=>a.stacking !== "stackable")) return null;
+  if (awards.some(a => (a.covers === "tuition" && tuition == null) || (a.covers === "living" && living == null) || (a.covers === "both" && (tuition == null || living == null)))) return null;
+  return usableUpfrontAid(awards.map((a,i)=>({...classifyAid({key:String(i),basis:"grant",covers:a.covers,amountUsd:a.amount,period:"year"}),annualUsd:a.amount})), {tuitionAnnualUsd:tuition,livingAnnualUsd:living}).totalUsd;
 }
 
 export function calculateCosts(input: CostInputs): CostBreakdown {
@@ -216,8 +218,8 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
 
   // Keep annual and one-time awards separate. Monthly awards can be annualized
   // without an invented duration; unsupported or absent periods remain unknown.
-  const annualAwards: { amount: number; covers: ScholarshipInput["covers"] }[] = [];
-  const oneTimeAwards: { amount: number; covers: ScholarshipInput["covers"] }[] = [];
+  const annualAwards: ScopedAward[] = [];
+  const oneTimeAwards: ScopedAward[] = [];
   let annualAwardUnknown = false;
   let oneTimeAwardUnknown = false;
   // Field-level aid classification from the canonical finance model. Loans and
@@ -233,15 +235,17 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
       reimbursement: award.reimbursement,
       amountUsd: award.amountUsd,
       period: award.awardPeriod,
+      paymentMonths: award.paymentMonths,
     });
     const excluded = classified.repayable || classified.kind === "reimbursement";
     byKind.push({
       name: award.name,
       kind: classified.kind,
       note: classified.note,
-      countsTowardNetCost: !excluded,
+      countsTowardNetCost: !excluded && (award.status === "awarded" || award.status === "paid"),
     });
-    if (excluded) {
+    if (award.status === "rejected") continue;
+    if (excluded || classified.kind === "unknown") {
       // A repayable loan / after-the-fact reimbursement cannot cover an upfront
       // bill. Report it honestly instead of silently folding it into "funding".
       addUnknown(`${award.name}: ${classified.note}`);
@@ -250,19 +254,20 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
     const period = normalizeScholarshipAwardPeriod(award.awardPeriod);
     const amount = knownNonNegative(award.amountUsd);
     if (period === "year" || period === "month") {
-      if (amount == null || amount <= 0) {
+      if (amount == null) {
         annualAwardUnknown = true;
-        addUnknown(`${award.name} has no positive, resolved USD award amount.`);
+        addUnknown(`${award.name} has no resolved non-negative USD award amount.`);
         continue;
       }
-      annualAwards.push({ amount: period === "month" ? amount * 12 : amount, covers: award.covers });
+      if (period === "month" && !(award.paymentMonths && award.paymentMonths > 0 && award.paymentMonths <= 12)) { addUnknown(`${award.name}: payment months are unknown.`); annualAwardUnknown = true; continue; }
+      annualAwards.push({ amount: period === "month" ? amount * award.paymentMonths! : amount, covers: award.covers, confirmed: award.status === "awarded" || award.status === "paid", conditional: award.status === "conditional", stacking: award.stacking, fundingYears: award.fundingYears });
     } else if (period === "one_time" || period === "total") {
-      if (amount == null || amount <= 0) {
+      if (amount == null) {
         oneTimeAwardUnknown = true;
-        addUnknown(`${award.name} has no positive, resolved USD award amount.`);
+        addUnknown(`${award.name} has no resolved non-negative USD award amount.`);
         continue;
       }
-      oneTimeAwards.push({ amount, covers: award.covers });
+      oneTimeAwards.push({ amount, covers: award.covers, confirmed: award.status === "awarded" || award.status === "paid", conditional: award.status === "conditional", stacking: award.stacking });
     } else {
       annualAwardUnknown = true;
       oneTimeAwardUnknown = true;
@@ -270,20 +275,24 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
     }
   }
 
-  const knownAnnualScholarship = money(bestCaseByCover(annualAwards));
-  const knownOneTimeScholarship = money(bestCaseByCover(oneTimeAwards));
+  const knownAnnualScholarship = allocatedAid(annualAwards, tuition, living);
+  const knownOneTimeScholarship = allocatedAid(oneTimeAwards, tuition == null || years == null ? null : tuition * years, living == null || years == null ? null : living * years);
   const bestCaseAnnual = annualAwardUnknown ? null : knownAnnualScholarship;
   const bestCaseOneTime = oneTimeAwardUnknown ? null : knownOneTimeScholarship;
   const coveragePct = annualTotal != null && annualTotal > 0 && bestCaseAnnual != null
     ? Math.round(Math.min(100, (bestCaseAnnual / annualTotal) * 100))
     : null;
 
-  const annualAfterScholarship = annualTotal == null || bestCaseAnnual == null
+  const confirmedAnnual = allocatedAid(annualAwards.filter(a=>a.confirmed), tuition, living);
+  const durationUnknown = annualAwards.some(a=>a.confirmed && years != null && years > 1 && a.fundingYears == null);
+  const confirmedProgrammeAid = years == null ? null : allocatedAid([...annualAwards.filter(a=>a.confirmed).map(a=>({...a,amount:a.amount * Math.min(years,a.fundingYears ?? 1)})),...oneTimeAwards.filter(a=>a.confirmed)], tuition == null ? null : tuition * years, living == null ? null : living * years);
+  if (knownAnnualScholarship == null || knownOneTimeScholarship == null) addUnknown("Award stacking rules are unknown; scenarios cannot assume all awards combine.");
+  const annualAfterScholarship = annualTotal == null || confirmedAnnual == null
     ? null
-    : money(Math.max(0, annualTotal - bestCaseAnnual));
-  const totalAfterScholarship = totalCost == null || years == null || bestCaseAnnual == null || bestCaseOneTime == null
+    : money(Math.max(0, annualTotal - confirmedAnnual));
+  const totalAfterScholarship = totalCost == null || years == null || confirmedProgrammeAid == null || durationUnknown
     ? null
-    : money(Math.max(0, totalCost - bestCaseAnnual * years - bestCaseOneTime));
+    : money(Math.max(0, totalCost - confirmedProgrammeAid));
 
   const family = knownNonNegative(input.familyContributionUsd);
   const familyContributionKnown = family != null;
@@ -319,7 +328,7 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
   } else if (gapAnnual != null && gapAnnual <= 0 && gapTotal == null) {
     verdict = "Known annual costs appear covered by the recorded awards and explicit contribution, but whole-programme affordability remains unknown because duration, one-off costs, or award totals are unresolved.";
   } else if (gapAnnual != null && gapAnnual <= 0 && gapTotal != null && gapTotal <= 0) {
-    verdict = `On paper, confirmed annual family support covers the ${annualAfterScholarship.toLocaleString("en-US")} USD remaining after scholarships. This is a best-case scenario and assumes every listed award lands.`;
+    verdict = `On paper, confirmed annual family support covers the ${annualAfterScholarship.toLocaleString("en-US")} USD remaining after scholarships. Only awarded/paid support is counted; saved opportunities are not secured funding.`;
   } else {
     verdict = `The annual funding gap is ${gapAnnual?.toLocaleString("en-US") ?? "unknown"} USD after confirmed contribution. Verify award conditions and any unknown cost lines before relying on this result.`;
   }
@@ -331,6 +340,8 @@ export function calculateCosts(input: CostInputs): CostBreakdown {
     unknowns,
     scholarship: {
       bestCaseAnnualUsd: bestCaseAnnual,
+      confirmedAnnualUsd: confirmedAnnual,
+      conditionalAnnualUsd: allocatedAid(annualAwards.filter(a=>a.confirmed||a.conditional),tuition,living),
       bestCaseOneTimeUsd: bestCaseOneTime,
       coveragePct,
       misaligned,
@@ -381,7 +392,7 @@ export function assessPortfolio(input: PortfolioInputs): PortfolioAdvice {
 
   advice.push({ key: list.length === 0 ? "noSavedAwards" : "unconfirmedAwards" });
 
-  const missingAmounts = list.filter((s) => s.amountUsd == null || !Number.isFinite(s.amountUsd) || s.amountUsd <= 0).length;
+  const missingAmounts = list.filter((s) => s.amountUsd == null || !Number.isFinite(s.amountUsd) || s.amountUsd < 0).length;
   if (missingAmounts > 0) advice.push({ key: "missingAmounts", count: missingAmounts });
 
   const overdue = list.filter((s) => s.deadlineDays != null && s.deadlineDays < 0).length;

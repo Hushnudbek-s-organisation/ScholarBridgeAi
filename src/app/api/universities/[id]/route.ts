@@ -1,5 +1,8 @@
+import { ensureCatalogRevision } from "@/lib/catalogCache";
 import { postgresId } from "@/lib/pagination";
 import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
+import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
+import { withScopedDetailRequirements } from "@/lib/universityDetailRequirements";
 import { legacyEvidence } from "@/lib/factPresentation";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
@@ -19,8 +22,8 @@ import { calculateUniversityMatch, type MatchBreakdown } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { localizeDetailPayload, localizeHighlights, localizeUniversityDescription } from "@/lib/catalogLocalizer";
 import { toMatchProfileWithActivities, chancingProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
-import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
-import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { universityProgrammeDiscovery } from "@/lib/universityProgrammeDiscovery";
+import { parseUniversitySort } from "@/lib/universitySort";
 import { verifiedQsRankNumber } from "@/lib/universityRank";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { countriesMatch } from "@/lib/countries";
@@ -34,62 +37,6 @@ import {
   setCachedUniversityDetailBase,
 } from "@/lib/catalogCache";
 import { studentProfiles } from "@/db/schema";
-
-/**
- * GENERIC structured parser for `other_requirements` free-text.
- *
- * Some databases store requirement values (IELTS, TOEFL, Duolingo, PTE,
- * Cambridge English, SAT/ACT required) inside a single `other_requirements`
- * text column instead of dedicated numeric columns. This parser extracts them
- * with explicit patterns ONLY when the text explicitly encodes a value.
- *
- * It is fully generic — no university names, no hardcoded rules.
- * Values are only used as FALLBACK when the dedicated column is empty.
- */
-/**
- * Module 4 — the positioning half of the dual score, computed exactly the way
- * GET /api/universities and the dashboard compute it: a synthetic programme
- * row from the student's stated major (or the university's own field) plus
- * the university's published minimums, against the QS Top 200 benchmark.
- */
-function chanceForUniRow(
-  chancingProfile: Awaited<ReturnType<typeof chancingProfileWithActivities>>,
-  // Bundle/DB university row — the engine only reads benchmark-shaped fields.
-  uni: {
-    id: number;
-    name?: string;
-    country?: string;
-    programMajor?: string | null;
-    degreeLevel?: string | null;
-    minGpa?: number | null;
-    minIelts?: number | null;
-    minSat?: number | null;
-  },
-  profileRow: { targetMajor?: string | null; degreeLevel?: string | null }
-) {
-  // The engine reads benchmark-shaped fields only; the cast is the same
-  // convention the match call above uses for bundle/DB rows.
-  const chanceEval = evaluateUniversityAndProgramChance(
-    chancingProfile,
-    uni as never,
-    {
-      id: uni.id,
-      universityId: uni.id,
-      name: profileRow.targetMajor || uni.programMajor || "General Studies",
-      degreeLevel: profileRow.degreeLevel || uni.degreeLevel || "Bachelor",
-      field: profileRow.targetMajor || uni.programMajor || null,
-    },
-    { minGpa: uni.minGpa ?? null, minIelts: uni.minIelts ?? null, minSat: uni.minSat ?? null },
-    [],
-    matchQsUniversityBenchmark(uni as never)
-  );
-  return {
-    score: chanceEval.compositeProgramFitScore,
-    effectiveAcceptRatePct: chanceEval.effectiveProgramAcceptRatePct,
-    selectivityCategory: chanceEval.selectivityCategory,
-    studentGpaPercentile: chanceEval.studentGpaPercentile,
-  };
-}
 
 function parseOtherRequirements(texts: string[]) {
   const joined = texts.join("\n");
@@ -111,7 +58,7 @@ function parseOtherRequirements(texts: string[]) {
   };
 
   out.ielts = num(/IELTS\s*(?:score)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
-  out.toefl = num(/TOEFL\s*(?:iBT)?\s*[:=]?\s*(\d+)/i);
+  out.toefl = num(/TOEFL\s*(?:iBT)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
   out.duolingo = num(/Duolingo(?:\s+DET)?\s*[:=]?\s*(\d+)/i);
   out.pte = num(/PTE(?:\s+Academic)?\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
   out.cambridgeEnglish = num(/Cambridge(?:\s+English)?\s*[:=]?\s*(\d+)/i);
@@ -239,6 +186,7 @@ function providerMatchesInstitution(
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await ensureCatalogRevision();
     const detailGeneration = universityDetailCacheGeneration();
     const { id } = await params;
     const uniId = postgresId(id);
@@ -357,10 +305,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       breakdown: MatchBreakdown;
     } | null = null;
     /**
-     * Module 4 — the positioning half of the dual score. Fit (`match`) says
-     * "does this university want someone like me overall"; `chance` says how
-     * my numbers sit inside the admitted cohort of the department, from the
-     * same engine the Explorer and the dashboard use. Owner/admin reads only.
+     * Experimental programme planning index, never a personal probability or
+     * observed cohort statistic. Same real-programme selection and explicit
+     * sort opt-in as the explorer. Owner/admin profile reads only.
      */
     let chance: {
       score: number;
@@ -369,7 +316,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       studentGpaPercentile: number | null;
     } | null = null;
     const locale = localeFromRequest(req);
-    const profileIdParam = new URL(req.url).searchParams.get("profileId");
+    const searchParams=new URL(req.url).searchParams;
+    const contextText=(key:string,max:number)=>{const value=searchParams.get(key);if(value==null||value==="")return null;if(value.length>max||/[\u0000-\u001f]/.test(value))throw new Error("invalid_requirement_context");return value.trim()||null;};
+    const selectedProgram=searchParams.get("programId");
+    const programId=selectedProgram==null?null:postgresId(selectedProgram);
+    if(selectedProgram!=null&&programId==null)return privateNoStoreJson({error:"Invalid programme id"},{status:400});
+    const requirementContext={programId,admissionCycle:contextText("admissionCycle",100),applicantScope:contextText("applicantScope",200),degreeLevel:contextText("degreeLevel",100)};
+    const scopedPayload=async(base:Record<string,unknown>)=>{
+      const rows=(base.programs??[]) as {id:number}[];
+      const [institution,programmes]=await Promise.all([loadCatalogueFacts("university",[uniId]),loadCatalogueFacts("program",rows.map(row=>row.id))]);
+      return withScopedDetailRequirements(base,institution.get(uniId)??[],programmes,requirementContext);
+    };
+    const experimental=parseUniversitySort(searchParams.get("sort")).sort==="chance_desc";
+    let programmeDiscovery:ReturnType<typeof universityProgrammeDiscovery>["programmeDiscovery"]|null=null;
+    const profileIdParam = searchParams.get("profileId");
     if (profileIdParam) {
       const pId = Number(profileIdParam);
       const auth = await authenticate(req);
@@ -381,14 +341,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             ...uni,
             ...resolvedUsdUniversityCosts(uni),
           };
-          const result = calculateUniversityMatch(cachedProfile.matchProfile, row as never);
+          const result = calculateUniversityMatch(cachedProfile.matchProfile, toUniversityData(row));
           match = {
             score: result.matchScore,
             reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
             issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
             breakdown: result.breakdown,
           };
-          chance = chanceForUniRow(cachedProfile.chancingProfile, row, cachedProfile.profileData);
+          const discovery=universityProgrammeDiscovery(row,bundle?.programsByUni?.get(uniId)??[],cachedProfile.profileData,cachedProfile.chancingProfile,experimental);
+          programmeDiscovery=discovery.programmeDiscovery;
+          if(discovery.chance)chance={score:discovery.chance.compositeProgramFitScore,effectiveAcceptRatePct:discovery.chance.effectiveProgramAcceptRatePct,selectivityCategory:discovery.chance.selectivityCategory,studentGpaPercentile:discovery.chance.studentGpaPercentile};
         } else {
           const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
           if (p) {
@@ -403,7 +365,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
               issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
               breakdown: result.breakdown,
             };
-            chance = chanceForUniRow(await chancingProfileWithActivities(p), uni, p);
+            const bundle=await getCachedUniversitiesBundle();
+            const discovery=universityProgrammeDiscovery(uni,bundle.programsByUni?.get(uniId)??[],p,await chancingProfileWithActivities(p),experimental);
+            programmeDiscovery=discovery.programmeDiscovery;
+            if(discovery.chance)chance={score:discovery.chance.compositeProgramFitScore,effectiveAcceptRatePct:discovery.chance.effectiveProgramAcceptRatePct,selectivityCategory:discovery.chance.selectivityCategory,studentGpaPercentile:discovery.chance.studentGpaPercentile};
           }
         }
       }
@@ -415,7 +380,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return privateNoStoreJson(
         localizeDetailPayload(
           {
-            ...cachedBase,
+            ...await scopedPayload(cachedBase),
+            programmeDiscovery:programmeDiscovery??cachedBase.programmeDiscovery,
             match,
             chance,
           },
@@ -591,6 +557,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         sourceUrl: r.sourceUrl ?? null,
         lastVerifiedAt: r.lastVerifiedAt ? new Date(r.lastVerifiedAt).toISOString() : null,
         verificationStatus: r.verificationStatus,
+        admissionCycle: r.academicYear ?? null,
       });
       let programMinIelts: number | null = null;
       let programMinSat: number | null = null;
@@ -599,11 +566,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       let programMinGpa: number | null = null;
       let programMinAct: number | null = null;
       for (const r of reqRows) {
-        // Requirements without row-level verification are not facts. Keep them
-        // out of the response and out of the program minima consumed by
-        // matching/chancing; provenance alone (for example, a university root
-        // URL) does not verify a numeric requirement.
-        if (!hasVerifiedProgramEvidence(r)) continue;
+        // Preserve legacy records (including unverified ones) for labelled
+        // discovery. The response adapter separately resolves official scoped
+        // facts; these columns never become official minima through row flags.
         const prov = reqProvenance(r);
         if (r.minIelts != null) {
           reqs.push({ requirementType: "ielts", minimumValue: r.minIelts, valueText: null, ...prov });
@@ -1024,6 +989,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       money,
       universityRequirements,
       programs: programsWithReqs,
+      programmeDiscovery:universityProgrammeDiscovery(uni,programs.map(p=>({...p,degreeLevel:p.degree})),null,null,false).programmeDiscovery,
       applicationCycles: cycles,
       sources: uniSources,
       scholarships: uniScholarships,
@@ -1044,7 +1010,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return privateNoStoreJson(
       localizeDetailPayload(
         {
-          ...basePayload,
+          ...await scopedPayload(basePayload),
+          programmeDiscovery:programmeDiscovery??basePayload.programmeDiscovery,
           match,
           chance,
         },
@@ -1052,6 +1019,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       )
     );
   } catch (error) {
+    if(error instanceof Error&&["invalid_requirement_context","programme_scope_mismatch"].includes(error.message))return privateNoStoreJson({error:"Invalid programme or requirement scope",code:error.message},{status:400});
     console.error("GET /api/universities/[id] error:", error);
     // Never substitute sample universities: during a database outage students
     // would be shown made-up data as if it were real. Clients show the error

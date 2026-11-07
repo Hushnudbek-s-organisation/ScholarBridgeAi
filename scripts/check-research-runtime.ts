@@ -104,11 +104,12 @@ async function main() {
   });
 
   await check("process kill: a completed item + checkpoint survive in durable DB, not memory", async () => {
-    // The ORIGINAL in-process run has no lease (createDurableRun leaves
-    // lease_owner NULL); its result is written without a guard. The process is
-    // then 'killed'. Restart workers only write AFTER claiming a lease (below).
-    await store.appendDurableItem("run_a", 11, { status: "complete", report: report({ universityId: 11 }), attempts: 1 });
-    await store.patchDurableRun("run_a", { checkpoint: { completedUniversityIds: [11], reports: [], progress: ["done 11"] } }, { kind: "unclaimed" });
+    // The initial request now claims exactly like a restart worker. No null-token bypass.
+    assert.equal(await store.appendDurableItem("run_a",11,{status:"complete"}),false);
+    assert.equal(await store.patchDurableRun("run_a",{state:"complete"},{kind:"unclaimed"}),false);
+    const initial=await store.claimDurableRun("run_a","initial",60_000);assert.ok(initial?.lease_owner);
+    assert.equal(await store.appendDurableItem("run_a",11,{status:"complete",report:report({universityId:11}),attempts:1},{workerId:initial.lease_owner}),true);
+    assert.equal(await store.patchDurableRun("run_a",{checkpoint:{completedUniversityIds:[11],reports:[],progress:["done 11"]}},{workerId:initial.lease_owner}),true);
     // A fresh process reading ONLY the DB reconstructs the checkpoint.
     const loaded = await store.loadDurableRun("run_a");
     assert.ok(loaded, "run must be loadable from the DB");
@@ -118,6 +119,7 @@ async function main() {
     assert.equal(items.filter((i: { status: string }) => i.status === "pending").length, 2, "only unfinished items remain");
   });
 
+  let liveToken = "";
   await check("two workers claiming in parallel: exactly ONE wins the atomic claim", async () => {
     // Force the run into a claimable (stale) state.
     await client!.query("UPDATE public.research_runs SET status='running', lease_owner=NULL, lease_until=NULL, attempts=1 WHERE id='run_a'");
@@ -128,7 +130,7 @@ async function main() {
     const winners = [a, b].filter(Boolean);
     assert.equal(winners.length, 1, "parallel claims must not both succeed");
     const owner = winners[0]!.lease_owner;
-    assert.ok(["worker-x", "worker-y"].includes(String(owner)));
+    assert.ok(/^(worker-x|worker-y):[0-9a-f-]{36}$/.test(String(owner)));
   });
 
   await check("an EXPIRED lease cannot later write a stale result (atomic lease guard)", async () => {
@@ -142,9 +144,10 @@ async function main() {
     // New worker claims (lease expired) and writes its own result.
     const claimed = await store.claimDurableRun("run_a", "worker-y", 60_000);
     assert.ok(claimed, "a new worker must be able to claim the expired lease");
+    liveToken = claimed.lease_owner!;
     const freshWrite = await store.appendDurableItem(
       "run_a", 22, { status: "complete", report: report({ universityId: 22, fresh: true }), attempts: 1 },
-      { workerId: "worker-y" },
+      { workerId: liveToken },
     );
     assert.equal(freshWrite, true, "live-lease write must succeed");
     const row = await client!.query("SELECT report FROM public.research_run_items WHERE run_id='run_a' AND university_id=22");
@@ -166,15 +169,15 @@ async function main() {
       "SELECT status, attempts, error FROM public.research_runs WHERE id='run_a'",
     );
     assert.deepEqual(afterStale.rows, before.rows, "run row is untouched by the stale patch");
-    const live = await store.patchDurableRun("run_a", { attempts: 2 }, { workerId: "worker-y" });
+    const live = await store.patchDurableRun("run_a", { attempts: 2 }, { workerId: liveToken });
     assert.equal(live, true, "the live lease owner can still checkpoint");
     const afterLive = await client!.query("SELECT attempts FROM public.research_runs WHERE id='run_a'");
-    assert.equal(afterLive.rows[0].attempts, 2);
+    assert.equal(afterLive.rows[0].attempts, Number(before.rows[0].attempts),"checkpoint cannot decrease retry attempts");
     // §8 FAIL CLOSED: an untyped caller is NEVER allowed to touch durable status.
     const unguarded = await store.patchDurableRun("run_a", { attempts: 99 });
     assert.equal(unguarded, false, "an unguarded run-status write must be denied");
     const afterUnguarded = await client!.query("SELECT attempts FROM public.research_runs WHERE id='run_a'");
-    assert.equal(afterUnguarded.rows[0].attempts, 2, "the unguarded write changed nothing");
+    assert.equal(afterUnguarded.rows[0].attempts, Number(before.rows[0].attempts), "the unguarded write changed nothing");
     // The original in-process run is fenced out once a worker holds the lease.
     const unclaimed = await store.patchDurableRun(
       "run_a", { attempts: 98, state: "complete", error: "in-process overwrite" },
@@ -182,8 +185,24 @@ async function main() {
     );
     assert.equal(unclaimed, false, "an in-process callback cannot overwrite a durable-worker-owned run");
     const afterUnclaimed = await client!.query("SELECT attempts, status, error FROM public.research_runs WHERE id='run_a'");
-    assert.equal(afterUnclaimed.rows[0].attempts, 2);
+    assert.equal(afterUnclaimed.rows[0].attempts, Number(before.rows[0].attempts));
     assert.notEqual(afterUnclaimed.rows[0].error, "in-process overwrite");
+  });
+
+  await check("reused worker label receives a new fencing token; expired heartbeat cannot revive", async () => {
+    await client!.query("INSERT INTO public.research_runs(id,status,request,max_attempts) VALUES('run_reused','queued','{}'::jsonb,5)");
+    const first = await store.claimDurableRun("run_reused","same-label",60_000);
+    assert.ok(first?.lease_owner);
+    await client!.query("UPDATE public.research_runs SET lease_until=now()-interval '1 second' WHERE id='run_reused'");
+    assert.equal(await store.renewDurableLease("run_reused",first.lease_owner!,60_000),false);
+    const second = await store.claimDurableRun("run_reused","same-label",60_000);
+    assert.ok(second?.lease_owner);
+    assert.notEqual(first.lease_owner,second.lease_owner);
+    assert.equal(await store.patchDurableRun("run_reused",{state:"complete"},{workerId:first.lease_owner!}),false);
+    assert.equal(await store.appendDurableItem("run_reused",99,{status:"complete",report:report({universityId:99}),attempts:1},{workerId:first.lease_owner!}),false);
+    assert.equal(await store.patchDurableRun("run_reused",{attempts:1},{workerId:second.lease_owner!}),true);
+    const row=await client!.query("SELECT attempts FROM public.research_runs WHERE id='run_reused'");
+    assert.equal(row.rows[0].attempts,2,"checkpoint cannot reset claim retry budget");
   });
 
   await check("cancellation stops new claims, heartbeats and later writes", async () => {
@@ -337,6 +356,10 @@ async function main() {
       assert.equal(await store.patchDurableRun("run_parallel", { attempts: 7 }, { kind: "unclaimed" }), false);
       assert.equal(await store.patchDurableRun("run_parallel", { attempts: 7 }, { workerId: winnerId }), true);
     } finally { await second.end().catch(() => {}); }
+  });
+
+  await check("C09 real paused process rejects 8 persistence/audit entrypoints plus generic fenced SQL after B reclaim",async()=>{
+    await (await import("./proofs/research-write-fence")).proveResearchWrites(client!);
   });
 
   console.log(`\n${passed} passed, ${failures.length} failed`);

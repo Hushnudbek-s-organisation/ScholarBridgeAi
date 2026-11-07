@@ -2,7 +2,7 @@ import EmbeddedPostgres from "embedded-postgres";
 import { isolatedServiceEnvironment } from "./isolated-env";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, appendFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { FullConfig } from "@playwright/test";
@@ -55,10 +55,30 @@ export default async function globalSetup(_config: FullConfig) {
   env.NEXT_TELEMETRY_DISABLED = "1";
   env.LD_LIBRARY_PATH = [embeddedLibrary, env.LD_LIBRARY_PATH].filter(Boolean).join(":");
   env.E2E_FIXTURE_FILE = fixtureFile;
+  env.E2E_CONTINUATION_SCHEMA=process.env.E2E_CONTINUATION_SCHEMA??(process.env.PERF_STAGE?"0":"1");
 
   let pg: EmbeddedPostgres | null = null;
   let server: ChildProcess | null = null;
   let serverOutput = "";
+  const safeFailureFile=resolve(root,"test-results/e2e-safe-failures.jsonl");
+  mkdirSync(resolve(root,"test-results"),{recursive:true});writeFileSync(safeFailureFile,"");
+  let diagnosticBuffer="";
+  const recordSafeFailures=(chunk:Buffer)=>{
+    diagnosticBuffer+=chunk.toString();
+    const lines=diagnosticBuffer.split("\n");diagnosticBuffer=lines.pop()?.slice(-2000)??"";
+    for(const line of lines){
+      if(!line.startsWith("[journey-failure] ")||line.length>1000)continue;
+      try{
+        const data=JSON.parse(line.slice("[journey-failure] ".length));
+        // Persist ONLY the fixed non-sensitive taxonomy, never raw server logs.
+        if(!/^[0-9a-f-]{36}$/.test(data.requestId)||!["snapshot_changed","database_auth","database_transient","schema_unavailable","internal"].includes(data.category))continue;
+        const where=typeof data.where==="string"&&/^[a-zA-Z/ -]{1,100}$/.test(data.where)?data.where:"route";
+        const kind=["TypeError","RangeError","CacheRevisionChangedError","DrizzleQueryError","Error"].includes(data.kind)?data.kind:"Error";
+        const dbCode=/^(?:[0-9A-Z]{5}|other)$/.test(data.dbCode??"")?data.dbCode:"other";
+        appendFileSync(safeFailureFile,JSON.stringify({requestId:data.requestId,category:data.category,where,kind,dbCode})+"\n");
+      }catch{/* Not one of our structured diagnostics; never persist it. */}
+    }
+  };
   const cleanup = async () => {
     if (server && server.exitCode === null && server.signalCode === null) {
       server.kill("SIGTERM");
@@ -100,14 +120,17 @@ export default async function globalSetup(_config: FullConfig) {
     });
 
     const serverEnv = { ...env, PORT: String(appPort), NODE_ENV: nextMode === "start" ? "production" as const : "development" as const };
-    const appServer = spawn(process.execPath, [join(root, "node_modules/next/dist/bin/next"), nextMode, "--hostname", "127.0.0.1", "--port", String(appPort)], {
+    const artifact=process.env.E2E_BUILT_ARTIFACT_DIR;
+    if(artifact&&nextMode!=="start")throw new Error("Archived build E2E requires production start mode");
+    const serverArgs=artifact?[join(root,"scripts/e2e/start-built.mjs"),artifact]:[join(root, "node_modules/next/dist/bin/next"), nextMode, "--hostname", "127.0.0.1", "--port", String(appPort)];
+    const appServer = spawn(process.execPath, serverArgs, {
       cwd: root,
       env: serverEnv,
       stdio: ["ignore", "pipe", "pipe"],
     });
     server = appServer;
     appServer.stdout?.on("data", (chunk: Buffer) => { serverOutput = `${serverOutput}${chunk.toString()}`.slice(-12_000); });
-    appServer.stderr?.on("data", (chunk: Buffer) => { serverOutput = `${serverOutput}${chunk.toString()}`.slice(-12_000); });
+    appServer.stderr?.on("data", (chunk: Buffer) => { recordSafeFailures(chunk);serverOutput = `${serverOutput}${chunk.toString()}`.slice(-12_000); });
 
     const healthUrl = `http://127.0.0.1:${appPort}/api/health`;
     const deadline = Date.now() + 120_000;

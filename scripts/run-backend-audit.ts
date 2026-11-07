@@ -17,7 +17,10 @@ for (const name of ["backend-resilience", "backend-second-pass", "dashboard-cach
     env, timeout: 300_000, maxBuffer: 16 * 1024 * 1024, encoding: "utf8",
   });
   writeFileSync(`test-results/backend/${name}.log`, `${result.stdout ?? ""}\n${result.stderr ?? ""}${result.error ? `\n${result.error.message}` : ""}`);
-  const ok = result.status === 0 && !result.error;
+  // Some embedded-PG exit hooks can overwrite process.exitCode. Never call
+  // an explicit failed assertion/summary green merely because exit is zero.
+  const reportedFailure=/^\s*[✗❌]|^\s*FATAL:/m.test(`${result.stdout??""}\n${result.stderr??""}`);
+  const ok = result.status === 0 && !result.error && !reportedFailure;
   console.log(`${ok ? "PASS" : "FAIL"} ${name}; log: test-results/backend/${name}.log`);
   if (!ok) { failed = true; console.log((result.stderr || result.stdout || "").slice(-3000)); }
 }

@@ -38,21 +38,12 @@ import {
   formatCurrencyAmount,
 } from "@/lib/countryCostBenchmarks";
 import { Button } from "@/components/ui/Button";
+import {parseRecordedFundingUsd,type PostAdmissionFunding} from "@/lib/journey/funding";
 
 // ===========================================================================
 // OFFERS & DECISIONS (spec §23) + POST-ADMISSION FUNDING (spec §24)
 // ===========================================================================
 
-interface OfferFunding {
-  tuition: number | null;
-  scholarship: number;
-  aid: number;
-  otherConfirmed: number;
-  deposit: number | null;
-  depositDueDate: string | null;
-  payableNow: { amount: number | null; dueDate: string | null; payee: string };
-  explanation: string[];
-}
 interface OfferRow {
   id: number;
   applicationId: number;
@@ -73,7 +64,7 @@ interface OfferRow {
     intakeTerm: string | null;
     postStudyWorkVisaYears: number | null;
   } | null;
-  funding: OfferFunding;
+  funding: PostAdmissionFunding;
 }
 interface OffersData {
   offers: OfferRow[];
@@ -253,20 +244,25 @@ export function OffersPanel({ profileId, onNavigateTab }: { profileId: number; o
               </div>
 
               {/* SPEC §24: explicit, itemised funding — never "full funding". */}
-              <div className="rounded-surface bg-slate-50 p-3 dark:bg-slate-800/60">
+              <div data-offer-funding={o.id} data-funding-scenario={o.funding.scenario} data-tuition-remaining={o.funding.tuitionRemaining??"unknown"} className="rounded-surface bg-slate-50 p-3 dark:bg-slate-800/60">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("opFundingTitle")}</h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t(o.funding.tuitionBasis==="published_annual_usd"?"opTuitionBasisAnnual":o.funding.tuitionBasis==="offer_recorded_usd"?"opTuitionBasisRecorded":"opTuitionBasisUnknown")}</p>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("opFundingNominal")}</p>
                 <dl className="mt-2 space-y-1 text-sm">
                   <Line label={t("lineTuition")} value={o.funding.tuition} />
-                  <Line label={t("fundScholarship")} value={o.funding.scholarship} tone="good" />
-                  <Line label={t("fundAid")} value={o.funding.aid} tone="good" />
+                  <Line label={t("opConfirmedScholarship")} value={o.funding.scholarship} tone="good" />
+                  <Line label={t("opConfirmedAid")} value={o.funding.aid} tone="good" />
                   <Line label={t("opOtherConfirmed")} value={o.funding.otherConfirmed} tone="good" />
+                  <Line label={t("opTuitionAllocated")} value={o.funding.confirmedAllocatedToTuition} />
+                  <Line label={t("opTuitionRemaining")} value={o.funding.tuitionRemaining} tone="warn" />
                   <Line label={t("lineDepositNow")} value={o.funding.payableNow.amount} tone="warn" />
                 </dl>
                 {o.funding.payableNow.dueDate && <p className="mt-1 text-sm text-slate-500">{t("opDuePayee", { date: o.funding.payableNow.dueDate, payee: o.funding.payableNow.payee })}</p>}
                 <ul className="mt-2 list-disc space-y-0.5 pl-4 text-sm text-slate-500 dark:text-slate-400">
-                  {o.funding.explanation.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
+                  {o.funding.confirmedNotAllocatedToTuition>0&&<li>{t("opFundingRestricted",{amount:formatMoney(o.funding.confirmedNotAllocatedToTuition,"USD")})}</li>}
+                  {o.funding.conditionalTotal>0&&<li>{t("opFundingConditional",{amount:formatMoney(o.funding.conditionalTotal,"USD")})}</li>}
+                  {o.funding.repayableTotal>0&&<li>{t("fpLoanNote",{amount:formatMoney(o.funding.repayableTotal,"USD")})}</li>}
+                  <li>{t("opFundingTiming")}</li>
                 </ul>
                 {o.status === "accepted" ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -297,7 +293,7 @@ function Line({ label, value, tone = "slate" }: { label: string; value: number |
           tone === "good" ? "text-emerald-600 dark:text-emerald-400" : tone === "warn" ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"
         }`}
       >
-        {value == null ? t("opAmountUnknown") : `$${value.toLocaleString()}`}
+        {formatMoney(value,"USD",{placeholder:t("opAmountUnknown")})}
       </dd>
     </div>
   );
@@ -357,7 +353,8 @@ export function PostAdmissionOfferMatrix({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  <MatrixRow label={t("pamStatus")} offers={data.offers} value={(offer) => offer.status} />
+                  <MatrixRow label={t("pamStatus")} offers={data.offers} value={(offer) => OFFER_STATUSES.includes(offer.status)?t(`opStatus_${offer.status}` as never):t("opAmountUnknown")} />
+                  <MatrixRow label={t("opTuitionBasisLabel")} offers={data.offers} value={offer=>t(offer.funding.tuitionBasis==="published_annual_usd"?"opTuitionBasisAnnual":offer.funding.tuitionBasis==="offer_recorded_usd"?"opTuitionBasisRecorded":"opTuitionBasisUnknown")} />
                   <MatrixRow label={t("pamTuition")} offers={data.offers} value={(offer) => amount(offer.funding.tuition)} numeric />
                   <MatrixRow
                     label={t("pamConfirmedAwards")}
@@ -369,10 +366,10 @@ export function PostAdmissionOfferMatrix({
                     label={t("pamNetAnnualCost")}
                     offers={data.offers}
                     numeric
-                    value={(offer) => offer.funding.tuition == null
-                      ? t("opAmountUnknown")
-                      : amount(Math.max(0, offer.funding.tuition - offer.funding.scholarship - offer.funding.aid))}
+                    value={(offer) => amount(offer.funding.tuitionRemaining)}
                   />
+                  <MatrixRow label={t("opTuitionAllocated")} offers={data.offers} value={(offer)=>amount(offer.funding.confirmedAllocatedToTuition)} numeric />
+                  <MatrixRow label={t("opRepayableLoans")} offers={data.offers} value={(offer)=>amount(offer.funding.repayableTotal)} numeric />
                   <MatrixRow label={t("pamDeposit")} offers={data.offers} value={(offer) => amount(offer.funding.deposit)} numeric />
                   <MatrixRow label={t("pamDepositDue")} offers={data.offers} value={(offer) => offer.funding.depositDueDate ?? t("opAmountUnknown")} />
                   <MatrixRow label={t("pamResponseDeadline")} offers={data.offers} value={(offer) => offer.responseDeadline ?? t("opAmountUnknown")} />
@@ -666,6 +663,10 @@ interface FundingData {
   estimatedLines: string[];
   unknownLines: string[];
   plan: {
+    scenario?:"confirmed"|"optimistic";
+    securedAllocatedTotal?:number;
+    repayableTotal?:number;
+    upfrontGap?:number|null;
     annualCost: number | null;
     currency: string;
     scholarshipTotal: number;
@@ -679,7 +680,7 @@ interface FundingData {
     openActions: { name: string; kind: string; amountUsd: number; status: string }[];
   };
   items: { id: number; kind: string; kindLabel: string; name: string; amountUsd: number; status: string; covers: string | null; notes: string | null }[];
-  gapActions: { gap: number | null; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null; country: string | null; coversGap: boolean; saved: boolean }[]; tab: string; cta: string };
+  gapActions: { gap: number | null; scholarships: { id: number; title: string; provider: string; amountUsdValue: number; tuitionCoverage: string; deadlineDate: string | null; country: string | null; coversGap: boolean; saved: boolean; annualComparable:boolean;awardAmount:number|null;awardCurrency:string|null;awardPeriod:string|null }[]; tab: string; cta: string };
   benchmarkSource?: { country: string; name: string; url: string; notes: string; defaultCurrency: string };
   countries?: string[];
   displayCurrency?: string;
@@ -692,17 +693,21 @@ const FUNDING_COUNTRIES = Object.keys(COUNTRY_COST_BENCHMARKS);
 
 export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: { profileId: number; applicationId?: number | null; onNavigateTab: (t: string) => void }) {
   const t = useTranslations("journey");
+  const amountDescriptionId=React.useId();
   const [countryOverride, setCountryOverride] = useState<string>("");
   const [displayCurrency, setDisplayCurrency] = useState<string>("USD");
+  const [scenarioChoice,setScenarioChoice]=useState<{profileId:number;value:"confirmed"|"optimistic"}>({profileId,value:"confirmed"});
+  const scenario=scenarioChoice.profileId===profileId?scenarioChoice.value:"confirmed";
   const { data, loading, error, reload } = useResource<FundingData>(
     useCallback(() => {
       const params = new URLSearchParams({ profileId: String(profileId) });
       if (applicationId != null) params.set("applicationId", String(applicationId));
       if (countryOverride) params.set("country", countryOverride);
       if (displayCurrency) params.set("currency", displayCurrency);
+      params.set("scenario",scenario);
       return getJson<FundingData>(`/api/funding?${params.toString()}`, t("fpLoadError"));
-    }, [profileId, applicationId, countryOverride, displayCurrency, t]),
-    [profileId, applicationId, countryOverride, displayCurrency],
+    }, [profileId, applicationId, countryOverride, displayCurrency, scenario, t]),
+    [profileId, applicationId, countryOverride, displayCurrency, scenario],
     {
       initial: {
         costLines: [],
@@ -713,6 +718,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
         estimatedLines: [],
         unknownLines: [],
         plan: {
+          scenario:"confirmed",
           annualCost: null,
           currency: "USD",
           scholarshipTotal: 0,
@@ -740,6 +746,9 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
 
   const add = async () => {
     if (!form.name.trim() || !form.amountUsd) return;
+    const amount=parseRecordedFundingUsd(form.amountUsd);
+    if(amount==null){setActionError(t("fpUsdAmountInvalid"));return;}
+    setActionError("");
     setBusy(true);
     try {
       await sendJson(
@@ -757,6 +766,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
   };
 
   const addGapScholarship = async (scholarship: FundingData["gapActions"]["scholarships"][number]) => {
+    if(!scholarship.annualComparable){setActionError(t("fpAnnualUnknown"));return;}
     if (data.items.some((item) => item.kind === "scholarship" && item.name === scholarship.title)) return;
     setBusy(true);
     setActionError("");
@@ -782,13 +792,12 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
     await reload();
   };
 
-  if (loading) return <Loading label={t("fpLoading")} />;
-
   const pct = data.annualCost == null
     ? null
     : data.annualCost > 0
-      ? Math.round((data.plan.securedTotal / data.annualCost) * 100)
+      ? Math.min(100,Math.round(((data.plan.securedAllocatedTotal??0) / data.annualCost) * 100))
       : 0;
+  const scenarioReady=!loading&&data.plan.scenario===scenario&&!error;
   const activeCountry = countryOverride || data.benchmarkSource?.country || data.university?.country || "United States";
 
   return (
@@ -814,6 +823,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
               variant="outline"
               className="print:hidden min-h-11"
               onClick={() => window.print()}
+              disabled={!scenarioReady}
               title={t("fpPrintSummaryHint")}
             >
               <Printer className="h-3.5 w-3.5" aria-hidden />
@@ -822,7 +832,17 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
           </div>
         }
       >
-        {error && <ErrorNote message={error} />}
+        {error && <><ErrorNote message={error} /><Button variant="outline" onClick={()=>void reload()}>{t("fpRetry")}</Button></>}
+        <label className="mb-3 block text-sm font-bold" htmlFor="funding-scenario">{t("fpScenario")}
+          <select id="funding-scenario" className={`${inputClass} mt-1`} value={scenario} onChange={event=>setScenarioChoice({profileId,value:event.target.value as "confirmed"|"optimistic"})}>
+            <option value="confirmed">{t("fpScenarioConfirmed")}</option>
+            <option value="optimistic">{t("fpScenarioOptimistic")}</option>
+          </select>
+        </label>
+        <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t("fpScenarioNote")}</p>
+        <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t("fpUpfrontUnknown")}</p>
+        {scenarioReady&&Boolean(data.plan.repayableTotal)&&<p className="mb-3 text-sm text-amber-700 dark:text-amber-300">{t("fpLoanNote",{amount:formatMoney(data.plan.repayableTotal!,"USD")})}</p>}
+        {!scenarioReady&&!error&&<Loading label={t("fpScenarioLoading")} />}
 
         <div className="mb-3 grid gap-2 sm:grid-cols-2">
           <div>
@@ -885,6 +905,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
           </p>
         )}
 
+        {scenarioReady&&<div data-funding-scenario={data.plan.scenario} data-funding-gap={data.plan.fundingGap??"unknown"}>
         <div className="mb-3">
           {pct == null ? (
             <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{t("fpGapUnavailable")}</p>
@@ -892,7 +913,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
             <ProgressBar
               pct={pct}
               size="lg"
-              tone={data.plan.isCovered ? "good" : "warn"}
+              tone={data.plan.securedGap===0 ? "good" : "warn"}
               label={t("fpSecuredPct", { pct })}
             />
           )}
@@ -912,10 +933,11 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
             tone={data.plan.securedGap == null ? "neutral" : data.plan.securedGap > 0 ? "warn" : "good"}
           />
         </div>
+        </div>}
       </JourneyCard>
 
       <JourneyCard title={t("fpMoneyTitle")} subtitle={t("fpMoneySubtitle")}>
-        <div className="space-y-2">
+        {!scenarioReady?<p className="text-sm text-slate-500">{t(error?"fpGapUnavailable":"fpScenarioLoading")}</p>:<div className="space-y-2">
           {data.plan.byLine.map((l) => (
             <div key={l.key}>
               <div className="flex items-center justify-between text-xs">
@@ -943,7 +965,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
               </div>
             </div>
           ))}
-        </div>
+        </div>}
       </JourneyCard>
 
       <JourneyCard title={t("fpAddFundingTitle")} subtitle={t("fpAddFundingSubtitle")}>
@@ -961,7 +983,8 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
             <input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("fpNamePlaceholder")} />
           </Field>
           <Field label={t("fpFieldAmount")}>
-            <input className={inputClass} type="number" value={form.amountUsd} onChange={(e) => setForm({ ...form, amountUsd: e.target.value })} />
+            <input className={inputClass} type="number" min="0" step="any" aria-label={t("fpFieldAmount")} aria-describedby={amountDescriptionId} value={form.amountUsd} onChange={(e) => setForm({ ...form, amountUsd: e.target.value })} />
+            <p id={amountDescriptionId} className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{t("fpUsdRounding")}</p>
           </Field>
           <Field label={t("fpFieldStatus")}>
             <select className={inputClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
@@ -1018,13 +1041,14 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
         </JourneyCard>
       )}
 
-      {data.gapActions.gap != null && data.gapActions.gap > 0 &&
+      {scenarioReady&&data.gapActions.gap != null && data.gapActions.gap > 0 &&
         (() => {
           const gapValue = data.gapActions.gap ?? 0;
-          const chosen = data.gapActions.scholarships.filter((s) => gapPicks[s.id]);
+          const chosen = data.gapActions.scholarships.filter((s) => s.annualComparable&&gapPicks[s.id]);
           const remaining = Math.max(0, gapValue - chosen.reduce((sum, s) => sum + s.amountUsdValue, 0));
           return (
             <JourneyCard title={t("fpGapTitle")}>
+              <p className="mb-2 text-sm text-slate-600 dark:text-slate-300">{t("fpDiscoveryOnly")}</p>
               <p className="text-sm text-slate-700 dark:text-slate-200">
                 {t("fpGapShort", { amount: `$${gapValue.toLocaleString()}` })}
               </p>
@@ -1037,17 +1061,21 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
                           type="checkbox"
                           className="h-3.5 w-3.5 accent-indigo-600"
                           checked={Boolean(gapPicks[s.id])}
+                          disabled={!s.annualComparable}
+                          title={!s.annualComparable?t("fpAnnualUnknown"):undefined}
                           onChange={(e) => setGapPicks((prev) => ({ ...prev, [s.id]: e.target.checked }))}
                           aria-label={t("fpGapCheckAria", { title: s.title })}
                         />
                         <span className="font-semibold text-slate-700 dark:text-slate-200">{s.title}</span>
-                        <Pill tone={s.coversGap ? "good" : "brand"}>${s.amountUsdValue.toLocaleString()}</Pill>
-                        {s.coversGap && <Pill tone="good">{t("fpGapCloses")}</Pill>}
+                        <Pill tone="brand">${s.amountUsdValue.toLocaleString()}</Pill>
+                        {s.coversGap && <Pill tone="brand">{t("fpGapCloses")}</Pill>}
                         <Pill tone="slate">{t("fpTuitionCoverage", { coverage: s.tuitionCoverage })}</Pill>
                         {s.deadlineDate && (
                           <span className="text-slate-500">{t("fpCloses", { date: s.deadlineDate })}</span>
                         )}
-                        {data.items.some((item) => item.kind === "scholarship" && item.name === s.title) ? <Pill tone="good">{t("fpAlreadyAdded")}</Pill> : <Button size="sm" variant="outline" disabled={busy} onClick={() => void addGapScholarship(s)}>{t("fpAddToPlan")}</Button>}
+                        <span className="text-slate-500">{t("fpAwardOriginal",{amount:s.awardAmount??t("fpAmountUnknown"),currency:s.awardCurrency??"?",period:s.awardPeriod??t("fpAmountUnknown")})}</span>
+                        {!s.annualComparable?<Button size="sm" variant="outline" onClick={()=>window.dispatchEvent(new CustomEvent("scholarbridge:focus-record",{detail:{kind:"scholarship",id:s.id,title:s.title}}))}>{t("fpReviewAwardTerms")}</Button>:
+                        data.items.some((item) => item.kind === "scholarship" && item.name === s.title) ? <Pill tone="good">{t("fpAlreadyAdded")}</Pill> : <Button size="sm" variant="outline" disabled={busy} onClick={() => void addGapScholarship(s)}>{t("fpAddToPlan")}</Button>}
                       </li>
                     ))}
                   </ul>

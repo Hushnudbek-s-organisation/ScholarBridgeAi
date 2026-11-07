@@ -78,6 +78,7 @@ function readSystemDark(): boolean {
 }
 
 function writeChoice(next: ThemeChoice) {
+  applyTheme(next==="system"?(readSystemDark()?"dark":"light"):next);
   try {
     localStorage.setItem(THEME_STORAGE_KEY, next);
   } catch {

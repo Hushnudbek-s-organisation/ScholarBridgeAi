@@ -5,7 +5,7 @@
  * - Never overwrite verified data with weaker data.
  * - Only verified when source + validation support it.
  */
-import { db } from "@/db";
+import { researchDb as db, fenceResearchWrite, researchWriteIsFenced } from "./writeFence";
 import {
   universities,
   universityPrograms,
@@ -57,6 +57,7 @@ export async function readCurrent(universityId: number): Promise<CurrentState> {
     state.sourceUrls = new Set(src.map((s) => normalizeUrl(s.url)));
     return state;
   } catch (err) {
+    if(researchWriteIsFenced())throw err;
     console.error("[research-agent] readCurrent failed (DB unavailable?):", err);
     return state;
   }
@@ -93,7 +94,7 @@ export function sourcePriority(type: string): number {
  *  - generic "other" pages are stored only when they are real HTML/PDF pages
  *    with a meaningful title.
  */
-export async function upsertSource(
+async function upsertSourceInternal(
   evidence: SourceEvidence,
   universityId: number
 ): Promise<{ sourceId: number | null; inserted: boolean; duplicate: boolean; rejected?: string }> {
@@ -145,6 +146,7 @@ export async function upsertSource(
     });
     return { sourceId: row.id, inserted: true, duplicate: false };
   } catch (err) {
+    if(researchWriteIsFenced())throw err;
     console.error("[research-agent] upsertSource failed:", err);
     return { sourceId: null, inserted: false, duplicate: false };
   }
@@ -220,7 +222,7 @@ export function decideUniversityFields(
 }
 
 /** Write university-level fields honoring update rules (CASE A–E). */
-export async function writeUniversity(
+async function writeUniversityInternal(
   universityId: number,
   extracted: ExtractedUniversity,
   evidence: SourceEvidence[],
@@ -245,6 +247,7 @@ export async function writeUniversity(
     try {
       await db.update(universities).set({ ...patch, lastVerifiedAt: new Date() }).where(eq(universities.id, universityId));
     } catch (err) {
+    if(researchWriteIsFenced())throw err;
       console.error("[research-agent] writeUniversity failed:", err);
     }
   }
@@ -281,7 +284,7 @@ export function findExistingProgram(
  * (a discovered "Computing BEng" at imperial.ac.uk/... must match an existing
  * "Computing BEng" at www.imperial.ac.uk/...). Returns what WOULD change.
  */
-export async function upsertProgram(
+async function upsertProgramInternal(
   universityId: number,
   p: ExtractedProgram,
   sourceUrl: string
@@ -334,13 +337,14 @@ export async function upsertProgram(
       .returning();
     return { programId: row.id, inserted: true, updated: [], unchanged: false };
   } catch (err) {
+    if(researchWriteIsFenced())throw err;
     console.error("[research-agent] upsertProgram failed:", err);
     return { programId: null, inserted: false, updated: [], unchanged: false };
   }
 }
 
 /** Upsert requirements for a program (single row, wide columns). */
-export async function upsertRequirements(
+async function upsertRequirementsInternal(
   programId: number,
   req: ExtractedRequirements,
   sourceUrl: string,
@@ -391,13 +395,14 @@ export async function upsertRequirements(
     }
     return true;
   } catch (err) {
+    if(researchWriteIsFenced())throw err;
     console.error("[research-agent] upsertRequirements failed:", err);
     return false;
   }
 }
 
 /** Upsert an application cycle (dedupe: university + academic_year + type + deadline). */
-export async function upsertCycle(
+async function upsertCycleInternal(
   universityId: number,
   c: ExtractedCycle,
   sourceUrl: string,
@@ -433,13 +438,14 @@ export async function upsertCycle(
     });
     return { inserted: true, duplicate: false };
   } catch (err) {
+    if(researchWriteIsFenced())throw err;
     console.error("[research-agent] upsertCycle failed:", err);
     return { inserted: false, duplicate: false };
   }
 }
 
 /** Upsert a scholarship by title/provider/university identity and attach known source evidence. */
-export async function upsertScholarship(
+async function upsertScholarshipInternal(
   s: ExtractedScholarship,
   sourceUrl: string,
   universityId: number | null = null
@@ -510,7 +516,16 @@ export async function upsertScholarship(
     }
     return { inserted: true, duplicate: false };
   } catch (err) {
+    if(researchWriteIsFenced())throw err;
     console.error("[research-agent] upsertScholarship failed:", err);
     return { inserted: false, duplicate: false };
   }
 }
+
+// All catalogue/source/link writes share the same short, lease-locked transaction.
+export const upsertSource=fenceResearchWrite(upsertSourceInternal);
+export const writeUniversity=fenceResearchWrite(writeUniversityInternal);
+export const upsertProgram=fenceResearchWrite(upsertProgramInternal);
+export const upsertRequirements=fenceResearchWrite(upsertRequirementsInternal);
+export const upsertCycle=fenceResearchWrite(upsertCycleInternal);
+export const upsertScholarship=fenceResearchWrite(upsertScholarshipInternal);

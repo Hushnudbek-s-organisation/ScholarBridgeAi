@@ -1,3 +1,5 @@
+import {resolveAcademicRequirements,academicDecisionEnvelope} from "@/lib/universityDetailRequirements";
+import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
@@ -12,9 +14,8 @@ import { memoizeMatch } from "@/lib/matchMemo";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
+import { universityProgrammeDiscovery } from "@/lib/universityProgrammeDiscovery";
 import { matchesUniversityType } from "@/lib/universityType";
-import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
-import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { verifiedQsRank } from "@/lib/universityRank";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
@@ -38,6 +39,8 @@ export async function GET(req: Request) {
     const maxTuition = searchParams.get("maxTuition")?.slice(0, 24);
     const sort = searchParams.get("sort")?.slice(0, 24);
     const uniType = searchParams.get("type")?.trim().slice(0, 24); // Public | Private
+    const contextText=(key:string,max:number)=>{const value=searchParams.get(key);if(value==null||value==="")return null;if(value.length>max||/[\u0000-\u001f]/.test(value))throw new Error("invalid_requirement_context");return value.trim()||null;};
+    const academicContext={programName:null,degreeLevel:degreeLevel??null,admissionCycle:contextText("admissionCycle",100),applicantScope:contextText("applicantScope",200)};
     const ieltsFilter = searchParams.get("ielts")?.slice(0, 12); // e.g. "6.5" → only unis with minIelts <= 6.5
     const rank = (name: string) => {
       const raw = searchParams.get(name);
@@ -170,7 +173,7 @@ export async function GET(req: Request) {
     if (ieltsFilter != null && ieltsFilter !== "") {
       const minI = Number(ieltsFilter);
       if (Number.isFinite(minI) && minI >= 0 && minI <= 9) {
-        allUnis = allUnis.filter(u => u.minIelts != null && u.minIelts <= minI);
+        allUnis = allUnis.filter(u => {const value=resolveAcademicRequirements(bundle.facts?.get(u.id)??[],academicContext).summary.ielts?.single;return value!=null&&value<=minI;});
       }
     }
 
@@ -252,45 +255,13 @@ export async function GET(req: Request) {
       }
       const src = sourceMap.get(uni.id) || null;
       const progFields = programFieldsByUni.get(uni.id) ?? [];
-      // Module 4 — dual scoring. `matchScore` answers "does this fit my
-      // profile?" (shared match engine, unchanged); `chanceScore` answers
-      // "how well does my profile sit inside this department's admitted
-      // cohort?" (QS Top 200 + 5-layer program engine). Same synthetic
-      // programme row the dashboard uses, so the two screens can never
-      // disagree — and both stay NULL for signed-out visitors.
-      let chance: ReturnType<typeof evaluateUniversityAndProgramChance> | null = null;
-      if (chancingProfile) {
-        const syntheticProgram = {
-          id: uni.id,
-          universityId: uni.id,
-          name: profileData?.targetMajor || uni.programMajor || "General Studies",
-          degreeLevel: profileData?.degreeLevel || uni.degreeLevel || "Bachelor",
-          field: profileData?.targetMajor || uni.programMajor || null,
-        };
-        // The chance result depends on the same (profile, university) pair as the
-        // fit score, so it lives in the same memo — keyed by the university row,
-        // with the synthesized programme (derived from that same profile) folded
-        // into the key by way of the profile fingerprint.
-        const chanceProfile = chancingProfile;
-        chance = memoizeMatch(
-          "chance",
-          profileFingerprint,
-          uni.id,
-          uni as unknown as Record<string, unknown>,
-          () =>
-            evaluateUniversityAndProgramChance(
-              chanceProfile,
-              uni,
-              syntheticProgram,
-              { minGpa: uni.minGpa, minIelts: uni.minIelts, minSat: uni.minSat },
-              [],
-              matchQsUniversityBenchmark(uni)
-            )
-        );
-      }
+      // Discovery never synthesizes a programme from the student's major.
+      // Experimental model is opt-in via the existing explicit sort choice.
+      const {chance,programmeDiscovery}=universityProgrammeDiscovery(uni,bundle.programsByUni?.get(uni.id)??[],profileData,chancingProfile,parseUniversitySort(sort).sort==="chance_desc");
       return {
         ...uni,
         programFields: progFields,
+        programmeDiscovery,
         matchScore: matchInfo.matchScore,
         chanceScore: chance ? chance.compositeProgramFitScore : null,
         effectiveAcceptRatePct: chance ? chance.effectiveProgramAcceptRatePct : null,
@@ -365,11 +336,14 @@ export async function GET(req: Request) {
     // numbers are KEPT but never promoted to a verified official minimum by
     // the entity-level `verified` flag. Clients/UI/Telegram consume the same
     // shape instead of re-interpreting raw columns.
-    payload.universities = rows.map((u) => {
-      const localized = localizeUniversityRow(u, locale);
+    payload.universities = rows.map((u) => localizeUniversityRow(u, locale));
+    payload.universities = (payload.universities as typeof rows).map((u) => {
+      const localized = u;
       const raw = u as unknown as Record<string, unknown>;
       return {
         ...localized,
+        academicRequirements:academicDecisionEnvelope(resolveAcademicRequirements(bundle.facts?.get(u.id)??[],academicContext)),
+        resolvedFacts: presentedCatalogueFacts(bundle.facts?.get(u.id) ?? []),
         evidence: legacyEvidence({
           entityVerified: raw.verificationStatus === "verified",
           sourceUrl: typeof raw.website === "string" ? raw.website : null,
@@ -385,6 +359,7 @@ export async function GET(req: Request) {
     });
     return privateNoStoreJson(payload);
   } catch (error) {
+    if(error instanceof Error&&error.message==="invalid_requirement_context")return privateNoStoreJson({error:"Invalid requirement context"},{status:400});
     console.error("GET /api/universities error:", error);
     // Never substitute sample universities: during a database outage students
     // would be shown made-up data as if it were real. Clients show the error

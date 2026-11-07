@@ -255,7 +255,7 @@ export function CountryComparePanel() {
                         {c.minIelts.avg ?? "—"} <span className="text-xs font-normal text-slate-500">({c.minIelts.published}/{c.universities})</span>
                       </dd>
                       <EvidenceNote fact={c.evidence?.minIeltsAvg} compact />
-                      <span className="mt-0.5 block text-[10px] leading-tight text-slate-500">{te("observedAverage")}</span>
+                      <span className="mt-0.5 block text-xs leading-tight text-slate-500">{te("observedAverage")}</span>
                     </div>
                     <div className="col-span-2 border-t border-slate-200 pt-3 dark:border-slate-700">
                       <dt className="text-xs font-bold text-slate-500">{t("potentialFunding")}</dt>

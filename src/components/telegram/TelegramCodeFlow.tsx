@@ -6,6 +6,7 @@ import { AnimatePresence, m as Motion } from "framer-motion";
 import { CheckCircle2, ExternalLink, Loader2, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
 import { Button } from "@/components/ui/Button";
+import { profileFromSessionEnvelope } from "@/lib/authenticatedProfile";
 
 /**
  * Telegram flows shared by sign-in and by "connect Telegram" (settings page).
@@ -226,9 +227,11 @@ export function TelegramCodeFlow({
           inputRef.current?.focus();
           return;
         }
+        const authenticated=purpose==="login"?profileFromSessionEnvelope(body):null;
+        if(purpose==="login"&&!authenticated){setError(t("errors.invalid_response"));return;}
         doneRef.current = true;
         setStatus((s) => (s ? { ...s, status: "used" } : s));
-        if (purpose === "login" && body.profile) onLoggedIn?.(body.profile as StudentProfile, Boolean(body.isNew));
+        if (purpose === "login" && authenticated) onLoggedIn?.(authenticated, Boolean(body.isNew));
         if (purpose === "link") onLinked?.();
       } catch {
         setError(t("errors.network"));

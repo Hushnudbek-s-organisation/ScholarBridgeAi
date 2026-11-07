@@ -8,6 +8,7 @@
  * apart (the chancing copy omitted fields the strength copy passed, and both
  * needed a `as never` cast to satisfy the compiler).
  */
+import {recordedToefl} from "@/lib/applicantContext";
 import { AsyncTtlCache } from "@/lib/asyncTtlCache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -58,10 +59,11 @@ type UniversityMappingRow = Pick<
  */
 export function toChancingProfile(row: ProfileRow): ChancingProfile {
   return {
-    gpa: row.gpa,
-    gpaScale: row.gpaScale,
+    applicantContext:row.applicantContext??null,
+    gpa: row.applicantContext?.gpa?row.applicantContext.gpa.value:row.gpa,
+    gpaScale: row.applicantContext?.gpa?row.applicantContext.gpa.maximum:row.gpaScale,
     ieltsScore: row.ieltsScore,
-    toeflScore: row.toeflScore,
+    toeflScore: recordedToefl(row.applicantContext,row.toeflScore).score,
     satScore: row.satScore,
     actScore: row.actScore,
     greScore: row.greScore,
@@ -169,10 +171,11 @@ export function toMatchProfile(row: ProfileRow): StudentProfileData {
     name: row.name,
     degreeLevel: row.degreeLevel,
     targetMajor: row.targetMajor,
-    gpa: row.gpa,
-    gpaScale: row.gpaScale,
+    applicantContext:row.applicantContext??null,
+    gpa: row.applicantContext?.gpa?row.applicantContext.gpa.value:row.gpa,
+    gpaScale: row.applicantContext?.gpa?row.applicantContext.gpa.maximum:row.gpaScale,
     ieltsScore: row.ieltsScore,
-    toeflScore: row.toeflScore,
+    toeflScore: recordedToefl(row.applicantContext,row.toeflScore).score,
     duolingoScore: row.duolingoScore,
     satScore: row.satScore,
     greScore: row.greScore,

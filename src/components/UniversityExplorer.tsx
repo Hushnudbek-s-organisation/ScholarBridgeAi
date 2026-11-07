@@ -1,4 +1,6 @@
 "use client";
+import {EvidenceNote} from "./EvidenceNote";
+import type {ResolvedAcademicDecisionInput} from "@/lib/academicDecision";
 
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
@@ -65,6 +67,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 
 export interface University {
   id: number;
+  academicRequirements?:ResolvedAcademicDecisionInput;
   name: string;
   country: string;
   city: string;
@@ -105,6 +108,7 @@ export interface University {
    * profile to place into an admitted cohort, and the UI never shows a fake.
    */
   chanceScore?: number | null;
+  programmeDiscovery?:{status:string;programmeCount:number;selectedProgrammeId:number|null;selectedProgrammeName:string|null};
   effectiveAcceptRatePct?: number | null;
   selectivityCategory?: string | null;
   studentGpaPercentile?: number | null;
@@ -719,6 +723,7 @@ export function UniversityExplorer({
   if (selectedUniId != null) {
     return (
       <UniversityDetail
+        experimentalChancing={sortBy==="chance_desc"}
         universityId={selectedUniId}
         activeProfile={activeProfile}
         onBack={() => setSelectedUniId(null)}
@@ -1043,6 +1048,7 @@ export function UniversityExplorer({
             return (
               <div
                 key={uni.id}
+                data-university-id={uni.id}
                 className="group flex h-full flex-col justify-between overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-xs transition-all hover:border-indigo-300 hover:shadow-lg dark:border-slate-700 dark:bg-surface dark:hover:border-indigo-500/50"
               >
                 {/* Top Image Banner — a taller banner on a phone, where the
@@ -1077,15 +1083,12 @@ export function UniversityExplorer({
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
                       {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")}
                     </span>
-                    {/* Module 4 — the second, independent number: how my
-                        profile sits inside this department's admitted cohort
-                        (positioning engine), with the programme's effective
-                        acceptance rate as context. Rendered only when the
-                        API actually computed one. */}
+                    {/* Opt-in experimental index for an actual recorded programme.
+                        No cohort percentile or personal admission probability. */}
                     {typeof uni.chanceScore === "number" && (
                       <span
                         className="inline-flex items-center gap-1 rounded-control bg-violet-700 px-2.5 py-1 text-xs font-bold text-white shadow-sm"
-                        title={uni.selectivityCategory ?? undefined}
+                        title={[uni.programmeDiscovery?.selectedProgrammeName,uni.selectivityCategory].filter(Boolean).join(" · ") || undefined}
                       >
                         🎯 {t("chanceBadgeLabel", { score: uni.chanceScore })}
                       </span>
@@ -1255,11 +1258,11 @@ export function UniversityExplorer({
                       </div>
                       <div>
                         <span className="block text-slate-500 dark:text-slate-400">{t("exMinGpa")}</span>
-                        <strong className="font-bold text-slate-900 dark:text-white">{formatNumber(uni.minGpa, { decimals: 2, suffix: " / 4.0" })}</strong>
+                        <strong className="font-bold text-slate-900 dark:text-white">{uni.academicRequirements?.summary.gpa?`${uni.academicRequirements.summary.gpa.single} / ${uni.academicRequirements.summary.gpa.unit}`:t("notSpecified")}</strong>
                       </div>
                       <div>
                         <span className="block text-slate-500 dark:text-slate-400">{t("exMinIelts")}</span>
-                        <strong className="font-bold text-slate-900 dark:text-white">{formatNumber(uni.minIelts, { decimals: 1 })}</strong>
+                        <strong className="font-bold text-slate-900 dark:text-white">{uni.academicRequirements?.summary.ielts?.single??t("notSpecified")}</strong>
                       </div>
                     </div>
 
@@ -1274,6 +1277,9 @@ export function UniversityExplorer({
                         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
                       </summary>
                       <div className="mt-2 space-y-2 border-t border-slate-200/70 pt-2 text-slate-600 dark:border-slate-800/60">
+                        <div className="text-sm"><EvidenceNote compact label="GPA" fact={uni.academicRequirements?.evidence.gpa??null}/><EvidenceNote compact label="IELTS" fact={uni.academicRequirements?.evidence.ielts??null}/>
+                          {(uni.minGpa!=null||uni.minIelts!=null)&&<p className="mt-2 text-sm text-slate-500">{t("recordedCatalogueValue")}: {uni.minGpa!=null?`GPA ${uni.minGpa} (${t("scoreScaleNotRecorded")})`:""}{uni.minIelts!=null?` · IELTS ${uni.minIelts}`:""}</p>}
+                        </div>
                         {uni.description && uni.descriptionSourceLanguage === "en" && (
                           <p className="inline-flex items-center gap-1 rounded-control bg-slate-200/70 px-1.5 py-0.5 text-sm font-semibold text-slate-700 dark:bg-slate-700/60 dark:text-slate-200">
                             <Languages className="h-3 w-3 shrink-0" aria-hidden />
@@ -1531,6 +1537,7 @@ export function UniversityExplorer({
                       <td key={u.id} className="py-2.5 px-4 font-bold text-indigo-600">#{formatNumber(u.worldRanking, { placeholder: "—" })}</td>
                     ))}
                   </tr>
+                  <tr><td className="sticky left-0 z-10 bg-white px-4 py-3 font-semibold text-slate-500">{t("academicReqs")}</td>{comparedUniversities.map(u=><td key={u.id} className="px-4 py-3"><DecisionPillStrip university={u} profile={activeProfile} compact/></td>)}</tr>
                   <tr>
                     <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMatchScore")}</td>
                     {comparedUniversities.map((u) => (
@@ -1569,13 +1576,13 @@ export function UniversityExplorer({
                   <tr>
                     <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMinGpa")}</td>
                     {comparedUniversities.map((u) => (
-                      <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatNumber(u.minGpa, { decimals: 2, suffix: " / 4.0" })}</td>
+                      <td key={u.id} className="py-2.5 px-4 text-slate-900">{u.academicRequirements?.summary.gpa?`${u.academicRequirements.summary.gpa.single} / ${u.academicRequirements.summary.gpa.unit}`:t("notSpecified")}<EvidenceNote compact label="GPA" fact={u.academicRequirements?.evidence.gpa??null}/>{u.minGpa!=null&&<p className="mt-1 text-sm text-slate-500">{t("recordedCatalogueValue")}: {u.minGpa} ({t("scoreScaleNotRecorded")})</p>}</td>
                     ))}
                   </tr>
                   <tr>
                     <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMMinIelts")}</td>
                     {comparedUniversities.map((u) => (
-                      <td key={u.id} className="py-2.5 px-4 text-slate-900">{formatNumber(u.minIelts, { decimals: 1 })}</td>
+                      <td key={u.id} className="py-2.5 px-4 text-slate-900">{u.academicRequirements?.summary.ielts?.single??t("notSpecified")}<EvidenceNote compact label="IELTS" fact={u.academicRequirements?.evidence.ielts??null}/>{u.minIelts!=null&&<p className="mt-1 text-sm text-slate-500">{t("recordedCatalogueValue")}: {u.minIelts}</p>}</td>
                     ))}
                   </tr>
                   <tr>

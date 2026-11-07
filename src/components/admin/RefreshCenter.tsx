@@ -138,9 +138,9 @@ export function RefreshCenter({ adminProfileId }: RefreshCenterProps) {
 
         {/* Two explicitly different modes — never silently conflated. */}
         <div className="mt-4">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{t("modeLabel")}</p>
+          <p className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">{t("modeLabel")}</p>
           <div className="grid gap-2 sm:grid-cols-2">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setMode("status_from_existing_dates")}
               aria-pressed={mode === "status_from_existing_dates"}
@@ -154,8 +154,8 @@ export function RefreshCenter({ adminProfileId }: RefreshCenterProps) {
                 <CalendarClock className="h-3.5 w-3.5" /> {t("statusMode")}
               </span>
               <span className="mt-1 block text-xs text-slate-500">{t("statusModeHint")}</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => setMode("official_source_reverification")}
               aria-pressed={mode === "official_source_reverification"}
@@ -169,15 +169,15 @@ export function RefreshCenter({ adminProfileId }: RefreshCenterProps) {
                 <ShieldCheck className="h-3.5 w-3.5" /> {t("officialMode")}
               </span>
               <span className="mt-1 block text-xs text-slate-500">{t("officialModeHint")}</span>
-            </button>
+            </Button>
           </div>
         </div>
 
         <div className="mt-4">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{t("scopeLabel")}</p>
+          <p className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">{t("scopeLabel")}</p>
           <div className="flex flex-wrap gap-2">
             {(["all", "scholarships", "universities"] as Scope[]).map((s) => (
-              <button
+              <Button variant="unstyled"
                 key={s}
                 type="button"
                 onClick={() => setScope(s)}
@@ -187,7 +187,7 @@ export function RefreshCenter({ adminProfileId }: RefreshCenterProps) {
                 }`}
               >
                 {s === "all" ? t("scopeAll") : s === "scholarships" ? t("scopeScholarships") : t("scopeUniversities")}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -226,18 +226,18 @@ export function RefreshCenter({ adminProfileId }: RefreshCenterProps) {
               <Stat label={t("discovered")} value={outcome.discovered} />
             </div>
             {outcome.mode === "official_source_reverification" && outcome.verifiedDatesUpdated === 0 && (
-              <p className="mt-2 text-xs font-semibold text-amber-700">{t("noDatesMoved")}</p>
+              <p className="mt-2 text-sm font-semibold text-amber-700">{t("noDatesMoved")}</p>
             )}
             {outcome.errors.length > 0 && (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-700">
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-rose-700">
                 {outcome.errors.slice(0, 6).map((e, i) => <li key={i}>{e}</li>)}
               </ul>
             )}
             {outcome.mode === "official_source_reverification" && (
               <div className="mt-3">
-                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{t("checksTitle")}</p>
+                <p className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">{t("checksTitle")}</p>
                 {outcome.sourceChecks.length === 0 ? (
-                  <p className="text-xs text-slate-500">{t("noChecks")}</p>
+                  <p className="text-sm text-slate-500">{t("noChecks")}</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
@@ -343,7 +343,7 @@ export function RefreshCenter({ adminProfileId }: RefreshCenterProps) {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-surface border border-slate-200 bg-white px-2 py-1.5">
-      <span className="block text-[11px] font-semibold text-slate-500">{label}</span>
+      <span className="block text-xs font-semibold text-slate-500">{label}</span>
       <span className="block text-sm font-extrabold text-slate-800">{value}</span>
     </div>
   );

@@ -111,8 +111,8 @@ check("unknown living → unknown verdict, no exact total, no 'fits' conclusion"
   assert.ok(plan.unknowns.length > 0);
 });
 
-check("a budget of zero/unknown is unknown, not 'free' or 'fully covered'", () => {
-  assert.equal(evaluateBudgetFit({ tuitionUsd: 3000, livingUsd: 15000, budgetUsd: 0 }).state, "unknown");
+check("an explicit zero budget is known and cannot cover positive costs; null remains unknown", () => {
+  assert.equal(evaluateBudgetFit({ tuitionUsd: 3000, livingUsd: 15000, budgetUsd: 0 }).state, "tuition_over");
   assert.equal(evaluateBudgetFit({ tuitionUsd: 3000, livingUsd: 15000, budgetUsd: null }).state, "unknown");
 });
 
@@ -127,7 +127,7 @@ check("a partial tuition waiver is capped at tuition and cannot 'cover' living c
     annualTuitionUsd: 3000, annualLivingEstUsd: 15000, years: 1,
     scholarships: [{ name: "Partial waiver", amountUsd: 5000, awardPeriod: "year", covers: "tuition" }],
   });
-  assert.equal(plan.scholarship.bestCaseAnnualUsd, 5000, "best-case award is reported honestly");
+  assert.equal(plan.scholarship.bestCaseAnnualUsd, 3000, "usable optimistic aid is capped at its tuition restriction");
   assert.ok(plan.scholarship.byKind.some((a) => a.kind === "tuition_waiver"));
 });
 
@@ -160,12 +160,12 @@ check("a reimbursement cannot pay an upfront bill", () => {
 
 // ---- Required case 5: monthly stipend -------------------------------------
 check("a monthly cash stipend annualizes to 12× and stays distinct from a grant", () => {
-  const stipend = classifyAid({ key: "stipend", covers: "living", amountUsd: 200, period: "month" });
+  const stipend = classifyAid({ key: "stipend", covers: "living", amountUsd: 200, period: "month", paymentMonths: 12 });
   assert.equal(stipend.kind, "cash_stipend");
   assert.equal(stipend.annualUsd, 2400);
   const plan = calculateCosts({
     annualTuitionUsd: 3000, annualLivingEstUsd: 15000, years: 2,
-    scholarships: [{ name: "Monthly stipend", amountUsd: 200, awardPeriod: "month", covers: "living" }],
+    scholarships: [{ name: "Monthly stipend", amountUsd: 200, awardPeriod: "month", paymentMonths: 12, covers: "living" }],
   });
   assert.equal(plan.scholarship.bestCaseAnnualUsd, 2400);
   assert.equal(plan.scholarship.bestCaseOneTimeUsd, 0);
@@ -176,7 +176,7 @@ check("multi-year: annual and whole-programme totals reconcile once, no double c
   const plan = calculateCosts({
     ...KNOWN_EXTRAS, annualTuitionUsd: 3000, annualLivingEstUsd: 15000,
     visaFeeUsd: 400, applicationFeeUsd: 80, years: 4,
-    scholarships: [{ name: "Annual grant", amountUsd: 1000, awardPeriod: "year", covers: "both" }],
+    scholarships: [{ name: "Annual grant", status: "awarded", fundingYears: 4, amountUsd: 1000, awardPeriod: "year", covers: "both" }],
   });
   assert.equal(plan.annualTotalUsd, 18000);
   assert.equal(plan.totalUsd, 18000 * 4 + 480, "one-time fees are added ONCE, not per year");

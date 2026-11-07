@@ -38,6 +38,8 @@ export interface MoneyValue {
   basis: "original" | "converted";
   /** Null when the conversion rate was not recorded. */
   fxRateToUsd?: number | null;
+  /** Explicit funded/charged months; never assume twelve for an academic year. */
+  paymentMonths?: number | null;
 }
 
 /** A cost line is either annual recurring or a one-time charge. */
@@ -118,7 +120,7 @@ export function annualUsd(value: MoneyValue | null | undefined): number | null {
   else if (value.basis === "converted" && value.fxRateToUsd != null && value.fxRateToUsd > 0) {
     usd = amount * value.fxRateToUsd;
   } else return null; // unsupported currency or missing rate → unknown
-  const perYear = periodsPerYear(value.period);
+  const perYear = value.period === "month" ? (value.paymentMonths != null && value.paymentMonths > 0 && value.paymentMonths <= 12 ? value.paymentMonths : null) : periodsPerYear(value.period);
   return perYear == null ? null : roundMoney(usd * perYear);
 }
 
@@ -167,6 +169,7 @@ export function classifyAid(input: {
   reimbursement?: boolean | null;
   amountUsd?: number | null;
   period?: string | null;
+  paymentMonths?: number | null;
 }): FinanceAidLine {
   const noteText = `${input.basis ?? ""} ${input.covers ?? ""}`.toLowerCase();
   let kind: AidKind = "unknown";
@@ -177,7 +180,7 @@ export function classifyAid(input: {
   else if (/grant|scholarship|full_tuition|full funding|award|bursary/.test(noteText) || input.covers === "both") kind = "grant";
 
   const period = normalizeFinancePeriod(input.period);
-  const perYear = period == null ? null : periodsPerYear(period);
+  const perYear = period === "month" ? (input.paymentMonths != null && input.paymentMonths > 0 && input.paymentMonths <= 12 ? input.paymentMonths : null) : period == null ? null : periodsPerYear(period);
   const amount = knownMoney(input.amountUsd);
   const annual = amount != null && perYear != null ? roundMoney(amount * perYear) : null;
 
@@ -204,27 +207,23 @@ export function usableUpfrontAid(
   aid: FinanceAidLine[],
   limits: { tuitionAnnualUsd: number | null; livingAnnualUsd: number | null },
 ): { totalUsd: number; excluded: string[] } {
-  let total = 0;
   const excluded: string[] = [];
-  let waiverUsed = 0;
-  for (const line of aid) {
-    if (!line.reducesUpfrontCost || line.annualUsd == null) {
-      excluded.push(line.key);
-      continue;
-    }
-    let usable = line.annualUsd;
-    if (line.kind === "tuition_waiver") {
-      const cap = knownMoney(limits.tuitionAnnualUsd) ?? 0;
-      usable = Math.max(0, Math.min(usable, Math.max(0, cap - waiverUsed)));
-      waiverUsed += usable;
-    }
-    if (line.appliesTo === "living" && knownMoney(limits.livingAnnualUsd) == null) {
-      // Living cost unknown: a living stipend cannot be verified as covering a
-      // shortfall, but it remains a real award; it is not silently dropped.
-      excluded.push(line.key);
-      continue;
-    }
-    total += usable;
-  }
-  return { totalUsd: roundMoney(total), excluded };
+  const usable = aid.filter(line => {
+    const valid = line.reducesUpfrontCost && knownMoney(line.annualUsd) != null;
+    if (!valid) excluded.push(line.key);
+    return valid;
+  });
+  const sum = (scope: FinanceAidLine["appliesTo"]) => usable.filter(line => line.appliesTo === scope).reduce((total, line) => total + line.annualUsd!, 0);
+  const tuition = knownMoney(limits.tuitionAnnualUsd);
+  const living = knownMoney(limits.livingAnnualUsd);
+  // Restricted awards allocate first; unrestricted cash uses only the residual.
+  // Aggregate by scope so permutations cannot alter the result or pay one cost twice.
+  const tuitionAid = tuition == null ? 0 : Math.min(tuition, sum("tuition"));
+  const livingAid = living == null ? 0 : Math.min(living, sum("living"));
+  if (tuition == null) excluded.push(...usable.filter(line => line.appliesTo === "tuition").map(line => line.key));
+  if (living == null) excluded.push(...usable.filter(line => line.appliesTo === "living").map(line => line.key));
+  const remaining = tuition != null && living != null ? Math.max(0, tuition + living - tuitionAid - livingAid) : 0;
+  const unrestricted = Math.min(remaining, sum("any"));
+  if (tuition == null || living == null) excluded.push(...usable.filter(line => line.appliesTo === "any").map(line => line.key));
+  return { totalUsd: roundMoney(tuitionAid + livingAid + unrestricted), excluded };
 }

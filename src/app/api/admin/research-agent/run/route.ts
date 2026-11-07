@@ -5,6 +5,8 @@ import { runBatch } from "@/lib/research-agent/run-batch";
 import { AGENT_CONFIG } from "@/lib/research-agent/config";
 import {
   createRun,
+  flushDurableRunWrites,
+  waitForDurableRunCreation,
   setRun,
   appendProgress,
   getRun,
@@ -15,6 +17,8 @@ import {
   recordUniversityResult,
   ResearchCapacityError,
 } from "@/lib/research-agent/registry";
+import { claimDurableRun,isDurableStoreEnabled,renewDurableLease,releaseDurableRun } from "@/lib/research-agent/durableStore";
+import { randomUUID } from "node:crypto";
 import { parseResearchRequest } from "@/lib/research-agent/request";
 
 /**
@@ -58,7 +62,17 @@ export async function POST(req: Request) {
       universityIds: ids,
       scopes: request.scopes,
     });
-    setRun(runId, { state: "running" });
+    let claimToken:string|undefined;
+    if(isDurableStoreEnabled()){
+      await waitForDurableRunCreation(runId);
+      const claimed=await claimDurableRun(runId,`initial:${randomUUID()}`,60_000);
+      claimToken=claimed?.lease_owner??undefined;
+      if(!claimToken){
+        setRun(runId,{state:"error",error:"Durable claim unavailable; no research business writes started.",finishedAt:Date.now()});
+        return NextResponse.json({error:"Research claim unavailable; check the durable migration and retry.",code:"research_claim_unavailable"},{status:503});
+      }
+    }
+    setRun(runId, { state: "running" }, claimToken);
     appendProgress(runId, `Queueing ${ids.length} universit${ids.length === 1 ? "y" : "ies"}...`);
 
     const timer = setTimeout(() => {
@@ -68,6 +82,11 @@ export async function POST(req: Request) {
     }, AGENT_CONFIG.runTimeoutMs);
     if (typeof timer.unref === "function") timer.unref();
 
+    let leaseLost=false;
+    const heartbeat=claimToken?setInterval(()=>{
+      void renewDurableLease(runId,claimToken!,60_000).then(ok=>{if(!ok)leaseLost=true;}).catch(()=>{leaseLost=true;});
+    },15_000):null;
+    heartbeat?.unref();
     // Run in background — do not block the request.
     void (async () => {
       try {
@@ -78,10 +97,11 @@ export async function POST(req: Request) {
             setRun(runId, { universityId });
             appendProgress(runId, message);
           },
-          () => isRunCancelled(runId),
+          () => leaseLost || isRunCancelled(runId),
           {
-            onUniversityComplete: (report) => recordUniversityResult(runId, report),
-            onUniversityError: (universityId, error) => recordUniversityError(runId, universityId, error),
+            lease:claimToken?{runId,workerId:claimToken}:undefined,
+            onUniversityComplete: (report) => recordUniversityResult(runId, report,claimToken),
+            onUniversityError: (universityId, error) => recordUniversityError(runId, universityId, error,claimToken),
           }
         );
         const last = reports[reports.length - 1] ?? null;
@@ -109,6 +129,9 @@ export async function POST(req: Request) {
         setRun(runId, { state: "error", error: "Research run failed. Check server logs.", finishedAt: Date.now() });
       } finally {
         clearTimeout(timer);
+        if(heartbeat)clearInterval(heartbeat);
+        await flushDurableRunWrites(runId);
+        if(claimToken)await releaseDurableRun(runId,claimToken);
       }
     })();
 

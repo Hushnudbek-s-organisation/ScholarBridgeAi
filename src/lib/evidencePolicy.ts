@@ -41,6 +41,8 @@ export type EntityType = "university" | "program" | "scholarship" | "ranking" | 
  * date, verification status and value type. Null means unknown/not recorded.
  */
 export interface CatalogueFact {
+  publisherOfficial?: boolean;
+  applicantScope?: string | null;
   entityType: EntityType;
   entityId: number;
   fieldKey: string;

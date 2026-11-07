@@ -1,3 +1,4 @@
+import {execFileSync} from "node:child_process";
 /**
  * Phase 3 gates — catalogue localization coverage, memo correctness, score memo.
  *
@@ -53,6 +54,15 @@ function check(name: string, fn: () => void) {
     console.log(`  ✗ ${name} — ${(err as Error).message}`);
   }
 }
+
+check("generated English stages and small country-label projection exactly match their source",()=>{
+ execFileSync(process.execPath,["scripts/generate-english-stages.mjs","--check"],{cwd:ROOT,stdio:"pipe"});
+ const projection=JSON.parse(readFileSync(join(ROOT,"src/i18n/staged/country-names.json"),"utf8"));
+ for(const locale of ["en","uz","ru"]){const messages=JSON.parse(readFileSync(join(ROOT,`src/i18n/messages/${locale}.json`),"utf8"));assert.deepEqual(projection[locale],messages.countryNames);}
+});
+check("client-used country/catalogue helpers never import a full server dictionary registry",()=>{
+ for(const path of ["src/lib/countries.ts","src/lib/catalogLocalizer.ts"]){const source=readFileSync(join(ROOT,path),"utf8");assert.doesNotMatch(source,/from ["'][^"']*messages\.server["']/);assert.match(source,/staged\/country-names\.json/);}
+});
 
 /** Minimal CSV reader for a single column (the file has quoted commas). */
 function csvColumn(file: string, column: string): string[] {

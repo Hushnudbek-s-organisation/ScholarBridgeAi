@@ -1,9 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { db, pool } from "@/db";
-import { appConfig, savedScholarships, scholarships, studentProfiles, universities, userDocuments, courses, courseModules, lessons, auditLogs } from "@/db/schema";
+import { appConfig, savedScholarships, scholarships, studentProfiles, universities, userDocuments, courses, courseModules, lessons, auditLogs,universityPrograms,sources } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
 
 async function main() {
+  if(process.env.E2E_CONTINUATION_SCHEMA==="1")await(await import("./continuation-schema")).continuationFixtureSchema();
   // Expose all student panes in this disposable audit fixture only.
   await db.insert(appConfig).values({ key: "nav_hidden_items", value: "[]" });
   const password = "Phase12-E2E-Only-Password-2026!";
@@ -75,6 +76,12 @@ async function main() {
     isActive: true,
   }).returning();
 
+  let fixtureProgramId:number|null=null;
+  if(process.env.E2E_CONTINUATION_SCHEMA==="1"){
+    const [program]=await db.insert(universityPrograms).values({universityId:verifiedUniversity.id,name:"FICTIONAL browser Computer Science programme",degree:"Bachelor",field:"Computer Science",sourceUrl:"https://verified-e2e.example.test/programme",programUrl:"https://verified-e2e.example.test/programme",lastVerifiedAt:new Date("2026-11-07"),isVerified:true,verificationStatus:"verified",isActive:true}).returning();fixtureProgramId=program.id;
+    await db.insert(sources).values({url:"https://verified-e2e.example.test/programme",title:"FICTIONAL isolated publisher ownership",domain:"verified-e2e.example.test",isOfficial:true,isVerified:true,sourceType:"official_university"});
+  }
+
   const deadlineDate = new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10);
   const [scholarship] = await db.insert(scholarships).values({
     title: "Phase12 E2E Unverified Scholarship",
@@ -114,6 +121,8 @@ async function main() {
   const fixturePath = process.env.E2E_FIXTURE_FILE;
   if (!fixturePath) throw new Error("E2E_FIXTURE_FILE must point to the disposable fixture manifest");
   writeFileSync(fixturePath, JSON.stringify({
+    fixtureProgramId,
+    fixturePublisherUrl:"https://verified-e2e.example.test/programme",
     courseId: course.id,
     lessonId: lesson.id,
     adminEmail: admin.email,

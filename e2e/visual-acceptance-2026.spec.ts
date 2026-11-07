@@ -14,7 +14,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import en from "../src/i18n/messages/en.json";
 
-const OUT = join(process.cwd(), "docs/redesign/after-2026-11-06");
+const OUT = join(process.cwd(), process.env.E2E_VISUAL_OUTPUT_DIR??"docs/redesign/after-2026-11-06");
 mkdirSync(OUT, { recursive: true });
 
 const fixtures = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8")) as {

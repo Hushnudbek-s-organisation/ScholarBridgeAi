@@ -218,14 +218,14 @@ async function main() {
     const e = err as (Error & { code?: string }) | undefined;
     const msg = String(e?.message ?? err ?? "unknown error");
     const code = String(e?.code ?? "");
-    console.error(`\nCONNECTION FAILED: ${msg}${code ? ` (code: ${code})` : ""}`);
-    console.error(`  host: ${host || "(unparseable)"}  port: ${port}  url: ${redactedUrl}`);
+    console.error(`\nCONNECTION FAILED: ${code || "unclassified connection failure"}. Structural comparison was NOT run.`);
+    console.error(`  host: ${host || "(unparseable)"}  port: ${port}`);
     const hints: string[] = [];
     if (/password authentication failed|28000|28P01/i.test(`${msg} ${code}`)) {
       hints.push("Wrong database user/password. Supabase: Project Settings → Database → Connection string (URI) — copy it whole, the password is the DATABASE password, not the dashboard login.");
       const asUser = /for user "([^"]+)"/.exec(msg)?.[1] ?? "";
       if (looksSupabase && asUser && !asUser.includes(".")) {
-        hints.push(`Supabase's pooler authenticates as "postgres.<project-ref>", not as "${asUser}". Copy the URI verbatim from Project Settings → Database → Connection string → Session pooler (it starts postgresql://postgres.<ref>:…). The string already stored in the deploy host's DATABASE_URL env var is known-good — reuse exactly that one.`);
+        hints.push(`Supabase's pooler authenticates as "postgres.<project-ref>", not as "${asUser}". Copy the URI verbatim from Project Settings → Database → Connection string → Session pooler (it starts postgresql://postgres.<ref>:…). Check the intended project and environment; no stored URL is assumed valid.`);
       }
       hints.push("If the password contains @ # / : ? or % it must be percent-encoded in the URL (@ → %40, # → %23, % → %25), or reset it: Settings → Database → Reset database password.");
     }
@@ -279,6 +279,7 @@ async function main() {
     // the URL asks for it (sslmode=/ssl=), so retry once with TLS forced and
     // tell the operator to fix the string rather than failing blindly.
     const asksForSsl = /[?&](sslmode|ssl)=/.test(url);
+    if (/^(28P01|28000)$/.test(String((err as {code?:string})?.code ?? ""))) failConnect(err);
     if (looksSupabase && !asksForSsl) {
       try {
         rows = await readColumns({ connectionString: url, ssl: { rejectUnauthorized: false } });
@@ -345,6 +346,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("check crashed:", err);
+  console.error("Schema check could not complete; no structural result.", /^[A-Z0-9]{5}$/.test(String(err?.code)) ? err.code : "unclassified");
   process.exit(2);
 });

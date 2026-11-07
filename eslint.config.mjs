@@ -7,5 +7,6 @@ export default defineConfig([
   // `desktop/build-resources/` is the staged copy of the compiled server that
   // the desktop installer is packaged from (generated, git-ignored) — not
   // source code.
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "desktop/build-resources/**"]),
+  // Cached historical builds and generated browser evidence are not source.
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "desktop/build-resources/**", ".cache/**", "test-results/**"]),
 ]);

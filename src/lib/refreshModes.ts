@@ -23,7 +23,7 @@ export function parseRefreshMode(value: unknown): RefreshMode {
 }
 
 export interface OfficialSourceCheck {
-  entityType: "university" | "scholarship";
+  entityType: "university" | "scholarship" | "program";
   entityId: number;
   sourceUrl: string;
   /** The adapter actually fetched and parsed the official page. */

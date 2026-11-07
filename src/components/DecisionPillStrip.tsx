@@ -13,6 +13,7 @@
  * cost unknown" instead of claiming the university fits the student's budget.
  */
 import React from "react";
+import {evaluateScopedUniversityDecision,type OriginalAcademicProfile,type ScopedDecisionUniversity} from "@/lib/academicDecision";
 import { useTranslations } from "next-intl";
 import { Briefcase, GraduationCap, Wallet } from "lucide-react";
 import { formatMoney } from "@/lib/format";
@@ -20,8 +21,6 @@ import {
   DECISION_PILL_CLASS,
   evaluateUniversityDecision,
   type DecisionPill,
-  type DecisionProfileInput,
-  type DecisionUniversityInput,
 } from "@/lib/decisionPills";
 
 const PILL_ICON: Record<DecisionPill["id"], React.ComponentType<{ className?: string }>> = {
@@ -31,9 +30,9 @@ const PILL_ICON: Record<DecisionPill["id"], React.ComponentType<{ className?: st
 };
 
 interface DecisionPillStripProps {
-  university: DecisionUniversityInput;
+  university: ScopedDecisionUniversity;
   /** Null for an anonymous visitor — the pills then report what is published. */
-  profile?: DecisionProfileInput | null;
+  profile?: OriginalAcademicProfile | null;
   /** Tighter padding for table rows and the compare sheet. */
   compact?: boolean;
   className?: string;
@@ -62,7 +61,7 @@ export function DecisionPillStrip({ university, profile, compact = false, classN
   const t = useTranslations("university");
 
   const decision = React.useMemo(
-    () => evaluateUniversityDecision(university, profile ?? null),
+    () => evaluateScopedUniversityDecision(university, profile ?? null, new Date().toISOString().slice(0,10)),
     [university, profile]
   );
 

@@ -1,3 +1,5 @@
+import {ensureRequirements} from "@/lib/journey/requirements.server";
+import {resolveDocumentStatuses} from "@/lib/documentReviews.server";
 import { NextResponse } from "next/server";
 import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
@@ -95,6 +97,7 @@ export async function GET(req: Request) {
       .limit(1);
     if (!app) return jsonError(404, "Application not found", "not_found");
 
+    await ensureRequirements(profileId,applicationId);
     const [requirements, offers, recs, docs, essays, finance, plans, deadlines] = await Promise.all([
       db
         .select()
@@ -124,6 +127,8 @@ export async function GET(req: Request) {
       )),
     ]);
 
+    const usageById=new Map(docs.map(row=>[row.user_documents.id,row.application_document_links.usage]));
+    const effectiveDocs=await resolveDocumentStatuses(docs.map(row=>row.user_documents));
     const progress = computeWorkspaceProgress(
       requirements.map((r) => ({ key: r.itemKey, section: r.section, status: r.status, isRequired: r.isRequired, linkedType: r.linkedType })),
       Object.fromEntries(requirements.map((r) => [r.itemKey, r.title])),
@@ -194,14 +199,15 @@ export async function GET(req: Request) {
         verificationStatus: r.verificationStatus,
         linkedType: r.linkedType,
       })),
-      documents: docs.map((d) => ({
-        id: d.user_documents.id,
-        title: d.user_documents.title,
-        docType: d.user_documents.docType,
-        status: d.user_documents.status,
-        expiresAt: d.user_documents.expiresAt ? String(d.user_documents.expiresAt).slice(0, 10) : null,
-        fileUrl: d.user_documents.fileUrl,
-        usage: d.application_document_links.usage,
+      documents: effectiveDocs.map((d) => ({
+        id: d.id,
+        title: d.title,
+        docType: d.docType,
+        status: d.status,
+        expiresAt: d.expiresAt ? String(d.expiresAt).slice(0, 10) : null,
+        fileUrl: d.fileUrl,
+        usage:usageById.get(d.id),
+        verificationProvenance:d.verificationProvenance,
       })),
       essays: essays.map((e) => ({ id: e.id, essayType: e.essayType, title: e.title, wordCount: e.wordCount, versionNumber: e.versionNumber })),
       recommendations: recs,

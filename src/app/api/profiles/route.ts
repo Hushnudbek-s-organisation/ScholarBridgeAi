@@ -1,3 +1,4 @@
+import { parseApplicantContext } from "@/lib/applicantContext";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -79,6 +80,9 @@ export async function POST(req: Request) {
       return privateNoStoreJson({ error: parsed.error, code: parsed.code }, { status: parsed.status });
     }
     const body = parsed.body;
+    let applicantContext;
+    try{applicantContext=parseApplicantContext(body.applicantContext);}
+    catch(error){return privateNoStoreJson({error:error instanceof Error?error.message:"Invalid applicant context",code:"applicant_context_invalid"},{status:400});}
     const hasStudyInterests = body.studyInterests !== undefined;
     const submittedStudyInterests = hasStudyInterests
       ? parseStudyInterestSelections(body.studyInterests)
@@ -183,6 +187,7 @@ export async function POST(req: Request) {
         degreeLevel: clampString(body.degreeLevel, 60) || null,
         targetMajor: isExploringInterests ? "" : clampString(body.targetMajor, 160) || null,
         studyInterests: submittedStudyInterests ? JSON.stringify(submittedStudyInterests) : undefined,
+        applicantContext,
         gpa: scoreOrNull(body.gpa),
         gpaScale: scoreOrNull(body.gpaScale),
         ieltsScore: scoreOrNull(body.ieltsScore),

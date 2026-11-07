@@ -1,5 +1,7 @@
 "use client";
 
+import { ApplicantContextFields } from "@/components/ApplicantContextFields";
+import type {ApplicantContext} from "@/lib/applicantContext";
 import React, { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {countriesMatch, countryTranslationKey, withQsTop200Countries, resolveCountryCode} from "@/lib/countries";
@@ -62,6 +64,7 @@ interface OnboardingWizardProps {
 }
 
 interface FormState {
+  applicantContext:ApplicantContext|null;
   name: string;
   email: string;
   password: string;
@@ -165,6 +168,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
   // as if the student had typed it, and keep the email optional for them.
   const placeholderEmail = isTelegramPlaceholderEmail(profile?.email) ? profile!.email : "";
   const [form, setForm] = useState<FormState>({
+    applicantContext:profile?.applicantContext??null,
     name: profile?.name || "",
     email: placeholderEmail ? "" : profile?.email || initialEmail?.trim().toLowerCase() || "",
     password: "",
@@ -258,6 +262,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
             : studyInterestsTouched.current
               ? compatibilityTargetMajor(form.studyInterests)
               : form.targetMajor || compatibilityTargetMajor(form.studyInterests) || null,
+        applicantContext:form.applicantContext,
         gpa: num(form.gpa),
         gpaScale: num(form.gpaScale),
         ieltsScore: num(form.ieltsScore),
@@ -834,6 +839,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
           </div>
         )}
 
+        {step===2&&<ApplicantContextFields value={form.applicantContext} onChange={value=>setForm(f=>({...f,applicantContext:value}))} legacyGpa={form.gpa} legacyScale={form.gpaScale} legacyToefl={form.toeflScore}/>}
         {/* STEP 3 — Optional budget plus preferred destinations. */}
         {step === 2 && (
           <p className="rounded-surface border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
