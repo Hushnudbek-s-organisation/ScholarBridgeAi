@@ -20,17 +20,17 @@ type RevealProps = Omit<HTMLMotionProps<"div">, "children"> & {
  */
 export function Reveal({
   children,
-  distance = 16,
+  distance: _distance = 16,
   delay = 0,
   ...rest
 }: RevealProps) {
   return (
     <Motion.div
-      initial="hidden"
+      initial={false}
       whileInView="visible"
       viewport={{ once: true, margin: "-60px 0px -60px 0px" }}
       variants={{
-        hidden: { opacity: 0, y: distance },
+        hidden: { opacity: 1, y: 0 },
         visible: {
           opacity: 1,
           y: 0,
@@ -63,7 +63,7 @@ export function RevealGroup({
 }) {
   return (
     <Motion.div
-      initial="hidden"
+      initial={false}
       whileInView="visible"
       viewport={{ once: true, margin: "-60px 0px -60px 0px" }}
       variants={staggerParent(stagger, delayChildren)}
@@ -80,7 +80,7 @@ export function RevealGroup({
  */
 export function RevealItem({
   children,
-  distance = 12,
+  distance: _distance = 12,
   ...rest
 }: Omit<HTMLMotionProps<"div">, "children" | "variants"> & {
   children: ReactNode;
@@ -89,7 +89,7 @@ export function RevealItem({
   return (
     <Motion.div
       variants={{
-        hidden: { opacity: 0, y: distance },
+        hidden: { opacity: 1, y: 0 },
         visible: {
           opacity: 1,
           y: 0,

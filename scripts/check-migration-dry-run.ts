@@ -508,4 +508,4 @@ main()
     if (client) await client.end().catch(() => {});
     if (pg) await pg.stop().catch(() => {});
     rmSync(DATA_DIR, { recursive: true, force: true });
-  });
+  }).finally(()=>process.exit(process.exitCode??0));

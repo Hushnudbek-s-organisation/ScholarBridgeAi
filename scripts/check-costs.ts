@@ -185,30 +185,30 @@ const periodAwareAwards = calculateCosts({
   ...completeCosts,
   years: 2,
   scholarships: [
-    sch({ name: "Annual award", amountUsd: 1000, awardPeriod: "year", covers: "tuition" }),
-    sch({ name: "Monthly stipend", amountUsd: 200, awardPeriod: "month", covers: "living" }),
-    sch({ name: "One-time grant", amountUsd: 500, awardPeriod: "one-time", covers: "other" }),
+    sch({ name: "Annual award", stacking: "stackable", amountUsd: 1000, awardPeriod: "year", covers: "tuition" }),
+    sch({ name: "Monthly stipend", amountUsd: 200, awardPeriod: "month", paymentMonths: 12, stacking: "stackable", covers: "living" }),
+    sch({ name: "One-time grant", basis: "grant", stacking: "stackable", amountUsd: 500, awardPeriod: "one-time", covers: "other" }),
   ],
 });
 check("monthly awards are normalized to annual USD without mixing one-time aid", periodAwareAwards.scholarship.bestCaseAnnualUsd === 3400 && periodAwareAwards.scholarship.bestCaseOneTimeUsd === 500);
-check("one-time aid is subtracted once from the programme total", periodAwareAwards.net.totalAfterScholarshipUsd === (49100 * 2 + 480) - 3400 * 2 - 500);
+check("saved annual and one-time aid do not reduce confirmed programme costs", periodAwareAwards.net.totalAfterScholarshipUsd === (49100 * 2 + 480));
 
 const unknownAnnualAward = calculateCosts({
   ...completeCosts,
   scholarships: [sch({ name: "Unknown annual amount", amountUsd: null, awardPeriod: "year" })],
 });
-check("an unknown annual award keeps annual scholarship totals and gaps unknown", unknownAnnualAward.scholarship.bestCaseAnnualUsd === null && unknownAnnualAward.net.gapAnnualUsd === null);
+check("an unknown saved annual award leaves optimistic funding unknown without reducing confirmed costs", unknownAnnualAward.scholarship.bestCaseAnnualUsd === null && unknownAnnualAward.net.gapAnnualUsd === 49100);
 const unknownPeriodAward = calculateCosts({
   ...completeCosts,
   scholarships: [sch({ name: "Unsupported award", amountUsd: 5000, awardPeriod: "variable" })],
 });
-check("an unsupported award period is not treated as annual USD", unknownPeriodAward.scholarship.bestCaseAnnualUsd === null && unknownPeriodAward.net.gapAnnualUsd === null);
+check("an unsupported award period is not treated as annual USD", unknownPeriodAward.scholarship.bestCaseAnnualUsd === null && unknownPeriodAward.net.gapAnnualUsd === 49100);
 const unknownOneTimeAward = calculateCosts({
   ...completeCosts,
   scholarships: [sch({ name: "Unknown one-time award", amountUsd: null, awardPeriod: "one_time" })],
   familyContributionUsd: 0,
 });
-check("an unknown one-time award does not fabricate an annual zero or a programme total", unknownOneTimeAward.net.gapAnnualUsd === 49100 && unknownOneTimeAward.net.gapTotalUsd === null);
+check("an unknown saved one-time award never reduces the known confirmed programme cost", unknownOneTimeAward.net.gapAnnualUsd === 49100 && unknownOneTimeAward.net.gapTotalUsd === 49100 * 4 + 480);
 
 const affordable = calculateCosts({
   ...completeCosts,
@@ -218,7 +218,7 @@ const affordable = calculateCosts({
 });
 check("a covered programme reads as affordable only with a known explicit contribution", affordable.net.affordable === true);
 check("the gap is zero", affordable.net.gapAnnualUsd === 0);
-check("the verdict still states the best-case condition", /best-case scenario/i.test(affordable.verdict));
+check("the verdict explicitly excludes saved opportunities from secured funding", /saved opportunities are not secured funding/i.test(affordable.verdict));
 
 const unfunded = calculateCosts({
   ...completeCosts,
@@ -261,7 +261,7 @@ const deadlineReview = assessPortfolio({
 });
 check("upcoming listed deadlines are surfaced for verification", deadlineReview.advice.some((item) => item.key === "deadlinesUpcoming" && item.count === 1));
 check("past listed deadlines prompt an official status check", deadlineReview.advice.some((item) => item.key === "deadlinesPassed" && item.count === 1));
-check("zero/missing award amounts prompt provider verification and stay unknown in totals", assessPortfolio({ scholarships: [sch({ name: "Unknown amount", amountUsd: 0 })] }).advice.some((item) => item.key === "missingAmounts") && calculateCosts({ ...completeCosts, scholarships: [sch({ name: "Unknown amount", amountUsd: 0 })] }).scholarship.bestCaseAnnualUsd === null);
+check("explicit zero award stays zero; only null amount needs verification", !assessPortfolio({ scholarships: [sch({ name: "Explicit zero", amountUsd: 0 })] }).advice.some(item=>item.key==="missingAmounts") && calculateCosts({ ...completeCosts, scholarships: [sch({name:"Explicit zero",amountUsd:0})] }).scholarship.bestCaseAnnualUsd===0 && calculateCosts({...completeCosts,scholarships:[sch({name:"Unknown",amountUsd:null})]}).scholarship.bestCaseAnnualUsd===null);
 check("an empty portfolio points to official catalogue information", assessPortfolio({ scholarships: [] }).advice.some((item) => item.key === "noSavedAwards"));
 
 const unknownFamily = calculateCosts({ ...completeCosts, familyContributionUsd: null });

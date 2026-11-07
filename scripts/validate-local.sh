@@ -42,6 +42,7 @@ run admission-probability   npm run test:admission-probability
 run evidence-render         npm run test:evidence-render
 run finance-unified         npm run test:finance-unified
 run cache-revision          npm run test:cache-revision
+run snapshot-recovery       npm run test:snapshot-recovery
 run channel                 npm run test:channel
 run profile-recompute       npm run test:profile-recompute
 run chunk-recovery          npm run test:chunk-recovery
@@ -53,6 +54,11 @@ run audit-safety            npm run test:audit-safety
 run build-gates             npm run test:build-gates
 run feature-inventory       npm run test:feature-inventory:verify
 run design-system           npm run test:design-system
+run audit:ui                npm run audit:ui
+run catalogue-query-load npm run test:catalogue-query-load
+run continuation            npm run test:continuation
+run master-regressions      npm run test:master-regressions
+run master-database         npm run test:master-database
 
 echo "== 2. Migration: forward vs recovery (NOT one apply chain) =="
 run migration-runner        npm run test:migration-runner

@@ -132,7 +132,7 @@ export async function POST(req: Request) {
       actor: "ADMIN",
       verificationStatus: "unverified",
     });
-    invalidateCatalogCache("scholarships");
+    await invalidateCatalogCache("scholarships");
     return NextResponse.json({ scholarship });
   } catch (error) {
     console.error("POST /api/admin/scholarships error:", error);
@@ -179,7 +179,7 @@ export async function PATCH(req: Request) {
     } catch (err) {
       console.warn("scholarship change notifications failed:", err);
     }
-    invalidateCatalogCache("scholarships");
+    await invalidateCatalogCache("scholarships");
     return NextResponse.json({ scholarship });
   } catch (error) {
     console.error("PATCH /api/admin/scholarships error:", error);
@@ -203,7 +203,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Scholarship id is required" }, { status: 400 });
     }
     await db.delete(scholarships).where(eq(scholarships.id, id));
-    invalidateCatalogCache("scholarships");
+    await invalidateCatalogCache("scholarships");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/admin/scholarships error:", error);

@@ -1226,6 +1226,7 @@ and the migration is safely retried.
 | `degree_level` | text |  | yes |  |
 | `target_major` | text | yes | — |  |
 | `study_interests` | text | yes | — | Structured locale-independent IDs; nullable for legacy profiles |
+| `applicant_context` | jsonb | yes | — | Student-entered original GPA/test scales, dates and subscores, citizenship (not destination), residency and optional need-based context; not an official conversion or eligibility proof. Additive migration: `supabase/applicant_context_2026-11-07.sql`; NULL for existing profiles until supplied. |
 | `gpa` | double precision | yes | — |  |
 | `gpa_scale` | double precision |  | yes |  |
 | `ielts_score` | double precision | yes | yes |  |

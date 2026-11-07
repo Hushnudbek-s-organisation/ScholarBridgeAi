@@ -10,6 +10,7 @@
  * Run with `npm run test:perf` (the bundle-size part needs a build first).
  */
 import assert from "node:assert/strict";
+import {shellMessagesFor,messagesFor} from "../src/i18n/messages.server";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -33,7 +34,17 @@ console.log("\nPerformance — the landing page must stay light");
 
 check("only English is bundled; the other locales load one at a time", () => {
   const messages = read("src/i18n/messages.ts");
-  assert.ok(messages.includes('import en from "./messages/en.json"'), "English stays a static import (it is the fallback)");
+  // Old -> new: the full static English fallback moved to generated bootstrap
+  // + lazy features. Require exact canonical parity, not the old spelling.
+  assert.ok(messages.includes('import bootstrap from "./staged/en-bootstrap.json"'), "the English bootstrap must stay static");
+  assert.ok(!/^import\s+(?!type\b).+from\s+["']\.\/messages\/en\.json["']/m.test(messages), "the full English dictionary must not return to the landing runtime");
+  assert.ok(messages.includes('await import("./staged/en-features.json")'), "English features must remain deferred");
+  const bootstrap=JSON.parse(read("src/i18n/staged/en-bootstrap.json"));
+  const features=JSON.parse(read("src/i18n/staged/en-features.json"));
+  assert.ok(Object.keys(bootstrap).length>0&&Object.keys(features).length>0,"both stages must contain real namespaces");
+  assert.deepEqual(Object.keys(bootstrap).filter(key=>key in features),[],"stage namespaces must not overlap");
+  assert.deepEqual({...bootstrap,...features},JSON.parse(read("src/i18n/messages/en.json")),"stages must equal canonical English, without dropped strings");
+  assert.match(messages,/englishMessages\s*=\s*bootstrap/,"the synchronous fallback must be bootstrap, not all features");
   assert.ok(!/^import\s+\w+\s+from\s+"\.\/messages\/(uz|ru)\.json"/m.test(messages), "uz/ru must NOT be static imports");
   assert.ok(messages.includes('await import("./messages/uz.json")'), "uz must be a dynamic import");
   assert.ok(messages.includes('await import("./messages/ru.json")'), "ru must be a dynamic import");
@@ -61,7 +72,9 @@ check("no client module imports the all-locales dictionary", () => {
 
 check("the landing route entry passes one locale, never three", () => {
   const page = read("src/app/page.tsx");
-  assert.ok(page.includes("clientMessagesFor(initialLocale)"), "page.tsx must pass the visitor's locale only");
+  assert.ok(page.includes("shellMessagesFor(initialLocale)"), "page.tsx must pass only the visitor's shell locale");
+  assert.equal(shellMessagesFor("en"),null,"bundled English bootstrap must not also travel as full RSC messages");
+  for(const locale of ["uz","ru"])assert.equal(shellMessagesFor(locale),messagesFor(locale),"each non-English visitor receives only its requested dictionary");
   const home = read("src/app/HomeClient.tsx");
   assert.ok(home.includes("initialMessages={initialMessages}"), "HomeClient must forward the dictionary to LocaleProvider");
   assert.ok(

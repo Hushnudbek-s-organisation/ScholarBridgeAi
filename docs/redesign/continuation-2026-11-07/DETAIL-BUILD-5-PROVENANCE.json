@@ -1,0 +1,60 @@
+{
+  "branch": "arena/660f1392-scholarbridgeai",
+  "head": "1bd810bbb5a6e749488331fb60d452b425c1b918",
+  "buildId": "FuHQnA99VfFmUqFVKyYzH",
+  "scopeComplete": false,
+  "releaseReady": false,
+  "groups": {
+    "runtime": {
+      "fileCount": 744,
+      "sha256": "f4d4b082f15cd06a5a0a3c9f5243d2c8878163c30064233924a1a0e4d9344935"
+    },
+    "verification": {
+      "fileCount": 220,
+      "sha256": "a73c8a926e58bcd0a64cd3067396a69a0f8c002cee4d78440bde23f0d4977b2f"
+    },
+    "migrations": {
+      "fileCount": 123,
+      "sha256": "0519645bdd78357744598f7baebd213f7e8cde34a7fda2ec64b468a9a243d705"
+    }
+  },
+  "note": "Runtime hash includes tracked and untracked source/public/package/config files; verification hash includes current scripts and E2E; migrations separate. Local build, not CI or production evidence.",
+  "screenshots": {
+    "native-scope-en-390.png": "18eb44d4653b1a6593359901070ef18b1145d82c01d832debdd1b7af40700dd4",
+    "native-scope-ru-390.png": "e9860782efacce5ec5ec78db50294a7d09489da6aaa90243ee760ab8ad7dd656",
+    "native-scope-uz-390.png": "ca81022ebde1d521c6e691eb7be336c951c7823683b3d2c246a79734ae649b9c"
+  },
+  "smoke": {
+    "command": "E2E_NEXT_MODE=start npm run test:e2e -- e2e/university-detail-contracts.spec.ts",
+    "passed": 1,
+    "failed": 0,
+    "exit": 0,
+    "note": "FICTIONAL disposable PostgreSQL; EN/UZ/RU 390x844 native-scale scope UI and real API; not performance evidence",
+    "build": "detail-build4"
+  },
+  "hashMethod": "v2: sorted path + NUL + file SHA256 + newline; verification includes auto-discovered CI and portable mirror",
+  "diagnosticRun": {
+    "build": "detail-build5",
+    "passed": 15,
+    "failed": 0,
+    "exit": 0,
+    "durationMs": 49400,
+    "note": "Real disposable API + production dashboard/detail EN/UZ/RU; Build4 dashboard 500 did not recur. Its original cause is not established; no causal fix claim."
+  },
+  "fullRunStatus": "complete: detail-build5-full-e2e.log",
+  "fullRun": {
+    "passed": 39,
+    "failed": 0,
+    "skipped": 2,
+    "exit": 0,
+    "duration": "7.9m",
+    "note": "Two existing opt-in performance tests skipped; not performance evidence."
+  },
+  "sharedRun": {
+    "command": "npm run validate:local",
+    "exit": 0,
+    "totalFails": 0,
+    "log": "detail-build5-shared.log"
+  },
+  "screenshotsBuild": "detail-build4"
+}

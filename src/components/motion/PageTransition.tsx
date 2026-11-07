@@ -14,7 +14,7 @@ export function PageTransition({
   children,
   transitionKey,
   className = "",
-  distance = 18,
+  distance: _distance = 18,
 }: {
   children: ReactNode;
   /** Change this to trigger the animation (route, tab id, view name…). */
@@ -25,7 +25,7 @@ export function PageTransition({
   return (
     <Motion.div
       key={transitionKey}
-      initial={{ opacity: 0, y: distance }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
       className={className}

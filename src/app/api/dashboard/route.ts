@@ -1,3 +1,6 @@
+import {getCachedProfileForMatching} from "@/lib/catalogCache";
+import { loadDocumentReviewContext, documentIdentity } from "@/lib/documentReviews.server";
+import { effectiveDocumentStatus } from "@/lib/documentStatus";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { memoizeMatch } from "@/lib/matchMemo";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
@@ -33,7 +36,7 @@ import { chancingProfileWithActivities, toMatchProfileWithActivities, toMatchPro
 import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
 import { adaptLegacyField, eligibilityCutoff } from "@/lib/typedEvidence";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
-import { sharedDashboardRecommendationCacheKey, getCachedDashboardRecommendations } from "@/lib/dashboardRecommendationCache";
+import { sharedDashboardRecommendationCacheKey, getRevisionFencedDashboardRecommendations } from "@/lib/dashboardRecommendationCache";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -46,7 +49,7 @@ import { hasUndergraduateAdmission, supportsDegreeLevel } from "@/lib/degreeLeve
 import { countriesMatch } from "@/lib/countries";
 import type { Locale } from "@/i18n/config";
 import { buildPhaseProgress } from "@/lib/journey/planning";
-import { annualFundingCostLines, buildFundingPlan, knownAnnualCostTotal } from "@/lib/journey/funding";
+import { annualFundingCostLines, buildFundingScenario, knownAnnualCostTotal } from "@/lib/journey/funding";
 import { resolvedUsdUniversityCosts, resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 import {
   coverageTier,
@@ -112,6 +115,10 @@ export async function GET(req: Request) {
       .from(studentProfiles)
       .where(eq(studentProfiles.id, profileId))
       .limit(1);
+
+    const ownedDocuments = await db.select().from(userDocuments).where(eq(userDocuments.profileId,profileId));
+    const {reviews,links:documentLinks} = await loadDocumentReviewContext(ownedDocuments.map(document=>document.id));
+    if(row) row.documentsReady = ownedDocuments.filter(document=>["uploaded","verified"].includes(effectiveDocumentStatus(document,reviews.get(document.id)?.content_hash===documentIdentity(document,documentLinks.get(document.id)),todayIso,reviews.has(document.id)))).length;
 
     // The aggregate query is already anchored to this profile row, so reuse
     // its projection instead of issuing a second full-row SELECT.
@@ -201,7 +208,7 @@ export async function GET(req: Request) {
     let fundingGapClosed = false;
     let annualCost: number | null = null;
     const fundingEstimated = false;
-    let fundingSummary: ReturnType<typeof buildFundingPlan> | null = null;
+    let fundingSummary: ReturnType<typeof buildFundingScenario> | null = null;
     if (acceptedApp?.universityId) {
       const [uni] = await db.select().from(universities).where(eq(universities.id, acceptedApp.universityId)).limit(1);
       if (uni) {
@@ -213,7 +220,7 @@ export async function GET(req: Request) {
         annualCost = knownAnnualCostTotal(lines);
         if (annualCost != null) {
           const appFundingRows = fundingRows.filter((row) => row.applicationId === acceptedApp.id);
-          fundingSummary = buildFundingPlan({ annualCost, lines, items: normalizeFunding(appFundingRows) });
+          fundingSummary = buildFundingScenario({ annualCost, lines, items: normalizeFunding(appFundingRows) });
           fundingGapClosed = fundingSummary.isCovered === true;
         }
       }
@@ -561,15 +568,15 @@ function cachedRecommendedFor(
   // application/document/catalogue-evidence writes that do not change this
   // profile's fingerprint) changes the key here too — no stale cross-instance
   // result. The function stays async because the revision is a cheap DB read.
-  return (async () => {
-    const key = await sharedDashboardRecommendationCacheKey(
-      profileId, locale, todayIso, profileMatchFingerprint(profile),
-    );
-    return getCachedDashboardRecommendations(
-      key,
-      () => recommendedFor(profileId, profile, locale, todayIso, derivedProfiles),
-    );
-  })();
+  void derivedProfiles;
+  return getRevisionFencedDashboardRecommendations(
+    ()=>sharedDashboardRecommendationCacheKey(profileId,locale,todayIso,profileMatchFingerprint(profile)),
+    async()=>{
+      const [fresh,rows]=await Promise.all([getCachedProfileForMatching(profileId),db.select().from(studentProfiles).where(eq(studentProfiles.id,profileId))]);
+      if(!fresh||!rows[0])throw new Error("Profile disappeared during recommendation load");
+      return recommendedFor(profileId,rows[0],locale,todayIso,{matchProfile:fresh.matchProfile,chancingProfile:fresh.chancingProfile});
+    }
+  );
 }
 
 async function recommendedFor(
@@ -641,18 +648,11 @@ async function recommendedFor(
     annualTuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
   }));
 
-  /**
-   * One row per candidate university: the fit (catalogue match) AND the
-   * positioning score from the QS Top 200 / program engine. Both are kept:
-   * `matchScore` stays the number the Explorer shows, `chanceScore` adds the
-   * department-level cohort view, and `combinedScore` is what the list is
-   * ordered by (55% fit / 45% positioning — a documented, deterministic weight,
-   * not a hidden ranking).
-   */
+  // Default discovery ranks fit only; no QS-derived cohort or personal-chance proxy.
   let scored: {
     uni: typeof universities.$inferSelect;
     match: ReturnType<typeof calculateUniversityMatch>;
-    chance: ReturnType<typeof evaluateUniversityAndProgramChance>;
+    chance: null;
     combinedScore: number;
   }[] = [];
   if (hasBasis) {
@@ -663,45 +663,18 @@ async function recommendedFor(
 
     scored = pool
       .filter((u) => supportsDegreeLevel(u.degreeLevel, degreeLevel))
-      .filter((u) => {
-        if (countries.length) {
-          return countries.some((c) => countriesMatch(u.country, c));
-        }
-        // No country preference: fall back to the stated field, so a major-only
-        // profile still gets a list that has something to do with their field.
-        if (major && u.programMajor) return similar(u.programMajor, major);
-        return true;
-      })
       .map((u) => {
         const uniData = toUniversityData(u);
         const match = memoizeMatch("fit", fingerprint, u.id, uniData as unknown as Record<string, unknown>, () =>
           calculateUniversityMatch(matchProfile, uniData)
         );
-        const qsBenchmark = matchQsUniversityBenchmark(u);
-        // A synthetic programme row: the dashboard never loads the program
-        // catalogue, so it evaluates the stated major against this university's
-        // own benchmark band instead of inventing a specific programme id.
-        const chance = memoizeMatch("chance", fingerprint, u.id, u as unknown as Record<string, unknown>, () =>
-          evaluateUniversityAndProgramChance(
-            chancingProfile,
-            u,
-            {
-              id: u.id,
-              universityId: u.id,
-              name: major || u.programMajor || "General Studies",
-              degreeLevel: degreeLevel || u.degreeLevel || "Bachelor",
-              field: major || u.programMajor || null,
-            },
-            null,
-            [],
-            qsBenchmark
-          )
-        );
+        const chance = null; // No synthetic programme or QS-derived positioning in default discovery.
+
         return {
           uni: u,
           match,
           chance,
-          combinedScore: Math.round(match.matchScore * 0.55 + chance.compositeProgramFitScore * 0.45),
+          combinedScore: match.matchScore,
         };
       })
       .sort((a, b) => b.combinedScore - a.combinedScore || b.match.matchScore - a.match.matchScore)
@@ -740,11 +713,11 @@ async function recommendedFor(
        * alone cannot see department selectivity or the admitted-cohort GPA band,
        * so the panel shows both side by side.
        */
-      chanceScore: chance.compositeProgramFitScore,
+      chanceScore: undefined,
       combinedScore,
-      effectiveAcceptRatePct: chance.effectiveProgramAcceptRatePct,
-      studentGpaPercentile: chance.studentGpaPercentile,
-      programGpa50: chance.programGpa50,
+      effectiveAcceptRatePct: null,
+      studentGpaPercentile: null,
+      programGpa50: null,
       matchReasons: translateReasons(locale, "university", match.reasonDetails, match.reasons),
       matchIssues: translateReasons(locale, "university", match.issueDetails, match.potentialIssues),
       matchBreakdown: match.breakdown,

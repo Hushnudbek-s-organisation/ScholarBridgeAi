@@ -101,7 +101,7 @@ async function main() {
     );
     assert.deepEqual(edited, { grantCount: 2 });
     assert.equal(calls, 2, "an edited profile re-scores");
-    const dropped = invalidateDashboardRecommendationsForProfile(profileId);
+    const dropped = await invalidateDashboardRecommendationsForProfile(profileId);
     assert.equal(dropped, 2, "both locale/fingerprint variants are invalidated");
   });
 
@@ -137,7 +137,7 @@ async function main() {
     assert.match(source, /[Pp]rocess-local/);
     assert.match(source, /sharedDashboardRecommendationCacheKey/);
     assert.match(source, /readCacheRevision|cacheRevisionKeyPart/);
-    assert.match(source, /bumpCacheRevision\("profile"/, "profile writes bump the shared revision");
+    assert.match(source, /bumpCacheRevision\(`profile:\$\{profileId\}`/, "profile writes bump the shared revision");
     const oldKey = dashboardRecommendationCacheKey(903, "uz", "2026-11-06", "before-edit");
     const newKey = dashboardRecommendationCacheKey(903, "uz", "2026-11-06", "after-edit");
     assert.notEqual(oldKey, newKey);

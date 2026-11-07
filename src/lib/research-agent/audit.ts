@@ -3,13 +3,13 @@
  * Uses existing refresh_jobs table when available; falls back to console
  * without failing (the table may not exist in some deployments).
  */
-import { db } from "@/db";
+import { researchDb as db, fenceResearchWrite, researchWriteIsFenced } from "./writeFence";
 import { refreshJobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { AuditReport, ExtractionDebug, FieldDecision, InsertedEntity } from "./types";
 
 /** Create a run log row (best-effort). Returns log id or null. */
-export async function logRunStart(universityId: number, scopes: string[]): Promise<number | null> {
+async function logRunStartInternal(universityId: number, scopes: string[]): Promise<number | null> {
   try {
     const [row] = await db
       .insert(refreshJobs)
@@ -21,14 +21,15 @@ export async function logRunStart(universityId: number, scopes: string[]): Promi
       })
       .returning();
     return row.id;
-  } catch {
+  } catch (error) {
+    if(researchWriteIsFenced())throw error;
     console.log(`[research-agent] run start (log table unavailable): university ${universityId}, scopes ${scopes.join(",")}`);
     return null;
   }
 }
 
 /** Finish a run log row (best-effort). */
-export async function logRunFinish(logId: number | null, report: AuditReport | null, error?: string) {
+async function logRunFinishInternal(logId: number | null, report: AuditReport | null, error?: string) {
   if (!logId) {
     console.log(
       `[research-agent] run finish: ${error ? `ERROR ${error}` : `ok (${report?.updatedFields.length ?? 0} updated)`}`
@@ -49,7 +50,8 @@ export async function logRunFinish(logId: number | null, report: AuditReport | n
         finishedAt: new Date(),
       })
       .where(eq(refreshJobs.id, logId));
-  } catch {
+  } catch (error) {
+    if(researchWriteIsFenced())throw error;
     // log unavailable — ignore
   }
 }
@@ -96,3 +98,6 @@ export function buildReport(input: {
     duplicatesPrevented: input.duplicatesPrevented,
   };
 }
+
+export const logRunStart=fenceResearchWrite(logRunStartInternal);
+export const logRunFinish=fenceResearchWrite(logRunFinishInternal);

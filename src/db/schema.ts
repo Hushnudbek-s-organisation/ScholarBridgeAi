@@ -1,4 +1,5 @@
 import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, jsonb, index, unique, uniqueIndex, foreignKey, check, AnyPgColumn } from "drizzle-orm/pg-core";
+import type { ApplicantContext } from "@/lib/applicantContext";
 import { sql } from "drizzle-orm";
 
 export const studentProfiles = pgTable("student_profiles", {
@@ -32,6 +33,7 @@ export const studentProfiles = pgTable("student_profiles", {
   // old column defaults (3.5 GPA, IELTS 7.0, SAT 1350, $25 000 budget, a
   // fabricated activity list) were indistinguishable from real answers, so
   // every score, match and recommendation silently used them.
+  applicantContext: jsonb("applicant_context").$type<ApplicantContext|null>(),
   gpa: doublePrecision("gpa"),
   gpaScale: doublePrecision("gpa_scale"),
   ieltsScore: doublePrecision("ielts_score"),
@@ -1875,7 +1877,7 @@ export const applicationDocumentLinks = pgTable(
     usage: text("usage").notNull().default("required"), // required | optional | submitted
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [uniqueIndex("uq_app_doc_link").on(table.applicationId, table.documentId)]
+  (table) => [uniqueIndex("uq_app_doc_link").on(table.applicationId, table.documentId), index("idx_app_doc_document").on(table.documentId, table.applicationId)]
 );
 
 /** Test Planner (spec §8) — current / target score and dates per test. */

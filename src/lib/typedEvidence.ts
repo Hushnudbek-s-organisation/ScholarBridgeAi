@@ -36,6 +36,7 @@ export type TrustLevel =
 export interface TrustedValue<T = number | string | null> {
   /** The value is KEPT (never discarded) even when its trust is low. */
   value: T;
+  fieldKey?:string;
   trust: TrustLevel;
   valueType: MetricValueType;
   verificationStatus: VerificationStatus;
@@ -44,6 +45,7 @@ export interface TrustedValue<T = number | string | null> {
   period: string | null;
   degreeLevel: string | null;
   programName: string | null;
+  applicantScope?: string|null;
   admissionCycle: string | null;
   sourceUrl: string | null;
   verifiedAt: string | null;
@@ -51,10 +53,33 @@ export interface TrustedValue<T = number | string | null> {
   note: string;
 }
 
+/** node-postgres/Drizzle raw SQL returns our UTC timestamp-without-time-zone
+ * columns as strings. Canonicalise that DB representation at the boundary;
+ * never use this to relax validation of applicant-entered dates. Trust still
+ * requires verifiedEvidenceDate, including calendar and future-date checks. */
+export function databaseVerificationISO(value:unknown):string|null{
+  if(value instanceof Date)return Number.isFinite(value.getTime())?value.toISOString():null;
+  if(typeof value!=="string")return null;
+  const iso=value.replace(" ","T");
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.]\d{1,6})?$/.test(iso)?`${iso}Z`:iso.replace(/([+-]\d{2})$/,"$1:00");
+}
+
+/** A verification date is an actual past/today ISO check, not a publication
+ * year, invalid calendar date or a future promise. No admission fact inferred. */
+export function verifiedEvidenceDate(value:string|null|undefined):boolean{
+  if(!value||!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:[.]\d{1,6})?(?:Z|[+-]\d{2}:\d{2}))?$/.test(value))return false;
+  const day=Date.parse(value.slice(0,10)),time=Date.parse(value);
+  return Number.isFinite(day)&&new Date(day).toISOString().slice(0,10)===value.slice(0,10)&&Number.isFinite(time)&&time<=Date.now();
+}
+
 /** A value may be shown as an official minimum ONLY with a successful check. */
-export function isOfficialMinimum(v: TrustedValue): boolean {
+export function isVerifiedOfficialRequirement(v:TrustedValue):boolean{
   return v.trust === "official_verified" && v.valueType === "official_requirement" &&
-    v.verificationStatus === "verified" && Boolean(v.sourceUrl) && Boolean(v.verifiedAt);
+    v.verificationStatus === "verified" && Boolean(v.sourceUrl?.startsWith("https://")) && verifiedEvidenceDate(v.verifiedAt);
+}
+
+export function isOfficialMinimum(v:TrustedValue):boolean{
+  return isVerifiedOfficialRequirement(v)&&typeof v.value==="number"&&Number.isFinite(v.value)&&(!v.fieldKey||v.fieldKey.startsWith("min_"));
 }
 
 /** A value may auto-reject an applicant ONLY as a verified official minimum. */
@@ -94,7 +119,7 @@ export function fromCatalogueFact(fact: CatalogueFact): TrustedValue<number | st
       // A recommended score IS published by the official source, but
       // isOfficialMinimum() requires valueType === "official_requirement",
       // so it can NEVER be rendered or used as a cutoff / auto-reject rule.
-      trust = fact.verificationStatus === "verified" && fact.sourceUrl && fact.verifiedAt
+      trust = fact.verificationStatus === "verified" && fact.publisherOfficial === true && fact.sourceUrl?.startsWith("https://") && verifiedEvidenceDate(fact.verifiedAt)
         ? "official_verified" : "official_unverified";
       break;
     case "observed_statistic":
@@ -112,6 +137,7 @@ export function fromCatalogueFact(fact: CatalogueFact): TrustedValue<number | st
   }
   return {
     value,
+    fieldKey:fact.fieldKey,
     trust,
     valueType: fact.valueType,
     verificationStatus: fact.verificationStatus,
@@ -120,6 +146,7 @@ export function fromCatalogueFact(fact: CatalogueFact): TrustedValue<number | st
     period: fact.period ?? null,
     degreeLevel: fact.degreeLevel ?? null,
     programName: fact.programName ?? null,
+    applicantScope: fact.applicantScope??null,
     admissionCycle: fact.admissionCycle ?? null,
     sourceUrl: fact.sourceUrl ?? null,
     verifiedAt: fact.verifiedAt ?? null,

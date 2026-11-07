@@ -13,6 +13,7 @@
  */
 
 export interface ProfileMatchFingerprintSource {
+  applicantContext?:import("./applicantContext").ApplicantContext|null;
   id?: number | null;
   degreeLevel?: string | null;
   targetMajor?: string | null;
@@ -45,6 +46,7 @@ export function profileMatchFingerprint(p: ProfileMatchFingerprintSource | null 
   if (!p) return "";
   return [
     norm(p.id),
+    JSON.stringify(p.applicantContext??null),
     norm(p.degreeLevel),
     norm(p.targetMajor),
     norm(p.studyInterests),

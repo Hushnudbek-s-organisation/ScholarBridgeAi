@@ -1,4 +1,6 @@
 "use client";
+import type {ApplicantContext} from "@/lib/applicantContext";
+import {academicRecordText} from "@/lib/applicantContextPresentation";
 
 /**
  * ScholarBridge Telegram Mini App.
@@ -88,6 +90,7 @@ type Phase =
   | { k: "ready" };
 
 interface MiniProfile {
+  applicantContext?:ApplicantContext|null;
   id: number;
   name: string;
   preferredLocale?: string | null;
@@ -889,11 +892,7 @@ function HomeScreen({
   }, [profile.id]);
 
   const dot: Record<string, string> = { critical: "tg-status-danger", high: "tg-status-orange", medium: "tg-status-warning", low: "tg-status-success" };
-  const english = profile.ieltsScore != null
-    ? formatMessage(t.ieltsScore, { score: profile.ieltsScore })
-    : profile.toeflScore != null
-      ? formatMessage(t.toeflScore, { score: profile.toeflScore })
-      : null;
+  const english = academicRecordText(profile,t.notSet).english;
   const pills: (string | null)[] = [
     profile.degreeLevel ?? null,
     profile.targetMajor ?? null,
@@ -2068,11 +2067,7 @@ function ProfileScreen({
       return t.notSet;
     }
   }, [profile.preferredCountries, t.notSet]);
-  const english = profile.ieltsScore != null
-    ? formatMessage(t.ieltsScore, { score: profile.ieltsScore })
-    : profile.toeflScore != null
-      ? formatMessage(t.toeflScore, { score: profile.toeflScore })
-      : t.notSet;
+  const english = academicRecordText(profile,t.notSet).english;
   const activePreset = link ? PRESETS.find((p) => p.days.join(",") === link.reminderDays.join(","))?.id ?? null : null;
   const planLabel = plan === "free"
     ? t.planNames.free

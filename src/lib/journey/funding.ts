@@ -9,6 +9,18 @@
  * PURE MODULE — asserted in `scripts/check-journey.ts`.
  */
 
+/** Existing funding_items storage is whole USD, nearest-dollar rounded.
+ * Validate BEFORE coercion: absence/null/booleans/containers are not zero.
+ * Keep numeric form strings and existing fractional-input rounding compatible;
+ * this does not claim original fractions/currency periods are stored. */
+export function parseRecordedFundingUsd(value:unknown):number|null{
+  if(typeof value!=="number"&&(typeof value!=="string"||!value.trim()))return null;
+  const amount=typeof value==="number"?value:Number(value);
+  if(!Number.isFinite(amount)||amount<0)return null;
+  const rounded=Math.round(amount);
+  return rounded<=2147483647?rounded:null;
+}
+
 export type FundingKind = "scholarship" | "aid" | "family" | "savings" | "loan" | "other";
 export type FundingStatus = "planned" | "applied" | "awarded" | "confirmed" | "declined";
 
@@ -203,9 +215,53 @@ export function buildFundingPlan(input: {
   };
 }
 
+/** Existing projection/allocator above is retained for compatibility. Rendered
+ * plans use this explicit scenario adapter, never the optimistic projection by
+ * accident. A student's status is a record, not publisher eligibility proof. */
+export type FundingScenario="confirmed"|"optimistic";
+export function buildFundingScenario(input:Parameters<typeof buildFundingPlan>[0],scenario:FundingScenario="confirmed") {
+  const possibleItems=input.items.filter(item=>item.status!=="declined");
+  const confirmedItems=possibleItems.filter(item=>item.status==="confirmed");
+  const projected=buildFundingPlan({...input,items:possibleItems});
+  const confirmed=buildFundingPlan({...input,items:confirmedItems});
+  const active=scenario==="optimistic"?projected:confirmed;
+  const allocated=(plan:FundingPlanResult)=>plan.byLine.reduce((total,line)=>total+(line.covered??0),0);
+  const gap=(plan:FundingPlanResult):number|null=>{
+    // Restricted excess cannot close an unrelated line. Incomplete or
+    // inconsistent lines cannot prove a whole-year funding gap.
+    const total=knownAnnualCostTotal(plan.byLine);
+    if(plan.annualCost==null||total==null||Math.abs(total-plan.annualCost)>0.005)return null;
+    return Math.round(Math.max(0,plan.annualCost-allocated(plan))*100)/100;
+  };
+  const fundingGap=gap(active),securedGap=gap(confirmed);
+  return {...projected,
+    scenario,basis:"student_recorded_cash_commitments" as const,
+    scholarshipTotal:active.scholarshipTotal,ownContributionTotal:active.ownContributionTotal,
+    securedTotal:confirmed.securedTotal,securedAllocatedTotal:allocated(confirmed),
+    conditionalTotal:Math.max(0,projected.projectedTotal-confirmed.securedTotal),
+    optimisticGap:gap(projected),fundingGap,securedGap,
+    isCovered:fundingGap==null?null:fundingGap===0,byLine:active.byLine,
+    // No disbursement timing is stored by this legacy USD metadata model.
+    // Even confirmed cash commitments do not establish upfront availability.
+    upfrontGap:null as number|null,timingRecorded:false as const,
+    repayableTotal:active===confirmed?sum(confirmedItems.filter(item=>item.kind==="loan")):sum(possibleItems.filter(item=>item.kind==="loan")),
+  };
+}
+
 /** Breakdown line for the post-admission view (spec §24). */
+export type OfferTuitionBasis = "offer_recorded_usd" | "published_annual_usd";
 export interface PostAdmissionFunding {
+  scenario: "confirmed";
+  basis: "student_recorded_cash_commitments";
+  tuitionBasis: OfferTuitionBasis | "unknown";
   tuition: number | null;
+  tuitionRemaining: number | null;
+  confirmedAllocatedToTuition: number;
+  confirmedNotAllocatedToTuition: number;
+  conditionalTotal: number;
+  repayableTotal: number;
+  upfrontGap: number | null;
+  timingRecorded: false;
   scholarship: number;
   aid: number;
   otherConfirmed: number;
@@ -218,12 +274,13 @@ export interface PostAdmissionFunding {
 
 export function postAdmissionFunding(input: {
   tuition: number | null;
+  tuitionBasis?: OfferTuitionBasis;
   items: FundingItemLike[];
   depositAmount?: number | null;
   depositDueDate?: string | null;
   universityName: string;
 }): PostAdmissionFunding {
-  const securedItems = input.items.filter((i) => i.status === "awarded" || i.status === "confirmed");
+  const securedItems = input.items.filter((i) => i.status === "confirmed");
   const scholarship = sum(securedItems.filter((i) => i.kind === "scholarship"));
   const aid = sum(securedItems.filter((i) => i.kind === "aid"));
   // A confirmed explicit family/savings/loan item is real funding; profile
@@ -231,8 +288,12 @@ export function postAdmissionFunding(input: {
   const otherConfirmed = sum(securedItems.filter((i) => i.kind !== "scholarship" && i.kind !== "aid"));
   const secured = scholarship + aid + otherConfirmed;
   const deposit = input.depositAmount == null ? null : nullableNonNegativeFinite(input.depositAmount);
-  const tuition = input.tuition == null ? null : nonNegativeFinite(input.tuition);
-  const remaining = tuition == null ? null : Math.max(0, tuition - secured);
+  const tuition = input.tuition == null ? null : nullableNonNegativeFinite(input.tuition);
+  // Reuse the existing once-only allocator and confirmed scenario adapter.
+  // Housing/living restrictions never become unrestricted tuition coverage.
+  const plan = buildFundingScenario({annualCost:tuition,lines:[{key:"tuition",label:"Tuition",cost:tuition}],items:input.items});
+  const remaining = plan.fundingGap;
+  const notAllocated = Math.max(0, secured - plan.securedAllocatedTotal);
 
   const confirmedBreakdown = [
     scholarship > 0 ? `scholarship $${scholarship.toLocaleString()}` : "",
@@ -250,7 +311,7 @@ export function postAdmissionFunding(input: {
         ? "No confirmed funding is recorded."
         : "No confirmed funding yet — the full tuition is still your responsibility."
   );
-  if (deposit != null && deposit > 0) {
+  if (deposit != null) {
     explanation.push(
       `Deposit: $${deposit.toLocaleString()}${input.depositDueDate ? ` due ${input.depositDueDate}` : ""}, payable to ${input.universityName}.`
     );
@@ -261,8 +322,22 @@ export function postAdmissionFunding(input: {
     ? "Remaining tuition after confirmed funding cannot be calculated until the tuition amount is verified."
     : `Remaining after confirmed funding: $${remaining.toLocaleString()}.`);
 
+  if(notAllocated>0)explanation.push(`$${notAllocated.toLocaleString()} of confirmed funding is not allocated to this tuition amount; restrictions and excess do not pay unrelated costs.`);
+  if(plan.conditionalTotal>0)explanation.push(`Conditional funding recorded: $${plan.conditionalTotal.toLocaleString()} (planned, applied or awarded; excluded from confirmed tuition coverage).`);
+  if(plan.repayableTotal>0)explanation.push(`Confirmed loans: $${plan.repayableTotal.toLocaleString()}, repayable rather than grant funding.`);
+  explanation.push("Funding disbursement timing is not recorded; confirmed commitments do not prove upfront availability or reduce the recorded deposit.");
   return {
+    scenario:"confirmed",
+    basis:plan.basis,
+    tuitionBasis:tuition==null?"unknown":(input.tuitionBasis??"offer_recorded_usd"),
     tuition,
+    tuitionRemaining:remaining,
+    confirmedAllocatedToTuition:plan.securedAllocatedTotal,
+    confirmedNotAllocatedToTuition:notAllocated,
+    conditionalTotal:plan.conditionalTotal,
+    repayableTotal:plan.repayableTotal,
+    upfrontGap:plan.upfrontGap,
+    timingRecorded:plan.timingRecorded,
     scholarship,
     aid,
     otherConfirmed,

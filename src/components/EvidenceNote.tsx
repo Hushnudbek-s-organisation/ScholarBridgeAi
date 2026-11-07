@@ -60,6 +60,9 @@ export function EvidenceNote({ fact, label, compact = false }: EvidenceNoteProps
   const url = safeHttpUrl(fact?.sourceUrl ?? null);
   const official = fact?.displayAs === "official_minimum";
   const name = label ?? fact?.label ?? t("unnamedValue");
+  const policyLabel=fact?.trust==="official_verified"&&fact.verificationStatus==="verified"
+    ?fact.valueType==="not_published"?t("notPublishedConfirmed"):fact.valueType==="not_applicable"?t("notApplicableConfirmed"):fact.valueType==="official_requirement"&&typeof fact.value==="string"?t("officialCriteria"):null
+    :null;
   const note = fact?.note?.trim()
     || (fact ? t("noMetadata") : t("noMetadataAtAll"));
 
@@ -69,7 +72,7 @@ export function EvidenceNote({ fact, label, compact = false }: EvidenceNoteProps
       data-evidence-trust={fact?.trust ?? "metadata_missing"}
       data-evidence-display={fact?.displayAs ?? "unknown"}
       data-evidence-source={url ? "official_link" : "none"}
-      className={`mt-1 block min-w-0 text-[10px] leading-tight ${official ? "text-emerald-700" : "text-amber-700"}`}
+      className={`mt-1 block min-w-0 text-xs leading-tight ${official ? "text-emerald-700" : "text-amber-700"}`}
     >
       <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
         {official
@@ -77,7 +80,7 @@ export function EvidenceNote({ fact, label, compact = false }: EvidenceNoteProps
           : <ShieldAlert className="h-3 w-3 shrink-0" aria-hidden />}
         <span className="min-w-0 break-words font-semibold">{name}</span>
         <span aria-hidden>·</span>
-        <span className="min-w-0 break-words">{displayLabel(fact?.displayAs ?? "unknown", t)}</span>
+        <span className="min-w-0 break-words">{policyLabel??displayLabel(fact?.displayAs ?? "unknown", t)}</span>
         {fact?.admissionCycle && (
           <span className="text-slate-500">· {t("cycle")}: {fact.admissionCycle}</span>
         )}
@@ -98,7 +101,7 @@ export function EvidenceNote({ fact, label, compact = false }: EvidenceNoteProps
       {/* Always present, even in compact mode: a missing envelope must not
           silently drop its caveat. `compact` only decides whether it starts open. */}
       <details open={!compact} className="group mt-0.5 min-w-0 text-slate-500">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm font-semibold text-slate-600 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 [&::-webkit-details-marker]:hidden">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-control font-semibold text-slate-600 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700 [&::-webkit-details-marker]:hidden">
             <Info className="h-2.5 w-2.5" aria-hidden /> {t("details")}
           </summary>
           <span className="mt-0.5 block max-w-prose break-words">{note}</span>

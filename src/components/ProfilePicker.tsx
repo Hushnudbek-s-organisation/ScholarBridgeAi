@@ -7,6 +7,7 @@ import { StudentProfile } from "./Navbar";
 import { TelegramCodeFlow } from "./telegram/TelegramCodeFlow";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { Button } from "@/components/ui/Button";
+import { profileFromSessionEnvelope } from "@/lib/authenticatedProfile";
 
 interface ProfilePickerProps {
   open: boolean;
@@ -14,11 +15,14 @@ interface ProfilePickerProps {
   deviceProfiles: StudentProfile[];
   currentId: number | null;
   onClose: () => void;
+  /** Device history: caller must verify the server session before selecting. */
   onSelect: (profile: StudentProfile) => void;
+  /** Fresh server-confirmed login response only; never device/local storage. */
+  onAuthenticated: (profile:StudentProfile)=>void;
   /** Start a new account, optionally carrying the email already typed. */
   onAddNew: (email?: string) => void;
   /** Server-side hint (e.g. "sign in to open this account"). */
-  notice?: string;
+  noticeKey?: "signInToOpenAccount"|"sessionVerifyFailed"|null;
 }
 
 interface TelegramPublicConfig {
@@ -32,7 +36,9 @@ interface TelegramPublicConfig {
  * a code from the Telegram bot (no password) or email + password.
  * The Telegram tab only appears when an admin has connected the bot.
  */
-export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSelect, onAddNew, notice }: ProfilePickerProps) {
+export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSelect, onAuthenticated, onAddNew, noticeKey }: ProfilePickerProps) {
+  const alive=useRef(true);
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   const t = useTranslations("picker");
   const tt = useTranslations("telegram");
   const [email, setEmail] = useState("");
@@ -54,6 +60,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const close = useCallback(() => {
+    alive.current=false;
     setSignInError("");
     onClose();
   }, [onClose]);
@@ -130,15 +137,17 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
         body: JSON.stringify({ email: email.trim(), password }),
       });
       const data = await res.json();
-      if (!res.ok || !data.profile) {
+      if(!alive.current)return;
+      const authenticated=profileFromSessionEnvelope(data);
+      if (!res.ok || !authenticated) {
         throw new Error(res.status === 401 ? t("wrongCredentials") : res.status === 429 ? t("tooMany") : data.error || t("failed"));
       }
       setSignInError("");
-      onSelect(data.profile as StudentProfile);
+      onAuthenticated(authenticated);
     } catch (err: unknown) {
-      setSignInError(err instanceof Error ? err.message : t("failed"));
+      if(alive.current)setSignInError(err instanceof Error ? err.message : t("failed"));
     } finally {
-      setSignInBusy(false);
+      if(alive.current)setSignInBusy(false);
     }
   };
 
@@ -165,8 +174,8 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
         </div>
 
         <div className="max-h-[75vh] space-y-5 overflow-y-auto p-4 sm:p-5">
-          {notice && (
-            <div className="rounded-surface border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{notice}</div>
+          {noticeKey && (
+            <div className="rounded-surface border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{t(noticeKey)}</div>
           )}
 
           {/* ===== Accounts used on THIS device ===== */}
@@ -249,7 +258,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
               <div>
                 <p className="text-sm font-extrabold text-slate-800">{tt("loginTitle")}</p>
                 <p className="mb-3 mt-0.5 text-sm text-slate-500">{tt("loginSubtitle")}</p>
-                <TelegramCodeFlow purpose="login" botUsername={tg?.botUsername} onLoggedIn={(p) => onSelect(p)} />
+                <TelegramCodeFlow purpose="login" botUsername={tg?.botUsername} onLoggedIn={(p) => {if(alive.current)onAuthenticated(p);}} />
                 <p className="mt-3 text-sm leading-relaxed text-slate-500">{tt("loginLinkedOnly")}</p>
               </div>
             ) : (
@@ -263,7 +272,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {setMethod("email");setEmail(e.target.value);}}
                     placeholder={t("email")}
                     aria-label={t("email")}
                     className="w-full min-h-11 rounded-surface border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -278,7 +287,7 @@ export function ProfilePicker({ open, deviceProfiles, currentId, onClose, onSele
                     <input
                       type={showPassword ? "text" : "password"}
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {setMethod("email");setPassword(e.target.value);}}
                       placeholder={t("password")}
                       aria-label={t("password")}
                       className="w-full min-h-11 rounded-surface border border-slate-200 bg-white px-3.5 py-2.5 pr-12 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"

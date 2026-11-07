@@ -28,6 +28,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 console.log("\nTyped evidence — field-level trust across the product");
 
 const base: CatalogueFact = {
+  publisherOfficial: true,
   entityType: "university", entityId: 1, fieldKey: "min_ielts",
   valueNumeric: 7.0, unit: "IELTS band", degreeLevel: "Master",
   admissionCycle: "2027 intake", sourceUrl: "https://yenchingacademy.pku.edu.cn/ADMISSIONS.htm",

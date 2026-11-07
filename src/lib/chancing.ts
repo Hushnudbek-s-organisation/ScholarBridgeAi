@@ -24,6 +24,7 @@ export { ADMISSION_PROBABILITY_POLICY, type CatalogueFact, type MetricValueType 
 // ---------------------------------------------------------------------------
 
 export interface ChancingProfile {
+  applicantContext?:import("./applicantContext").ApplicantContext|null;
   gpa?: number | null;
   gpaScale?: number | null;
   ieltsScore?: number | null;
@@ -112,7 +113,7 @@ export function parseListColumn(raw: unknown): string[] {
  * anything else is null (unknown, never a 4.0).
  */
 export function normalizedGpa(profile: ChancingProfile): number | null {
-  return gpaTo40Scale(profile.gpa, profile.gpaScale);
+  return gpaTo40Scale(profile.gpa, profile.gpaScale, profile.applicantContext?.gpa ? profile.applicantContext.gpa.minimum : 0);
 }
 
 /** Rough word-overlap similarity (0–1) between two free-text majors. */

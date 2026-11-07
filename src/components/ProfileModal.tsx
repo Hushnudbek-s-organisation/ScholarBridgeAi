@@ -1,5 +1,7 @@
 "use client";
 
+import { ApplicantContextFields } from "@/components/ApplicantContextFields";
+import type {ApplicantContext} from "@/lib/applicantContext";
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { countriesMatch, countryTranslationKey, resolveCountryCode, withQsTop200Countries } from "@/lib/countries";
@@ -111,6 +113,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
   const studyInterestsTouched = useRef(false);
   useDialogFocusTrap({ open: isOpen, dialogRef, onEscape: onClose });
   const [formData, setFormData] = useState<{
+    applicantContext:ApplicantContext|null;
     name: string;
     email: string;
     degreeLevel: string;
@@ -154,6 +157,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
     certificates: string;
     password: string;
   }>({
+    applicantContext:null,
     name: "",
     email: "",
     password: "",
@@ -229,6 +233,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         }
 
         setFormData({
+          applicantContext:profile.applicantContext??null,
           name: profile.name || "",
           // Telegram-only accounts have a technical email — show an empty field.
           email: isTelegramPlaceholderEmail(profile.email) ? "" : profile.email || "",
@@ -279,6 +284,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
         });
       } else if (isNew) {
         setFormData({
+          applicantContext:null,
           name: "",
           email: "",
           degreeLevel: "",
@@ -786,6 +792,7 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               </div>
             </div>
 
+            <div className="mt-4"><ApplicantContextFields value={formData.applicantContext} onChange={value=>setFormData({...formData,applicantContext:value})} legacyGpa={formData.gpa} legacyScale={formData.gpaScale} legacyToefl={formData.toeflScore}/></div>
             {/* Test Scores */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
               <div>

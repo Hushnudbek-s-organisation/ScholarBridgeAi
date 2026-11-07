@@ -27,6 +27,18 @@ const MAX_REPORT_BYTES = 2 * 1024 * 1024;
 const runs = new Map<string, RunStatus>();
 const idempotencyKeys = new Map<string, string>();
 
+const pendingRunWrites=new Map<string,Promise<unknown>>();
+function queueDurableWrite(runId:string,write:()=>Promise<unknown>){
+  const previous=pendingRunWrites.get(runId)??Promise.resolve();
+  const next=previous.catch(()=>{}).then(write);
+  pendingRunWrites.set(runId,next);
+  void next.finally(()=>{if(pendingRunWrites.get(runId)===next)pendingRunWrites.delete(runId);}).catch(()=>{});
+}
+export async function flushDurableRunWrites(runId:string){await pendingRunWrites.get(runId);}
+
+const pendingRunCreation=new Map<string,Promise<void>>();
+export async function waitForDurableRunCreation(runId:string){await pendingRunCreation.get(runId);}
+
 export class ResearchCapacityError extends Error {
   constructor() { super("Research workers are busy. Retry when a run finishes."); this.name = "ResearchCapacityError"; }
 }
@@ -78,14 +90,16 @@ export function createRun(universityId: number | null, options: CreateRunOptions
   runs.set(runId, run);
   if (options.idempotencyKey) idempotencyKeys.set(options.idempotencyKey, runId);
   if (options.request) {
-    void createDurableRun({
+    const pending = createDurableRun({
       runId,
       request: options.request,
       universityIds: options.universityIds ?? options.request.universityIds,
       scopes: options.scopes ?? options.request.scopes,
       idempotencyKey: options.idempotencyKey,
       timeoutAt: options.timeoutAt,
-    }).catch(() => {});
+    }).finally(()=>pendingRunCreation.delete(runId));
+    pendingRunCreation.set(runId,pending);
+    void pending.catch(()=>{});
   }
   return runId;
 }
@@ -174,7 +188,7 @@ export function setRun(
   const guard = next.workerId
     ? { workerId: next.workerId as string }
     : ({ kind: "unclaimed" } as const);
-  if (!terminal) void patchDurableRun(runId, next, guard).catch(() => {});
+  if (!terminal) queueDurableWrite(runId,()=>patchDurableRun(runId,next,guard));
 }
 
 export function appendProgress(runId: string, message: string) {
@@ -198,7 +212,7 @@ export function recordUniversityResult(runId: string, report: AuditReport, worke
   // lease expired (another worker may already own the run). The original
   // in-process path has no lease and keeps its unguarded behavior.
   const guard = workerId ? { workerId } : undefined;
-  void appendDurableItem(runId, report.universityId, { status: "complete", report, attempts: run.attempts ?? 1 }, guard).catch(() => {});
+  queueDurableWrite(runId,()=>appendDurableItem(runId, report.universityId, { status: "complete", report, attempts: run.attempts ?? 1 }, guard));
 }
 
 export function recordUniversityError(runId: string, universityId: number, error: string, workerId?: string) {
@@ -206,7 +220,7 @@ export function recordUniversityError(runId: string, universityId: number, error
   if (!run) return;
   setRun(runId, { universityId, error }, workerId);
   const guard = workerId ? { workerId } : undefined;
-  void appendDurableItem(runId, universityId, { status: "error", error, attempts: (run.attempts ?? 1) + 1 }, guard).catch(() => {});
+  queueDurableWrite(runId,()=>appendDurableItem(runId, universityId, { status: "error", error, attempts: (run.attempts ?? 1) + 1 }, guard));
 }
 
 export function isRunCancelled(runId: string): boolean {

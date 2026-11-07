@@ -140,8 +140,11 @@ export async function deleteConfig(key: string): Promise<void> {
 }
 
 /** Get a config value (cached per process for CONFIG_CACHE_TTL_MS). */
-export async function getConfig(key: string): Promise<string> {
+export async function getConfig(key: string, database?:Pick<typeof db,"select">): Promise<string> {
   try {
+    // A permission transaction must use its own connection, not wait for a
+    // second pool client while holding profile/subscription locks.
+    if(database){const [row]=await database.select().from(appConfig).where(eq(appConfig.key,key));return row?.value??CONFIG_DEFAULTS[key]??"";}
     return (await getStoredConfig(key)) ?? CONFIG_DEFAULTS[key] ?? "";
   } catch {
     // DB unavailable — fall back to defaults so the app still works.

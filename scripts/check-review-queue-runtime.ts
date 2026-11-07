@@ -298,4 +298,4 @@ async function cleanup() {
   rmSync(DATA_DIR, { recursive: true, force: true });
 }
 
-void main().finally(cleanup);
+void main().catch(error=>{console.error(error);process.exitCode=1;}).finally(cleanup).finally(()=>process.exit(process.exitCode??0));

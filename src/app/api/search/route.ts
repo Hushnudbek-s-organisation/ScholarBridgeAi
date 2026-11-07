@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import {resolveDocumentStatuses} from "@/lib/documentReviews.server";
+import {privateNoStoreJson} from "@/lib/apiResponse";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -67,7 +68,7 @@ export async function GET(req: Request) {
     ];
 
     if (q.length < 2) {
-      return NextResponse.json({ query: q, results: features.slice(0, 12), counts: { features: features.length } });
+      return privateNoStoreJson({ query: q, results: features.slice(0, 12), counts: { features: features.length } });
     }
 
     const like = `%${q}%`;
@@ -109,7 +110,7 @@ export async function GET(req: Request) {
         .orderBy(desc(applications.updatedAt))
         .limit(6),
       db
-        .select({ id: userDocuments.id, title: userDocuments.title, docType: userDocuments.docType, status: userDocuments.status })
+        .select()
         .from(userDocuments)
         .where(and(eq(userDocuments.profileId, profileId), ilike(userDocuments.title, like)))
         .limit(6),
@@ -153,7 +154,7 @@ export async function GET(req: Request) {
       found.push({ kind: "scholarship", id: s.id, title: s.title, subtitle: `${localizeScholarshipProvider(s.provider, locale)} · ${localizeCountry(s.country, locale)}`, group: "explore", tab: "scholarships/browse" });
     for (const a of apps)
       found.push({ kind: "application", id: a.id, title: a.universityName || "Application", subtitle: a.programName ?? "Your application", group: "applications", tab: "applications/workspace" });
-    for (const d of docs)
+    for (const d of await resolveDocumentStatuses(docs))
       found.push({ kind: "document", id: d.id, title: d.title, subtitle: `${d.docType} · ${d.status}`, group: "applications", tab: "materials/documents" });
     for (const s of stories)
       found.push({ kind: "story", id: s.id, title: s.admittedUniversity, subtitle: s.major ?? "Admission story", group: "plan", tab: "profile/stories" });
@@ -166,7 +167,7 @@ export async function GET(req: Request) {
     for (const e of essays)
       found.push({ kind: "essay", id: e.id, title: e.title || e.essayType, subtitle: "Essay", group: "applications", tab: "materials/essays" });
 
-    return NextResponse.json({
+    return privateNoStoreJson({
       query: q,
       results: found.slice(0, 30),
       counts: {

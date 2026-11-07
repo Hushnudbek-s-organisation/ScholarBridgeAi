@@ -10,6 +10,7 @@
  *   ul:y / ul:n           unlink confirmation
  *   st:n:1|0 / st:r:<p>   notifications on/off, reminder preset
  */
+import {academicRecordText} from "@/lib/applicantContextPresentation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { telegramLinks } from "@/db/schema";
@@ -168,14 +169,15 @@ async function profile(ctx: BotCtx) {
   } catch {
     /* keep "not set" */
   }
-  const english = p.ieltsScore != null ? `IELTS ${p.ieltsScore}` : p.toeflScore != null ? `TOEFL ${p.toeflScore}` : ns;
+  const academic=academicRecordText(p,ns);
+  const english=academic.english;
   await send(
     ctx,
     T(ctx).profile({
       name: p.name || ns,
       level: p.degreeLevel || ns,
       major: p.targetMajor || ns,
-      gpa: p.gpa != null ? `${p.gpa}${p.gpaScale ? ` / ${p.gpaScale}` : ""}` : ns,
+      gpa:academic.gpa,
       english,
       countries,
       budget: money(p.budgetAnnualUsd) ?? ns,

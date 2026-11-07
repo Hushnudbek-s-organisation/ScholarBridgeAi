@@ -1,3 +1,6 @@
+import {resolveAcademicRequirements} from "@/lib/universityDetailRequirements";
+import {loadCatalogueFacts} from "@/lib/catalogueFacts.server";
+import {EvidenceNote} from "@/components/EvidenceNote";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -192,7 +195,8 @@ export default async function UniversitiesPage({
     );
   }
 
-  const universities = rows;
+  const academicFacts=await loadCatalogueFacts("university",rows.map(row=>row.id));
+  const universities = rows.map(row=>{const academic=resolveAcademicRequirements(academicFacts.get(row.id)??[],{});return {...row,recorded_min_ielts:row.min_ielts,min_ielts:academic.summary.ielts?.single??null,ieltsEvidence:academic.evidence.ielts};});
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
   const currentPage = Math.min(requestedPage, totalPages);
   const number = new Intl.NumberFormat(locale);
@@ -300,7 +304,9 @@ export default async function UniversitiesPage({
                   <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs">
                     <CatalogFact label={copy.annualTuition} value={university.annual_tuition_usd == null ? copy.notPublished : `${usd.format(university.annual_tuition_usd)} · ${copy.perYear}`} numeric />
                     <CatalogFact label={copy.annualLiving} value={university.annual_living_est_usd == null ? copy.notPublished : `${usd.format(university.annual_living_est_usd)} · ${copy.perYear}`} numeric />
-                    <CatalogFact label={copy.minIelts} value={university.min_ielts == null ? copy.notPublished : number.format(university.min_ielts)} numeric />
+                    <CatalogFact label={copy.minIelts} value={university.min_ielts == null ? dictionaries[locale].university.notSpecified : number.format(university.min_ielts)} numeric />
+                    <EvidenceNote compact label="IELTS" fact={university.ieltsEvidence}/>
+                    {university.recorded_min_ielts!=null&&<p className="text-sm text-slate-500">{dictionaries[locale].university.recordedCatalogueValue}: IELTS {university.recorded_min_ielts}</p>}
                   </dl>
 
                   <div className="mt-auto flex items-center gap-1.5 pt-4">

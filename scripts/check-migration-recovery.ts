@@ -206,8 +206,8 @@ async function main() {
   console.log(`\n${passed} passed, ${failures.length} failed`);
   if (failures.length) { for (const f of failures) console.error(`  - ${f}`); process.exitCode = 1; }
 }
-void main().finally(async () => {
+void main().catch(error=>{console.error(error);process.exitCode=1;}).finally(async () => {
   try { await client?.end(); } catch { /* already closed */ }
   try { await pg?.stop(); } catch { /* already stopped */ }
   rmSync(DATA_DIR, { recursive: true, force: true });
-});
+}).finally(()=>process.exit(process.exitCode??0));

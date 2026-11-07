@@ -77,7 +77,7 @@ check("RENDERED: a legacy 5040 value stays unverified even when the entity is ve
 check("RENDERED: an unknown value says unknown, never zero", () => {
   const facts = legacyEvidence({ fields: { awardAmount: null } });
   const html = renderHtml(facts.awardAmount);
-  assert.match(html, /Not published — unknown, not zero/);
+  assert.match(html, /No confirmed value in this scope — unknown, not zero/);
   assert.match(html, /data-evidence-display="unknown"/);
 });
 
@@ -93,7 +93,7 @@ check("RENDERED: only a fully verified official requirement says 'minimum'", () 
 check("RENDERED: a javascript: source URL is never rendered as a link", () => {
   const html = renderHtml(officialFact("javascript:alert(1)"));
   assert.doesNotMatch(html, /href="javascript:/i);
-  assert.match(html, /data-evidence-display="official_minimum"/, "the fact is still shown");
+  assert.match(html, /data-evidence-display="unverified_value"/, "unsafe source is never official but its value is kept");
 });
 
 check("RENDERED: a missing evidence object still shows an honest gap", () => {
@@ -159,7 +159,10 @@ check("EN/UZ/RU evidence namespaces have identical, non-empty keys", () => {
   });
   assert.deepEqual(sets[0], sets[1], "UZ keys differ from EN");
   assert.deepEqual(sets[0], sets[2], "RU keys differ from EN");
-  assert.equal(sets[0].length, 16);
+  // Three explicit policy/group labels supplement, rather than replace, the
+  // original 16 evidence keys. Exact parity remains required.
+  assert.equal(sets[0].length, 19);
+  for(const key of ["notPublishedConfirmed","notApplicableConfirmed","officialCriteria"])assert.ok(sets[0].includes(key));
 });
 
 
@@ -202,14 +205,15 @@ check("§5 — a benchmark is never labelled an official minimum; a computed val
   const unknown = renderHtml(presentRaw({
     value: null, fieldLabel: "Award amount", trust: "legacy_unknown", valueType: "unverified",
   }));
-  assert.match(unknown, /Not published/i);
+  assert.match(unknown, /No confirmed value/i);
+  assert.doesNotMatch(unknown, /Not published/i);
   // A lone rendered zero would mean "unknown became 0". CSS decimals such as
   // 0.5 are not rendered values, so check the value slot instead.
   assert.doesNotMatch(unknown, />\s*0\s*</);
   assert.match(unknown, /data-evidence-display="unknown"/);
   // presentRaw always emits an explicit note, so the visible gap is its
   // wording (not the generic noMetadata fallback).
-  assert.match(unknown, /Not published in this view/i);
+  assert.match(unknown, /No confirmed value in this scope/i);
   assert.match(unknown, /no field-level source link/i);
 });
 
@@ -292,6 +296,17 @@ check("§5 — EN / UZ / RU all really render trust, unknown and recommended lab
   }
 });
 
+check("RENDERED: missing evidence is not a publisher-confirmed absence or exemption",()=>{
+  const base=officialFact("https://fictional.example.edu/policy");
+  for(const [valueType,text] of [["not_published","Source confirms no published minimum"],["not_applicable","Source confirms this criterion does not apply"]] as const){
+    const policy={...base,value:null,valueType,displayAs:"unknown" as const,isOfficialMinimum:false};
+    assert.match(renderHtml(policy),new RegExp(text));
+    const draft=renderHtml({...policy,trust:"unknown",verificationStatus:"review_needed"});
+    assert.doesNotMatch(draft,/Source confirms/);assert.match(draft,/No confirmed value/);
+  }
+  const group=renderHtml({...base,value:'{"operator":"anyOf"}',displayAs:"unverified_value",isOfficialMinimum:false});
+  assert.match(group,/Official criteria \(field-level verified\)/);assert.doesNotMatch(group,/Unverified value/);
+});
 console.log(`\n${passed} passed, ${failures.length} failed`);
 if (failures.length) {
   for (const f of failures) console.error(`  - ${f}`);

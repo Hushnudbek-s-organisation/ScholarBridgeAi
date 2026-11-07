@@ -1,3 +1,8 @@
+import {resolveAcademicRequirements,academicDecisionEnvelope} from "@/lib/universityDetailRequirements";
+import {parseApplicantContext,recordedToefl} from "@/lib/applicantContext";
+import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
+import { resolveScopedFact } from "@/lib/factResolver";
+import { mayAutoReject,isVerifiedOfficialRequirement } from "@/lib/typedEvidence";
 import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
 import { NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
@@ -34,9 +39,6 @@ import {
   studyInterestDisplayTerms,
   studyInterestRecommendationTerms,
 } from "@/lib/studyInterests";
-import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
-import { verifiedQsRankNumber } from "@/lib/universityRank";
-import { resolveProgramDepartmentProfile } from "@/lib/programChancing";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +148,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
   }
   const body = parsed.body;
+  if(body.applicantScope!=null&&(typeof body.applicantScope!=="string"||body.applicantScope.length>200))return NextResponse.json({error:"Invalid applicant scope"},{status:400});
+  const applicantScope=typeof body.applicantScope==="string"?body.applicantScope.trim()||null:null;
 
   // Authorization: session owner or admin; the claimed id is never trusted.
   const access = await requireProfileAccess(req, body.profileId);
@@ -202,10 +206,15 @@ export async function POST(req: Request) {
   }
 
   const degreeLevel = resolveStringInput(body.degreeLevel === undefined ? undefined : (body.degreeLevel ?? null), profile.degreeLevel);
-  const gpa = resolveNumberInput(clampNumber(body.gpa, 0, 100), profile.gpa);
-  const gpaScale = resolveNumberInput(clampNumber(body.gpaScale, 0.1, 100), profile.gpaScale);
+  const gpa = resolveNumberInput(clampNumber(body.gpa, 0, 100), profile.applicantContext?.gpa?profile.applicantContext.gpa.value:profile.gpa);
+  const gpaScale = resolveNumberInput(clampNumber(body.gpaScale, 0.1, 100), profile.applicantContext?.gpa?profile.applicantContext.gpa.maximum:profile.gpaScale);
   const ielts = resolveNumberInput(clampNumber(body.ielts, 0, 9), profile.ieltsScore);
-  const toefl = resolveNumberInput(clampNumber(body.toefl, 0, 120), profile.toeflScore);
+  const toefl = resolveNumberInput(clampNumber(body.toefl, 0, 120), recordedToefl(profile.applicantContext,profile.toeflScore).score);
+  const toeflOverridden=["toefl","toeflScale","toeflExamDate","toeflValidUntil","toeflSections"].some(key=>body[key]!==undefined);
+  let toeflRecord;
+  try{
+    toeflRecord=toeflOverridden?parseApplicantContext({toefl:{score:toefl.value,scale:body.toeflScale??null,examDate:body.toeflExamDate??null,validUntil:body.toeflValidUntil??null,sections:body.toeflSections}})?.toefl:profile.applicantContext?.toefl;
+  }catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Invalid TOEFL record",code:"applicant_context_invalid"},{status:400});}
   const duolingo = resolveNumberInput(clampNumber(body.duolingo, 0, 160), profile.duolingoScore);
   const sat = resolveNumberInput(clampNumber(body.sat, 0, 1600), profile.satScore);
   const act = resolveNumberInput(clampNumber(body.act, 0, 36), profile.actScore);
@@ -254,26 +263,17 @@ export async function POST(req: Request) {
     fundingNeed: fundingNeed.value,
     languagePref: languagePref.value as string | null,
     startYear: startYear.value as number | null,
+    citizenships:body.citizenship===undefined?(profile.applicantContext?.citizenships??[]):undefined,
+    toeflRecord,
+    citizenship: body.citizenship===undefined?(profile.applicantContext?.citizenships?.[0]??null):typeof body.citizenship === "string" ? body.citizenship.slice(0,100) : null,
+    toeflScale:toeflRecord?.scale??null,
+    gpaMinimum:body.gpaMinimum===undefined?(body.gpaScale===undefined?profile.applicantContext?.gpa?.minimum??null:null):clampNumber(body.gpaMinimum,0,100),
     asOfDate: new Date().toISOString().slice(0, 10),
   };
 
   // ---- Load the catalog (any failure = 503, never mock data) -------------
   let catalog: RecommendationCatalog;
   let totalPrograms = 0;
-  /**
-   * QS benchmark per university id, filled while the catalog loads and read
-   * when the results are serialised. The card used to carry a fourth column
-   * that only ever said "Admission probability: unavailable"; it now carries
-   * these measurements instead. Same benchmark the chancing engine reads, so
-   * the two screens cannot disagree, and no tier vocabulary is exposed.
-   */
-  const benchmarkByUniId = new Map<number, ReturnType<typeof matchQsUniversityBenchmark>>();
-  /**
-   * QS 2026 position as stored on `universities.world_ranking` (Phase Y
-   * reconciled it to the official edition). It wins over the curated table
-   * so a card can never print a benchmark rank the profile page contradicts.
-   */
-  const verifiedRankByUniId = new Map<number, number | null>();
   try {
     const [programRows, uniRows, reqRows, cycleRows, scholarshipRows] = await Promise.all([
       db
@@ -291,8 +291,6 @@ export async function POST(req: Request) {
 
     const unis = new Map<number, RecommendUniversity>();
     for (const u of uniRows) {
-      benchmarkByUniId.set(u.id, matchQsUniversityBenchmark(u));
-      verifiedRankByUniId.set(u.id, verifiedQsRankNumber(u));
       unis.set(u.id, {
         id: u.id,
         name: u.name,
@@ -358,18 +356,32 @@ export async function POST(req: Request) {
     }));
     totalPrograms = programs.length;
 
+    const programFacts = await loadCatalogueFacts("program", programIds);
+    const programById = new Map(programRows.map(program => [program.id, program]));
     const requirements = new Map<number, RecommendRequirement[]>();
     for (const r of reqRows) {
-      if (!hasVerifiedProgramEvidence(r)) continue;
+      const program = programById.get(r.programId);
+      const context = { programName: program?.name, degreeLevel: program?.degree, admissionCycle: r.academicYear,applicantScope };
+      const fact = (key: string) => resolveScopedFact(programFacts.get(r.programId) ?? [], key, context);
+      const minimum = (key: string) => { const value = fact(key); return value && mayAutoReject(value) && typeof value.value === "number" && Number.isFinite(value.value) ? value.value : null; };
+      const group=fact("requirement_group");
+      const operator = fact("english_requirement_operator");
+      const toefl = fact("min_toefl");
+      const gpa = fact("min_gpa");
       const arr = requirements.get(r.programId) ?? [];
       arr.push({
+        academicRequirements:academicDecisionEnvelope(resolveAcademicRequirements(programFacts.get(r.programId)??[],context)),
+        requirementGroup:group&&isVerifiedOfficialRequirement(group)?group.value:undefined,
         programId: r.programId,
-        minIelts: r.minIelts,
-        minToefl: r.minToefl,
-        minDet: r.minDet,
-        minSat: r.minSat,
-        minAct: r.minAct,
-        minGpa: r.minGpa,
+        academicYear: r.academicYear,
+        englishOperator: operator && isVerifiedOfficialRequirement(operator) && (operator.value === "OR" || operator.value === "AND") ? operator.value : null,
+        toeflScale: toefl?.unit === "120" ? "120" : toefl?.unit === "6" ? "6" : null,
+        minIelts: minimum("min_ielts"),
+        minToefl: minimum("min_toefl"),
+        minDet: minimum("min_det"),
+        minSat: minimum("min_sat"),
+        minAct: minimum("min_act"),
+        minGpa: gpa && ["4", "4.0", "GPA 4.0"].includes(gpa.unit ?? "") ? minimum("min_gpa") : null,
         ibRequirement: r.ibRequirement,
         aLevelRequirement: r.aLevelRequirement,
         apRequirement: r.apRequirement,
@@ -377,6 +389,21 @@ export async function POST(req: Request) {
         otherRequirements: r.otherRequirements,
       });
       requirements.set(r.programId, arr);
+    }
+
+    // Canonical numeric/group facts are authorable without a legacy flat row.
+    // One exact context is resolved once; no union across cycles/programmes.
+    for(const program of programs){
+      const facts=programFacts.get(program.id)??[];
+      for(const admissionCycle of new Set(facts.map(fact=>fact.admissionCycle??null))){
+        const arr=requirements.get(program.id)??[];
+        if(arr.some(row=>row.academicYear===admissionCycle))continue;
+        const resolved=resolveAcademicRequirements(facts,{programName:program.name,degreeLevel:program.degreeLevel,admissionCycle,applicantScope});
+        const academicRequirements=academicDecisionEnvelope(resolved);
+        if(!academicRequirements.requirementGroup&&!Object.keys(academicRequirements.summary).length)continue;
+        arr.push({programId:program.id,academicYear:admissionCycle,academicRequirements,requirementGroup:academicRequirements.requirementGroup?.value,minGpa:null,minIelts:null,minToefl:null,minDet:null,minSat:null,minAct:null,ibRequirement:null,aLevelRequirement:null,apRequirement:null,subjectRequirements:null,otherRequirements:null});
+        requirements.set(program.id,arr);
+      }
     }
 
     const cycles = new Map<number, RecommendCycle[]>();
@@ -398,18 +425,29 @@ export async function POST(req: Request) {
     }
     for (const arr of cycles.values()) arr.sort((a, b) => (b.deadline || b.academicYear || "").localeCompare(a.deadline || a.academicYear || ""));
 
-    const scholarshipList: RecommendScholarship[] = scholarshipRows.map((s) => ({
+    const scholarshipFacts = await loadCatalogueFacts("scholarship",scholarshipRows.map(s=>s.id));
+    const scholarshipList: RecommendScholarship[] = scholarshipRows.map((s) => {
+      const context={admissionCycle:input.startYear ? String(input.startYear) : null};
+      const fact=(key:string)=>resolveScopedFact(scholarshipFacts.get(s.id)??[],key,context);
+      const citizenship=fact("eligible_citizenships"), institution=fact("university_id"), cycle=fact("admission_cycle"), destination=fact("destination_country"), degrees=fact("degree_levels"), majors=fact("eligible_majors");
+      const eligibilityVerified=[citizenship,institution,cycle,destination,degrees,majors].every(value=>value && isVerifiedOfficialRequirement(value)) && institution?.value===s.universityId && destination?.value===s.country;
+      return ({
       id: s.id,
       title: s.title,
       country: s.country,
-      degreeLevels: parseCatalogJsonArray(s.degreeLevels),
+      universityId: s.universityId,
+      eligibleCitizenships: citizenship && typeof citizenship.value==="string" ? parseCatalogJsonArray(citizenship.value) : [],
+      admissionCycle: cycle && typeof cycle.value==="string" ? cycle.value : null,
+      eligibilityVerified,
+      degreeLevels: degrees && typeof degrees.value==="string" ? parseCatalogJsonArray(degrees.value) : [],
       coverageType: s.coverageType,
       minGpa: s.minGpa != null ? Number(s.minGpa) : null,
       minIelts: s.minIelts != null ? Number(s.minIelts) : null,
       financialNeedBased: Boolean(s.financialNeedBased),
       meritBased: Boolean(s.meritBased),
-      eligibleMajors: parseCatalogJsonArray(s.eligibleMajors),
-    }));
+      eligibleMajors: majors && typeof majors.value==="string" ? parseCatalogJsonArray(majors.value) : [],
+    });
+    });
 
     catalog = {
       programs,
@@ -432,27 +470,7 @@ export async function POST(req: Request) {
   const results = recommend(input, catalog, limit);
 
   return NextResponse.json({
-    results: results.map((r) => {
-      const benchmark = benchmarkByUniId.get(r.university.id);
-      if (!benchmark) return r;
-      // The department shifts the university band by its own selectivity — the
-      // same shift `evaluateUniversityAndProgramChance` applies.
-      const dept = resolveProgramDepartmentProfile(r.program.name, r.program.field);
-      const gpa25 = Math.round(clampNum(benchmark.gpa25 + dept.gpaShift, 2.4, 3.94) * 100) / 100;
-      const gpa50 = Math.round(clampNum(benchmark.gpa50 + dept.gpaShift, gpa25 + 0.05, 3.98) * 100) / 100;
-      const gpa75 = Math.round(clampNum(benchmark.gpa75 + dept.gpaShift, gpa50 + 0.03, 4.0) * 100) / 100;
-      return {
-        ...r,
-        positioning: {
-          qsRank: verifiedRankByUniId.get(r.university.id) ?? benchmark.qsRank ?? null,
-          universityAcceptRatePct: Number.isFinite(benchmark.acceptRatePct) ? benchmark.acceptRatePct : null,
-          departmentLabel: dept.label,
-          gpa25,
-          gpa50,
-          gpa75,
-        },
-      };
-    }),
+    results: results.map((r) => ({...r, positioning: undefined, positioningState: "unknown_no_verified_cohort"})),
     totalProgramsScanned: totalPrograms,
     // Probability policy (2026-10): the dimension is surfaced as unavailable —
     // no fit score below is an admission probability.
@@ -462,10 +480,10 @@ export async function POST(req: Request) {
       interests: { value: displayedInterests, source: "request" as InputSource },
       interestMode: { value: isExploring ? "exploring" : "selected", source: "request" as InputSource },
       degreeLevel: { value: degreeLevel.value, source: degreeLevel.source },
-      gpa: { value: gpa.value, source: gpa.source },
+      gpa: { value: gpa.value, source: gpa.source, originalRecord:gpa.source==="profile"?profile.applicantContext?.gpa??null:null, planningConversionIsOfficial:false },
       gpaScale: { value: gpaScale.value, source: gpaScale.source },
       ielts: { value: ielts.value, source: ielts.source },
-      toefl: { value: toefl.value, source: toefl.source },
+      toefl: { value: toefl.value, source: toefl.source, scale:toeflRecord?.scale??null, examDate:toeflRecord?.examDate??null, validUntil:toeflRecord?.validUntil??null, sections:toeflRecord?.sections??null },
       duolingo: { value: duolingo.value, source: duolingo.source },
       sat: { value: sat.value, source: sat.source },
       act: { value: act.value, source: act.source },

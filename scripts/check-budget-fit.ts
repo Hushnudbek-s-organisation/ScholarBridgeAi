@@ -71,7 +71,7 @@ check("unknown tuition / budget / negative values never become zero", () => {
   assert.equal(evaluateBudgetFit({ tuitionUsd: 1000, livingUsd: 500, budgetUsd: null }).state, "unknown");
   assert.equal(evaluateBudgetFit({ tuitionUsd: -1, livingUsd: 500, budgetUsd: 1000 }).tuitionUsd, null);
   assert.equal(evaluateBudgetFit({ tuitionUsd: 1000, livingUsd: NaN, budgetUsd: 1000 }).withinBudget, null);
-  assert.equal(evaluateBudgetFit({ tuitionUsd: 1000, livingUsd: 0, budgetUsd: 0 }).budgetUsd, null);
+  assert.equal(evaluateBudgetFit({ tuitionUsd: 1000, livingUsd: 0, budgetUsd: 0 }).budgetUsd, 0);
 });
 
 check("extra explicitly known annual lines are included and listed", () => {

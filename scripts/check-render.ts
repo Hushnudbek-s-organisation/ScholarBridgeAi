@@ -86,7 +86,7 @@ const withEnglishIntl = (node: React.ReactElement) =>
   });
 const withEnglishLocale = (node: React.ReactElement) =>
   // eslint-disable-next-line react/no-children-prop
-  React.createElement(LocaleProvider, { initialLocale: "en", children: node });
+  React.createElement(LocaleProvider, { initialLocale: "en", initialMessages:loadMessages("en"), children: node });
 const withIntlLocale = (locale: string, node: React.ReactElement) =>
   // eslint-disable-next-line react/no-children-prop
   React.createElement(NextIntlClientProvider, {

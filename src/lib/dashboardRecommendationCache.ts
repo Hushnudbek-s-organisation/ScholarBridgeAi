@@ -1,3 +1,4 @@
+import {revisionFencedCache} from "./revisionFencedCache";
 import { AsyncTtlCache } from "@/lib/asyncTtlCache";
 import { readCacheRevision, cacheRevisionKeyPart, bumpCacheRevision } from "@/lib/cacheRevision";
 
@@ -49,24 +50,30 @@ export async function sharedDashboardRecommendationCacheKey(
   todayIso: string,
   profileFingerprint = "",
 ): Promise<string> {
-  const { revision, shared } = await readCacheRevision("profile");
-  return `${dashboardRecommendationCacheKey(profileId, locale, todayIso, profileFingerprint)}:${cacheRevisionKeyPart(revision, shared)}`;
+  const revisions = await Promise.all(([`profile:${profileId}`, "catalogue", "evidence", `applications:${profileId}`, `documents:${profileId}`] as const).map((scope) => readCacheRevision(scope)));
+  return `${dashboardRecommendationCacheKey(profileId, locale, todayIso, profileFingerprint)}:${revisions.map(({revision,shared})=>cacheRevisionKeyPart(revision,shared)).join(":")}`;
 }
 
 export function getCachedDashboardRecommendations<T>(key: string, create: () => Promise<T>): Promise<T> {
   return recommendationCache.getOrCreate(key, create) as Promise<T>;
 }
 
+export function getRevisionFencedDashboardRecommendations<T>(key:()=>Promise<string>,create:()=>Promise<T>):Promise<T>{return revisionFencedCache(recommendationCache,key,create) as Promise<T>;}
+
 /**
  * Invalidate every locale/date/fingerprint variant for one profile after a
  * successful profile or saved-list mutation. Process-local, but the
  * fingerprinted key is what keeps OTHER instances honest.
  */
-export function invalidateDashboardRecommendationsForProfile(profileId: number): number {
+export async function invalidateDashboardRecommendationsForProfile(profileId: number): Promise<number> {
   const prefix = `${profileId}:`;
   // ALSO bump the shared revision: this instance's entries are cleared now,
   // and every OTHER instance will compute a new key on its next read.
-  // Fire-and-forget; bumpCacheRevision never rejects (documented fallback).
-  void bumpCacheRevision("profile", `dashboard recommendation invalidation for profile ${profileId}`);
-  return recommendationCache.invalidateWhere((key) => key.startsWith(prefix));
+  // Awaited callers also wait for the shared revision bump.
+  // Preserve the original immediate local invalidation contract, even for a
+  // caller that does not await the shared DB bump. A delayed old invalidation
+  // must not evict a new snapshot created while that bump is in flight.
+  const invalidated=recommendationCache.invalidateWhere(key=>key.startsWith(prefix));
+  await bumpCacheRevision(`profile:${profileId}`, `dashboard recommendation invalidation for profile ${profileId}`);
+  return invalidated;
 }

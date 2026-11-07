@@ -90,6 +90,16 @@ async function main() {
   await pendingRejection.catch(() => undefined);
   check("a rejected invalidated promise cannot evict its replacement", await byProfile.getOrCreate("19:en:2026-10-22", async () => "wrong") === "replacement");
 
+  const {LocalCacheRevisionStore,setCacheRevisionStore}=await import("../src/lib/cacheRevision");
+  const {invalidateDashboardRecommendationsForProfile,getCachedDashboardRecommendations}=await import("../src/lib/dashboardRecommendationCache");
+  setCacheRevisionStore(new LocalCacheRevisionStore());
+  try{
+    const oldInvalidation=invalidateDashboardRecommendationsForProfile(991);
+    await getCachedDashboardRecommendations("991:none:en:2026-11-07",async()=>"new valid snapshot");
+    await oldInvalidation;
+    check("an unawaited old invalidation cannot evict a newer valid snapshot",await getCachedDashboardRecommendations("991:none:en:2026-11-07",async()=>"wrong recomputation")==="new valid snapshot");
+  }finally{setCacheRevisionStore(null);}
+
   console.log(`\n✅ ${passed} passed, ${failed} failed`);
   if (failed) process.exitCode = 1;
 }

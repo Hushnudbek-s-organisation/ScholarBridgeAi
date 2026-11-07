@@ -13,6 +13,8 @@
  *   6. What should I look at? → recommendations based on the real profile
  */
 import React, { useCallback, useState } from "react";
+import { DashboardOverview } from "./DashboardOverview";
+import { selectDashboardActions } from "@/lib/dashboardActions";
 import { CountryFlag } from "@/components/CountryFlag";
 import { useTranslations } from "next-intl";
 import { getJson, useResource } from "./useResource";
@@ -226,7 +228,7 @@ function actionLabelForStep(t: RecTranslator, id: string, tab: string): string {
   if (id === "funding-gap") return t("ccActionFindScholarships");
   if (id === "recommendations") return t("ccActionManageLetters");
   if (id === "profile") return t("ccActionCompleteProfile");
-  if (tab === "universities") return t("ccActionSaveUnis");
+  if (tab === "universities") return t("overviewBrowseAction");
   if (tab === "chancing") return t("ccActionCheckFit");
   if (tab === "activities") return t("ccActionAddActivities");
   if (tab === "workspace") return t("ccActionOpenWorkspace");
@@ -324,9 +326,9 @@ export function RecommendedPanel({
               {recommended.personalised ? t("ccNoUnis") : t("ccRecNoBasisUnis")}
             </p>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(showAllRecUnis ? recommended.universities : recommended.universities.slice(0, 3)).map((u) => (
-                <div key={u.id} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
+                <div key={u.id} className="min-w-0 rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100">
                     <CountryFlag country={u.country} flagEmoji={u.flagEmoji} size="xs" />
                     <span className="min-w-0 break-words">{u.name}</span>
@@ -373,13 +375,13 @@ export function RecommendedPanel({
                       ))}
                     </ul>
                   )}
-                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
                     <SourceTag
                       url={u.sourceUrl}
                       verificationStatus={u.verificationStatus}
                       lastVerified={u.lastVerifiedAt}
                     />
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       {!u.saved && <Button size="sm" variant="outline" disabled={saving === `university-${u.id}`} onClick={() => void saveRecommendation("university", u.id)}>{saving === `university-${u.id}` ? t("ccSaving") : t("ccSave")}</Button>}
                       {u.saved && <Pill tone="good">{t("ccSaved")}</Pill>}
                       <Button size="sm" variant="ghost" onClick={() => onNavigateTab("universities")}>{t("ccView")}</Button>
@@ -401,9 +403,9 @@ export function RecommendedPanel({
         {recommended.scholarships.length > 0 ? (
           <div>
             <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("ccScholarshipsHeading")}</h3>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {(showAllRecSchols ? recommended.scholarships : recommended.scholarships.slice(0, 3)).map((s) => (
-                <div key={s.id} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
+                <div key={s.id} className="min-w-0 rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                   {/* Module 1 — this award applies to a university the student
                       SAVED, and 100%-full ones lead the list. The names come
                       straight from the coverage rules; nothing is claimed. */}
@@ -468,7 +470,7 @@ export function RecommendedPanel({
                         ? t("ccRecCitMatch")
                         : t("ccRecCitUnknown")}
                   </p>
-                  <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <SourceTag url={s.sourceUrl} lastVerified={s.lastVerifiedAt} verificationStatus={s.verificationStatus} />
                     {s.saved ? <Pill tone="good">{t("ccSaved")}</Pill> : <Button size="sm" variant="outline" disabled={saving === `scholarship-${s.id}`} onClick={() => void saveRecommendation("scholarship", s.id)}>{saving === `scholarship-${s.id}` ? t("ccSaving") : t("ccSave")}</Button>}
                   </div>
@@ -621,12 +623,14 @@ export function JourneyControlCenter({
   profileVersion,
   onNavigateTab,
   onOpenWorkspace,
+  afterOverview,
 }: {
   profileId: number | null;
   /** Changes on every score-relevant profile edit; forces a fresh dashboard. */
   profileVersion?: string | null;
   onNavigateTab: (tab: string) => void;
   onOpenWorkspace: (applicationId: number) => void;
+  afterOverview?: React.ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
   const t = useTranslations("journey");
@@ -748,6 +752,7 @@ export function JourneyControlCenter({
     if (step.detailKey === "fundingGapReview") values.amount = formatMoney(Number(values.amount ?? 0), "USD");
     return t(`nextStepDetail.${step.detailKey}` as never, values as never);
   };
+  const {primary:primaryStep,remaining:remainingSteps}=selectDashboardActions(nextSteps);
   const currentStageLabel = translatedStageLabel(journey.current, journey.currentLabel);
   const nextStageLabel = journey.next ? translatedStageLabel(journey.next, journey.next) : null;
   const currentDescription = journey.stillNeeded.length > 0
@@ -760,17 +765,19 @@ export function JourneyControlCenter({
   );
 
   return (
-    <div className="space-y-4">
-      {!starterComplete && (
-        <DashboardFirstSteps activity={starterActivity} onNavigateTab={onNavigateTab} />
-      )}
+    <div className="space-y-5" data-testid="journey-dashboard">
+      <DashboardOverview data={data} primaryTitle={primaryStep ? nextStepTitle(primaryStep) : t("ccNothingOutstanding")}
+        primaryDetail={primaryStep ? nextStepDetail(primaryStep) : t("ccNothingOutstandingHint")}
+        primaryLabel={primaryStep ? actionLabelForStep(t,primaryStep.id,primaryStep.tab) : t("ccContinue",{stage:currentStageLabel})}
+        primaryTab={primaryStep?.tab ?? journey.continueTab} currentStage={currentStageLabel}
+        onNavigate={onNavigateTab}/>
 
-      {/* ---- 1. The journey bar ------------------------------------------ */}
+      <details className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-surface"><summary className="cursor-pointer text-sm font-semibold">{t("overviewJourneyDetails")}</summary>
       <JourneyCard tone="hero">
         <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-5">
           <div className="min-w-0">
             <p className="sb-journey-eyebrow text-sm font-bold uppercase tracking-wider">{t("ccEyebrow")}</p>
-            <h1 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
+            <h2 className="mt-1 flex min-w-0 items-center gap-2 text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
               <Motion.span
                 aria-hidden
                 initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
@@ -781,7 +788,7 @@ export function JourneyControlCenter({
                 {journey.currentIcon}
               </Motion.span>
               <span className="sb-gradient-text min-w-0 break-words">{currentStageLabel}</span>
-            </h1>
+            </h2>
             <p className="mt-2 max-w-2xl break-words text-sm leading-relaxed text-slate-600 dark:text-slate-300">
               {currentDescription}
             </p>
@@ -857,7 +864,7 @@ export function JourneyControlCenter({
               <Motion.li
                 key={s.id}
                 className="min-w-0"
-                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                initial={reduceMotion ? false : { opacity: 1, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: reduceMotion ? 0 : i * 0.05, duration: reduceMotion ? 0 : 0.32 }}
               >
@@ -902,17 +909,19 @@ export function JourneyControlCenter({
 
       </JourneyCard>
 
+      </details>
+
       {/* ---- 2. Next steps ----------------------------------------------- */}
-      <JourneyCard title={t("ccNextStepsTitle")} subtitle={t("ccNextStepsSubtitle")}>
+      {remainingSteps.length > 0 && <JourneyCard title={t("ccNextStepsTitle")} subtitle={t("ccNextStepsSubtitle")}>
         {nextSteps.length === 0 ? (
           <Empty title={t("ccNothingOutstanding")} hint={t("ccNothingOutstandingHint")} />
         ) : (
           <>
           <ul className="space-y-2">
-            {(showAllSteps ? nextSteps : nextSteps.slice(0, 3)).map((s, i) => (
+            {(showAllSteps ? remainingSteps : remainingSteps.slice(0, 3)).map((s, i) => (
               <Motion.li
                 key={s.id}
-                initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+                initial={reduceMotion ? false : { opacity: 1, x: -8 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, margin: "-40px 0px" }}
                 transition={{ delay: reduceMotion ? 0 : i * 0.06, duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
@@ -939,16 +948,16 @@ export function JourneyControlCenter({
           </ul>
           <ShowMoreToggle
             className="mt-3"
-            totalCount={nextSteps.length}
+            totalCount={remainingSteps.length}
             visibleCount={3}
             expanded={showAllSteps}
             onToggle={() => setShowAllSteps((v) => !v)}
           />
           </>
         )}
-      </JourneyCard>
+      </JourneyCard>}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {deadlines.length === 0 && applications.total === 0 ? <JourneyCard title={t("ccAppProgressTitle")}><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-600 dark:text-slate-300">{t("overviewEmptyTracking")}</p><Button variant="outline" onClick={()=>onNavigateTab("applications")}>{t("ccStartApplication")}</Button></div></JourneyCard> : <div className="grid gap-4 lg:grid-cols-2">
         {/* ---- 3. Deadlines ---------------------------------------------- */}
         <JourneyCard
           title={t("ccDeadlinesTitle")}
@@ -967,7 +976,7 @@ export function JourneyControlCenter({
               {(showAllDeadlines ? deadlines : deadlines.slice(0, 4)).map((d, i) => (
                 <Motion.li
                   key={d.id}
-                  initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                  initial={reduceMotion ? false : { opacity: 1, y: 6 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-30px 0px" }}
                   transition={{ delay: reduceMotion ? 0 : i * 0.04, duration: 0.3 }}
@@ -1019,7 +1028,7 @@ export function JourneyControlCenter({
                 ].map((s, i) => (
                   <Motion.div
                     key={s.label}
-                    initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.97 }}
+                    initial={reduceMotion ? false : { opacity: 1, y: 8, scale: 0.97 }}
                     whileInView={{ opacity: 1, y: 0, scale: 1 }}
                     viewport={{ once: true, margin: "-30px 0px" }}
                     transition={{ delay: reduceMotion ? 0 : i * 0.06, type: "spring", stiffness: 320, damping: 26 }}
@@ -1038,7 +1047,7 @@ export function JourneyControlCenter({
             </>
           )}
         </JourneyCard>
-      </div>
+      </div>}
 
       {/* ---- 4b. At a glance ---------------------------------------------
           Four numbers the student should not have to hunt for. Each tile is
@@ -1310,6 +1319,17 @@ export function JourneyControlCenter({
           onToggle={() => setShowAllPhases((v) => !v)}
         />
       </JourneyCard>
+      {starterActivity.applications === 0 && !starterComplete && <DashboardStarterHelp key={data.profile.id} profileId={data.profile.id} activity={starterActivity} onNavigateTab={onNavigateTab}/>}
+      {afterOverview && <details className="sb-dashboard-disclosure"><summary>{t("overviewRewards")}</summary>{afterOverview}</details>}
     </div>
   );
+}
+
+function DashboardStarterHelp({profileId,activity,onNavigateTab}:{profileId:number;activity:StarterActivity;onNavigateTab:(tab:string)=>void}) {
+  const t=useTranslations("journey");
+  const key=`scholarbridge:setup-dismissed:${profileId}`;
+  const [dismissed,setDismissed]=useState(()=>{try{return localStorage.getItem(key)==="1";}catch{return false;}});
+  function dismiss(value:boolean){setDismissed(value);try{localStorage.setItem(key,value?"1":"0");}catch{/* Storage is optional; navigation still works. */}}
+  if(dismissed)return <Button variant="ghost" className="justify-self-start" onClick={()=>dismiss(false)}>{t("overviewRestoreSetup")}</Button>;
+  return <details className="sb-dashboard-disclosure"><summary>{t("firstSteps.title")}</summary><DashboardFirstSteps activity={activity} onNavigateTab={onNavigateTab}/><Button variant="ghost" onClick={()=>dismiss(true)}>{t("overviewDismissSetup")}</Button></details>;
 }

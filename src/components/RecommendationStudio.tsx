@@ -1,4 +1,8 @@
 "use client";
+import {recordedToefl,type ApplicantContext} from "@/lib/applicantContext";
+import {ToeflRecordFields,type ToeflRecord} from "@/components/ToeflRecordFields";
+import { RequirementGroupView } from "@/components/RequirementGroupView";
+import type {RequirementEvaluation} from "@/lib/requirementGroups";
 
 /**
  * #recommend — Program Recommender studio.
@@ -66,6 +70,7 @@ import { Button } from "@/components/ui/Button";
 // ---------------------------------------------------------------------------
 
 interface StudioProfile {
+  applicantContext?:ApplicantContext|null;
   id?: number;
   gpa?: number | null;
   gpaScale?: number | null;
@@ -119,7 +124,7 @@ interface RecommendResult {
     livingCostCurrency: string;
   };
   subjectFit: { level: "exact" | "synonym" | "partial" | "weak" | "none" | "unknown"; matchedInterests: string[] };
-  eligibility: { items: ReqItem[]; met: number; unmet: number; unknown: number; textRequirements: { kind: string; text: string }[] };
+  eligibility: { group?:RequirementEvaluation;items: ReqItem[]; met: number; unmet: number; unknown: number; textRequirements: { kind: string; text: string }[] };
   affordability: {
     annualTuition: number | null;
     tuitionCurrency: string;
@@ -188,13 +193,16 @@ function buildPayload(
     degreeLevel: string;
     gpa: string;
     gpaScale: string;
+    gpaMinimum:string;
     ielts: string;
     toefl: string;
+    toeflRecord:ToeflRecord;
     duolingo: string;
     sat: string;
     act: string;
     budget: string;
     fundingNeed: string;
+    applicantScope:string;
     languagePref: string;
     startYear: string;
     countries: string[];
@@ -222,10 +230,18 @@ function buildPayload(
   };
 
   strField("degreeLevel", "degreeLevel");
+  strField("applicantScope","applicantScope");
   numField("gpa", "gpa");
   numField("gpaScale", "gpaScale");
+  numField("gpaMinimum","gpaMinimum");
   numField("ielts", "ielts");
-  numField("toefl", "toefl");
+  if(form.toeflRecord.score!=null||baseline.toefl!=null){
+    body.toefl=form.toeflRecord.score;
+    body.toeflScale=form.toeflRecord.scale;
+    body.toeflExamDate=form.toeflRecord.examDate??null;
+    body.toeflValidUntil=form.toeflRecord.validUntil??null;
+    body.toeflSections=form.toeflRecord.sections??{};
+  }
   numField("duolingo", "duolingo");
   numField("sat", "sat");
   numField("act", "act");
@@ -278,13 +294,16 @@ interface FormState {
   degreeLevel: string;
   gpa: string;
   gpaScale: string;
+  gpaMinimum:string;
   ielts: string;
   toefl: string;
+  toeflRecord:ToeflRecord;
   duolingo: string;
   sat: string;
   act: string;
   budget: string;
   fundingNeed: string;
+  applicantScope:string;
   languagePref: string;
   startYear: string;
   countries: string[];
@@ -294,13 +313,16 @@ const EMPTY_FORM: FormState = {
   degreeLevel: "",
   gpa: "",
   gpaScale: "",
+  gpaMinimum:"",
   ielts: "",
   toefl: "",
+  toeflRecord:{score:null,scale:null},
   duolingo: "",
   sat: "",
   act: "",
   budget: "",
   fundingNeed: "",
+  applicantScope:"",
   languagePref: "",
   startYear: "",
   countries: [],
@@ -316,6 +338,7 @@ export function RecommendationStudio({
   onProfileSaved?: (profile: StudentProfile) => void;
 }) {
   const t = useTranslations("recommend");
+  const tc=useTranslations("profile.context");
   const tStudy = useTranslations("studyInterest");
   const { locale } = useLocaleContext();
 
@@ -341,7 +364,7 @@ export function RecommendationStudio({
   const statusRef = useRef<HTMLDivElement>(null);
 
   const setField = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => ({ ...f, [key]: value,...(key==="gpaScale"?{gpaMinimum:""}:{}) }));
   }, []);
 
   // ---- Prefill from the saved profile (flagged; user confirms) -------------
@@ -364,12 +387,14 @@ export function RecommendationStudio({
         }
       })();
 
+      const test=recordedToefl(profile.applicantContext,profile.toeflScore);
       const b: Record<string, unknown> = {
         degreeLevel: profile.degreeLevel,
-        gpa: profile.gpa,
-        gpaScale: profile.gpaScale,
+        gpa: profile.applicantContext?.gpa?.value??profile.gpa,
+        gpaMinimum:profile.applicantContext?.gpa?.minimum??null,
+        gpaScale:profile.applicantContext?.gpa?.maximum??profile.gpaScale,
         ielts: profile.ieltsScore,
-        toefl: profile.toeflScore,
+        toefl: test.score,
         duolingo: profile.duolingoScore,
         sat: profile.satScore,
         act: profile.actScore,
@@ -384,10 +409,12 @@ export function RecommendationStudio({
       setForm((f) => ({
         ...f,
         degreeLevel: profile.degreeLevel || f.degreeLevel,
-        gpa: profile.gpa != null ? String(profile.gpa) : f.gpa,
-        gpaScale: profile.gpaScale != null ? String(profile.gpaScale) : f.gpaScale,
+        gpa:b.gpa!=null?String(b.gpa):f.gpa,
+        gpaMinimum:b.gpaMinimum!=null?String(b.gpaMinimum):"",
+        gpaScale:b.gpaScale!=null?String(b.gpaScale):f.gpaScale,
         ielts: profile.ieltsScore != null ? String(profile.ieltsScore) : f.ielts,
-        toefl: profile.toeflScore != null ? String(profile.toeflScore) : f.toefl,
+        toefl: test.score != null ? String(test.score) : f.toefl,
+        toeflRecord:test,
         duolingo: profile.duolingoScore != null ? String(profile.duolingoScore) : f.duolingo,
         sat: profile.satScore != null ? String(profile.satScore) : f.sat,
         act: profile.actScore != null ? String(profile.actScore) : f.act,
@@ -738,8 +765,10 @@ export function RecommendationStudio({
                 )}
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <label className="grid gap-1 text-sm" htmlFor="rec-applicant-scope"><span className={labelCls}>{tc("applicantScope")}</span><select id="rec-applicant-scope" value={form.applicantScope} onChange={event=>setField("applicantScope",event.target.value)} className={inputCls}><option value="">{tc("unknown")}</option><option value="international">{tc("international")}</option><option value="domestic">{tc("domestic")}</option></select><span className={hintCls}>{tc("scopeHint")}</span></label>
+                  {optionalField("gpaMinimum","rec-gpa-minimum",tc("gpaMinimum"),tc("hint"),"number")}
                   {optionalField("ielts", "rec-ielts", t("ielts"), t("testsWhy"), "number")}
-                  {optionalField("toefl", "rec-toefl", t("toefl"), t("testsWhy"), "number")}
+                  <div className="sm:col-span-2 lg:col-span-3"><ToeflRecordFields value={form.toeflRecord} onChange={toeflRecord=>setForm(form=>({...form,toefl:toeflRecord.score==null?"":String(toeflRecord.score),toeflRecord}))}/></div>
                   {optionalField("duolingo", "rec-duolingo", t("duolingo"), t("testsWhy"), "number")}
                   {optionalField("sat", "rec-sat", t("sat"), t("testsWhy"), "number")}
                   {optionalField("act", "rec-act", t("act"), t("testsWhy"), "number")}
@@ -998,7 +1027,7 @@ export function RecommendationStudio({
                           {/* 2 — Eligibility */}
                           <div>
                             <DimHeading icon={<ListChecks className="h-3.5 w-3.5" />}>{t("eligibility")}</DimHeading>
-                            {r.eligibility.items.length === 0 && r.eligibility.textRequirements.length === 0 ? (
+                            {r.eligibility.group?<RequirementGroupView evaluation={r.eligibility.group}/>:r.eligibility.items.length === 0 && r.eligibility.textRequirements.length === 0 ? (
                               <p className="mt-1.5 flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
                                 <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {t("noReqs")}
                               </p>

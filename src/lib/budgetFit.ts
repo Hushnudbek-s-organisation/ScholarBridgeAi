@@ -70,9 +70,7 @@ const round = roundMoney;
 export function evaluateBudgetFit(input: BudgetFitInput): BudgetFit {
   const tuitionUsd = known(input.tuitionUsd);
   const livingUsd = known(input.livingUsd);
-  const budgetUsd = known(input.budgetUsd) && (input.budgetUsd as number) > 0
-    ? known(input.budgetUsd)
-    : null;
+  const budgetUsd = known(input.budgetUsd);
   const extra = (input.extraAnnualLines ?? []).filter(
     (line) => Number.isFinite(line.annualUsd) && line.annualUsd >= 0,
   );

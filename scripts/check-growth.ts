@@ -1,3 +1,4 @@
+import {unsafeSql} from "./lib/sql-safety";
 /**
  * Growth-features regression test — deterministic, no DB, no network.
  *
@@ -300,7 +301,13 @@ check("public story shape never leaks profileId or adminNote", () => {
 });
 check("no growth route builds SQL by string concatenation", () => {
   const routes = walk("src/app/api").filter((p) => /(journey|autopilot|vault|goals|departure|stories|goal-templates|answer-prompts|checklist|guide|overview)/.test(p));
-  for (const p of routes) assert.ok(!/sql\.raw\(|`\s*SELECT .*\$\{/i.test(readFileSync(p, "utf8")), p);
+  for(const path of routes)assert.equal(unsafeSql(readFileSync(path,"utf8")),false,path);
+  // Tagged Drizzle SQL interpolations are bound parameters, not string
+  // concatenation. Still reject raw strings, multiline interpolation and raw().
+  assert.equal(unsafeSql('db.execute(sql`SELECT id FROM t WHERE id=${id}`)'),false);
+  assert.equal(unsafeSql('db.execute(`SELECT id FROM t\nWHERE id=${id}`)'),true);
+  assert.equal(unsafeSql('db.execute("SELECT id FROM t WHERE id="+id)'),true);
+  assert.equal(unsafeSql('db.execute(sql.raw(input))'),true);
 });
 
 // ---------------------------------------------------------------------------

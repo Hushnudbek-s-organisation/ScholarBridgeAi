@@ -154,7 +154,7 @@ export function AdminPanel({ activeProfile, onOpenProfileEditor }: AdminPanelPro
     try {
       localStorage.setItem(TAB_KEY, id);
       // Shareable: /#admin/channel opens this section directly.
-      window.history.replaceState(null, "", `#admin/${id}`);
+      window.history.replaceState(window.history.state, "", `#admin/${id}`);
     } catch {
       // ignore
     }

@@ -648,7 +648,11 @@ check("the explorer never calls a native alert()", !/(?:^|[^.\w"'])alert\(/.test
 check("the explorer reports problems in inline banners", explorer.includes('role="status"') && explorer.includes('role="alert"'));
 
 const detail = read("src/components/UniversityDetail.tsx");
-check("the detail view renders the same decision strip", detail.includes("<DecisionPillStrip university={uni} profile={activeProfile ?? null}"));
+// Old → new: same strip/profile, but a scope refetch masks OLD academic
+// evidence until the new response settles. The production detail E2E also
+// asserts its real data-decision-eligibility state after each scope selection.
+check("the detail view renders the same decision strip", /<DecisionPillStrip university=\{(?:uni|loading\|\|error\?\{\.\.\.uni,academicRequirements:null\}:uni)\} profile=\{activeProfile \?\? null\}/.test(detail));
+check("detail scope refetch never reuses previous academic verdict inputs",detail.includes("university={loading||error?{...uni,academicRequirements:null}:uni}"));
 check("the detail view exposes the numbers behind the pills", detail.includes("pillFactGpa") && detail.includes("pillFactWorkVisa"));
 
 const scholarshipHub = read("src/components/ScholarshipHub.tsx");

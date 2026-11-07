@@ -70,8 +70,10 @@ import {
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { loadBootConfig } from "@/lib/bootConfig";
 import { Button } from "@/components/ui/Button";
+import { GroupedDock } from "./GroupedDock";
 
 export interface StudentProfile {
+  applicantContext?:import("@/lib/applicantContext").ApplicantContext|null;
   id: number;
   name: string;
   email: string;
@@ -799,19 +801,6 @@ export function Navbar({
     </div>
   );
 
-  // The bottom bar only offers groups that still have a visible destination.
-  const bottomItems = BOTTOM_BAR_GROUPS.filter((b) => visibleDestinations.some((d) => d.group === b.group));
-  const activeInBottomBar = bottomItems.some((b) => b.group === activeGroup);
-
-  // The tablet rail carries the destinations a student moves between all day
-  // (plus Admin for an operator). Everything else stays in the drawer.
-  const tabletItems = useMemo(() => {
-    const ids = new Set(TABLET_RAIL_IDS);
-    const list = visibleDestinations.filter((d) => ids.has(d.id));
-    const admin = utilityItems.find((u) => u.id === "admin");
-    if (admin) list.push(admin);
-    return list;
-  }, [visibleDestinations, utilityItems]);
 
   return (
     <>
@@ -822,108 +811,8 @@ export function Navbar({
         {t("skipToContent")}
       </a>
 
-      {/* ================= LAPTOP / DESKTOP: LEFT SIDEBAR ================= */}
-      <aside className="sticky top-0 z-40 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex xl:w-72 dark:border-slate-800 dark:bg-slate-900">
-        <Button variant="unstyled" className="min-h-11 border-b border-slate-100 px-5 py-4 text-left dark:border-slate-800" onClick={() => go("dashboard")}>
-          {Logo}
-        </Button>
-        <div className="px-3 pt-3">{SearchButton}</div>
-        <nav className="no-scrollbar flex-1 overflow-y-auto overscroll-contain px-3 py-3" aria-label={t("mainNav")}>
-          {renderGroups("nav-active-desktop")}
-          {renderUtility("nav-active-desktop")}
-        </nav>
-        <div className="shrink-0 space-y-2.5 border-t border-slate-100 px-3 py-3 dark:border-slate-800">
-          {renderProfileCard()}
-          {SettingsRow}
-        </div>
-      </aside>
-
-      {/* ================= TABLET: COMPACT ICON RAIL ================= */}
-      {/* 768px – 1023px. A stretched phone tab bar wastes the tablet's width
-          and a full desktop sidebar squeezes the content column, so tablets
-          get their own 80px rail: every destination is one tap away, the
-          labels stay short, and the drawer is still one tap for the full
-          list. */}
-      <aside className="sticky top-0 z-40 hidden h-screen w-20 shrink-0 flex-col items-center justify-between border-r border-slate-200 bg-white py-3 md:flex lg:hidden dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col items-center gap-1.5">
-          <Button variant="unstyled"
-            onClick={() => go("dashboard")}
-            className="flex h-11 w-11 items-center justify-center rounded-surface transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
-            aria-label={tm("appName")}
-          >
-            <span className="sb-logo-well h-9 w-9 overflow-hidden rounded-control border border-slate-200 bg-white shadow-sm">
-              <BrandingImage alt={t("logoAlt")} className="h-9 w-9 object-cover" />
-            </span>
-          </Button>
-          <Button variant="unstyled"
-            onClick={openSearch}
-            className="flex h-11 w-11 items-center justify-center rounded-control text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            aria-label={t("searchButton")}
-          >
-            <Search className="h-[18px] w-[18px]" />
-          </Button>
-          <Button variant="unstyled"
-            onClick={() => setDrawerOpen(true)}
-            className="flex h-11 w-11 items-center justify-center rounded-control text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-            aria-label={t("openMenu")}
-            aria-expanded={drawerOpen}
-            aria-haspopup="dialog"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
-
-        <nav
-          className="no-scrollbar flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto overscroll-contain px-1.5 py-2"
-          aria-label={t("mainNav")}
-        >
-          {tabletItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = isDestinationActive(item.id);
-            return (
-              <Button variant="unstyled"
-                key={item.id}
-                onClick={() => go(item.id)}
-                aria-current={isActive ? "page" : undefined}
-                title={item.label}
-                className={`relative flex min-h-16 w-full min-w-11 flex-col items-center justify-center gap-1 rounded-surface px-1 py-1.5 text-xs font-semibold transition-colors ${
-                  isActive
-                    ? "text-indigo-600 dark:text-indigo-300"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                }`}
-              >
-                {isActive && (
-                  <Motion.span
-                    layoutId="nav-active-tablet"
-                    className="absolute inset-0 rounded-surface bg-indigo-50 dark:bg-indigo-500/10"
-                    transition={LAYOUT_SPRING}
-                  />
-                )}
-                <Icon className="relative h-5 w-5 shrink-0" />
-                <span className="relative w-full min-w-0 break-words whitespace-normal text-center leading-tight">
-                  {item.label}
-                </span>
-              </Button>
-            );
-          })}
-        </nav>
-
-        <div className="flex flex-col items-center gap-1.5">
-          <NotificationBell profileId={activeProfileId ?? null} placement="up" />
-          <ThemeSwitch />
-          <Button variant="unstyled"
-            onClick={() => onOpenProfileModal(false)}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white transition-colors hover:bg-indigo-700"
-            aria-label={t("editProfile")}
-            title={t("editProfile")}
-          >
-            {initials}
-          </Button>
-        </div>
-      </aside>
-
       {/* ================= PHONE: TOP BAR ================= */}
-      <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 shadow-xs backdrop-blur-md md:hidden dark:border-slate-800 dark:bg-slate-900/95">
+      <header data-sb-shell-header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
         <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
           <Button variant="unstyled"
             onClick={() => setDrawerOpen(true)}
@@ -956,55 +845,19 @@ export function Navbar({
         </div>
       </header>
 
-      {/* ================= PHONE: BOTTOM TAB BAR ================= */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden dark:border-slate-800 dark:bg-slate-900/95"
-        aria-label={t("quickNav")}
-      >
-        <div className="mx-auto grid max-w-xl grid-cols-5">
-          {bottomItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeGroup === item.group;
-            return (
-              <Button variant="unstyled"
-                key={item.group}
-                onClick={() => go(item.section)}
-                aria-current={isActive ? "page" : undefined}
-                className={`relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-1.5 text-xs font-semibold transition-colors ${
-                  isActive ? "text-indigo-600 dark:text-indigo-300" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
-                }`}
-              >
-                {isActive && (
-                  <Motion.span
-                    layoutId="nav-active-bottom"
-                    className="absolute top-0 h-0.5 w-10 rounded-full bg-indigo-600"
-                    transition={LAYOUT_SPRING}
-                  />
-                )}
-                <Icon className="h-5 w-5" />
-                <span className="w-full min-w-0 break-words whitespace-normal text-center leading-tight">{t(item.labelKey)}</span>
-              </Button>
-            );
-          })}
-          <Button variant="unstyled"
-            onClick={() => setDrawerOpen(true)}
-            aria-expanded={drawerOpen}
-            aria-haspopup="dialog"
-            className={`relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-1.5 text-xs font-semibold ${
-              activeInBottomBar ? "text-slate-500 dark:text-slate-400" : "text-indigo-600 dark:text-indigo-300"
-            }`}
-          >
-            <Menu className="h-5 w-5" />
-            <span>{t("tabMore")}</span>
-          </Button>
-        </div>
-      </nav>
+      <GroupedDock dashboardShortLabel={t("tabHome")} dashboardLabel={labelFor("dashboard")} dashboardActive={activeTab === "dashboard"} onDashboard={() => go("dashboard")} moreLabel={t("tabMore")} onMore={() => setDrawerOpen(true)} groups={[
+        ...NAV_GROUPS.filter(g=>g!=="home").map(g=>{
+          const items=visibleDestinations.filter(i=>i.group===g); const Icon=GROUP_ICONS_LUCIDE[g];
+          return {id:g,label:t(NAV_GROUP_I18N[g]),shortLabel:t(`dockShort.${g}` as never),icon:<Icon aria-hidden className="h-5 w-5"/>,active:activeGroup===g,count:items.length,content:items.map(i=>renderItem(i,`dock-${g}`))};
+        }).filter(g=>g.count>0),
+        {id:"account",label:t("dockAccount"),shortLabel:t("dockShort.account"),icon:<Users aria-hidden className="h-5 w-5"/>,active:utilityItems.some(i=>isDestinationActive(i.id)),count:utilityItems.length,content:<div className="space-y-3">{utilityItems.map(i=>renderItem(i,"dock-account"))}{renderProfileCard()}{SettingsRow}</div>}
+      ]}/>
 
       {/* ================= PHONE / TABLET: SLIDE-IN MENU ================= */}
       <AnimatePresence>
         {drawerOpen && (
           <Motion.div
-            className="fixed inset-0 z-[60] lg:hidden"
+            className="fixed inset-0 z-[60]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1035,7 +888,7 @@ export function Navbar({
                 {renderProfileCard(true)}
                 {SearchButton}
               </div>
-              <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-3" aria-label={t("mainNav")}>
+              <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3" aria-label={t("mainNav")}>
                 {renderGroups("nav-active-drawer")}
                 {renderUtility("nav-active-drawer")}
               </nav>

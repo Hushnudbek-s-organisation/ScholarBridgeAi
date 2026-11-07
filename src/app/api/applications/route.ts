@@ -1,3 +1,4 @@
+import { bumpCacheRevision } from "@/lib/cacheRevision";
 import { NextResponse } from "next/server";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
@@ -188,6 +189,7 @@ export async function POST(req: Request) {
       })
       .returning();
 
+    await bumpCacheRevision(`applications:${profileId}`,"application created");
     return NextResponse.json({ application: row, outcome: null });
   } catch (error) {
     console.error("POST /api/applications error:", error);
@@ -241,6 +243,7 @@ export async function PATCH(req: Request) {
       .where(eq(applications.id, id))
       .returning();
 
+    await bumpCacheRevision(`applications:${existing!.profileId}`,"application updated");
     return NextResponse.json({ application: row });
   } catch (error) {
     console.error("PATCH /api/applications error:", error);
@@ -261,6 +264,7 @@ export async function DELETE(req: Request) {
     }
 
     await db.delete(applications).where(and(eq(applications.id, id)));
+    await bumpCacheRevision(`applications:${existing!.profileId}`,"application deleted");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/applications error:", error);

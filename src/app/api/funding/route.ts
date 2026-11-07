@@ -1,9 +1,10 @@
+import {normalizeScholarshipAwardPeriod} from "@/lib/usdCosts";
 import { NextResponse } from "next/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { applications, fundingItems, savedScholarships, savedUniversities, scholarships, universities } from "@/db/schema";
 import { guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
-import { annualFundingCostLines, buildFundingPlan, knownAnnualCostTotal, ONE_OFF_COST_LINES, FUNDING_KIND_LABELS, type FundingItemLike, type FundingKind, type FundingStatus } from "@/lib/journey/funding";
+import { parseRecordedFundingUsd, annualFundingCostLines, buildFundingScenario, knownAnnualCostTotal, ONE_OFF_COST_LINES, FUNDING_KIND_LABELS, type FundingItemLike, type FundingKind, type FundingStatus } from "@/lib/journey/funding";
 import { countriesMatch } from "@/lib/countries";
 import {
   COUNTRY_COST_BENCHMARKS,
@@ -18,7 +19,7 @@ const KINDS = ["scholarship", "aid", "family", "savings", "loan", "other"] as co
 const STATUSES = ["planned", "applied", "awarded", "confirmed", "declined"] as const;
 
 /**
- * GET /api/funding?profileId=[&applicationId=][&country=][&currency=]
+ * GET /api/funding?profileId=[&applicationId=][&country=][&currency=][&scenario=confirmed|optimistic]
  *
  * My Funding Plan: canonical annual cost lines plus separately reported
  * one-off application/visa fees, scholarships, aid and the remaining gap.
@@ -35,6 +36,8 @@ export async function GET(req: Request) {
   if (rawApplicationId != null && (!Number.isInteger(applicationId) || applicationId! <= 0)) {
     return jsonError(400, "applicationId must be a positive integer", "bad_request");
   }
+  const scenario=searchParams.get("scenario")??"confirmed";
+  if(scenario!=="confirmed"&&scenario!=="optimistic")return jsonError(400,"Unknown funding scenario","bad_request");
   const countryParam = (searchParams.get("country") || "").trim() || null;
   const displayCurrency = ((searchParams.get("currency") || "USD").trim().toUpperCase()) || "USD";
 
@@ -106,7 +109,7 @@ export async function GET(req: Request) {
       covers: r.covers,
     }));
 
-    const plan = buildFundingPlan({ annualCost, items, lines });
+    const plan = buildFundingScenario({ annualCost, items, lines },scenario);
 
     // Scholarships that could close the gap — matched to the saved list.
     const saved = await db
@@ -126,6 +129,9 @@ export async function GET(req: Request) {
         provider: s.provider,
         country: s.country ?? null,
         amountUsdValue: resolveMultiCurrencyScholarshipAmount(s).amountUsd,
+        annualComparable:normalizeScholarshipAwardPeriod(s.awardPeriod)==="year"&&String(s.awardCurrency??"").trim().toUpperCase()==="USD"&&s.awardAmount!=null,
+        awardAmount:s.awardAmount??null,awardCurrency:s.awardCurrency??null,awardPeriod:s.awardPeriod??null,
+        discoveryOnly:true,eligibility:"unknown" as const,
         tuitionCoverage: s.tuitionCoverage || "Not specified",
         deadlineDate: s.deadlineDate ? String(s.deadlineDate).slice(0, 10) : null,
       }))
@@ -145,10 +151,10 @@ export async function GET(req: Request) {
       if (gap == null || list.length === 0) return [];
       const home = (x: (typeof list)[number]) => Number(Boolean(homeCountry && x.country === homeCountry));
       const closers = list
-        .filter((x) => x.amountUsdValue >= gap)
+        .filter((x) => x.annualComparable&&x.amountUsdValue >= gap)
         .sort((a, b) => home(b) - home(a) || a.amountUsdValue - b.amountUsdValue);
       const partials = list
-        .filter((x) => x.amountUsdValue < gap)
+        .filter((x) => !x.annualComparable||x.amountUsdValue < gap)
         .sort((a, b) => home(b) - home(a) || b.amountUsdValue - a.amountUsdValue);
       return [...closers, ...partials].slice(0, 5);
     };
@@ -178,7 +184,7 @@ export async function GET(req: Request) {
           const gap = plan.fundingGap;
           return gapCandidates(matched, gap, uni && !countryParam ? (uni.country as string | null) : null).map((s) => ({
             ...s,
-            coversGap: gap != null && s.amountUsdValue >= gap,
+            coversGap: s.annualComparable&&gap != null && s.amountUsdValue >= gap,
           }));
         })(),
         tab: "scholarships",
@@ -203,8 +209,8 @@ export async function POST(req: Request) {
   const { profileId } = g.value;
   const name = text(b.value.name, 200);
   if (!name) return jsonError(400, "name is required", "bad_request");
-  const amount = Number(b.value.amountUsd);
-  if (!Number.isFinite(amount) || amount < 0) return jsonError(400, "amountUsd must be a positive number", "bad_request");
+  const amount = parseRecordedFundingUsd(b.value.amountUsd);
+  if (amount == null) return jsonError(400, "amountUsd must be a non-negative USD number within the supported range", "bad_request");
   try {
     const requestedApplicationId = b.value.applicationId;
     let linked: number | null = null;
@@ -229,7 +235,7 @@ export async function POST(req: Request) {
         applicationId: linked,
         kind: oneOf(b.value.kind, KINDS, "other"),
         name,
-        amountUsd: Math.round(amount),
+        amountUsd: amount,
         covers: JSON.stringify(covers),
         status: oneOf(b.value.status, STATUSES, "planned"),
         notes: text(b.value.notes, 1000),
@@ -250,6 +256,10 @@ export async function PATCH(req: Request) {
   const { profileId } = g.value;
   const id = Number(b.value.id);
   if (!Number.isInteger(id) || id <= 0) return jsonError(400, "id is required", "bad_request");
+  const amount=b.value.amountUsd===undefined?undefined:parseRecordedFundingUsd(b.value.amountUsd);
+  // Reject the entire update before any status/metadata write. An omitted
+  // field preserves its previous value; explicit null must never erase it.
+  if(amount===null)return jsonError(400,"amountUsd must be a non-negative USD number within the supported range","bad_request");
   try {
     const rawApplicationId = b.value.applicationId;
     let applicationScope = isNull(fundingItems.applicationId);
@@ -278,7 +288,7 @@ export async function PATCH(req: Request) {
       .set({
         kind: b.value.kind == null ? row.kind : oneOf(b.value.kind, KINDS, row.kind),
         name: b.value.name === undefined ? row.name : text(b.value.name, 200) ?? row.name,
-        amountUsd: b.value.amountUsd === undefined ? row.amountUsd : Math.max(0, Math.round(Number(b.value.amountUsd) || 0)),
+        amountUsd: amount === undefined ? row.amountUsd : amount,
         covers: b.value.covers === undefined ? row.covers : JSON.stringify(Array.isArray(b.value.covers) ? b.value.covers : []),
         status,
         confirmedAt: status === "confirmed" ? new Date().toISOString().slice(0, 10) : row.confirmedAt,

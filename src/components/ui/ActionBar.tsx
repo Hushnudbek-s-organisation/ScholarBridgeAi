@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Button } from "./Button";
 import { cn } from "./cn";
 
 /**
@@ -38,7 +39,7 @@ export function ActionBar({
       aria-label={label}
       className={cn("sb-stack flex flex-wrap items-center gap-2", className)}
     >
-      <button
+      <Button variant="unstyled"
         type="button"
         onClick={primary.onClick}
         disabled={primary.disabled}
@@ -53,9 +54,9 @@ export function ActionBar({
       >
         {primary.icon}
         <span>{primary.label}</span>
-      </button>
+      </Button>
       {secondary.map((a) => (
-        <button
+        <Button variant="unstyled"
           key={a.id}
           type="button"
           onClick={a.onClick}
@@ -72,7 +73,7 @@ export function ActionBar({
         >
           {a.icon}
           <span>{a.label}</span>
-        </button>
+        </Button>
       ))}
     </div>
   );

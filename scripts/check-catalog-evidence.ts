@@ -41,7 +41,13 @@ for (const p of [
 assert.equal(program.annualTuition, 1000); // No mutation of raw catalogues.
 
 const api = readFileSync("src/app/api/programs/recommend/route.ts", "utf8");
-assert.match(api, /if \(!hasVerifiedProgramEvidence\(r\)\) continue/);
+// Whole-row programme flags must not grant authority to legacy minima. The
+// live route now resolves each scoped typed field independently; the real API
+// continuation test also proves an unverified legacy row grants no cutoff.
+assert.match(api, /loadCatalogueFacts\("program", programIds\)/);
+assert.match(api, /mayAutoReject\(value\)/);
+assert.match(api, /isVerifiedOfficialRequirement\(group\)/);
+assert.doesNotMatch(api, /minIelts:\s*r\.minIelts| minToefl:\s*r\.minToefl/);
 assert.match(api, /from\(applicationCycles\)\.where\(eq\(applicationCycles\.isActive, true\)\)/);
 const detail = readFileSync("src/app/api/universities/[id]/route.ts", "utf8");
 assert.match(detail, /eq\(applicationCycles\.isActive, true\)/);

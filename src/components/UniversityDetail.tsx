@@ -1,9 +1,12 @@
 "use client";
+import {originalAcademicRequirementInput,type ResolvedAcademicDecisionInput} from "@/lib/academicDecision";
 
 import React, { useEffect, useState } from "react";
 import { ShowMoreToggle } from "@/components/ui/hubs";
 import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 import { useTranslations } from "next-intl";
+import { RequirementGroupView } from "@/components/RequirementGroupView";
+import { evaluateApplicantRequirementGroup } from "@/lib/requirementGroups";
 import { EvidenceNote } from "@/components/EvidenceNote";
 import { presentRaw, type PresentedFact } from "@/lib/factPresentation";
 
@@ -49,7 +52,9 @@ import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { Button } from "@/components/ui/Button";
 
 interface UniversityDetailData {
+  recordedMinimums?: {minGpa:number|null;minIelts:number|null;minSat:number|null};
   id: number;
+  academicRequirements?:ResolvedAcademicDecisionInput;
   name: string;
   country: string;
   city: string;
@@ -124,6 +129,9 @@ interface ProgramData {
   minSat: number | null;
   minAct: number | null;
   minGpa: number | null;
+  requirementGroup?: PresentedFact | null;
+  recordedRequirements?: ProgramData["requirements"];
+  recordedFlags?: Record<string, boolean>;
   portfolioRequired: boolean;
   interviewRequired: boolean;
   recommendationRequired: boolean;
@@ -148,6 +156,8 @@ interface ProgramData {
     requirementType: string;
     minimumValue: number | null;
     valueText: string | null;
+    unit?: string | null;
+    evidence?: PresentedFact;
     sourceUrl: string | null;
     lastVerifiedAt: string | null;
     verificationStatus: string;
@@ -204,13 +214,14 @@ interface SourceData {
 }
 
 interface UniversityDetailProps {
+  experimentalChancing?: boolean;
   universityId: number;
   /**
    * The scores and budget the decision strip compares against. Every field is
    * optional: an anonymous visitor or a profile that has not recorded a GPA
    * still gets the strip, with honest "not provided" pills instead of a guess.
    */
-  activeProfile?: ({ id: number; country?: string | null } & DecisionProfileInput) | null;
+  activeProfile?: ({ id: number; country?: string | null; applicantContext?: import("@/lib/applicantContext").ApplicantContext | null; actScore?: number | null; duolingoScore?: number | null } & DecisionProfileInput) | null;
   onBack: () => void;
   /** Priority 4.1 — where the hub wants to go after an application is created. */
   onNavigate?: (id: string) => void;
@@ -234,6 +245,7 @@ interface UniversityDetailPayload {
   applicationCycles?: CycleData[];
   cycles?: CycleData[];
   universityRequirements?: any;
+  requirementContexts?: {admissionCycles:string[];applicantScopes:string[]};
   money?: any;
   scholarships?: ScholarshipData[];
   sources?: SourceData[];
@@ -258,12 +270,12 @@ function fmtValue(v: string | number | null | undefined, suffix = ""): string {
 function req(
   ur: Record<string, any> | null,
   key: string,
-  fmt: (v: number) => string
+  fmt: (v: number, unit?: string | null) => string
 ): string {
   const v = ur?.[key];
   if (!v) return NOT_SPECIFIED;
   if (typeof v === "number") return fmt(v);
-  if (typeof v.single === "number") return fmt(v.single);
+  if (typeof v.single === "number") return fmt(v.single, v.unit ?? null);
   if (Array.isArray(v.values) && v.values.length > 0) {
     const nums = v.values.filter((x: any) => typeof x === "number");
     if (nums.length === 0) return NOT_SPECIFIED;
@@ -302,12 +314,24 @@ function Field({ label, value, icon, evidence }: {
   );
 }
 
+/** Official scoped value and legacy discovery are deliberately separate. */
+function AcademicRequirementField({label,name,requirements,format,notApplicable=false}:{label:string;name:string;requirements:Record<string,any>|null;format:(value:number,unit?:string|null)=>string;notApplicable?:boolean}){
+  const t=useTranslations("university");
+  const fact=requirements?.evidence?.[name] as PresentedFact|undefined;
+  const recorded=req(requirements?.recordedCatalogue??null,name,format);
+  const value=notApplicable?t("satNotApplicable"):fact?.valueType==="not_published"?t("minimumNotPublished"):fact?.valueType==="not_applicable"?t("requirementNotApplicable"):req(requirements,name,format);
+  return <div className="min-w-0"><Field label={label} value={value} evidence={fact??null}/>
+    {recorded!==NOT_SPECIFIED&&<div className="mt-1 px-1 text-xs text-slate-500"><p className="break-words">{t("recordedCatalogueValue")}: {recorded}</p><EvidenceNote compact label={label} fact={presentRaw({value:recorded,fieldLabel:label,trust:"legacy_unknown",valueType:"unverified"})}/></div>}
+  </div>;
+}
+
 export function UniversityDetail({
   universityId,
   activeProfile,
   onBack,
   onNavigate,
   onApplicationStarted,
+  experimentalChancing=false,
 }: UniversityDetailProps) {
   const t = useTranslations("university");
   const { locale } = useLocaleContext();
@@ -319,6 +343,11 @@ export function UniversityDetail({
   const [programs, setPrograms] = useState<ProgramData[]>([]);
   const [cycles, setCycles] = useState<CycleData[]>([]);
   const [universityRequirements, setUniversityRequirements] = useState<any>(null);
+  const [requirementContexts,setRequirementContexts]=useState({admissionCycles:[] as string[],applicantScopes:[] as string[]});
+  const [requirementSelection,setRequirementSelection]=useState({universityId,programId:"",admissionCycle:"",applicantScope:""});
+  const scope=React.useMemo(()=>requirementSelection.universityId===universityId?requirementSelection:{universityId,programId:"",admissionCycle:"",applicantScope:""},[requirementSelection,universityId]);
+  const selectRequirementScope=(key:"programId"|"admissionCycle"|"applicantScope",value:string)=>{setLoading(true);setError("");setRequirementSelection({...scope,[key]:value});};
+  const evaluateGroup=(value:unknown)=>evaluateApplicantRequirementGroup(value,originalAcademicRequirementInput(activeProfile),new Date().toISOString().slice(0,10));
   const [money, setMoney] = useState<any>(null);
   const [scholarships, setScholarships] = useState<ScholarshipData[]>([]);
   const [sources, setSources] = useState<SourceData[]>([]);
@@ -326,6 +355,7 @@ export function UniversityDetail({
   const [chance, setChance] = useState<UniversityDetailData["chance"]>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryVersion,setRetryVersion]=useState(0);
   // Presentation-only UI state (no fetch/API changes)
   const [reqsExpanded, setReqsExpanded] = useState(false);
   const [showAllPrograms, setShowAllPrograms] = useState(false);
@@ -353,12 +383,13 @@ export function UniversityDetail({
     setPrograms(data.programs || []);
     setCycles(data.applicationCycles || data.cycles || []);
     setUniversityRequirements(data.universityRequirements || null);
+    setRequirementContexts(data.requirementContexts??{admissionCycles:[],applicantScopes:[]});
     setMoney(data.money || null);
     setScholarships(data.scholarships || []);
     setSources(data.sources || []);
     setMatch(data.match ?? null);
     setChance(data.chance ?? null);
-  }, []);
+  }, [setUni,setPrograms,setCycles,setUniversityRequirements,setRequirementContexts,setMoney,setScholarships,setSources,setMatch,setChance]);
 
   /**
    * Create the application row for this university and hand the workspace to the
@@ -483,6 +514,10 @@ export function UniversityDetail({
       const params = new URLSearchParams();
       if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
       params.set("locale", locale);
+      if(experimentalChancing)params.set("sort","chance_desc");
+      if(scope.programId)params.set("programId",scope.programId);
+      if(scope.admissionCycle)params.set("admissionCycle",scope.admissionCycle);
+      if(scope.applicantScope)params.set("applicantScope",scope.applicantScope);
       const qs = `?${params.toString()}`;
       const cacheKey = `${universityId}${qs}`;
       // The payload the browser already has (the student pressed "Back" a
@@ -515,9 +550,9 @@ export function UniversityDetail({
     return () => {
       cancelled = true;
     };
-  }, [universityId, activeProfile?.id, applyDetailPayload, locale, profileFingerprint]);
+  }, [universityId, activeProfile?.id, applyDetailPayload, locale, profileFingerprint, experimentalChancing, scope, retryVersion]);
 
-  if (loading) {
+  if ((loading && !uni) || (uni && uni.id !== universityId && !error)) {
     return (
       <div className="flex items-center justify-center gap-2 p-16 text-xs font-semibold text-slate-500">
         <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
@@ -525,7 +560,7 @@ export function UniversityDetail({
     );
   }
 
-  if (error || !uni) {
+  if (!uni || uni.id !== universityId) {
     const errorText = error
       ? error === "load-failed" ? t("loadFailed") : error
       : t("notFound");
@@ -720,15 +755,15 @@ export function UniversityDetail({
           </Button>
         </div>
 
-        <DecisionPillStrip university={uni} profile={activeProfile ?? null} className="mt-3" />
+        <DecisionPillStrip university={loading||error?{...uni,academicRequirements:null}:uni} profile={activeProfile ?? null} className="mt-3" />
 
         {/* The published numbers behind the pills, so a verdict can be checked
             rather than trusted. NULL stays "not specified" (spec §19). */}
         <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <Field label={t("pillFactGpa")} value={uni.minGpa != null ? `${formatNumber(uni.minGpa, { decimals: 2 })} / 4.0` : NOT_SPECIFIED}
-            evidence={presentRaw({ value: uni.minGpa, fieldLabel: t("pillFactGpa"), trust: "legacy_unknown", valueType: "unverified", unit: "GPA / 4.0" })} />
-          <Field label={t("pillFactIelts")} value={uni.minIelts != null ? formatNumber(uni.minIelts, { decimals: 1 }) : NOT_SPECIFIED}
-            evidence={presentRaw({ value: uni.minIelts, fieldLabel: t("pillFactIelts"), trust: "legacy_unknown", valueType: "unverified", unit: "IELTS band" })} />
+          <Field label={t("pillFactGpa")} value={(uni.recordedMinimums?.minGpa ?? uni.minGpa) != null ? `${formatNumber((uni.recordedMinimums?.minGpa ?? uni.minGpa)!, { decimals: 2 })} (${t("scoreScaleNotRecorded")})` : NOT_SPECIFIED}
+            evidence={presentRaw({ value: uni.recordedMinimums?.minGpa ?? uni.minGpa, fieldLabel: t("pillFactGpa"), trust: "legacy_unknown", valueType: "unverified", unit: null })} />
+          <Field label={t("pillFactIelts")} value={(uni.recordedMinimums?.minIelts ?? uni.minIelts) != null ? formatNumber((uni.recordedMinimums?.minIelts ?? uni.minIelts)!, { decimals: 1 }) : NOT_SPECIFIED}
+            evidence={presentRaw({ value: uni.recordedMinimums?.minIelts ?? uni.minIelts, fieldLabel: t("pillFactIelts"), trust: "legacy_unknown", valueType: "unverified", unit: "IELTS band" })} />
           <Field
             label={t("pillFactTuition")}
             value={fmtMoney(money?.annualTuition ?? uni.annualTuitionUsd, money?.tuitionCurrency ?? "USD", money?.tuitionPeriod ?? "year")}
@@ -944,44 +979,31 @@ export function UniversityDetail({
           <GraduationCap className="h-4 w-4 text-indigo-600" /> {t("academicReqs")}
         </h2>
 
-        {/* Score grid: 2-col mobile / 4-col desktop */}
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <Field label="IELTS" value={req(universityRequirements, "ielts", (v) => `${v}`)} />
-          <Field label="TOEFL" value={req(universityRequirements, "toefl", (v) => `${v}`)} />
-          <Field label="Duolingo" value={req(universityRequirements, "duolingo", (v) => `${v}`)} />
-          <Field label="GPA" value={req(universityRequirements, "gpa", (v) => `${v} / 4.0`)} />
-          <Field
-            label="SAT"
-            value={
-              universityRequirements?.undergraduateTestsApply === false
-                ? t("satNotApplicable")
-                : universityRequirements?.satRequired
-                ? universityRequirements?.satMinimumPublished
-                  ? req(universityRequirements, "sat", (v) => `${v}`)
-                  : t("satNoMin")
-                : NOT_SPECIFIED
-            }
-          />
-          <Field
-            label="ACT"
-            value={
-              universityRequirements?.undergraduateTestsApply === false
-                ? t("satNotApplicable")
-                : universityRequirements?.actRequired
-                ? universityRequirements?.actMinimumPublished
-                  ? req(universityRequirements, "act", (v) => `${v}`)
-                  : t("satNoMin")
-                : NOT_SPECIFIED
-            }
-          />
-          <Field label="PTE Academic" value={req(universityRequirements, "pte", (v) => `${v}`)} />
-          <Field label="Cambridge English" value={req(universityRequirements, "cambridgeEnglish", (v) => `${v}`)} />
+        <p className="mt-2 text-sm text-slate-500">{t("requirementScopeHint")}</p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-busy={loading}>
+          <label className="min-w-0 text-sm">{t("requirementProgramme")}<select id="university-requirement-programme" className="mt-1 min-h-11 w-full max-w-full rounded-control border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" value={scope.programId} onChange={event=>selectRequirementScope("programId",event.target.value)}><option value="">{t("institutionOnly")}</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          <label className="min-w-0 text-sm">{t("requirementCycle")}<select id="university-requirement-cycle" className="mt-1 min-h-11 w-full max-w-full rounded-control border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" value={scope.admissionCycle} onChange={event=>selectRequirementScope("admissionCycle",event.target.value)}><option value="">{t("scopeNotSelected")}</option>{requirementContexts.admissionCycles.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+          <label className="min-w-0 text-sm">{t("requirementApplicantScope")}<select id="university-requirement-applicants" className="mt-1 min-h-11 w-full max-w-full rounded-control border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" value={scope.applicantScope} onChange={event=>selectRequirementScope("applicantScope",event.target.value)}><option value="">{t("scopeNotSelected")}</option>{requirementContexts.applicantScopes.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
         </div>
+        {loading && <p role="status" className="mt-3 text-sm text-slate-500">{t("loading")}</p>}
+        {error && <div className="mt-3"><p role="alert" className="text-sm text-rose-700">{t("loadFailed")}</p><Button variant="unstyled" className="mt-1 min-h-11 text-sm font-semibold" onClick={()=>{setLoading(true);setError("");setRetryVersion(value=>value+1);}}>{t("exTryAgain")}</Button></div>}
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5" aria-busy={loading}>
+          <AcademicRequirementField label="IELTS" name="ielts" requirements={loading || error ? null : universityRequirements} format={value=>String(value)}/>
+          <AcademicRequirementField label="TOEFL" name="toefl" requirements={loading || error ? null : universityRequirements} format={(value,unit)=>unit?`${value} / ${unit}`:`${value} (${t("scoreScaleNotRecorded")})`}/>
+          <AcademicRequirementField label="Duolingo" name="duolingo" requirements={loading || error ? null : universityRequirements} format={value=>String(value)}/>
+          <AcademicRequirementField label="GPA" name="gpa" requirements={loading || error ? null : universityRequirements} format={(value,unit)=>unit?`${value} / ${unit}`:`${value} (${t("scoreScaleNotRecorded")})`}/>
+          <AcademicRequirementField label="SAT" name="sat" requirements={loading || error ? null : universityRequirements} format={value=>String(value)} notApplicable={!loading && !error && universityRequirements?.undergraduateTestsApply===false}/>
+          <AcademicRequirementField label="ACT" name="act" requirements={loading || error ? null : universityRequirements} format={value=>String(value)} notApplicable={!loading && !error && universityRequirements?.undergraduateTestsApply===false}/>
+          <AcademicRequirementField label="PTE Academic" name="pte" requirements={loading || error ? null : universityRequirements} format={value=>String(value)}/>
+          <AcademicRequirementField label="Cambridge English" name="cambridgeEnglish" requirements={loading || error ? null : universityRequirements} format={value=>String(value)}/>
+        </div>
+        {!loading&&!error&&universityRequirements?.requirementGroup&&<div className="mt-3"><EvidenceNote label={t("publishedCriteria")} fact={universityRequirements.requirementGroup}/><RequirementGroupView evaluation={evaluateGroup(universityRequirements.requirementGroup.value)}/></div>}
         {/* The grid summarises every catalogued programme. When the values
             differ per programme it shows a range (e.g. IELTS 7-7.5) — say so,
             otherwise a lower bound reads like the requirement for all of
             them. */}
         <p className="mt-2 break-words text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t("catalogueRequirementsScope")}</p>
+        <p className="mt-1 text-sm text-slate-500">{t("recordedCatalogueValue")}</p>
         {["ielts", "toefl", "duolingo", "gpa", "sat", "act", "pte", "cambridgeEnglish"].some(
           (key) => Array.isArray(universityRequirements?.[key]?.values) && universityRequirements[key].values.length > 1,
         ) && (
@@ -990,13 +1012,14 @@ export function UniversityDetail({
 
         {/* Long text requirements: full-width, clamped by default */}
         {(() => {
-          const subjectReqs: string[] = Array.isArray(universityRequirements?.subject) ? universityRequirements.subject : [];
-          const otherReqs: string[] = Array.isArray(universityRequirements?.other) ? universityRequirements.other : [];
+          const catalogue=universityRequirements?.recordedCatalogue??universityRequirements;
+          const subjectReqs: string[] = Array.isArray(catalogue?.subject) ? catalogue.subject : [];
+          const otherReqs: string[] = Array.isArray(catalogue?.other) ? catalogue.other : [];
           const flags = [
-            universityRequirements?.portfolioRequired && t("flagPortfolio"),
-            universityRequirements?.interviewRequired && t("flagInterview"),
-            universityRequirements?.recommendationRequired && t("flagRecommendation"),
-            universityRequirements?.personalStatementRequired && t("flagPersonalStatement"),
+            catalogue?.portfolioRequired && t("flagPortfolio"),
+            catalogue?.interviewRequired && t("flagInterview"),
+            catalogue?.recommendationRequired && t("flagRecommendation"),
+            catalogue?.personalStatementRequired && t("flagPersonalStatement"),
           ].filter(Boolean) as string[];
           const hasLongContent = subjectReqs.length > 0 || otherReqs.length > 0;
           if (!hasLongContent && flags.length === 0) {
@@ -1079,14 +1102,14 @@ export function UniversityDetail({
         <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
           <FileText className="h-4 w-4 text-violet-600" /> {t("programs", { count: programs.length })}
         </h2>
-        {programs.length === 0 ? (
+        {loading || error ? <p className="mt-3 text-sm text-slate-500">{t(loading ? "loading" : "loadFailed")}</p> : programs.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">{t("noPrograms")}</p>
         ) : (
           <>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(showAllPrograms ? programs : programs.slice(0, 4)).map((p) => {
                 const reqsOpen = !!expandedProgramReqs[p.id];
-                const hasLongReqs = p.requirements.length > 0;
+                const hasLongReqs = p.requirements.length > 0 || Boolean(p.recordedRequirements?.length) || Boolean(p.requirementGroup) || Object.values(p.recordedFlags??{}).some(Boolean);
                 return (
                   <div key={p.id} className="rounded-surface border border-slate-200 p-4 hover:border-violet-300 transition-colors">
                     <div className="flex items-start justify-between gap-2">
@@ -1198,20 +1221,25 @@ export function UniversityDetail({
                     {hasLongReqs && (
                       <div className="mt-2.5 rounded-surface bg-slate-50 border border-slate-100 p-2.5">
                         <div
-                          className={`overflow-hidden transition-[max-height] duration-300 ease-in-out ${reqsOpen ? "max-h-[2000px]" : "max-h-[3.9rem]"}`}
+                          className={`overflow-hidden transition-[max-height] duration-300 ease-in-out ${reqsOpen ? "" : "max-h-[3.9rem]"}`}
                         >
                           <div className="space-y-1">
                             {p.requirements.map((r, i) => (
-                              <p key={i} className="text-sm text-slate-600">
+                              <div key={i} className="text-sm text-slate-600">
                                 <b className="capitalize">{r.requirementType}:</b>{" "}
-                                {r.minimumValue != null ? r.minimumValue : r.valueText ? r.valueText : t("requiredWord")}
-                              </p>
+                                {r.minimumValue != null ? r.minimumValue : r.valueText ? r.valueText : r.evidence?.valueType==="not_published"?t("minimumNotPublished"):r.evidence?.valueType==="not_applicable"?t("requirementNotApplicable"):t("notSpecified")}
+                                {r.unit&&<span> / {r.unit}</span>}
+                                <EvidenceNote compact label={r.requirementType} fact={r.evidence??null}/>
+                              </div>
                             ))}
+                            {p.requirementGroup&&<div><EvidenceNote label={t("publishedCriteria")} fact={p.requirementGroup}/><RequirementGroupView evaluation={evaluateGroup(p.requirementGroup.value)}/></div>}
+                            {Boolean(p.recordedRequirements?.length)&&<div className="border-t border-slate-200 pt-2"><p className="text-sm font-semibold">{t("recordedCatalogueValue")}</p>{p.recordedRequirements?.map((row,index)=><div key={index} className="mt-1 text-sm break-words"><span>{row.requirementType}: {row.minimumValue??row.valueText??t("notSpecified")}{row.minimumValue!=null&&["gpa", "toefl"].includes(row.requirementType)?` (${t("scoreScaleNotRecorded")})`:""}</span><EvidenceNote compact label={row.requirementType} fact={row.evidence??null}/></div>)}</div>}
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 pt-1 border-t border-slate-100">
-                              {p.portfolioRequired && <span className="text-xs text-slate-500">{t("flagPortfolio")}</span>}
-                              {p.interviewRequired && <span className="text-xs text-slate-500">{t("flagInterview")}</span>}
-                              {p.recommendationRequired && <span className="text-xs text-slate-500">{t("flagRecommendation")}</span>}
-                              {p.personalStatementRequired && <span className="text-xs text-slate-500">{t("flagPersonalStatement")}</span>}
+                              {Object.values(p.recordedFlags??{}).some(Boolean)&&<p className="w-full text-sm text-slate-500">{t("recordedCatalogueValue")}</p>}
+                              {(p.recordedFlags?.portfolioRequired??p.portfolioRequired) && <span className="text-xs text-slate-500">{t("flagPortfolio")}</span>}
+                              {(p.recordedFlags?.interviewRequired??p.interviewRequired) && <span className="text-xs text-slate-500">{t("flagInterview")}</span>}
+                              {(p.recordedFlags?.recommendationRequired??p.recommendationRequired) && <span className="text-xs text-slate-500">{t("flagRecommendation")}</span>}
+                              {(p.recordedFlags?.personalStatementRequired??p.personalStatementRequired) && <span className="text-xs text-slate-500">{t("flagPersonalStatement")}</span>}
                             </div>
                           </div>
                         </div>

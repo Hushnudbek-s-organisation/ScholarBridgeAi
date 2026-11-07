@@ -100,7 +100,7 @@ async function main() {
     !wrongHost.verificationSucceeded && /official source domain/.test(wrongHost.reason ?? ""));
 
   const subdomainOk = verifyFactOnPage({
-    html: "<p>min IELTS 7.0</p>", status: 200,
+    html: "<p>Minimum IELTS 7.0 for 2027 intake</p>", status: 200,
     finalUrl: "https://admissions.yenchingacademy.pku.edu.cn/ADMISSIONS.htm", target,
   });
   check("an official subdomain is accepted, not mistaken for a third party",
@@ -216,7 +216,7 @@ async function main() {
     targets: [target],
     deps: {
       lookupImpl: PUBLIC_DNS,
-      fetchImpl: async () => htmlResponse("<h1>Admissions</h1><p>English requirement: IELTS 7.0 overall.</p>"),
+      fetchImpl: async () => htmlResponse("<h1>Admissions</h1><p>English requirement: IELTS 7.0 overall for 2027 intake.</p>"),
     },
     persist: (r) => { persisted.push(r); },
     now: () => new Date("2026-11-06T00:00:00Z"),

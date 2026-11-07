@@ -1,0 +1,78 @@
+{
+  "branch": "arena/660f1392-scholarbridgeai",
+  "head": "1bd810bbb5a6e749488331fb60d452b425c1b918",
+  "buildId": "TkmlEzVr1teERbByD1fqm",
+  "scopeComplete": false,
+  "releaseReady": false,
+  "hashMethod": "v3: scripts/capture-source-state.mjs: SHA256(JSON.stringify(sorted path/sha256/bytes/symlink entries)); data/root configs/all CI included. Not directly comparable with compact v2.",
+  "sourceIndex": "test-results/continuation-2026-11-07/detail-build8-source-state.json",
+  "groups": {
+    "runtime": {
+      "fileCount": 785,
+      "sha256": "e282a9bb30d789d2d388b81f62bda868d93d74b82bc857ed20694717ba7e0e2b",
+      "bytes": 18128801
+    },
+    "verification": {
+      "fileCount": 227,
+      "sha256": "5c401984da90abbdce83aefcd70473c0da5bba42b88dcad890c3822f06951d79",
+      "bytes": 2954908
+    },
+    "migrations": {
+      "fileCount": 123,
+      "sha256": "c98d6c54d12c7babe1da345b68024cf0a8607e156a64dd3b48be8c1b014f7458",
+      "bytes": 1964281
+    }
+  },
+  "build": {
+    "exit": 0,
+    "log": "detail-build8.log"
+  },
+  "diagnosticRun": {
+    "passed": 3,
+    "failed": 0,
+    "exit": 0,
+    "duration": "34.4s",
+    "log": "detail-build8-diagnostic-e2e.log",
+    "note": "Real client locale boundary, funding default/opt-in/503/retry/held-real-response/drafts, native academic detail EN-UZ-RU."
+  },
+  "fullRun": {
+    "status": "passed",
+    "passed": 41,
+    "failed": 0,
+    "skipped": 2,
+    "exit": 0,
+    "duration": "8.0m",
+    "log": "detail-build8-full-e2e.log",
+    "report": "detail-build8-full-e2e-report.json",
+    "note": "Two performance tests are explicitly opt-in, not pass. Runtime and E2E sources unchanged after this run."
+  },
+  "sharedRun": {
+    "status": "passed on strengthened-guard rerun",
+    "firstExit": 1,
+    "firstLog": "detail-build8-shared.log",
+    "firstFailure": "backend-audit: check-journey expected only old early-return live-guard syntax. Actual hook has live AND sequence positive commit guards.",
+    "verificationChange": "Only scripts/check-journey.ts changed: preserve unmount guard and additionally require effect/reload success/failure sequence fences, cleanup invalidation and first-render scope mask. Runtime source unchanged; test:journey 115 assertions passed.",
+    "rerunLog": "detail-build8-guard-shared.log",
+    "sourceIndex": "detail-build8-guard-source-state.json",
+    "verificationHash": "6bda296b50db5c978afcc75ae080e87f5ee5b30d5e64bd4381fc6e6ee8a5d5f2",
+    "rerunExit": 0,
+    "totalFails": 0
+  },
+  "performance": {
+    "baselineBuildId": "nt8aOokw9O64qMq_cmbZk",
+    "baselinePassed": 2,
+    "baselineExit": 0,
+    "baselineProtocol": "actions-only-v2",
+    "baselineDirectory": "perf-pair-build6-build7",
+    "afterStatus": "completed: 2 PASS, exit0, 6.7m",
+    "note": "Mobile first-pane samples improved, landing bytes did not decrease; >1s mobile shell and pane still unresolved. No field INP/p95 or isolated causal claim.",
+    "afterBuildId": "TkmlEzVr1teERbByD1fqm",
+    "comparison": "perf-pair-build6-build7/comparison-build6-build8.json"
+  },
+  "historicalFailure": {
+    "build": "detail-build4",
+    "cause": "dashboard HTTP500, underlying exception not established",
+    "note": "No causal root-fix claim; did not recur in completed build5/build6 full production suites."
+  },
+  "note": "Local build/tests only; not CI/deploy/production/provider evidence. Workspace still dirty and original wider acceptance remains unfinished."
+}

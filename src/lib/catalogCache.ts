@@ -1,3 +1,7 @@
+import {revisionFencedCache} from "./revisionFencedCache";
+import { loadCatalogueFacts } from "./catalogueFacts.server";
+import type { CatalogueFact } from "./evidencePolicy";
+import { readCacheRevision, bumpCacheRevision, cacheRevisionKeyPart } from "./cacheRevision";
 import { AsyncTtlCache } from "@/lib/asyncTtlCache";
 /**
  * In-memory catalogue cache (Priority 1 — 20×–50× faster catalogue reads).
@@ -38,7 +42,7 @@ import {
   scholarshipSources,
   opportunities,
 } from "@/db/schema";
-import { inArray, eq } from "drizzle-orm";
+import { inArray, eq, and } from "drizzle-orm";
 import { selectUniversities } from "@/lib/universities";
 import { pickBestSource } from "@/lib/sourcePick";
 import { chancingProfileWithActivities, invalidateSavedActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
@@ -78,7 +82,11 @@ export type SourceSignal = {
 type UniRow = typeof universities.$inferSelect;
 type ScholarshipRow = typeof scholarships.$inferSelect;
 
+export type UniversityProgrammeIdentity = {id:number;universityId:number;name:string;field:string|null;degreeLevel:string|null};
+
 export type UniversitiesBundle = {
+  programsByUni?: Map<number,UniversityProgrammeIdentity[]>;
+  facts: Map<number,CatalogueFact[]>;
   /** Every university, with the compatibility USD cost mirrors resolved. */
   unis: (UniRow & ResolvedUsdUniversityCosts)[];
   /** universityId → list of program `field` labels (2,423 rows). */
@@ -88,6 +96,7 @@ export type UniversitiesBundle = {
 };
 
 export type ScholarshipsBundle = {
+  facts: Map<number,CatalogueFact[]>;
   /** Every ACTIVE scholarship, with the USD amount mirror resolved. */
   entries: (ScholarshipRow & { amountUsdValue: number | null })[];
   /** scholarshipId → best verified source link. */
@@ -132,7 +141,7 @@ type ProfileMatch = {
   chancingProfile: ChancingProfile;
 };
 
-const profileMatchCache = new AsyncTtlCache<number, ProfileMatch | null>(Math.max(1, PROFILE_MATCH_TTL_MS), 500);
+const profileMatchCache = new AsyncTtlCache<string, ProfileMatch | null>(Math.max(1, PROFILE_MATCH_TTL_MS), 500);
 const universityDetailCache = new Map<number, CacheEntry<Record<string, unknown>>>();
 // A read that began before an admin invalidation must not repopulate old data.
 let universityDetailGeneration = 0;
@@ -193,16 +202,18 @@ async function buildUniversitiesBundle(): Promise<UniversitiesBundle> {
   }));
 
   const programFieldsByUni = new Map<number, string[]>();
+  const programsByUni = new Map<number,UniversityProgrammeIdentity[]>();
   const sourceMap = new Map<number, SourceSignal>();
 
   try {
     const uniIds = unis.map((u) => u.id);
     if (uniIds.length > 0) {
       const progRows = await db
-        .select({ universityId: universityPrograms.universityId, field: universityPrograms.field })
+        .select({ id:universityPrograms.id,universityId: universityPrograms.universityId,name:universityPrograms.name,degreeLevel:universityPrograms.degree, field: universityPrograms.field })
         .from(universityPrograms)
-        .where(inArray(universityPrograms.universityId, uniIds));
+        .where(and(inArray(universityPrograms.universityId, uniIds),eq(universityPrograms.isActive,true)));
       for (const r of progRows) {
+        const recorded=programsByUni.get(r.universityId)??[];recorded.push(r);programsByUni.set(r.universityId,recorded);
         if (!r.field) continue;
         const arr = programFieldsByUni.get(r.universityId) ?? [];
         arr.push(r.field);
@@ -258,7 +269,7 @@ async function buildUniversitiesBundle(): Promise<UniversitiesBundle> {
     }
   }
 
-  return { unis, programFieldsByUni, sourceMap };
+  return { unis, programsByUni,programFieldsByUni, sourceMap, facts: await loadCatalogueFacts("university", unis.map(u=>u.id)) };
 }
 
 /**
@@ -267,7 +278,7 @@ async function buildUniversitiesBundle(): Promise<UniversitiesBundle> {
  * freely without mutating the cached snapshot.
  */
 export async function getCachedUniversitiesBundle(): Promise<UniversitiesBundle> {
-  return universitiesCache.getOrCreate("catalogue", buildUniversitiesBundle);
+  return revisionFencedCache(universitiesCache,ensureCatalogRevision,buildUniversitiesBundle);
 }
 
 /* ------------------------------------------------------------- scholarships */
@@ -373,12 +384,12 @@ async function buildScholarshipsBundle(): Promise<ScholarshipsBundle> {
     // scholarship_sources missing — UI shows pending verification.
   }
 
-  return { entries, sourceMap };
+  return { entries, sourceMap, facts: await loadCatalogueFacts("scholarship", entries.map(s=>s.id)) };
 }
 
 /** Base active-scholarship dataset. Copies are handed out per call. */
 export async function getCachedScholarshipsBundle(): Promise<ScholarshipsBundle> {
-  return scholarshipsCache.getOrCreate("catalogue", buildScholarshipsBundle);
+  return revisionFencedCache(scholarshipsCache,ensureCatalogRevision,buildScholarshipsBundle);
 }
 
 /* --------------------------------------------------------- opportunities */
@@ -405,7 +416,7 @@ async function buildOpportunitiesBundle(): Promise<OpportunitiesBundle> {
 
 /** Base opportunity feed dataset, cached with the same short TTL as catalogs. */
 export async function getCachedOpportunitiesBundle(): Promise<OpportunitiesBundle> {
-  return opportunitiesCache.getOrCreate("catalogue", buildOpportunitiesBundle);
+  return revisionFencedCache(opportunitiesCache,ensureCatalogRevision,buildOpportunitiesBundle);
 }
 
 /* --------------------------------------------------------- profile matching */
@@ -416,7 +427,9 @@ export async function getCachedOpportunitiesBundle(): Promise<OpportunitiesBundl
  */
 export async function getCachedProfileForMatching(profileId: number): Promise<ProfileMatch | null> {
   if (PROFILE_MATCH_TTL_MS === 0) return loadProfileForMatching(profileId);
-  return profileMatchCache.getOrCreate(profileId, () => loadProfileForMatching(profileId));
+  const key=async()=>{const revisions = await Promise.all(([`profile:${profileId}`,"catalogue","evidence"] as const).map(scope=>readCacheRevision(scope)));
+    return `${profileId}:${revisions.map(value=>cacheRevisionKeyPart(value.revision,value.shared)).join(":")}`;};
+  return revisionFencedCache(profileMatchCache,key,async()=>{invalidateSavedActivities(profileId);return loadProfileForMatching(profileId);});
 }
 
 async function loadProfileForMatching(profileId: number): Promise<ProfileMatch | null> {
@@ -437,7 +450,7 @@ async function loadProfileForMatching(profileId: number): Promise<ProfileMatch |
 /* ------------------------------------------------------------ invalidation */
 
 /** Drop the university and/or scholarship catalogue snapshots. */
-export function invalidateCatalogCache(kind: "universities" | "scholarships" | "opportunities" | "all" = "all") {
+export async function invalidateCatalogCache(kind: "universities" | "scholarships" | "opportunities" | "all" = "all") {
   if (kind === "universities" || kind === "all") {
     universitiesCache.clear();
     clearUniversityDetails();
@@ -457,9 +470,7 @@ export function invalidateCatalogCache(kind: "universities" | "scholarships" | "
   // Bump the shared revision so the OTHER instances' dashboard/profile keys
   // are recomputed too (the process-local clears above only fix this one).
   // Imported lazily to avoid a hard DB dependency at module load for guards.
-  void import("@/lib/cacheRevision")
-    .then((m) => m.bumpCacheRevision("catalogue", `catalogue cache invalidation (${kind})`))
-    .catch(() => undefined);
+  await bumpCacheRevision("catalogue", `catalogue cache invalidation (${kind})`);
 }
 
 /**
@@ -474,7 +485,7 @@ export function invalidateProfileMatchCache(profileId?: number) {
     profileMatchCache.clear();
     return;
   }
-  profileMatchCache.invalidate(profileId);
+  profileMatchCache.invalidateWhere(key=>key.startsWith(`${profileId}:`));
 }
 
 /** Test hook: clear everything. */
@@ -491,11 +502,20 @@ export function catalogCacheStats() {
   return {
     localization: localizeMemoStats(),
     matches: matchMemoStats(),
-    universitiesCached: universitiesCache.hasFresh("catalogue"),
-    scholarshipsCached: scholarshipsCache.hasFresh("catalogue"),
-    opportunitiesCached: opportunitiesCache.hasFresh("catalogue"),
+    universitiesCached: universitiesCache.freshSize > 0,
+    scholarshipsCached: scholarshipsCache.freshSize > 0,
+    opportunitiesCached: opportunitiesCache.freshSize > 0,
     profileMatchEntries: profileMatchCache.freshSize,
   };
 }
 
 export type { UniversityData };
+
+let lastSharedCatalogRevision = "";
+/** Checked on read, including detail reads, not just on the writer instance. */
+export async function ensureCatalogRevision(): Promise<string> {
+  const {revision,shared}=await readCacheRevision("catalogue");
+  const key=cacheRevisionKeyPart(revision,shared);
+  if(key!==lastSharedCatalogRevision){universitiesCache.clear();scholarshipsCache.clear();opportunitiesCache.clear();clearUniversityDetails();invalidateMatchMemo();invalidateLocalizeMemo();lastSharedCatalogRevision=key;}
+  return key;
+}

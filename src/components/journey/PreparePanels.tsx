@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/Button";
 // ===========================================================================
 
 interface VaultDoc {
+  reviewIdentity?:string;
   id: number;
   docType: string;
   title: string;
@@ -188,7 +189,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
                       </Button>
                     )}
                     {d.status !== "verified" ? (
-                      <Button size="sm" variant="outline" onClick={() => void patchDoc({ profileId, id: d.id, status: "verified" })}>
+                      <Button size="sm" variant="outline" onClick={() => void patchDoc({ profileId, id: d.id, status: "verified",expectedIdentity:d.reviewIdentity })}>
                         <Check className="h-3 w-3" /> {t("dvVerify")}
                       </Button>
                     ) : (

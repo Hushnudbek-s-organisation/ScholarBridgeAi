@@ -104,7 +104,7 @@ export async function POST(req: Request) {
     // A new activity changes the match inputs — never serve a stale score.
     invalidateProfileMatchCache(profileId);
     invalidateSavedActivities(profileId);
-    invalidateDashboardRecommendationsForProfile(profileId);
+    await invalidateDashboardRecommendationsForProfile(profileId);
     return NextResponse.json({ ok: true, activity: { ...row, evidence: withEvidence } });
   } catch (err) {
     return serverError("activities POST", err);
@@ -146,7 +146,7 @@ export async function PATCH(req: Request) {
     }
     invalidateProfileMatchCache(profileId);
     invalidateSavedActivities(profileId);
-    invalidateDashboardRecommendationsForProfile(profileId);
+    await invalidateDashboardRecommendationsForProfile(profileId);
     return NextResponse.json({ ok: true, id, evidence });
   } catch (err) {
     return serverError("activities PATCH", err);
@@ -167,7 +167,7 @@ export async function DELETE(req: Request) {
     if (!deleted.length) return jsonError(404, "Activity not found", "not_found");
     invalidateProfileMatchCache(g.value.profileId);
     invalidateSavedActivities(g.value.profileId);
-    invalidateDashboardRecommendationsForProfile(g.value.profileId);
+    await invalidateDashboardRecommendationsForProfile(g.value.profileId);
     return NextResponse.json({ ok: true, id });
   } catch (err) {
     return serverError("activities DELETE", err);

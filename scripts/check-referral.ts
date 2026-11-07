@@ -547,5 +547,5 @@ main().catch(async (err) => {
   } catch {
     // ignore
   }
-  process.exitCode = 1;
+  process.exit(1);
 });

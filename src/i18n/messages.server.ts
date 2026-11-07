@@ -30,5 +30,8 @@ export function messagesFor(locale: string | null | undefined): Messages {
  */
 export function clientMessagesFor(locale: string | null | undefined): Messages | null {
   const code = locale && dictionaries[locale] ? locale : "en";
-  return code === "en" ? null : dictionaries[code];
+  return dictionaries[code];
 }
+
+/** Root front door has its own bundled bootstrap; no duplicated English RSC payload. */
+export function shellMessagesFor(locale:string|null|undefined):Messages|null{return !locale||locale==="en"?null:messagesFor(locale);}

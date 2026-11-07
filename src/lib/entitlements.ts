@@ -1,3 +1,4 @@
+import type {db} from "@/db";
 import { getConfig } from "@/lib/config";
 
 export type Plan = "free" | "premium" | "admin";
@@ -98,9 +99,9 @@ export function profilePlan(profile: {
 }
 
 /** Config-driven override for a feature's required plan. */
-export async function featurePlan(feature: FeatureKey): Promise<Plan> {
+export async function featurePlan(feature: FeatureKey, database?:Pick<typeof db,"select">): Promise<Plan> {
   try {
-    const raw = await getConfig(`feature_${feature}`);
+    const raw = await getConfig(`feature_${feature}`,database);
     if (raw === "free" || raw === "premium" || raw === "admin") return raw;
   } catch {
     // fall through to default

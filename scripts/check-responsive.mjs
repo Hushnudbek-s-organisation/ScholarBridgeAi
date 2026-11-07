@@ -16,6 +16,7 @@ const source = {
   journey: read("src/components/journey/JourneyControlCenter.tsx"),
   workspace: read("src/components/journey/ApplicationWorkspacePanel.tsx"),
   navbar: read("src/components/Navbar.tsx"),
+  groupedDock: read("src/components/GroupedDock.tsx"),
   notificationBell: read("src/components/NotificationBell.tsx"),
   hubsUi: read("src/components/ui/hubs.tsx"),
   sectionIntro: read("src/components/SectionIntro.tsx"),
@@ -96,8 +97,10 @@ check("task list labels wrap and task actions meet the 44px touch target", !/(?:
 check("task form fields have associated labels and minimum touch height", /htmlFor="task-roadmap-title"/.test(source.tasks) && /id="task-roadmap-title"/.test(source.tasks) && /min-h-11 w-full/.test(source.tasks));
 check("task month cards form three wrapping tablet columns", /grid gap-4 sm:grid-cols-3/.test(source.tasks) && /break-words/.test(source.tasks));
 check("shared growth segmented controls wrap labels instead of scrolling horizontally", !/(?:overflow-x-auto|whitespace-nowrap)/.test(source.growthUi) && /flex flex-wrap/.test(source.growthUi) && /min-h-11/.test(source.growthUi));
-check("mobile navigation respects the bottom safe-area inset", /pb-\[env\(safe-area-inset-bottom\)\]/.test(source.navbar));
-check("mobile navigation labels wrap instead of truncating", /break-words whitespace-normal text-center leading-tight/.test(source.navbar));
+// Old bottom bar → GroupedDock (Navbar still owns the drawer). Runtime
+// geometry/hit-test evidence lives in dashboard-continuation.spec.ts.
+check("mobile navigation respects the measured dock and bottom safe-area inset", source.navbar.includes("<GroupedDock") && source.groupedDock.includes('"--sb-dock-height"') && source.globals.includes("bottom: calc(var(--sb-dock-gap) + var(--sb-keyboard-offset) + env(safe-area-inset-bottom, 0px))") && source.homeClient.includes("sb-dock-clearance"));
+check("mobile navigation keeps wrapping drawer labels and untruncated dock labels", source.navbar.includes("break-words whitespace-normal") && !source.groupedDock.includes("truncate") && source.groupedDock.includes("group.shortLabel??group.label"));
 check("phone/tablet app buttons and text fields receive at least 44px touch targets", /@media \(max-width: 1023px\)/.test(source.globals) && /min-width: 44px/.test(source.globals) && /min-height: 44px/.test(source.globals));
 check("mobile app header menu, brand and search controls meet 44px targets", (source.navbar.match(/h-11 w-11/g) ?? []).length >= 2 && /min-h-11 min-w-0 items-center gap-2/.test(source.navbar) && /aria-label=\{t\("openMenu"\)\}/.test(source.navbar) && /aria-label=\{t\("searchButton"\)\}/.test(source.navbar));
 check("notification bell is a 44×44px target wherever it appears", /min-h-11 min-w-11/.test(source.notificationBell));
@@ -115,10 +118,15 @@ check("scholarship cards reserve one heading box so a row lines up", /line-clamp
 check("scholarship sort and group selects have programmatic labels", /htmlFor="scholarship-sort"/.test(source.scholarship) && /id="scholarship-sort"/.test(source.scholarship) && /htmlFor="scholarship-group"/.test(source.scholarship) && /id="scholarship-group"/.test(source.scholarship));
 check("mobile help and dismiss actions retain 44px targets and visible focus",  /min-h-11 min-w-11/.test(source.sectionIntro) && /h-11 w-11/.test(source.sectionIntro));
 check("compact language selector and logout control meet 44px targets", /min-h-11/.test(source.languageSwitcher) && /h-11 w-11/.test(source.navbar));
+check("hash-only shell navigation preserves framework history state instead of queuing a stale Next route restore", !source.homeClient.includes('history.pushState(null') && !source.homeClient.includes('history.replaceState(null') && (source.homeClient.match(/history\.pushState\(window\.history\.state/g)??[]).length===3);
 check("application footer links remain tappable and keyboard focused", (source.homeClient.match(/min-h-11 min-w-11/g) ?? []).length >= 5 && /focus-visible:ring-2/.test(source.homeClient));
 check("mobile Applications navigation labels are concise in every locale", mobileAppLabels.en === "Apps" && mobileAppLabels.uz === "Arizalar" && mobileAppLabels.ru === "Заявки");
 check("editing a profile preserves an unanswered financial-aid choice", /needsFinancialAid: boolean \| null/.test(source.profile) && /needsFinancialAid: null/.test(source.profile) && /financialAidUnknown/.test(source.profile));
 check("university catalogue requirements carry a programme-specific verification caveat", /catalogueRequirementsScope/.test(source.university));
+check("legacy university GPA never invents a four-point scale", !source.university.includes(" / 4.0"));
+check("legacy GPA and TOEFL explicitly disclose that their scale was not recorded", source.university.includes("scoreScaleNotRecorded") && source.university.includes('["gpa", "toefl"]'));
+for (const locale of ["en", "uz", "ru"]) check(`legacy requirement scale disclosure is localized (${locale})`, Boolean(JSON.parse(read(`src/i18n/messages/${locale}.json`)).university?.scoreScaleNotRecorded));
+
 check("key catalogue cards wrap names, majors and descriptions", /break-words font-bold text-base/.test(source.explorer) && /break-words text-sm leading-relaxed/.test(source.explorer));
 check("global reduced-motion preference remains respected", /prefers-reduced-motion:\s*reduce/.test(source.globals));
 check("document checklist labels, placeholders and status controls use translations", source.documentChecklist.includes('useTranslations("documentChecklist")') && /placeholder=\{t\("placeholder"\)\}/.test(source.documentChecklist) && /aria-label=\{d\.status/.test(source.documentChecklist));

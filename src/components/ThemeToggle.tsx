@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, m as Motion } from "framer-motion";
+import { m as Motion } from "framer-motion";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme, type ThemeChoice } from "@/components/ThemeProvider";
@@ -75,22 +75,9 @@ export function ThemeSwitch({ className = "" }: { className?: string }) {
       title={targetModeLabel}
       className={`relative grid min-h-11 min-w-11 place-items-center rounded-control border border-slate-200 bg-white text-slate-600 transition-colors hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${className}`}
     >
-      <AnimatePresence initial={false} mode="wait">
-        <Motion.span
-          key={isDark ? "moon" : "sun"}
-          initial={{ opacity: 0, rotate: -90, scale: 0.6 }}
-          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-          exit={{ opacity: 0, rotate: 90, scale: 0.6 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-          className="grid place-items-center"
-        >
-          {isDark ? (
-            <Moon className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <Sun className="h-4 w-4" aria-hidden="true" />
-          )}
-        </Motion.span>
-      </AnimatePresence>
+      <span className="grid place-items-center" aria-hidden="true">
+        {isDark?<Moon className="h-4 w-4"/>:<Sun className="h-4 w-4"/>}
+      </span>
     </Button>
   );
 }

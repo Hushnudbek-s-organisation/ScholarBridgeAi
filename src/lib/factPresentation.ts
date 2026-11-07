@@ -24,6 +24,7 @@ export interface PresentedFact {
   period: string | null;
   currency: string | null;
   programName: string | null;
+  applicantScope?:string|null;
   degreeLevel: string | null;
   admissionCycle: string | null;
   sourceUrl: string | null;
@@ -65,6 +66,7 @@ export function presentFact(v: TrustedValue, fieldLabel: string): PresentedFact 
     period: v.period,
     currency: v.currency,
     programName: v.programName,
+    applicantScope:v.applicantScope??null,
     degreeLevel: v.degreeLevel,
     admissionCycle: v.admissionCycle,
     sourceUrl: v.sourceUrl,
@@ -84,7 +86,7 @@ export function presentFact(v: TrustedValue, fieldLabel: string): PresentedFact 
 export function presentFactLine(v: TrustedValue, fieldLabel: string): string {
   const p = presentFact(v, fieldLabel);
   if (p.isUnknown) return `${fieldLabel}: noma'lum (manba yo'q)`;
-  const scope = [p.degreeLevel, p.programName, p.admissionCycle].filter(Boolean).join(" · ");
+  const scope = [p.degreeLevel, p.programName, p.admissionCycle,p.applicantScope].filter(Boolean).join(" · ");
   const amount = [p.value, p.unit, p.currency, p.period ? `/ ${p.period}` : null].filter((x) => x != null && x !== "").join(" ");
   const suffix = p.isOfficialMinimum
     ? "rasmiy minimum (tekshirilgan)"
@@ -153,7 +155,7 @@ export function presentRaw(input: {
     sourceUrl: input.sourceUrl ?? null,
     verifiedAt: null,
     note: input.note ?? (unknown
-      ? "Not published in this view — unknown, not zero."
+      ? "No confirmed value in this scope — unknown, not zero."
       : "Locally derived value without a field-level official source check."),
   };
   return presentFact(v, input.fieldLabel);

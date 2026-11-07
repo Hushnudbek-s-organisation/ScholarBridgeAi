@@ -76,7 +76,9 @@ check("refresh logs a correlation id and never dumps a raw error", () => {
 check("the official-source adapter logs only a classified reason", () => {
   const server = read("src/lib/officialSourceAdapter.server.ts");
   assert.match(server, /logSafe\("official_source\.unavailable"/);
-  assert.match(server, /safeErrorMessage/);
+  assert.match(server, /errorClass: code/);
+  assert.match(server, /28P01/);
+  assert.doesNotMatch(server, /errorClass:.*(?:err\.message|String\(err)/);
   assert.doesNotMatch(server, /console\.warn\([^\n]*err/);
 });
 

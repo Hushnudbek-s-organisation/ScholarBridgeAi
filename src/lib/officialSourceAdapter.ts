@@ -33,7 +33,14 @@ import type {
 } from "@/lib/refreshModes";
 
 export interface OfficialSourceTarget {
-  entityType: "university" | "scholarship";
+  factId?: string;
+  expectedVersion?:string;
+  applicantScope?:string|null;
+  unit?:string|null;
+  currency?:string|null;
+  period?:string|null;
+  valueType?:string|null;
+  entityType: "university" | "scholarship" | "program";
   entityId: number;
   /** The one field this check verifies, e.g. `min_ielts`. */
   fieldKey: string;
@@ -48,6 +55,16 @@ export interface OfficialSourceTarget {
 }
 
 export interface OfficialSourceCheckResult extends OfficialSourceCheck {
+  factId?: string;
+  expectedVersion?:string;
+  applicantScope?:string|null;
+  unit?:string|null;
+  currency?:string|null;
+  period?:string|null;
+  valueType?:string|null;
+  factApplied?:boolean;
+  programName?: string | null;
+  degreeLevel?: string | null;
   fieldKey: string;
   verifiedFact: string | null;
   /** Bounded, HTML-escaped page excerpt proving the fact (no PII/secrets). */
@@ -178,10 +195,18 @@ export function verifyFactOnPage(input: {
     .filter((entry) => entry.at >= 0)
     .sort((a, b) => a.at - b.at)[0];
 
-  const factFound =
-    valueIndex >= 0 &&
-    labelIndex != null &&
-    Math.abs(valueIndex - labelIndex.at) <= 160; // value must belong to this field
+  const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const numeric = /^\d+(?:\.\d+)?$/.test(value);
+  const exact = new RegExp(`(?<![\\w.])${escape(value)}(?![\\w.])`, "i");
+  const sentences = text.split(/(?<=[.!?;])\s+(?=[A-Z])/);
+  const candidates = sentences.filter(part => labels.some(label => new RegExp(`\\b${escape(label)}\\b`,"i").test(part)) && exact.test(part));
+  const conflicts = /not\s+required|not\s+necessary|recommend|optional|waiv|another\s+program|other\s+program/i;
+  const scoped = (part: string) => [target.admissionCycle, target.programName, target.degreeLevel].every(v=>!v || part.toLowerCase().includes(v.toLowerCase()));
+  const minimum = /minimum|min\.?\s|at least|no less than|required|requirement/i;
+  const isScore = /^(min_|max_)/.test(target.fieldKey);
+  // Unsupported extractors remain review-needed, not guessed verified.
+  const supported = isScore && /ielts|toefl|gpa|sat|act|det/.test(target.fieldKey);
+  const factFound = supported && numeric && candidates.length === 1 && scoped(candidates[0]) && !conflicts.test(text) && minimum.test(candidates[0]);
   if (!factFound) {
     return {
       ...base,
@@ -343,12 +368,14 @@ export function createOfficialSourceAdapter(
     const scoped = targets.filter((t) =>
       scope === "all" ||
       (scope === "scholarships" && t.entityType === "scholarship") ||
-      (scope === "universities" && t.entityType === "university"),
+      (scope === "universities" && (t.entityType === "university" || t.entityType === "program")),
     );
 
     const results: OfficialSourceCheckResult[] = [];
+    const pages = new Map<string, ReturnType<typeof fetchOfficialPage>>();
     for (const target of scoped) {
-      const page = await fetchOfficialPage(target.sourceUrl, policy, options.deps);
+      if(!pages.has(target.sourceUrl)) pages.set(target.sourceUrl,fetchOfficialPage(target.sourceUrl, policy, options.deps));
+      const page = await pages.get(target.sourceUrl)!;
       let outcome: Omit<OfficialSourceCheckResult, "entityType" | "entityId" | "sourceUrl" | "fieldKey" | "admissionCycle">;
       if (page.reason) {
         outcome = {
@@ -368,6 +395,12 @@ export function createOfficialSourceAdapter(
         };
       }
       const result: OfficialSourceCheckResult = {
+        factId: target.factId,
+        expectedVersion:target.expectedVersion,
+        applicantScope:target.applicantScope??null,
+        unit:target.unit??null,currency:target.currency??null,period:target.period??null,valueType:target.valueType??null,
+        programName: target.programName ?? null,
+        degreeLevel: target.degreeLevel ?? null,
         entityType: target.entityType,
         entityId: target.entityId,
         sourceUrl: target.sourceUrl,

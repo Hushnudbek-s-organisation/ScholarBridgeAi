@@ -9,6 +9,8 @@
  *
  * Usage:  node scripts/check-i18n.mjs
  */
+import {execFileSync} from "node:child_process";
+execFileSync(process.execPath,["scripts/generate-english-stages.mjs","--check"],{stdio:"inherit"});
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import IntlMessageFormat from "intl-messageformat";

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
-import { clientMessagesFor } from "@/i18n/messages.server";
+import { shellMessagesFor } from "@/i18n/messages.server";
 import { Home } from "./HomeClient";
 
 /**
@@ -36,7 +36,7 @@ export default async function Page({
       hasSessionCookie={hasSessionCookie}
       startNow={startNow}
       initialLocale={initialLocale}
-      initialMessages={clientMessagesFor(initialLocale)}
+      initialMessages={shellMessagesFor(initialLocale)}
     />
   );
 }

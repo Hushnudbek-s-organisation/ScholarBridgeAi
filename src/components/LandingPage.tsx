@@ -1163,13 +1163,13 @@ export function LandingPage({
                       </div>
                       {mockSidebarGroups.map((group) => (
                         <div key={group.id} className="mb-0.5">
-                          <div className="px-2 pb-0 pt-0.5 text-[10px] font-black uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
+                          <div className="px-2 pb-0 pt-0.5 text-xs font-black uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
                             {group.label}
                           </div>
                           {group.items.map(({ id, label, icon: Icon, pro }) => (
                             <div
                               key={id}
-                              className={`mb-px flex items-center gap-1 rounded-control px-2 py-0.5 text-[11px] font-semibold leading-tight ${
+                              className={`mb-px flex items-center gap-1 rounded-control px-2 py-0.5 text-xs font-semibold leading-tight ${
                                 id === "dashboard"
                                   ? "bg-indigo-600 text-white dark:bg-indigo-500 dark:text-white"
                                   : pro
@@ -1192,14 +1192,14 @@ export function LandingPage({
                         </div>
                       ))}
                       <div className="mt-0.5 border-t border-slate-200 pt-0.5 dark:border-slate-800">
-                        <div className="px-2 pb-0 text-[10px] font-black uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
+                        <div className="px-2 pb-0 text-xs font-black uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
                           {nav("accountCluster")}
                         </div>
                         {mockAccountItems.map(
                           ({ id, label, icon: Icon, pro }) => (
                             <div
                               key={id}
-                              className={`mb-px flex items-center gap-1 rounded-control px-2 py-0.5 text-[11px] font-semibold leading-tight ${pro ? "border border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-300" : "text-slate-600 dark:text-slate-300"}`}
+                              className={`mb-px flex items-center gap-1 rounded-control px-2 py-0.5 text-xs font-semibold leading-tight ${pro ? "border border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-300" : "text-slate-600 dark:text-slate-300"}`}
                             >
                               <Icon
                                 className="h-2.5 w-2.5 shrink-0"

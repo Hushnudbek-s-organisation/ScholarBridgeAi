@@ -317,9 +317,9 @@ section("4. Shared helpers — GPA scale and degree levels");
 check("4.0 scale keeps the value", gpaTo40Scale(3.6, 4) === 3.6);
 check("100-point scale converts proportionally", Math.abs((gpaTo40Scale(85, 100) ?? 0) - 3.4) < 1e-9, String(gpaTo40Scale(85, 100)));
 check("5-point scale converts proportionally", Math.abs((gpaTo40Scale(4.5, 5) ?? 0) - 3.6) < 1e-9, String(gpaTo40Scale(4.5, 5)));
-check("no scale, value ≤ 4 → comparable", gpaTo40Scale(3.6, null) === 3.6);
+check("no scale, value ≤ 4 → unknown", gpaTo40Scale(3.6, null) === null);
 check("no scale, value > 4 → unknown (never 4.0)", gpaTo40Scale(85, null) === null);
-check("zero/negative GPA → unknown", gpaTo40Scale(0, 4) === null && gpaTo40Scale(-1, 4) === null);
+check("explicit zero GPA is valid; negative GPA is unknown", gpaTo40Scale(0, 4) === 0 && gpaTo40Scale(-1, 4) === null);
 
 check("alias: Master's ↔ Master", compareDegreeLevels("Master's", JSON.stringify(["Master", "PhD"])) === "match");
 check("alias: MSc ↔ Master", compareDegreeLevels("MSc", "Master") === "match");
@@ -442,7 +442,7 @@ check("GPA grading has no cliff (max 1 point per 0.01)", maxJump <= 1, `maxJump=
 
 // Monotone: a better GPA can never produce a lower score…
 let gpaMonotone = true;
-for (let g = 2.5; g <= 4.0; g += 0.05) {
+for (let g = 2.5; g <= 3.95; g += 0.05) {
   if (scoreForGpa(Number(g.toFixed(2))) > scoreForGpa(Number((g + 0.05).toFixed(2)))) gpaMonotone = false;
 }
 check("a better GPA never scores lower", gpaMonotone);

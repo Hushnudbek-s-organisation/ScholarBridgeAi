@@ -26,10 +26,10 @@ export interface PremiumStatus {
 
 const PLAN_LEVEL: Record<Plan, number> = { free: 0, premium: 1, admin: 2 };
 
-export async function getPremiumStatus(profileId: number): Promise<PremiumStatus> {
-  const sub = await findActiveSubscription(profileId);
+export async function getPremiumStatus(profileId: number, database:Pick<typeof db,"select">=db): Promise<PremiumStatus> {
+  const sub = await findActiveSubscription(profileId,database);
   const subscriptionActive = subscriptionIsActive(sub);
-  const [profile] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
+  const [profile] = await database.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
   // Subscription first: a paid plan is its own source and its own period end.
   // Only when there is no active subscription is the profile window treated as
   // the referral/admin-gift side of the union.
@@ -53,8 +53,8 @@ export async function getPremiumStatus(profileId: number): Promise<PremiumStatus
 }
 
 /** May this profile use the feature? (config-driven plan mapping, real premium status) */
-export async function hasFeature(profileId: number, feature: FeatureKey): Promise<boolean> {
-  const [{ plan }, required] = await Promise.all([getPremiumStatus(profileId), featurePlan(feature)]);
+export async function hasFeature(profileId: number, feature: FeatureKey, database?:Pick<typeof db,"select">): Promise<boolean> {
+  const [{ plan }, required] = await Promise.all([getPremiumStatus(profileId,database), featurePlan(feature,database)]);
   return PLAN_LEVEL[plan] >= PLAN_LEVEL[required];
 }
 
@@ -67,8 +67,8 @@ export const PREMIUM_REQUIRED_CODE = "premium_required";
  * this, otherwise a free account can use the feature by calling the API
  * directly. Returns null when allowed, otherwise the 403 response to send.
  */
-export async function premiumGate(profileId: number, feature: FeatureKey): Promise<NextResponse | null> {
-  if (await hasFeature(profileId, feature)) return null;
+export async function premiumGate(profileId: number, feature: FeatureKey, database?:Pick<typeof db,"select">): Promise<NextResponse | null> {
+  if (await hasFeature(profileId, feature,database)) return null;
   return NextResponse.json(
     { error: "This feature is part of Premium.", code: PREMIUM_REQUIRED_CODE, feature },
     { status: 403 }

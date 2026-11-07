@@ -100,8 +100,9 @@ check("durable store exposes claim, expiry, heartbeat and item state primitives"
   assert.match(source, /WHERE EXISTS \(SELECT 1 FROM live_lease\)/);
   assert.match(source, /rowCount\?\: number/);
   const worker = read("src/lib/research-agent/worker.ts");
-  assert.match(worker, /recordUniversityResult\(row\.id, report, workerId\)/);
-  assert.match(worker, /recordUniversityError\(row\.id, universityId, error, workerId\)/);
+  assert.match(worker, /const claimToken = claimed\.lease_owner/);
+  assert.match(worker, /recordUniversityResult\(row\.id, report, claimToken\)/);
+  assert.match(worker, /recordUniversityError\(row\.id, universityId, error, claimToken\)/);
   const registry = read("src/lib/research-agent/registry.ts");
   assert.match(registry, /appendDurableItem\([^\n]*guard\)/);
   assert.doesNotMatch(source, /import\s+\{\s*db\s*\}\s+from\s+["']@\/db["']/);

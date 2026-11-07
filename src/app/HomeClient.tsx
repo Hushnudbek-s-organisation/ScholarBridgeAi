@@ -12,11 +12,13 @@ import { LandingPage } from "@/components/LandingPage";
 import { ProfilePicker } from "@/components/ProfilePicker";
 import { LocaleProvider, useLocaleContext } from "@/i18n/LocaleProvider";
 import { defaultLocale, type Locale } from "@/i18n/config";
-import type { Messages } from "@/i18n/messages";
+import {withFeatureMessages,type Messages} from "@/i18n/messages";
 import { trackScreen } from "@/lib/tracker";
 import { scheduleWhenIdle } from "@/lib/idle";
 import { invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { invalidateClientCache } from "@/lib/clientCache";
+import { profileFromSessionEnvelope } from "@/lib/authenticatedProfile";
+import {useResource,getJson} from "@/components/journey/useResource";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { loadBootConfig } from "@/lib/bootConfig";
 import { PageTransition } from "@/components/motion";
@@ -25,6 +27,7 @@ import {
   isProfileEditorTarget,
   parseHiddenNav,
   resolveNavTarget,
+  visiblePanes,
 } from "@/lib/navSections";
 import { AppNote } from "@/components/AppNote";
 import { SectionIntro } from "@/components/SectionIntro";
@@ -49,27 +52,27 @@ const panelLoading = () => <PanelSkeleton rows={4} />;
 const ProfileModal = dynamic(() => import("@/components/ProfileModal").then((m) => m.ProfileModal), { loading: panelLoading });
 const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").then((m) => m.OnboardingWizard), { loading: panelLoading });
 const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter), { loading: panelLoading });
-const PaymentsSection = dynamic(() => import("@/components/PaymentsSection").then((m) => m.PaymentsSection), { loading: panelLoading });
-const RewardsSection = dynamic(() => import("@/components/RewardsSection").then((m) => m.RewardsSection), { loading: panelLoading });
-const ParentDashboard = dynamic(() => import("@/components/ParentDashboard").then((m) => m.ParentDashboard), { loading: panelLoading });
-const AdminPanel = dynamic(() => import("@/components/AdminPanel").then((m) => m.AdminPanel), { loading: panelLoading });
+const PaymentsSection = dynamic(() => withFeatureMessages(import("@/components/PaymentsSection").then((m) => m.PaymentsSection)), { loading: panelLoading });
+const RewardsSection = dynamic(() => withFeatureMessages(import("@/components/RewardsSection").then((m) => m.RewardsSection)), { loading: panelLoading });
+const ParentDashboard = dynamic(() => withFeatureMessages(import("@/components/ParentDashboard").then((m) => m.ParentDashboard)), { loading: panelLoading });
+const AdminPanel = dynamic(() => withFeatureMessages(import("@/components/AdminPanel").then((m) => m.AdminPanel)), { loading: panelLoading });
 const GuidedJourneyBar = dynamic(() => import("@/components/GuidedJourneyBar").then((m) => m.GuidedJourneyBar), { loading: () => null });
-const TelegramSettings = dynamic(() => import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings), { loading: panelLoading });
-const SessionsPanel = dynamic(() => import("@/components/SessionsPanel").then((m) => m.SessionsPanel), { loading: panelLoading });
+const TelegramSettings = dynamic(() => withFeatureMessages(import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings)), { loading: panelLoading });
+const SessionsPanel = dynamic(() => withFeatureMessages(import("@/components/SessionsPanel").then((m) => m.SessionsPanel)), { loading: panelLoading });
 
-const UniversitiesHub = dynamic(() => import("@/components/hubs").then((m) => m.UniversitiesHub));
-const ScholarshipsHub = dynamic(() => import("@/components/hubs").then((m) => m.ScholarshipsHub));
-const StudyPlanHub = dynamic(() => import("@/components/hubs").then((m) => m.StudyPlanHub));
-const TasksHub = dynamic(() => import("@/components/hubs").then((m) => m.TasksHub));
-const ProfileHub = dynamic(() => import("@/components/hubs").then((m) => m.ProfileHub));
-const FundingHub = dynamic(() => import("@/components/hubs").then((m) => m.FundingHub));
-const ApplicationsHub = dynamic(() => import("@/components/hubs").then((m) => m.ApplicationsHub));
-const MaterialsHub = dynamic(() => import("@/components/hubs").then((m) => m.MaterialsHub));
-const OffersHub = dynamic(() => import("@/components/hubs").then((m) => m.OffersHub));
-const PostAdmissionFundingHub = dynamic(() => import("@/components/hubs").then((m) => m.PostAdmissionFundingHub));
-const VisaHub = dynamic(() => import("@/components/hubs").then((m) => m.VisaHub));
-const GuidanceHub = dynamic(() => import("@/components/hubs").then((m) => m.GuidanceHub));
-const CommunityHub = dynamic(() => import("@/components/hubs").then((m) => m.CommunityHub));
+const UniversitiesHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.UniversitiesHub)));
+const ScholarshipsHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.ScholarshipsHub)));
+const StudyPlanHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.StudyPlanHub)));
+const TasksHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.TasksHub)));
+const ProfileHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.ProfileHub)));
+const FundingHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.FundingHub)));
+const ApplicationsHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.ApplicationsHub)));
+const MaterialsHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.MaterialsHub)));
+const OffersHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.OffersHub)));
+const PostAdmissionFundingHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.PostAdmissionFundingHub)));
+const VisaHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.VisaHub)));
+const GuidanceHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.GuidanceHub)));
+const CommunityHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.CommunityHub)));
 
 /**
  * Any destination, pane, legacy section id or utility screen may appear in the
@@ -79,7 +82,13 @@ const CommunityHub = dynamic(() => import("@/components/hubs").then((m) => m.Com
  */
 function targetFromHash(): { section: string; pane: string | null; openProfileEditor?: boolean } | null {
   if (typeof window === "undefined") return null;
-  const raw = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
+  let raw: string;
+  try {
+    raw = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
+  } catch {
+    // Malformed percent encoding is an unknown deep link, not a shell error.
+    return null;
+  }
   if (!raw) return null;
   if (isProfileEditorTarget(raw)) {
     const profile = resolveNavTarget("profile");
@@ -240,6 +249,18 @@ export function Home({
   // Ids an admin has turned off (Admin → Navigation). Hubs honour them too, so
   // a hidden tab is never reachable in the middle of a page.
   const [hiddenNav, setHiddenNav] = useState<string[]>([...DEFAULT_HIDDEN_NAV_ITEMS]);
+  const hiddenNavRef=useRef(hiddenNav);
+  useEffect(()=>{hiddenNavRef.current=hiddenNav;},[hiddenNav]);
+  // Start only the intended, visible search pane in parallel with its thin
+  // hub, rather than waiting for hub download/render to discover this chunk.
+  // No eager landing/recommendation fetch, no await, no API or permission change.
+  const prewarmSearch=useCallback((target:{section:string;pane:string|null})=>{
+    if(target.section!=="universities"||target.pane!=="search"||!visiblePanes("universities",hiddenNavRef.current).some(pane=>pane.id==="search"))return;
+    void import("@/components/UniversityExplorer").catch(()=>{
+      // Speculation is not navigation success. The existing dynamic mount and
+      // ChunkErrorBoundary still report/recover a real failed screen load.
+    });
+  },[]);
   // "restoring" = checking the HttpOnly session before choosing a screen,
   // "landing"   = visitor with no active session,
   // "wizard"    = step-by-step onboarding for a brand-new user,
@@ -264,7 +285,8 @@ export function Home({
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [wizardEmail, setWizardEmail] = useState("");
-  const [pickerMessage, setPickerMessage] = useState("");
+  const [pickerMessage, setPickerMessage] = useState<"signInToOpenAccount"|"sessionVerifyFailed"|null>(null);
+  const pickerRequest = useRef(0);
 
   const openProfileModal = useCallback((isNew = false) => {
     setIsNewProfile(isNew);
@@ -298,10 +320,23 @@ export function Home({
   // Only profiles this browser owns — used by the picker.
   const deviceProfiles = profiles.filter((p) => myProfileIds.includes(p.id));
 
-  // Saved Data
-  const [savedUniversities, setSavedUniversities] = useState<SavedUniversityItem[]>([]);
-  const [savedScholarships, setSavedScholarships] = useState<SavedScholarshipItem[]>([]);
-  const [savedProgramCount, setSavedProgramCount] = useState(0);
+  // Reuse the shared first-render owner mask and latest-read sequence fence.
+  // A response authorized for A before a switch must never mark B's catalogue.
+  const savedOwnerRef=useRef<number|null>(null);
+  const savedOwnerId=activeProfile?.id??null;
+  const {data:savedUniversities,reload:reloadSavedUniversities}=useResource(async()=>{
+    if(savedOwnerId==null)return [] as SavedUniversityItem[];
+    const body=await getJson<{savedUniversities:SavedUniversityItem[]}>(`/api/saved-universities?profileId=${savedOwnerId}`,"Saved universities could not be loaded",{noCache:true});
+    if(!Array.isArray(body.savedUniversities))throw new Error("Invalid saved-university response");
+    return body.savedUniversities;
+  },[savedOwnerId],{initial:[] as SavedUniversityItem[],enabled:savedOwnerId!=null});
+  const {data:savedScholarships,reload:reloadSavedScholarships}=useResource(async()=>{
+    if(savedOwnerId==null)return [] as SavedScholarshipItem[];
+    const body=await getJson<{savedScholarships:SavedScholarshipItem[]}>(`/api/saved-scholarships?profileId=${savedOwnerId}`,"Saved scholarships could not be loaded",{noCache:true});
+    if(!Array.isArray(body.savedScholarships))throw new Error("Invalid saved-scholarship response");
+    return body.savedScholarships;
+  },[savedOwnerId],{initial:[] as SavedScholarshipItem[],enabled:savedOwnerId!=null});
+  useEffect(()=>{savedOwnerRef.current=savedOwnerId;},[savedOwnerId]);
   /**
    * The one navigation entry point. It accepts anything the product has ever
    * used as a destination: a section id (`materials`), a pane deep link
@@ -316,6 +351,7 @@ export function Home({
     }
     const target = resolveNavTarget(id);
     if (!target) return;
+    prewarmSearch(target);
     setActiveTabState(target.section);
     setActivePane(target.utility ? null : target.pane);
     if (typeof window !== "undefined") {
@@ -326,11 +362,14 @@ export function Home({
         ? `#${target.section}`
         : `#${target.section}/${target.pane}`;
       if (window.location.hash !== want) {
-        window.history.pushState(null, "", `${window.location.pathname}${window.location.search}${want}`);
+        // Preserve the framework-owned history state for this hash-only SPA
+        // navigation. Passing null makes Next enqueue an unnecessary route
+        // restore; its later canonical-URL commit can clobber a newer hash.
+        window.history.pushState(window.history.state, "", `${window.location.pathname}${window.location.search}${want}`);
       }
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  }, [openProfileModal]);
+  }, [openProfileModal, prewarmSearch]);
 
   const openPane = useCallback(
     (pane: string) => {
@@ -341,7 +380,7 @@ export function Home({
       setActivePane(pane);
       const hash = `#${activeTab}/${pane}`;
       if (typeof window !== "undefined" && window.location.hash !== hash) {
-        window.history.pushState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
+        window.history.pushState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
       }
     },
     [activeTab]
@@ -430,46 +469,19 @@ export function Home({
     }
   };
 
-  const fetchSavedUniversities = useCallback(async (profileId: number) => {
-    try {
-      const res = await fetch(`/api/saved-universities?profileId=${profileId}`);
-      const data = await res.json();
-      if (data.savedUniversities) {
-        setSavedUniversities(data.savedUniversities);
-      }
-    } catch (err) {
-      console.error("Error fetching saved universities:", err);
-    }
-  }, []);
-
-  const fetchSavedScholarships = useCallback(async (profileId: number) => {
-    try {
-      const res = await fetch(`/api/saved-scholarships?profileId=${profileId}`);
-      const data = await res.json();
-      if (data.savedScholarships) {
-        setSavedScholarships(data.savedScholarships);
-      }
-    } catch (err) {
-      console.error("Error fetching saved scholarships:", err);
-    }
-  }, []);
-
-  // Spec §24 — how many specific programmes the student has shortlisted.
-  const fetchSavedProgramCount = useCallback(async (profileId: number) => {
-    try {
-      const res = await fetch(`/api/saved-programs?profileId=${profileId}`);
-      const data = await res.json();
-      if (typeof data.count === "number") setSavedProgramCount(data.count);
-    } catch (err) {
-      console.error("Error fetching saved program count:", err);
-    }
-  }, []);
-
-  const hydrateProfileData = useCallback((profileId: number) => {
-    void fetchSavedUniversities(profileId);
-    void fetchSavedScholarships(profileId);
-    void fetchSavedProgramCount(profileId);
-  }, [fetchSavedScholarships, fetchSavedUniversities, fetchSavedProgramCount]);
+  // Stable callbacks keep session restoration independent of owner changes.
+  // Initial owner reads are started by useResource after the new scope commits.
+  // Late mutation completions may refresh only the currently selected owner;
+  // they never apply their old response body or an old local array.
+  const fetchSavedUniversities=useCallback(async(profileId:number)=>{
+    if(savedOwnerRef.current===profileId)await reloadSavedUniversities();
+  },[reloadSavedUniversities]);
+  const fetchSavedScholarships=useCallback(async(profileId:number)=>{
+    if(savedOwnerRef.current===profileId)await reloadSavedScholarships();
+  },[reloadSavedScholarships]);
+  const hydrateProfileData=useCallback((profileId:number)=>{
+    void fetchSavedUniversities(profileId);void fetchSavedScholarships(profileId);
+  },[fetchSavedUniversities,fetchSavedScholarships]);
 
   // Keep shell-level profile summaries in sync with task workflows that may
   // update linked saved-item context; ignore events for another active profile.
@@ -535,6 +547,7 @@ export function Home({
         // default destination. Unknown/foreign ids fall back to the dashboard.
         const linked = targetFromHash();
         if (linked && (linked.section !== "admin" || data.profile.isAdmin)) {
+          prewarmSearch(linked);
           setActiveTabState(linked.section);
           setActivePane(linked.pane);
           if (linked.openProfileEditor) openProfileModal(false);
@@ -597,7 +610,7 @@ export function Home({
       return;
     }
     setView("landing");
-  }, [hydrateProfileData, openProfileModal, rememberProfile]);
+  }, [hydrateProfileData, openProfileModal, rememberProfile, prewarmSearch]);
 
   // Keep the URL hash in step with the open section so the browser Back
   // button works and a section can be shared/bookmarked (#scholarships).
@@ -608,19 +621,18 @@ export function Home({
     // section the operator was working in.
     const adminDeepLink = activeTab === "admin" && window.location.hash.startsWith("#admin/");
     const want = activePane ? `#${activeTab}/${activePane}` : adminDeepLink ? window.location.hash : `#${activeTab}`;
-    // The URL is the source of truth. If it already names a DIFFERENT valid
-    // destination (rapid hash changes, browser Back/Forward, or a shared deep
-    // link arriving while state is still settling), never overwrite it with an
-    // older activeTab. `onNav` below syncs state to the URL on hashchange.
+    // The URL is the source of truth for both destination and pane. A valid
+    // deep link arriving while state settles must not be overwritten by stale
+    // state, nor left waiting indefinitely for another hashchange event.
     const linked = targetFromHash();
-    if (linked && linked.section !== activeTab && !adminDeepLink) return;
+    if (linked && !adminDeepLink && (linked.section !== activeTab || linked.pane !== activePane)) return;
     if (window.location.hash === want) {
       hashSynced.current = true;
       return;
     }
     const url = `${window.location.pathname}${window.location.search}${want}`;
-    if (hashSynced.current) window.history.pushState(null, "", url);
-    else window.history.replaceState(null, "", url);
+    if (hashSynced.current) window.history.pushState(window.history.state, "", url);
+    else window.history.replaceState(window.history.state, "", url);
     hashSynced.current = true;
   }, [activeTab, activePane, view]);
 
@@ -670,6 +682,7 @@ export function Home({
     const onNav = () => {
       const linked = targetFromHash();
       if (!linked) return;
+      prewarmSearch(linked);
       setActiveTabState(linked.section);
       setActivePane(linked.pane);
       if (linked.openProfileEditor) {
@@ -686,7 +699,7 @@ export function Home({
       window.removeEventListener("popstate", onNav);
       window.removeEventListener("hashchange", onNav);
     };
-  }, [openProfileModal]);
+  }, [openProfileModal, prewarmSearch]);
 
   useEffect(() => {
     // No session cookie → no session to restore: never call the session
@@ -701,35 +714,19 @@ export function Home({
 
   /** Open the profile picker for sign-in or switching accounts. */
   const openProfilePicker = useCallback(async () => {
+    pickerRequest.current++;
     // The protected profile list is only useful after a valid profile has
     // loaded. Visitors and signed-out users can use the email/Telegram form
     // directly; calling it unauthenticated produced a noisy, expected 401.
-    if (activeProfile) await loadAllProfiles();
-    setPickerMessage("");
+    setPickerMessage(null);
     setIsPickerOpen(true);
+    if (activeProfile) void loadAllProfiles();
   }, [activeProfile, loadAllProfiles]);
 
-  /**
-   * Picking an account that this device used before is a convenience only: the
-   * server still has to confirm the session cookie belongs to that account.
-   * If it does not (new browser, expired session, different user), the picker
-   * stays open so the person signs in with email + password.
-   */
-  const handlePickProfile = async (p: StudentProfile) => {
-    try {
-      const res = await fetch("/api/auth/session", { cache: "no-store" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.session?.profileId !== p.id) {
-        setPickerMessage(
-          "Please sign in with your email and password to open this account."
-        );
-        return;
-      }
-    } catch {
-      setPickerMessage("Could not verify your session. Please sign in again.");
-      return;
-    }
-
+  /** Only fresh, successful same-origin auth responses enter this path.
+   * Device-history selections must use handlePickProfile below instead. */
+  const commitAuthenticatedProfile = (p:StudentProfile) => {
+    pickerRequest.current++;
     setActiveProfile(p);
     setProfiles((prev) => (prev.some((profile) => profile.id === p.id) ? prev : [...prev, p]));
     rememberProfile(p.id);
@@ -744,7 +741,24 @@ export function Home({
     setActiveTab(p.isAdmin ? "admin" : "dashboard");
   };
 
+  /** Browser account history is NOT authentication or role evidence. Recheck
+   * its ID against the server and commit the SERVER profile, not the cached p. */
+  const handlePickProfile = async (p: StudentProfile) => {
+    const request=++pickerRequest.current;
+    try {
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if(request!==pickerRequest.current)return;
+      const verified=profileFromSessionEnvelope(data);
+      if(!res.ok||!verified||verified.id!==p.id){setPickerMessage("signInToOpenAccount");return;}
+      commitAuthenticatedProfile(verified);
+    } catch {
+      if(request===pickerRequest.current)setPickerMessage("sessionVerifyFailed");
+    }
+  };
+
   const handleAddNewFromPicker = (email?: string) => {
+    pickerRequest.current++;
     // Carry the address the person just typed in the sign-in form: after a
     // failed sign-in the usual cause is that the account does not exist in this
     // database, and retyping the email is a pointless extra step.
@@ -759,6 +773,7 @@ export function Home({
    * Sign in, from this device or any other).
    */
   const handleLogout = () => {
+    pickerRequest.current++;
     // Clear the server-side session cookie too — otherwise the browser would
     // still be authenticated after "logging out".
     try {
@@ -772,8 +787,7 @@ export function Home({
       // ignore
     }
     setActiveProfile(null);
-    setSavedUniversities([]);
-    setSavedScholarships([]);
+    invalidateClientCache();
     setActiveTab("dashboard");
     setIsProfileModalOpen(false);
     setIsPickerOpen(false);
@@ -857,8 +871,8 @@ export function Home({
     const item = savedUniversities.find((s) => s.universityId === universityId);
     if (!item) return;
     try {
-      await fetch(`/api/saved-universities?id=${item.id}`, { method: "DELETE" });
-      setSavedUniversities((prev) => prev.filter((s) => s.id !== item.id));
+      const res=await fetch(`/api/saved-universities?id=${item.id}`, { method: "DELETE" });
+      if(res.ok&&activeProfile)await fetchSavedUniversities(activeProfile.id);
     } catch (err) {
       console.error(err);
     }
@@ -879,8 +893,8 @@ export function Home({
 
   const handleRemoveSavedUni = async (id: number) => {
     try {
-      await fetch(`/api/saved-universities?id=${id}`, { method: "DELETE" });
-      setSavedUniversities((prev) => prev.filter((s) => s.id !== id));
+      const res=await fetch(`/api/saved-universities?id=${id}`, { method: "DELETE" });
+      if(res.ok&&activeProfile)await fetchSavedUniversities(activeProfile.id);
     } catch (err) {
       console.error(err);
     }
@@ -905,8 +919,8 @@ export function Home({
     const item = savedScholarships.find((s) => s.scholarshipId === scholarshipId);
     if (!item) return;
     try {
-      await fetch(`/api/saved-scholarships?id=${item.id}`, { method: "DELETE" });
-      setSavedScholarships((prev) => prev.filter((s) => s.id !== item.id));
+      const res=await fetch(`/api/saved-scholarships?id=${item.id}`, { method: "DELETE" });
+      if(res.ok&&activeProfile)await fetchSavedScholarships(activeProfile.id);
     } catch (err) {
       console.error(err);
     }
@@ -927,8 +941,8 @@ export function Home({
 
   const handleRemoveSavedScholarship = async (id: number) => {
     try {
-      await fetch(`/api/saved-scholarships?id=${id}`, { method: "DELETE" });
-      setSavedScholarships((prev) => prev.filter((s) => s.id !== id));
+      const res=await fetch(`/api/saved-scholarships?id=${id}`, { method: "DELETE" });
+      if(res.ok&&activeProfile)await fetchSavedScholarships(activeProfile.id);
     } catch (err) {
       console.error(err);
     }
@@ -1002,10 +1016,11 @@ export function Home({
       open={isPickerOpen}
       deviceProfiles={deviceProfiles}
       currentId={activeProfile?.id ?? null}
-      onClose={() => setIsPickerOpen(false)}
+      onClose={() => {pickerRequest.current++;setIsPickerOpen(false);}}
       onSelect={handlePickProfile}
+      onAuthenticated={commitAuthenticatedProfile}
       onAddNew={handleAddNewFromPicker}
-      notice={pickerMessage}
+      noticeKey={pickerMessage}
     />
   ) : null;
 
@@ -1057,9 +1072,8 @@ export function Home({
 
   return (
     <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}>
-      {/* 3-tier shell: the column stacks on a phone, the tablet rail and the
-          laptop sidebar sit next to the content from `md` (768px) up. */}
-      <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
+      {/* Full-width content below the top bar; grouped dock floats above the safe area. */}
+      <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -1074,7 +1088,7 @@ export function Home({
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
-      <main id="main-content" tabIndex={-1} className="flex-1 w-full px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 md:pb-6 lg:px-8 lg:pb-6">
+      <main id="main-content" tabIndex={-1} className="sb-dock-clearance flex-1 w-full px-3  pt-4 sm:px-6 sm:pt-6  lg:px-8 ">
         <div className="mx-auto w-full max-w-screen-2xl">
         {/*
           The new-account reminder lives in the shell, not in one tab: in the
@@ -1133,11 +1147,11 @@ export function Home({
             />
           ) : activeTab === "dashboard" && (
             <div className="space-y-4">
-              <DailyStreakCard profileId={activeProfile?.id ?? null} compact />
               {/* Spec §3 — the control center. Journey bar, next steps,
                   deadlines, application progress, readiness, recommendations
                   and the ten study-plan phases, in that order. */}
               <JourneyControlCenter
+                afterOverview={<DailyStreakCard profileId={activeProfile?.id ?? null} compact />}
                 profileId={activeProfile?.id ?? null}
                 profileVersion={activeProfile ? profileMatchFingerprint(activeProfile) : null}
                 onNavigateTab={handleNavigateTab}
@@ -1355,7 +1369,7 @@ export function Home({
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white pt-6 pb-24 lg:pb-6 mt-12 text-center text-xs text-slate-500">
+      <footer className="sb-dock-clearance border-t border-slate-200 bg-white pt-6  mt-12 text-center text-xs text-slate-500">
         {/* Small print above Terms / Privacy: the app shows AI-written text
             and compiled catalogue data, both of which can be wrong or out of
             date. One honest line wherever the user ends up. */}

@@ -10,7 +10,7 @@ import React, {
 } from "react";
 import { NextIntlClientProvider } from "next-intl";
 import { defaultLocale, isLocale, type Locale } from "./config";
-import { dictionaries, englishMessages, loadMessages, registerMessages, type Messages } from "./messages";
+import { dictionaries, englishMessages, loadMessages, registerMessages, subscribeMessages, type Messages } from "./messages";
 import { getLocaleCookie, setLocaleCookie } from "./locale";
 
 interface LocaleContextValue {
@@ -64,6 +64,8 @@ export function LocaleProvider({
     registerMessages(initialLocale, initialMessages);
     return initialMessages ?? dictionaries[initialLocale] ?? englishMessages;
   });
+
+  useEffect(()=>subscribeMessages((changedLocale,loaded)=>{if(changedLocale===locale)setMessages(loaded);}),[locale]);
 
   // Read the persisted choice on mount (no-op when the server already did) and
   // fetch that language's dictionary if it is not the one we shipped.
@@ -129,7 +131,7 @@ export function LocaleProvider({
         }}
         getMessageFallback={({ namespace, key }) => {
           const path = namespace ? [namespace, ...key.split(".")] : key.split(".");
-          let node: unknown = englishMessages as unknown;
+          let node: unknown = dictionaries.en as unknown;
           for (const part of path) {
             if (node && typeof node === "object") node = (node as Record<string, unknown>)[part];
             else return path[path.length - 1] ?? key;

@@ -61,7 +61,7 @@ async function main() {
     instanceAKeyBefore.startsWith(base) && /:r\d+[sl]$/.test(instanceAKeyBefore));
 
   // A write handled by instance A bumps the SHARED revision.
-  const bumped = await bumpCacheRevision("profile", "activity added on instance A");
+  const bumped = await bumpCacheRevision("profile:17", "activity added on instance A");
   check("a write bumps the revision monotonically", bumped.revision === r0.revision + 1);
 
   // Instance B, which never saw the local invalidation, MUST now compute a
@@ -76,11 +76,11 @@ async function main() {
   check("another profile never shares the first profile's key", !otherProfile.startsWith(`${base.split(":")[0]}:`) && otherProfile !== instanceBKeyAfter);
 
   // The real invalidation entry point must also bump the shared revision.
-  const beforeInvalidate = await readCacheRevision("profile");
-  invalidateDashboardRecommendationsForProfile(17);
+  const beforeInvalidate = await readCacheRevision("profile:17");
+  await invalidateDashboardRecommendationsForProfile(17);
   // fire-and-forget bump is awaited via a microtask flush
   await new Promise((resolve) => setTimeout(resolve, 0));
-  const afterInvalidate = await readCacheRevision("profile");
+  const afterInvalidate = await readCacheRevision("profile:17");
   check("invalidateDashboardRecommendationsForProfile bumps the shared revision",
     afterInvalidate.revision > beforeInvalidate.revision,
     `${beforeInvalidate.revision} -> ${afterInvalidate.revision}`);
@@ -137,7 +137,7 @@ async function main() {
     /bumpCacheRevision\("catalogue"/.test(catalogCache));
   const dashCache = read("src/lib/dashboardRecommendationCache.ts");
   check("profile/write invalidation bumps the shared revision",
-    /bumpCacheRevision\("profile"/.test(dashCache));
+    /bumpCacheRevision\(`profile:\$\{profileId\}`/.test(dashCache));
 
   console.log(`\n✅ ${passed} passed, ${failed} failed`);
   if (failed) process.exitCode = 1;

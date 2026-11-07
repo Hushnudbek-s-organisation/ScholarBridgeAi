@@ -395,9 +395,9 @@ export async function syncProfilePremium(profileId: number, fallbackUntil?: Date
  * while a longer paid window was still running — a student who bought the
  * yearly plan on top of a monthly one was told Premium ended in 30 days.
  */
-export async function findActiveSubscription(profileId: number | null) {
+export async function findActiveSubscription(profileId: number | null, database:Pick<typeof db,"select">=db) {
   if (!profileId) return null;
-  const [sub] = await db
+  const [sub] = await database
     .select()
     .from(subscriptions)
     .where(

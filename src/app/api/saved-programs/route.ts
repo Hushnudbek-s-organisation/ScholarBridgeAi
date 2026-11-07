@@ -1,3 +1,4 @@
+import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
 import { NextResponse } from "next/server";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { db } from "@/db";
@@ -115,6 +116,7 @@ export async function POST(req: Request) {
       .values({ profileId, programId })
       .returning();
 
+    await invalidateDashboardRecommendationsForProfile(profileId);
     return NextResponse.json({ saved: newSaved });
   } catch (error) {
     console.error("POST /api/saved-programs error:", error);
@@ -150,6 +152,7 @@ export async function DELETE(req: Request) {
 
     await db.delete(savedPrograms).where(eq(savedPrograms.id, id));
 
+    await invalidateDashboardRecommendationsForProfile(target.profileId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/saved-programs error:", error);

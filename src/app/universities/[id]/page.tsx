@@ -1,3 +1,5 @@
+import {resolveAcademicRequirements} from "@/lib/universityDetailRequirements";
+import {EvidenceNote} from "@/components/EvidenceNote";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -91,6 +93,7 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
 
   const country = localizeCountry(university.country, locale);
   const verified = university.verificationStatus === "verified";
+  const academic=resolveAcademicRequirements(bundle?.facts?.get(university.id)??[],{});
   // Phase AD: a rank with no recorded edition is not a QS position, so the
   // <meta> description states "unknown" rather than an unsupported number.
   const qsPosition = verifiedQsRank(university);
@@ -102,8 +105,8 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
       tuition: verified && university.annualTuitionUsd != null
         ? formatMoney(university.annualTuitionUsd, "USD")
         : t.metaUnknown,
-      ielts: verified && university.minIelts != null
-        ? formatNumber(university.minIelts, { decimals: 1 })
+      ielts: academic.summary.ielts != null
+        ? formatNumber(academic.summary.ielts.single, { decimals: 1 })
         : t.metaUnknown,
       rank: verified && qsPosition
         ? `#${formatNumber(qsPosition.rank)}`
@@ -133,6 +136,8 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // Any figure on this page depends on a verified row. Unverified institutions
   // keep their identity (name, city, links) and lose their numbers.
   const verified = u.verificationStatus === "verified";
+  const academic=resolveAcademicRequirements(bundle?.facts?.get(u.id)??[],{});
+  const academicValue=(key:"gpa"|"ielts"|"sat")=>{const value=academic.summary[key];return value?`${value.single}${key==="gpa"?` / ${value.unit}`:""}`:copy.university.notSpecified;};
   // Phase AD — the one QS position this page may state: `null` when the row
   // records no edition (`qs_rank_year`), when the number is broken, or when the
   // row is unverified. Every rank below, and the prose reconciliation, reads it.
@@ -233,9 +238,9 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   ];
 
   const admissionFacts: { icon: React.ReactNode; label: string; value: string | null }[] = [
-    { icon: <GraduationCap className="h-3.5 w-3.5" aria-hidden />, label: t.minGpaLabel, value: verifiedValue(u.minGpa, 2) },
-    { icon: <Languages className="h-3.5 w-3.5" aria-hidden />, label: t.minIeltsLabel, value: verifiedValue(u.minIelts, 1) },
-    { icon: <BookOpen className="h-3.5 w-3.5" aria-hidden />, label: t.minSatLabel, value: verifiedValue(u.minSat) },
+    { icon: <GraduationCap className="h-3.5 w-3.5" aria-hidden />, label: t.minGpaLabel, value: academicValue("gpa") },
+    { icon: <Languages className="h-3.5 w-3.5" aria-hidden />, label: t.minIeltsLabel, value: academicValue("ielts") },
+    { icon: <BookOpen className="h-3.5 w-3.5" aria-hidden />, label: t.minSatLabel, value: academicValue("sat") },
     {
       icon: <BadgeCheck className="h-3.5 w-3.5" aria-hidden />,
       label: t.acceptanceLabel,
@@ -311,10 +316,10 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                 {tuitionLocal ?? tuitionUsd}
               </span>
             )}
-            {verifiedValue(u.minIelts, 1) && (
+            {academic.summary.ielts && (
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-inset ring-slate-200">
                 <Languages className="h-3 w-3" aria-hidden />
-                IELTS {verifiedValue(u.minIelts, 1)}+
+                IELTS {academic.summary.ielts?.single}+
               </span>
             )}
           </div>
@@ -386,6 +391,9 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
                   <Fact key={fact.label} icon={fact.icon} label={fact.label} value={fact.value ?? catalog.notPublished} />
                 ))}
               </dl>
+              <p className="mt-3 text-sm text-slate-500">{copy.university.requirementScopeHint}</p>
+              <div className="mt-2 space-y-1">{(["gpa","ielts","sat"] as const).map(key=><EvidenceNote key={key} compact label={key.toUpperCase()} fact={academic.evidence[key]}/>)}</div>
+              {(u.minGpa!=null||u.minIelts!=null||u.minSat!=null)&&<p className="mt-3 text-sm text-slate-500">{copy.university.recordedCatalogueValue}: {u.minGpa!=null?`GPA ${u.minGpa} (${copy.university.scoreScaleNotRecorded})`:""}{u.minIelts!=null?` · IELTS ${u.minIelts}`:""}{u.minSat!=null?` · SAT ${u.minSat}`:""}</p>}
             </Section>
 
             <Section id="fields" title={t.fields} icon={<BookOpen className="h-4 w-4" aria-hidden />}>

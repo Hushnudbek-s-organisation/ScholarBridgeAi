@@ -1,4 +1,4 @@
-import { dictionaries } from "@/i18n/messages.server";
+import countryNames from "@/i18n/staged/country-names.json";
 
 /**
  * Shared, additive country/territory options requested for the QS top-200
@@ -119,7 +119,7 @@ COUNTRY_KEY_BY_ALIAS.set("europeanunion", "europeanUnion");
 // widens what the matcher RECOGNIZES. (The keys of `countryNames` are exactly
 // the `CountryTranslationKey` union, hence the cast.)
 for (const locale of ["uz", "ru"] as const) {
-  const names = dictionaries[locale].countryNames as Record<string, string>;
+  const names = countryNames[locale] as Record<string, string>;
   for (const [key, name] of Object.entries(names)) {
     if (typeof name === "string" && name) {
       COUNTRY_KEY_BY_ALIAS.set(normalizeCountryAlias(name), key as CountryTranslationKey);
