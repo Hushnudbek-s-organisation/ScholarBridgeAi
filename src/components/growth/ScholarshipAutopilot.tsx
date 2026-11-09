@@ -1,4 +1,5 @@
 "use client";
+import {AwardCoverageNote} from "@/components/AwardCoverageNote";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -53,6 +54,7 @@ interface Item {
   decision: "applied" | "hidden" | null;
   saved: boolean;
   coveredUniversities?: string[];
+  coverageState?:"applicable"|"not_applicable"|"unknown";
   coversSavedUni?: boolean;
   isFullForSavedUni?: boolean;
   coverageTier?: number;
@@ -211,6 +213,7 @@ export function ScholarshipAutopilot({
             >
               <CalendarClock className="h-3 w-3" /> {deadlineText(s)}
             </span>
+            <AwardCoverageNote state={s.coverageState}/>
             {s.tags.fullFunding && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">{t("tagFull")}</span>}
             {(s.coveredUniversities?.length ?? 0) > 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">{s.isFullForSavedUni ? t("coverageFull", { universities: s.coveredUniversities!.join(", ") }) : t("coveragePartial", { universities: s.coveredUniversities!.join(", ") })}</span>}
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${s.tags.essay ? "bg-amber-100 text-amber-700" : "bg-teal-100 text-teal-700"}`}>

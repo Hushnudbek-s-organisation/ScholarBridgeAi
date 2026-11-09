@@ -1,0 +1,72 @@
+
+> test:stack-integration
+> tsx scripts/run-stack-integration.ts
+
+E2E database: disposable embedded PostgreSQL on 127.0.0.1:44877/sb_e2e_51992
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/user/ScholarBridgeAi/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[✓] Changes applied
+Created disposable E2E fixtures using the application schema and password hasher.
+E2E server ready: http://127.0.0.1:43835/api/health; external AI credentials removed from its environment.
+
+> test:provenance
+> tsx scripts/check-provenance.ts
+
+
+check-provenance — app: http://127.0.0.1:43835
+
+stale-label unit tests (fixed now = 2026-10-01):
+  ok  data >180d old is stale
+  ok  data 16d old is not stale
+  ok  data exactly 180d old is not stale (boundary)
+  ok  data 180d+1h old is stale
+  ok  null date is never stale (unknown ≠ stale ≠ verified)
+
+fixture setup (local dev DB, self-cleaning):
+  seeded university #3, programs #2 and #3
+  ok  API responds 200 with fixture university
+
+program-level provenance (verified program):
+  ok  p1 present in response
+  ok  p1.sourceUrl equals fixture URL (no invented data)
+  ok  p1.lastVerifiedAt is the fixture date
+  ok  p1.verificationStatus === 'verified'
+  ok  p1.isVerified === true
+  ok  p1.sources has 2 entries (official + third-party)
+  ok  official source: url + title + domain + accessedAt present
+  ok  official source flagged isOfficial
+  ok  third-party source NOT flagged official, last-checked = fixture date
+
+per-requirement provenance:
+
+unknown ≠ verified (unverified program, no source):
+  ok  p2 present in response
+  ok  p2.sourceUrl is null (nothing invented)
+  ok  p2.lastVerifiedAt is null
+  ok  p2.verificationStatus === 'unverified'
+  ok  p2.isVerified === false
+  ok  p2.sources is empty
+  ok  p2 requirements are withheld entirely (no source ⇒ not shown as fact)
+  ok  p2 is still listed even with its requirements withheld
+
+cycle provenance (estimated vs confirmed):
+  ok  2 cycles returned
+  ok  verified cycle: isEstimated === false
+  ok  verified cycle exposes sourceUrl + lastVerifiedAt
+  ok  unverified cycle: isEstimated === true (deadline NOT shown as confirmed)
+  ok  unverified cycle: sourceUrl null (no fabricated source)
+  ok  unverified cycle keeps its deadline VALUE (unknown ≠ deleted)
+
+university-level sources (domain + last-checked):
+  ok  2 university sources
+  ok  every uni source has domain + accessedAt
+
+fixtures cleaned up
+
+check-provenance: FAIL (2 failed)
+
+  FAIL p1 requirements all carry sourceUrl + status — got: []
+  FAIL p1 ielts minimum preserved (6.5)

@@ -1,3 +1,4 @@
+import {prepareAwardCoverage} from "@/lib/awardCoverageContext.server";
 import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
@@ -239,6 +240,9 @@ export async function GET(req: Request) {
     // the dropdown keeps listing every destination the SEARCH matches with the
     // number of awards each one holds (a country filter must not zero its own
     // options).
+    const awardCoverage=await prepareAwardCoverage(req,profileData,savedUniRefs,allScholarships.map(s=>s.id),bundle.facts);
+    savedUniRefs=awardCoverage.references;
+
     const countryFacetSource: string[] = wantFacets
       ? allScholarships.map((scholarship) => scholarship.country ?? "")
       : [];
@@ -364,9 +368,11 @@ export async function GET(req: Request) {
       const src = sourceMap.get(s.id) || null;
       // Saved-university coverage (Module 1) — empty refs means no private
       // saved list was available, and every flag below stays honestly false.
-      const cov = isVerified && savedUniRefs.length > 0 ? evaluateScholarshipForSavedUnis(s, savedUniRefs) : null;
+      const cov = savedUniRefs.length > 0 ? evaluateScholarshipForSavedUnis({...s,catalogueFacts:bundle.facts?.get(s.id)??[]}, savedUniRefs) : null;
       return {
         ...publicRow,
+        coverageAssessment:cov,
+        coverageState:cov?.coverageState??"unknown",
         coveredUniversities: cov?.coveredUniNames ?? [],
         coversSavedUni: cov?.coversSavedUni ?? false,
         isFullForSavedUni: cov?.isFullForSavedUni ?? false,

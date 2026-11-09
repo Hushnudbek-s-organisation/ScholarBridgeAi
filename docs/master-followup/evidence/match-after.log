@@ -1,0 +1,113 @@
+
+1. University match — requirements, cost, country, field
+  ✓ unrecorded IELTS/SAT scores do not lower fit
+  ✓ fit score carries no Reach/Match/Safety admissions category
+  ✓ unrecorded IELTS is not treated as a failed requirement
+  ✓ unrecorded SAT is not treated as a failed requirement
+  ✓ field alignment is the top reason (weight 12)
+  ✓ what-if values recompute against an immutable in-memory profile copy
+  ✓ what-if can explicitly return unknown values to null without writing the source profile
+  ✓ family income does not replace a missing explicit annual budget
+  ✓ fit explanations never score household income as available funding
+  ✓ strong profile → high score
+  ✓ max 2 reasons
+  ✓ max 2 issues
+  ✓ activities, work years, and publications do not inflate university fit
+  ✓ university fit does not claim activities strengthen admission
+  ✓ IELTS exactly at the bar → no IELTS issue
+  ✓ IELTS below the bar → penalty vs a score that meets it
+  ✓ IELTS below → issue asks the student to verify the programme-level policy
+  ✓ no published minimums → no test issues
+  ✓ no published minimums → high score
+  ✓ TOEFL instead of IELTS adds an informational signal without changing fit or claiming equivalence
+  ✓ Duolingo is surfaced as recorded context, never converted to IELTS
+  ✓ unrelated field → visible issue when requirements are met
+  ✓ unrelated field → lower score than a matching field
+  ✓ unknown target major → no field claim either way
+  ✓ unscaled GPA > 4 → no GPA comparison (no false 'well above')
+
+2. subjectAlignment / majorOverlap — word-based, blank-safe
+  ✓ exact field → strong
+  ✗ superset field → strong
+  ✓ unrelated field → none
+  ✓ blank student major → unknown
+  ✓ blank program focus → unknown
+  ✓ 'AI' does NOT match 'Sustainable Engineering'
+  ✗ 'AI' matches 'AI & Data Science'
+  ✓ short tokens are kept by the tokenizer
+  ✓ stop words are dropped
+  ✓ no comparable words → null, not a fake 0.5
+
+3. Scholarship match — level aliases, majors, English tests
+  ✓ 'Master''s' profile matches a ['Master','PhD'] award
+  ✓ 'Master''s' is NOT reported as 'Only open to'
+  ✓ PhD profile matches a ['Master','PhD'] award
+  ✓ Bachelor profile → explicit mismatch issue
+  ✓ Bachelor profile → lower score than a matching level
+  ✓ missing profile level → unknown (no mismatch claim)
+  ✓ Cyrillic 'магистратура' matches 'Master'
+  ✓ blank target major → NO 'your field is eligible' claim
+  ✓ blank target major → asks the student to add it
+  ✓ 'AI' is not reported eligible for an Engineering/Public Health award
+  ✓ 'Computer Science' matches a Computer Science award
+  ✓ 'All' majors award → no field issue for a blank major
+  ✓ no English test is not scored as a scholarship failure
+  ✓ TOEFL instead of IELTS adds a non-penalizing scholarship signal
+  ✓ merit-based + strong GPA → reason
+  ✓ merit-based + incomparable GPA → no invented merit reason
+
+4. Shared helpers — GPA scale and degree levels
+  ✓ 4.0 scale keeps the value
+  ✓ 100-point scale converts proportionally
+  ✓ 5-point scale converts proportionally
+  ✓ no scale, value ≤ 4 → unknown
+  ✓ no scale, value > 4 → unknown (never 4.0)
+  ✓ explicit zero GPA is valid; negative GPA is unknown
+  ✓ alias: Master's ↔ Master
+  ✓ alias: MSc ↔ Master
+  ✓ alias: Bachelor vs Master-only → mismatch
+  ✓ 'All' catalogue level matches anything
+  ✓ unknown profile level → unknown
+  ✓ unknown catalogue level → unknown
+  ✓ unknown is never coerced to All
+  ✓ multi-level label is recognised
+  ✓ a label with an unrecognised part stays unspecified
+  ✓ JSON-array label is compared, not read as unknown
+
+5. SAT/ACT catalogue figures are compared only for undergraduate applicants
+  ✓ graduate applicant at a graduate-only university → no SAT issue
+  ✓ a stored undergraduate SAT bar does not move a graduate applicant's score
+  ✓ undergraduate applicant's missing SAT remains unknown, not a failure
+  ✓ a graduate applicant at an undergraduate+graduate university is not scored on SAT
+  ✓ unknown level still shows the published SAT bar (never hidden)
+  ✓ graduate-only institution → test does not apply
+  ✓ undergraduate institution + undergraduate student → applies
+  ✓ unknown institution level keeps the published bar
+  ✓ hasUndergraduateAdmission: All → true
+  ✓ hasUndergraduateAdmission: Master only → false
+  ✓ hasUndergraduateAdmission: unknown → false (never claimed)
+  ✓ a Master programme ignores a stray SAT minimum
+  ✓ a Bachelor programme still assesses the SAT minimum
+
+6. Precision — continuous grading and visible arithmetic
+  ✓ the breakdown components sum to the raw score
+  ✓ the displayed score is the raw score rounded once
+  ✓ every dimension is reported, with the unmeasured ones marked not-compared
+  ✓ evidence coverage and level are derived from measured dimensions, not fit score
+  ✓ zero available dimensions stay limited evidence, never a probability
+  ✓ a dimension with no data contributes exactly 0
+  ✓ the GPA reason carries the exact points it contributed
+  ✓ GPA 3.80 against a 3.50 bar earns the graded 9.0, not a flat 10
+  ✓ meeting a minimum exactly is neutral (0), not a bonus
+  ✓ GPA grading has no cliff (max 1 point per 0.01)
+  ✓ a better GPA never scores lower
+  ✓ a larger budget never scores lower
+  ✓ non-USD canonical costs never fall back to stale USD mirrors
+  ✓ missing living cost is unknown, not treated as zero
+  ✓ a small budget gap costs far less than a large one
+  ✓ both gaps are still penalties, never awards
+  ✓ a 0.5-band margin over the IELTS bar scores strictly higher than an exact pass
+  ✓ scholarship breakdown also adds up to its raw score
+  ✓ a higher GPA never lowers a scholarship score
+
+❌ 97 passed, 2 failed

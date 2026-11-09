@@ -1,4 +1,5 @@
 "use client";
+import {AwardCoverageNote} from "@/components/AwardCoverageNote";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -39,6 +40,7 @@ interface DeadlineItem {
   verificationStatus?: string | null;
   chanceScore?: number | null;
   matchScore?: number | null;
+  coverageState?:"applicable"|"not_applicable"|"unknown";
   coversSavedUni?: boolean | null;
   isFullCoverage?: boolean | null;
   /** critical (≤14d) · soon (≤45d) · planned · past · undated */
@@ -323,6 +325,7 @@ export function DeadlineCenter({ profileId, onNavigateTab }: DeadlineCenterProps
                         </span>
                       )}
                     </div>
+                    {item.type==="scholarship"&&<AwardCoverageNote state={item.coverageState}/>}
                     {subtitle && <p className="break-words text-sm text-slate-600">{subtitle}</p>}
                     {externalSource && (
                       <a

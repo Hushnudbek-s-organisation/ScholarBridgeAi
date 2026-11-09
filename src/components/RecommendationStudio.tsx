@@ -1,4 +1,5 @@
 "use client";
+import {examRule,type ExamKind} from "@/lib/examRecords";
 import {recordedToefl,type ApplicantContext} from "@/lib/applicantContext";
 import {ToeflRecordFields,type ToeflRecord} from "@/components/ToeflRecordFields";
 import { RequirementGroupView } from "@/components/RequirementGroupView";
@@ -678,6 +679,7 @@ export function RecommendationStudio({
         id={id}
         type={type}
         inputMode={type === "number" ? "decimal" : undefined}
+        {...(["ielts","sat","act","duolingo"].includes(key)?examRule(key as ExamKind)??{}:{})}
         value={form[key] as string}
         onChange={(e) => setField(key, e.target.value)}
         placeholder={placeholder}

@@ -1,0 +1,83 @@
+{
+  "kind": "readonly_identity_candidates_not_merge_approval",
+  "officialPublisherPagesReRead": false,
+  "productionWrites": 0,
+  "automaticMerges": 0,
+  "requests": [
+    "dff34871-453b-41c7-884c-4d23caf9829f",
+    "e5030c39-9f43-4dfc-80cc-e987815c6eed",
+    "2c5688eb-8ad2-46e3-845c-23668c41fa82"
+  ],
+  "identityNamespaceGuard": {
+    "universities8": "National University of Singapore (NUS)",
+    "universities185": "Universidade de São Paulo (USP)",
+    "universities11": "University of Pennsylvania (UPenn)",
+    "universities127": "Kyushu University",
+    "mitInstitutionId": 1,
+    "stanfordInstitutionId": 3,
+    "currentOrmProgrammeTable": "programs",
+    "hostedLegacyProgrammeTable": "university_programs",
+    "note": "Numeric IDs without table/entity scope are not identity evidence. The current ORM and legacy hosted table must not be silently interchanged."
+  },
+  "candidates": [
+    {
+      "institution": "MIT",
+      "institutionId": 1,
+      "table": "programs",
+      "members": [
+        {
+          "id": 8,
+          "labelSummaryNotExactStoredTitle": "MBA (MIT Sloan School of Management)"
+        },
+        {
+          "id": 185,
+          "labelSummaryNotExactStoredTitle": "MBA (MIT Sloan)"
+        }
+      ],
+      "status": "candidate_only",
+      "programmeScopeVerifiedFromCurrentPublisherContent": false,
+      "admissionCycleKnown": false,
+      "mergeReady": false
+    },
+    {
+      "institution": "Stanford",
+      "institutionId": 3,
+      "table": "university_programs",
+      "members": [
+        {
+          "id": 30,
+          "labelSummaryNotExactStoredTitle": "MBA (Stanford Graduate School of Business)"
+        },
+        {
+          "id": 187,
+          "labelSummaryNotExactStoredTitle": "MBA (Stanford GSB)"
+        }
+      ],
+      "status": "candidate_only_legacy_table",
+      "currentOrmRows30And187IndependentlyRechecked": false,
+      "programmeScopeVerifiedFromCurrentPublisherContent": false,
+      "admissionCycleKnown": false,
+      "mergeReady": false
+    }
+  ],
+  "legacyLabel11And127": {
+    "table": "programs",
+    "11": {
+      "universityId": 1,
+      "name": "PhD in Artificial Intelligence",
+      "degreeLevel": "PhD"
+    },
+    "127": {
+      "universityId": 31,
+      "name": "Psychological and Brain Sciences",
+      "degreeLevel": "Bachelor's"
+    },
+    "doNotUseAsAStanfordMbaMergePair": true
+  },
+  "limitations": [
+    "Stored verification_status=verified is not this audit's fresh publisher-content validation.",
+    "Current publisher pages are outside this environment's permitted outbound host list. Stored URLs and historical quoted excerpts are not silently upgraded to a new network reread.",
+    "No identity decision, row deletion, programme invention, cycle transfer, scholarship transfer or source-link merge was performed.",
+    "This receipt preserves prior request identifiers and summarized findings, not full raw query results. Display labels above are summaries, not verbatim stored row titles; no omitted field is inferred."
+  ]
+}

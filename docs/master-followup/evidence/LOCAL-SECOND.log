@@ -1,0 +1,57 @@
+== 1. Static / type / copy guards ==
+FAIL typecheck                          rc=2 
+
+> typecheck
+> tsc --noEmit
+
+error TS6053: File '/home/user/ScholarBridgeAi/.next/dev/types/cache-life.d.ts' not found.
+  The file is in the program because:
+    Matched by include pattern '.next/dev/types/**/*.ts' in '/home/user/ScholarBridgeAi/tsconfig.json'
+error TS6053: File '/home/user/ScholarBridgeAi/.next/dev/types/validator.ts' not found.
+  The file is in the program because:
+    Matched by include pattern '.next/dev/types/**/*.ts' in '/home/user/ScholarBridgeAi/tsconfig.json'
+OK   lint:baseline                      PASS 
+OK   i18n                                
+OK   localization                       18 passed 0 failed
+OK   dark                                
+OK   source-recheck                     12 passed 0 failed
+OK   typed-evidence                     17 passed 0 failed
+OK   admission-probability              12 passed 0 failed
+OK   evidence-render                    18 passed 0 failed
+OK   finance-unified                    16 passed 0 failed
+OK   cache-revision                     20 passed 0 failed
+OK   snapshot-recovery                  PASS 
+OK   exam-boundaries                    50 passed 0 failed
+OK   subject-identities                 20 passed 0 failed
+OK   verify-summary                     4 passed 0 failed
+OK   scoped-award-coverage              32 passed 0 failed
+OK   channel                            196 passed 0 failed
+OK   profile-recompute                  6 passed 0 failed
+OK   chunk-recovery                     13 passed 0 failed
+OK   observability                      8 passed 0 failed
+OK   deploy                             6 passed 0 failed
+OK   official-source                    38 passed 0 failed
+OK   security                            
+OK   audit-safety                        
+OK   build-gates                        13 passed 0 failed
+OK   feature-inventory                   
+OK   design-system                      10 passed 0 failed
+OK   audit:ui                            
+OK   catalogue-query-load               PASS 
+OK   continuation                       PASS 
+OK   master-regressions                 26 passed 0 failed
+OK   master-database                    PASS 
+== 2. Migration: forward vs recovery (NOT one apply chain) ==
+OK   migration-runner                   9 passed 0 failed
+OK   migration-dry-run                  14 passed 0 failed
+OK   migration-recovery                 7 passed 0 failed
+== 3. Real disposable-PostgreSQL runtime proofs ==
+OK   research-worker                    9 passed 0 failed
+OK   research-runtime                   17 passed 0 failed
+OK   review-queue                       15 passed 0 failed
+OK   review-queue-runtime               10 passed 0 failed
+OK   backend-audit                      PASS 
+OK   api-security:isolated               
+== 4. Dependency state (no --force, no forced downgrade) ==
+OK   prod-audit                          
+TOTAL_FAILS=1

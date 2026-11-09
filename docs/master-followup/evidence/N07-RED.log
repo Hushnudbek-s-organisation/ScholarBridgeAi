@@ -1,0 +1,49 @@
+FAIL .github/workflows/supabase-verify.yml code 0: The input did not match the regular expression /## Supabase live schema verify — exit 0\n/. Input:
+
+'## Supabase live schema verify — exit \n' +
+  '\n' +
+  '### Gaps between src/db/schema.ts and the live database\n' +
+  '\n' +
+  'MISSING fixture_only_table\n' +
+  '\n' +
+  '```\n' +
+  'MISSING fixture_only_table\n' +
+  '```\n'
+
+FAIL .github/workflows/supabase-verify.yml code 2: The input did not match the regular expression /## Supabase live schema verify — exit 2\n/. Input:
+
+'## Supabase live schema verify — exit \n' +
+  '\n' +
+  '### Gaps between src/db/schema.ts and the live database\n' +
+  '\n' +
+  'MISSING fixture_only_table\n' +
+  '\n' +
+  '```\n' +
+  'MISSING fixture_only_table\n' +
+  '```\n'
+
+FAIL ci/supabase-verify.yml code 0: The input did not match the regular expression /## Supabase live schema verify — exit 0\n/. Input:
+
+'## Supabase live schema verify — exit \n' +
+  '\n' +
+  '### Gaps between src/db/schema.ts and the live database\n' +
+  '\n' +
+  'MISSING fixture_only_table\n' +
+  '\n' +
+  '```\n' +
+  'MISSING fixture_only_table\n' +
+  '```\n'
+
+FAIL ci/supabase-verify.yml code 2: The input did not match the regular expression /## Supabase live schema verify — exit 2\n/. Input:
+
+'## Supabase live schema verify — exit \n' +
+  '\n' +
+  '### Gaps between src/db/schema.ts and the live database\n' +
+  '\n' +
+  'MISSING fixture_only_table\n' +
+  '\n' +
+  '```\n' +
+  'MISSING fixture_only_table\n' +
+  '```\n'
+
+VERIFY_SUMMARY: 0 passed, 4 failed

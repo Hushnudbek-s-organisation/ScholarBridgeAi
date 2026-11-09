@@ -270,14 +270,10 @@ export function assessEligibility(
   }
 
   const add = (key: RequirementAssessment["key"], required: number | null | undefined, studentValue: number | null | undefined) => {
-    if (required == null || !Number.isFinite(Number(required)) || Number(required) <= 0) return;
-    const sv = studentValue != null && Number.isFinite(Number(studentValue)) ? Number(studentValue) : null;
-    items.push({
-      key,
-      required: Number(required),
-      studentValue: sv,
-      status: sv == null ? "unknown" : sv >= Number(required) ? "met" : "unmet",
-    });
+    if(typeof required!=="number"||!Number.isFinite(required))return;
+    const unit=({gpa:"4",ielts:"9",sat:"1600",act:"36",duolingo:"160",toefl:first?.toeflScale??"unknown"} as const)[key];
+    const result=evaluateApplicantRequirementGroup({id:`flat-${key}`,kind:"minimum",field:key,value:required,unit},{...input,[key]:studentValue},input.asOfDate??new Date().toISOString().slice(0,10));
+    items.push({key,required,studentValue:typeof result.actual==="number"?result.actual:null,status:result.state==="met"?"met":result.state==="unmet"?"unmet":"unknown"});
   };
 
   if (first) {
@@ -291,7 +287,7 @@ export function assessEligibility(
     // DIFFERENT test is NOT auto-substituted — that is an admission-office
     // decision, so we only mark it met when the same test is taken.
     add("ielts", first.minIelts, input.ielts);
-    add("toefl", first.minToefl, first.toeflScale && first.toeflScale === input.toeflScale && !(input.toeflRecord?.validUntil && input.toeflRecord.validUntil < (input.asOfDate??new Date().toISOString().slice(0,10))) ? input.toefl : null);
+    add("toefl", first.minToefl, input.toefl);
     add("duolingo", first.minDet, input.duolingo);
     // SAT/ACT are undergraduate-admission tests. A graduate programme (or a
     // graduate applicant) must not be scored against a stray SAT minimum —
@@ -713,7 +709,7 @@ export function recommend(
     const tier = LEVEL_RANK[b.subjectFit.level] - LEVEL_RANK[a.subjectFit.level];
     if (tier !== 0) return tier;
     if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-    if (a.program.verificationStatus === b.program.verificationStatus) return a.program.name.localeCompare(b.program.name);
+    if (a.program.verificationStatus === b.program.verificationStatus) return a.program.id - b.program.id;
     return a.program.verificationStatus === "verified" ? -1 : 1;
   });
 

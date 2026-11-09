@@ -1,0 +1,63 @@
+{
+  "kind": "hosted_read_only_metadata_not_workflow_auth_proof",
+  "projectRef": "zkdguzbdopfedkffsatk",
+  "productionWrites": 0,
+  "historicalPrerequisiteMigrationRepeated": false,
+  "requests": {
+    "privatePrerequisitePresence": "b9759a3a-101a-45d7-8f1a-9d7e0133f1c4",
+    "boundedAggregate": "083fa656-97ea-4e06-a4a3-3ca3967ea99c"
+  },
+  "aggregate": {
+    "publicTables": 124,
+    "rlsDisabledTables": [],
+    "browserReadableTables": [
+      "scholarships",
+      "universities"
+    ],
+    "browserWritableTables": [],
+    "universities": 356,
+    "scholarships": 833,
+    "catalogueFacts": 0,
+    "officialSourceChecksPresent": false,
+    "reviewQueueItemsPresent": false,
+    "reportedProgrammeRows": 2848,
+    "programmeCountTableIdentity": "not_preserved_in_this_receipt"
+  },
+  "observedPrivatePrerequisites": [
+    "cache_revisions",
+    "catalogue_facts",
+    "password_reset_tokens",
+    "research_run_items",
+    "research_runs"
+  ],
+  "privatePrerequisiteChecks": {
+    "allFivePresent": true,
+    "allFiveRlsEnabled": true,
+    "allFivePolicyCount": 0,
+    "anonAnySelectInsertUpdateDelete": false,
+    "authenticatedAnySelectInsertUpdateDelete": false,
+    "backendAnySelectInsertUpdateDelete": true,
+    "backendAllFourPrivileges": "not_attested_by_any_privilege_query"
+  },
+  "additionalScopeColumnAndReviewTableQuery": {
+    "outcome": "connector_read_timeout",
+    "retried": false,
+    "columnsAndAdditionalReviewTablesVerified": false
+  },
+  "githubActionsSecretMetadata": {
+    "outcome": "403 Resource not accessible by integration",
+    "secretValuesRequested": false,
+    "secretValuesRead": false,
+    "credentialRotationAttempted": false,
+    "currentWorkflowDatabaseCredentialVerified": false
+  },
+  "limitations": [
+    "Connector SQL authentication is not GitHub Actions DATABASE_URL authentication and does not resolve or disprove SQLSTATE 28P01.",
+    "RLS/grant metadata is not a runtime application ownership or backend-role acceptance test.",
+    "The historical 626-scholarship benchmark is not the current hosted count of 833; no data was deleted to force a benchmark count.",
+    "The prior aggregate reported 2848 programme rows, but this receipt does not preserve that count query’s physical-table identity. It is not a claimed current-ORM programme count; programs and legacy university_programs must not be interchanged.",
+    "Zero field-level catalogue facts cannot be presented as complete verified programme/cycle/applicant evidence.",
+    "Missing additional tables are release blockers, not permission to apply additional production migrations."
+  ],
+  "releaseReady": false
+}

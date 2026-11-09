@@ -1,0 +1,9 @@
+PASS .github/workflows/supabase-verify.yml: verifier=0, summary safe, original exit preserved
+PASS .github/workflows/supabase-verify.yml: verifier=2, summary safe, original exit preserved
+PASS ci/supabase-verify.yml: verifier=0, summary safe, original exit preserved
+PASS ci/supabase-verify.yml: verifier=2, summary safe, original exit preserved
+PASS runner negative control: child=0, reported=fixture: PASS, runner=0
+PASS runner negative control: child=0, reported=fixture: FAIL (2 failed), runner=1
+PASS runner negative control: child=0, reported=FAIL fixture assertion, runner=1
+PASS runner negative control: child=2, reported=fixture: PASS, runner=1
+VERIFY_SUMMARY: 8 passed, 0 failed

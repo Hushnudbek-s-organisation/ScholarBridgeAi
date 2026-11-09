@@ -1,0 +1,89 @@
+FAIL Cyrillic is not erased: Expected values to be strictly equal:
+
+'' !== 'психология'
+
+FAIL Cyrillic tokens survive: Expected values to be strictly deep-equal:
++ actual - expected
+
++ []
+- [
+-   'компьютерные',
+-   'науки'
+- ]
+
+FAIL NFKC full-width ASCII is equivalent: Expected values to be strictly equal:
++ actual - expected
+
++ 'science'
+- 'computer science'
+
+FAIL reviewed alias Computer Science / Компьютерные науки: The expression evaluated to a falsy value:
+
+  assert(['exact','synonym'].includes(fit.level))
+
+FAIL reviewed alias Kompyuter fanlari / Computer Science: The expression evaluated to a falsy value:
+
+  assert(['exact','synonym'].includes(fit.level))
+
+FAIL reviewed alias Informatika / Информатика: The expression evaluated to a falsy value:
+
+  assert(['exact','synonym'].includes(fit.level))
+
+FAIL reviewed alias Dasturiy injiniring / Software Engineering: The expression evaluated to a falsy value:
+
+  assert(['exact','synonym'].includes(fit.level))
+
+FAIL reviewed alias Kompyuter muhandisligi / Computer Engineering: The expression evaluated to a falsy value:
+
+  assert(['exact','synonym'].includes(fit.level))
+
+FAIL reviewed alias Axborot texnologiyalari / Information Technology: The expression evaluated to a falsy value:
+
+  assert(['exact','synonym'].includes(fit.level))
+
+FAIL reviewed alias Машиностроение / Mechanical Engineering: The expression evaluated to a falsy value:
+
+  assert(['exact','synonym'].includes(fit.level))
+
+FAIL reviewed alias Matematika / Математика: The expression evaluated to a falsy value:
+
+  assert(['exact','synonym'].includes(fit.level))
+
+PASS reviewed alias Sun’iy intellekt / Sunʻiy intellekt
+FAIL related is not identical Computer Science / Software Engineering: Expected values to be strictly equal:
++ actual - expected
+
++ 'synonym'
+- 'partial'
+
+FAIL related is not identical Computer Science / Computer Engineering: Expected values to be strictly equal:
++ actual - expected
+
++ 'synonym'
+- 'partial'
+
+FAIL related is not identical Computer Science / Information Technology: Expected values to be strictly equal:
++ actual - expected
+
++ 'synonym'
+- 'partial'
+
+FAIL related is not identical Computer Engineering / Mechanical Engineering: Expected values to be strictly equal:
++ actual - expected
+
++ 'strong'
+- 'partial'
+
+FAIL related is not identical Electrical Engineering / Mechanical Engineering: Expected values to be strictly equal:
++ actual - expected
+
++ 'strong'
+- 'partial'
+
+FAIL unrelated canonical fields do not match: Expected values to be strictly equal:
+
+'unknown' !== 'none'
+
+PASS blank preference remains unknown
+PASS mixed-script spoof is not a reviewed alias
+SUBJECT_IDENTITIES: 3 passed, 17 failed

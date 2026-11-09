@@ -212,12 +212,13 @@ section("2. subjectAlignment / majorOverlap — word-based, blank-safe");
 // ---------------------------------------------------------------------------
 
 check("exact field → strong", subjectAlignment("Computer Science", "Computer Science").level === "strong");
-check("superset field → strong", subjectAlignment("Computer Science", "Computer Science & Artificial Intelligence").level === "strong");
+// N04: a composite label is not an identity alias merely by token overlap.
+check("composite field → partial, not identity", subjectAlignment("Computer Science", "Computer Science & Artificial Intelligence").level === "partial" && subjectAlignment("Computer Science", "Computer Science & Artificial Intelligence").similarity! < 0.85);
 check("unrelated field → none", subjectAlignment("Law", "Computing").level === "none");
 check("blank student major → unknown", subjectAlignment("", "Computing").level === "unknown");
 check("blank program focus → unknown", subjectAlignment("Law", null).level === "unknown");
 check("'AI' does NOT match 'Sustainable Engineering'", subjectAlignment("AI", "Sustainable Engineering").level === "none");
-check("'AI' matches 'AI & Data Science'", subjectAlignment("AI", "AI & Data Science").level === "strong");
+check("'AI' is partial within composite 'AI & Data Science'", subjectAlignment("AI", "AI & Data Science").level === "partial" && subjectAlignment("AI", "AI & Data Science").similarity! < 0.85);
 check("short tokens are kept by the tokenizer", subjectTokens("AI & IT").join(",") === "ai,it");
 check("stop words are dropped", subjectTokens("Data and Science").join(",") === "data,science");
 check("no comparable words → null, not a fake 0.5", majorOverlap("—", "Computing") === null);

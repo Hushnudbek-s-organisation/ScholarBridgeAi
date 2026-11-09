@@ -1,3 +1,4 @@
+import {prepareAwardCoverage} from "@/lib/awardCoverageContext.server";
 import { NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -60,6 +61,7 @@ export async function GET(req: Request) {
       country: u.country,
       annualTuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
     }));
+    const awardCoverage=await prepareAwardCoverage(req,profile,savedUniRefs,rows.map(s=>s.id));
     const matchProfile = await toMatchProfileWithActivities(profile);
     const now = new Date();
     const decisionById = new Map(decisions.map((d) => [d.scholarshipId, d.status]));
@@ -68,9 +70,10 @@ export async function GET(req: Request) {
     const all = rows.filter((s) => s.verificationStatus === "verified").map((s) => {
       const m = calculateScholarshipMatch(matchProfile, s);
       const st = withStatus(s);
-      const cov = evaluateScholarshipForSavedUnis({ ...s, amountUsdValue: resolvedUsdScholarshipAmount(s) }, savedUniRefs);
+      const cov = evaluateScholarshipForSavedUnis({ ...s, amountUsdValue: resolvedUsdScholarshipAmount(s),catalogueFacts:awardCoverage.facts.get(s.id)??[] }, awardCoverage.references);
       const item: AutopilotScholarship = {
         id: s.id,
+        verifiedTotalCostCoverage:cov.isFullCoverage,
         // Catalogue text arrives in the student's language (en = source).
         title: localizeScholarshipTitle(s.title, locale),
         provider: localizeScholarshipProvider(s.provider, locale),
@@ -98,6 +101,8 @@ export async function GET(req: Request) {
         priority: autopilotPriority(item, now),
         decision: decisionById.get(s.id) ?? null,
         saved: savedIds.has(s.id),
+        coverageAssessment:cov,
+        coverageState:cov.coverageState,
         coveredUniversities: cov.coveredUniNames,
         coversSavedUni: cov.coversSavedUni,
         isFullForSavedUni: cov.isFullForSavedUni,

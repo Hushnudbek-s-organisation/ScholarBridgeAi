@@ -1,0 +1,114 @@
+
+> test:stack-integration
+> tsx scripts/run-stack-integration.ts
+
+E2E database: disposable embedded PostgreSQL on 127.0.0.1:38777/sb_e2e_52317
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/user/ScholarBridgeAi/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[✓] Changes applied
+Created disposable E2E fixtures using the application schema and password hasher.
+E2E server ready: http://127.0.0.1:40013/api/health; external AI credentials removed from its environment.
+
+> test:provenance
+> tsx scripts/check-provenance.ts
+
+
+check-provenance — app: http://127.0.0.1:40013
+
+stale-label unit tests (fixed now = 2026-10-01):
+  ok  data >180d old is stale
+  ok  data 16d old is not stale
+  ok  data exactly 180d old is not stale (boundary)
+  ok  data 180d+1h old is stale
+  ok  null date is never stale (unknown ≠ stale ≠ verified)
+
+fixture setup (local dev DB, self-cleaning):
+  seeded university #3, programs #2 and #3
+  ok  API responds 200 with fixture university
+
+program-level provenance (verified program):
+  ok  p1 present in response
+  ok  p1.sourceUrl equals fixture URL (no invented data)
+  ok  p1.lastVerifiedAt is the fixture date
+  ok  p1.verificationStatus === 'verified'
+  ok  p1.isVerified === true
+  ok  p1.sources has 2 entries (official + third-party)
+  ok  official source: url + title + domain + accessedAt present
+  ok  official source flagged isOfficial
+  ok  third-party source NOT flagged official, last-checked = fixture date
+
+per-requirement provenance:
+  ok  legacy originals retain their recorded source + status
+  ok  legacy IELTS original retained (6.5)
+  ok  an unselected scope does not turn a verified legacy row into an official cutoff
+  ok  exact-scope provenance response succeeds
+  ok  p1 requirements all carry sourceUrl + status in exact scope
+  ok  p1 scoped IELTS minimum preserved (6.5)
+
+unknown ≠ verified (unverified program, no source):
+  ok  p2 present in response
+  ok  p2.sourceUrl is null (nothing invented)
+  ok  p2.lastVerifiedAt is null
+  ok  p2.verificationStatus === 'unverified'
+  ok  p2.isVerified === false
+  ok  p2.sources is empty
+  ok  p2 requirements are withheld entirely (no source ⇒ not shown as fact)
+  ok  p2 is still listed even with its requirements withheld
+
+cycle provenance (estimated vs confirmed):
+  ok  2 cycles returned
+  ok  verified cycle: isEstimated === false
+  ok  verified cycle exposes sourceUrl + lastVerifiedAt
+  ok  unverified cycle: isEstimated === true (deadline NOT shown as confirmed)
+  ok  unverified cycle: sourceUrl null (no fabricated source)
+  ok  unverified cycle keeps its deadline VALUE (unknown ≠ deleted)
+
+university-level sources (domain + last-checked):
+  ok  2 university sources
+  ok  every uni source has domain + accessedAt
+
+fixtures cleaned up
+
+check-provenance: PASS
+
+> test:channel-e2e
+> tsx scripts/rehearse-channel.ts
+
+
+mode on
+  ✓ the due row is picked up
+  ✓ the tick reports one sent post
+  ✓ exactly one message reached the channel
+  ✓ the message is the rendered Uzbek card
+  ✓ the delivered message lints clean
+  ✓ the post and plan rows both end `sent`
+
+a second tick
+  ✓ nothing is sent twice
+
+a missed window
+  ✓ a row whose time passed is still published
+
+a missed day
+  ✓ yesterday's row is retired instead of published
+
+mode approval
+  ✓ the preview goes to the admin chat, not the channel
+  ✓ the preview carries exactly three actions
+  ✓ the preview registered the webhook before the operator saw a button
+  ✓ the post waits in the panel
+  ✓ the approved post reaches the channel
+  ✓ a deployment with no webhook is reported as 'missing'
+  ✓ the tick repairs the missing webhook by itself
+  ✓ a healthy webhook is not re-registered on every tick
+  ✓ the tick wrapper reports the verdict and never throws
+  ✓ a repair warns the admin chat once, so the button gets a second press
+  ✓ a dedicated publisher bot's approval press is answered by that bot
+  ✓ every message the mock received lints clean
+
+21 passed, 0 failed
+
+[auth] Using the development-only session key; configure SESSION_SECRET for deployment.

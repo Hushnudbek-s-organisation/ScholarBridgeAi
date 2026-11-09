@@ -1,0 +1,76 @@
+E2E: using package-bundled NSS/NSPR runtime libraries.
+E2E database: disposable embedded PostgreSQL on 127.0.0.1:46201/sb_e2e_18039
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/user/ScholarBridgeAi/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[✓] Changes applied
+Created disposable E2E fixtures using the application schema and password hasher.
+E2E server ready: http://127.0.0.1:45423/api/health; external AI credentials removed from its environment.
+
+Running 60 tests using 1 worker
+
+  ✓   1 e2e/authenticated-entry.spec.ts:24:1 › fresh server-authenticated sign-in enters the shell without a redundant session probe; backend permissions remain authoritative (25.5s)
+  ✓   2 e2e/authenticated-entry.spec.ts:38:1 › malformed login success without a matching session envelope cannot enter a profile (37.0s)
+  ✓   3 e2e/authenticated-entry.spec.ts:47:1 › real invalid credentials remain a visible failure and never enter the shell (37.0s)
+  ✓   4 e2e/authenticated-entry.spec.ts:53:1 › closing sign-in before a real response arrives cannot apply an unmounted picker callback (37.3s)
+  ✓   5 e2e/award-field-review.spec.ts:9:5 › exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification (832ms)
+  ✓   6 e2e/backend-resilience.spec.ts:8:5 › malformed JSON envelopes never turn public forms into server 500s (205ms)
+  ✓   7 e2e/backend-resilience.spec.ts:23:5 › public boot/catalogue APIs survive cold, warm and concurrent local reads (248ms)
+  ✓   8 e2e/backend-resilience.spec.ts:38:5 › authenticated backend reads remain private, owned and available after invalid writes (355ms)
+  ✓   9 e2e/backend-resilience.spec.ts:71:5 › admin branding rejects malformed/oversized multipart without storage calls (131ms)
+  ✓  10 e2e/backend-second-pass.spec.ts:5:5 › strict profile, numeric paths and forum pagination reject malformed HTTP requests (206ms)
+  ✓  11 e2e/backend-second-pass.spec.ts:15:5 › parallel learning HTTP retries complete once, keep time monotonic and grant one reward/certificate (247ms)
+  ✓  12 e2e/backend-second-pass.spec.ts:32:5 › admin malformed audit/research parameters fail before background work starts (163ms)
+  ✓  13 e2e/catalogue-read-diagnostics.spec.ts:7:5 › actual catalogue 503 retains its contract and safely correlates a missing relation without stale success (45ms)
+  ✓  14 e2e/checklist-continuation.spec.ts:9:5 › checklist and workspace share scoped programme criteria, units, provenance, refresh and atomic generation (835ms)
+  ✓  15 e2e/client-locales.spec.ts:8:5 › English catalogue does not download complete Russian/Uzbek admin dictionaries through shared country helpers (4.1s)
+  ✓  16 e2e/continuation-contracts.spec.ts:8:5 › real admin author -> exact manual group review -> profile/API grouped criteria and CAS (444ms)
+  ✓  17 e2e/continuation-contracts.spec.ts:42:5 › university discovery never synthesizes programmes; experimental index is explicit opt-in (223ms)
+  ✓  18 e2e/continuation-contracts.spec.ts:55:5 › C14 persona matrix keeps originals, unknowns and no personal probability (414ms)
+  ✓  19 e2e/dashboard-continuation.spec.ts:6:42 › C01–C07 real dashboard geometry, settled states and bottom hit tests en (13.2s)
+  ✓  20 e2e/dashboard-continuation.spec.ts:6:42 › C01–C07 real dashboard geometry, settled states and bottom hit tests uz (11.3s)
+  ✓  21 e2e/dashboard-continuation.spec.ts:6:42 › C01–C07 real dashboard geometry, settled states and bottom hit tests ru (12.3s)
+  ✓  22 e2e/exam-boundaries.spec.ts:4:5 › real profile API rejects invalid exams atomically and round-trips zero and original TOEFL/GPA (562ms)
+  ✓  23 e2e/exam-boundaries.spec.ts:24:5 › real recommendation API rejects forged scores rather than clamping; reviewed EN/UZ/RU subject aliases agree (208ms)
+  ✓  24 e2e/first-paint.spec.ts:3:5 › landing hero and primary actions paint even before JavaScript runs (4.7s)
+  ✓  25 e2e/first-paint.spec.ts:15:5 › campus photos are deferred, then load when their cards approach the viewport (11.2s)
+  ✓  26 e2e/funding-inputs.spec.ts:9:5 › funding writes reject unknown/coercible/invalid amounts atomically while keeping explicit zero and legacy rounding (585ms)
+  ✓  27 e2e/funding-inputs.spec.ts:48:5 › funding amount precision and invalid-input feedback are accessible in EN UZ RU without submitting an invalid write (14.7s)
+  ✓  28 e2e/funding-scenarios.spec.ts:9:5 › funding defaults to confirmed, keeps restricted gaps, and fences optimistic reads without losing drafts (8.8s)
+  ✓  29 e2e/home-saved-scope.spec.ts:20:5 › a held real saved-university response from A cannot mark B's catalogue saved (7.9s)
+  ✓  30 e2e/home-saved-scope.spec.ts:51:5 › a failed saved-university DELETE cannot falsely remove the saved marker (8.6s)
+  ✓  31 e2e/master-dashboard.spec.ts:46:7 › actual dashboard, disclosure focus and responsive layout: en (22.9s)
+  ✓  32 e2e/master-dashboard.spec.ts:46:7 › actual dashboard, disclosure focus and responsive layout: uz (22.4s)
+  ✓  33 e2e/master-dashboard.spec.ts:46:7 › actual dashboard, disclosure focus and responsive layout: ru (22.3s)
+  ✓  34 e2e/master-dashboard.spec.ts:117:5 › light dashboard and original public catalogue layouts (4.6s)
+  ✓  35 e2e/master-dashboard.spec.ts:141:5 › vault self-claims, expiry, ownership and atomic failed application links (2.4s)
+  ✓  36 e2e/master-dashboard.spec.ts:196:5 › dashboard data error keeps navigation and retry functional (3.3s)
+  ✓  37 e2e/phase12.spec.ts:54:5 › public university catalogue searches and filters real seeded records (19.6s)
+  ✓  38 e2e/phase12.spec.ts:89:5 › authenticated dashboard and saved scholarship/deadline state are profile-scoped (16.5s)
+  ✓  39 e2e/phase12.spec.ts:112:5 › document vault renders only the signed-in profile's documents (23.0s)
+  ✓  40 e2e/post-admission-funding.spec.ts:10:5 › post-admission offers and comparison use confirmed restricted allocations, explicit periods, loans and owned application scope (24.4s)
+  ✓  41 e2e/scoped-award-coverage.spec.ts:8:5 › real four-surface award scope parity and localized unknown disclosure across themes (34.0s)
+  ✓  42 e2e/search-loader-waterfall.spec.ts:10:5 › university search chunk starts on navigation intent without waiting for the real hub module response (3.8s)
+  ✓  43 e2e/site-audit.spec.ts:25:7 › public routes, mobile overflow and recovery states (en) (10.6s)
+  ✓  44 e2e/site-audit.spec.ts:25:7 › public routes, mobile overflow and recovery states (uz) (10.2s)
+  ✓  45 e2e/site-audit.spec.ts:25:7 › public routes, mobile overflow and recovery states (ru) (8.7s)
+  ✓  46 e2e/site-audit.spec.ts:52:7 › all student destinations and pane buttons (1440px) (59.1s)
+  ✓  47 e2e/site-audit.spec.ts:52:7 › all student destinations and pane buttons (390px) (40.3s)
+  ✓  48 e2e/site-audit.spec.ts:99:5 › public language/theme controls and missing reset link are usable (6.0s)
+  ✓  49 e2e/site-audit.spec.ts:114:5 › all admin sections render and account support is readable (40.2s)
+  ✓  50 e2e/site-audit.spec.ts:138:5 › mobile account utility buttons and logout work (43.9s)
+  ✓  51 e2e/site-audit.spec.ts:164:5 › rapid destination changes cannot be undone by an exiting hub's pane callback (27.6s)
+  ✓  52 e2e/university-detail-contracts.spec.ts:12:5 › detail shares exact scope, native units, conflict/unknown and real-programme opt-in contracts (39.1s)
+  ✓  53 e2e/university-request-epochs.spec.ts:6:5 › a superseded real catalogue body cannot replace newer cards or loading state (4.0s)
+  ✓  54 e2e/vault-continuation.spec.ts:10:5 › C11 vault Free/Pro, review CAS, every metadata edit, ownership, downgrade locks and rollback (1.6s)
+  ✓  55 e2e/vault-link-reviews.spec.ts:7:5 › document review binds normalized application links, rejects stale review CAS, and rolls back link revisions (751ms)
+  ✓  56 e2e/navigation-continuation.spec.ts:9:6 › URL, shell and pane stay aligned during rapid navigation 1440 (8.2s)
+  ✓  57 e2e/navigation-continuation.spec.ts:9:6 › URL, shell and pane stay aligned during rapid navigation 390 (34.8s)
+  -  58 e2e/performance.spec.ts:22:7 › browser performance (desktop)
+  -  59 e2e/performance.spec.ts:22:7 › browser performance (mobile)
+  ✓  60 e2e/shell-paint.spec.ts:10:5 › mobile sign-in dispatch, shell DOM and frame timeline remain observable (15.5s)
+
+  2 skipped
+  58 passed (13.9m)

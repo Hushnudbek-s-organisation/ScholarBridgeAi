@@ -161,10 +161,11 @@ check("autopilot funding totals require known USD amounts on a shared award peri
   assert.equal(totalComparableAwardValue([{ ...base, awardPeriod: null }]), null);
   assert.equal(totalComparableAwardValue([]), 0);
 });
-check("closing soon + full funding tags", () => {
+check("closing soon does not turn a funding keyword into verified total coverage", () => {
   const t = autopilotTags(base, NOW);
   assert.equal(t.closingSoon, true);
-  assert.equal(t.fullFunding, true);
+  assert.equal(t.fullFunding, false);
+  assert.equal(autopilotTags({...base,verifiedTotalCostCoverage:true},NOW).fullFunding,true);
   assert.equal(t.daysLeft, 14, "deadline day counts until 23:59 UTC");
 });
 check("essay detection only from published text", () => {

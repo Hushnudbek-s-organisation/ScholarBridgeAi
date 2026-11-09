@@ -1,0 +1,498 @@
+{
+  "config": {
+    "argv": [
+      "/usr/local/bin/node",
+      "/home/user/ScholarBridgeAi/node_modules/@playwright/test/cli.js",
+      "test",
+      "e2e/award-field-review.spec.ts",
+      "e2e/scoped-award-coverage.spec.ts",
+      "e2e/exam-boundaries.spec.ts",
+      "e2e/continuation-contracts.spec.ts",
+      "e2e/client-locales.spec.ts"
+    ],
+    "configFile": "/home/user/ScholarBridgeAi/playwright.config.ts",
+    "rootDir": "/home/user/ScholarBridgeAi/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/user/ScholarBridgeAi/e2e/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "snapshotDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "actionTimeout": 20000,
+          "navigationTimeout": 30000,
+          "baseURL": "http://127.0.0.1:37909",
+          "browserName": "chromium",
+          "headless": true,
+          "launchOptions": {
+            "executablePath": "/tmp/chromium",
+            "args": [
+              "--ash-no-nudges",
+              "--disable-domain-reliability",
+              "--disable-print-preview",
+              "--disk-cache-size=33554432",
+              "--no-default-browser-check",
+              "--no-pings",
+              "--font-render-hinting=none",
+              "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+              "--enable-features=SharedArrayBuffer",
+              "--ignore-gpu-blocklist",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader",
+              "--disable-setuid-sandbox",
+              "--headless='shell'",
+              "--no-sandbox",
+              "--no-zygote"
+            ]
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "video": "off"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": ""
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/e2e-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "award-field-review.spec.ts",
+      "file": "award-field-review.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2440,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:03:55.733Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "21d42585e140d41f11f6-40047d3624c9b3347125",
+          "file": "award-field-review.spec.ts",
+          "line": 9,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "client-locales.spec.ts",
+      "file": "client-locales.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "English catalogue does not download complete Russian/Uzbek admin dictionaries through shared country helpers",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 14710,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-university-id=\"1\"]')\nExpected: visible\nTimeout: 12000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" locator('[data-university-id=\"1\"]') with timeout 12000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-university-id=\"1\"]')\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-university-id=\"1\"]')\nExpected: visible\nTimeout: 12000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" locator('[data-university-id=\"1\"]') with timeout 12000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-university-id=\"1\"]')\u001b[22m\n\n    at /home/user/ScholarBridgeAi/e2e/client-locales.spec.ts:13:122",
+                    "location": {
+                      "file": "/home/user/ScholarBridgeAi/e2e/client-locales.spec.ts",
+                      "column": 122,
+                      "line": 13
+                    },
+                    "snippet": "  11 |  expect((await page.request.post(\"/api/auth/sign-in\",{data:{email:f.studentEmail,password:f.studentPassword}})).status()).toBe(200);\n  12 |  await page.context().addCookies([{name:\"scholarbridge_locale\",value:\"en\",url:process.env.E2E_BASE_URL!}]);\n> 13 |  await page.goto(\"/#universities/search\");await expect(page.locator(`[data-university-id=\"${f.verifiedUniversityId}\"]`)).toBeVisible();\n     |                                                                                                                          ^\n  14 |  // Distinct source-language admin text cannot belong to the small country-name\n  15 |  // projection or catalogue lexicon. Assert multiple sentinels per dictionary.\n  16 |  const sentinels=[ru,uz].flatMap(messages=>leaves(messages.admin).filter(value=>value.length>100&&!/[\\n\"\\\\]/.test(value)).slice(0,2).map(value=>value.slice(0,90)));"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/user/ScholarBridgeAi/e2e/client-locales.spec.ts",
+                        "column": 122,
+                        "line": 13
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-university-id=\"1\"]')\nExpected: visible\nTimeout: 12000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" locator('[data-university-id=\"1\"]') with timeout 12000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-university-id=\"1\"]')\u001b[22m\n\n\n  11 |  expect((await page.request.post(\"/api/auth/sign-in\",{data:{email:f.studentEmail,password:f.studentPassword}})).status()).toBe(200);\n  12 |  await page.context().addCookies([{name:\"scholarbridge_locale\",value:\"en\",url:process.env.E2E_BASE_URL!}]);\n> 13 |  await page.goto(\"/#universities/search\");await expect(page.locator(`[data-university-id=\"${f.verifiedUniversityId}\"]`)).toBeVisible();\n     |                                                                                                                          ^\n  14 |  // Distinct source-language admin text cannot belong to the small country-name\n  15 |  // projection or catalogue lexicon. Assert multiple sentinels per dictionary.\n  16 |  const sentinels=[ru,uz].flatMap(messages=>leaves(messages.admin).filter(value=>value.length>100&&!/[\\n\"\\\\]/.test(value)).slice(0,2).map(value=>value.slice(0,90)));\n    at /home/user/ScholarBridgeAi/e2e/client-locales.spec.ts:13:122"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:03:58.292Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/user/ScholarBridgeAi/test-results/e2e/client-locales-English-cat-c11c1-ough-shared-country-helpers/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/user/ScholarBridgeAi/test-results/e2e/client-locales-English-cat-c11c1-ough-shared-country-helpers/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/user/ScholarBridgeAi/test-results/e2e/client-locales-English-cat-c11c1-ough-shared-country-helpers/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/user/ScholarBridgeAi/e2e/client-locales.spec.ts",
+                    "column": 122,
+                    "line": 13
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "bfff756facfea0c20a51-49a57586eecbd5d4adf5",
+          "file": "client-locales.spec.ts",
+          "line": 8,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "continuation-contracts.spec.ts",
+      "file": "continuation-contracts.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real admin author -> exact manual group review -> profile/API grouped criteria and CAS",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2014,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:04:13.794Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "reviewed-group",
+                      "contentType": "application/json",
+                      "body": "eyJjb25maXJtZWQiOnsiZmFjdCI6eyJpZCI6Ijg1YTkzZTQzLWYyNTYtNDA1MC05MDg3LTY3YzhmZTBlYjUwZSIsImVudGl0eV90eXBlIjoicHJvZ3JhbSIsImVudGl0eV9pZCI6MSwiZmllbGRfa2V5IjoicmVxdWlyZW1lbnRfZ3JvdXAiLCJ2YWx1ZV9udW1lcmljIjpudWxsLCJ2YWx1ZV90ZXh0Ijoie1wiaWRcIjpcImVuZ2xpc2hcIixcIm9wZXJhdG9yXCI6XCJhbnlPZlwiLFwibGFiZWxcIjpcIkZJQ1RJT05BTCBmaXh0dXJlIEVuZ2xpc2ggYWx0ZXJuYXRpdmVzXCIsXCJjaGlsZHJlblwiOlt7XCJpZFwiOlwiaWVsdHNcIixcImtpbmRcIjpcIm1pbmltdW1cIixcImZpZWxkXCI6XCJpZWx0c1wiLFwidmFsdWVcIjo3LFwidW5pdFwiOlwiOVwifSx7XCJpZFwiOlwidG9lZmxcIixcIm9wZXJhdG9yXCI6XCJhbGxPZlwiLFwiY2hpbGRyZW5cIjpbe1wiaWRcIjpcInRvdGFsXCIsXCJraW5kXCI6XCJtaW5pbXVtXCIsXCJmaWVsZFwiOlwidG9lZmxcIixcInZhbHVlXCI6NS41LFwidW5pdFwiOlwiNlwifSx7XCJpZFwiOlwicmVhZGluZ1wiLFwia2luZFwiOlwibWluaW11bVwiLFwiZmllbGRcIjpcInRvZWZsLnJlYWRpbmdcIixcInZhbHVlXCI6NSxcInVuaXRcIjpcIjZcIn1dfV19IiwidW5pdCI6bnVsbCwiY3VycmVuY3kiOm51bGwsInBlcmlvZCI6bnVsbCwiZGVncmVlX2xldmVsIjpudWxsLCJwcm9ncmFtX25hbWUiOm51bGwsImFkbWlzc2lvbl9jeWNsZSI6bnVsbCwic291cmNlX3VybCI6Imh0dHBzOi8vdmVyaWZpZWQtZTJlLmV4YW1wbGUudGVzdC9wcm9ncmFtbWUiLCJ2ZXJpZmllZF9hdCI6IjIwMjYtMTEtMDkgMTE6MDQ6MTQuMzQ1MjMzIiwidmVyaWZpY2F0aW9uX3N0YXR1cyI6InZlcmlmaWVkIiwidmFsdWVfdHlwZSI6Im9mZmljaWFsX3JlcXVpcmVtZW50Iiwibm90ZXMiOiJGSUNUSU9OQUwgaXNvbGF0ZWQgQVBJIHByb29mLCBub3QgYWRtaXNzaW9ucyBpbmZvcm1hdGlvbiIsImlzX2FjdGl2ZSI6dHJ1ZSwiY3JlYXRlZF9hdCI6IjIwMjYtMTEtMDkgMTE6MDQ6MTQuMjc3NTE2IiwidXBkYXRlZF9hdCI6IjIwMjYtMTEtMDkgMTE6MDQ6MTQuMzQ4MDU1IiwiYXBwbGljYW50X3Njb3BlIjoiaW50ZXJuYXRpb25hbCIsInZlcnNpb24iOiIyIn0sInJldmlld1R5cGUiOiJtYW51YWxfc291cmNlX2F0dGVzdGF0aW9uIiwib2ZmaWNpYWxQYWdlUmVSZWFkIjpmYWxzZX0sImZpcnN0Ijp7InByb2dyYW0iOnsiaWQiOjEsInVuaXZlcnNpdHlJZCI6MSwibmFtZSI6IkZJQ1RJT05BTCBicm93c2VyIENvbXB1dGVyIFNjaWVuY2UgcHJvZ3JhbW1lIiwiZmllbGQiOiJDb21wdXRlciBTY2llbmNlIiwiZGVncmVlTGV2ZWwiOiJCYWNoZWxvciIsImR1cmF0aW9uWWVhcnMiOm51bGwsImR1cmF0aW9uVW5pdCI6InllYXJzIiwic3R1ZHlNb2RlIjpudWxsLCJsYW5ndWFnZSI6bnVsbCwiYW5udWFsVHVpdGlvbiI6bnVsbCwidHVpdGlvbkN1cnJlbmN5IjoiVVNEIiwidHVpdGlvblBlcmlvZCI6InllYXIiLCJwcm9ncmFtVXJsIjoiaHR0cHM6Ly92ZXJpZmllZC1lMmUuZXhhbXBsZS50ZXN0L3Byb2dyYW1tZSIsImFwcGxpY2F0aW9uVXJsIjpudWxsLCJpc1ZlcmlmaWVkIjp0cnVlLCJzb3VyY2VVcmwiOiJodHRwczovL3ZlcmlmaWVkLWUyZS5leGFtcGxlLnRlc3QvcHJvZ3JhbW1lIiwibGFzdFZlcmlmaWVkQXQiOiIyMDI2LTExLTA3VDAwOjAwOjAwLjAwMFoiLCJ2ZXJpZmljYXRpb25TdGF0dXMiOiJ2ZXJpZmllZCIsInNvdXJjZXMiOltdfSwidW5pdmVyc2l0eSI6eyJpZCI6MSwibmFtZSI6IlBoYXNlMTIgRTJFIFZlcmlmaWVkIFVuaXZlcnNpdHkiLCJjb3VudHJ5IjoiR2VybWFueSIsImNpdHkiOiJCZXJsaW4iLCJ3ZWJzaXRlVXJsIjoiaHR0cHM6Ly92ZXJpZmllZC1lMmUuZXhhbXBsZS50ZXN0IiwiYW5udWFsTGl2aW5nRXN0IjpudWxsLCJsaXZpbmdDb3N0Q3VycmVuY3kiOiJVU0QiLCJsaXZpbmdDb3N0UGVyaW9kIjoieWVhciJ9LCJzdWJqZWN0Rml0Ijp7ImxldmVsIjoiZXhhY3QiLCJzY29yZSI6MSwibWF0Y2hlZEludGVyZXN0cyI6WyJjb21wdXRlciBzY2llbmNlIl19LCJkZWdyZWVMZXZlbE1hdGNoIjoibWF0Y2giLCJlbGlnaWJpbGl0eSI6eyJpdGVtcyI6W10sIm1ldCI6MSwidW5tZXQiOjAsInVua25vd24iOjAsInRleHRSZXF1aXJlbWVudHMiOltdLCJncm91cCI6eyJpZCI6ImVuZ2xpc2giLCJsYWJlbCI6IkZJQ1RJT05BTCBmaXh0dXJlIEVuZ2xpc2ggYWx0ZXJuYXRpdmVzIiwic3RhdGUiOiJtZXQiLCJyZWFzb24iOiJncm91cCIsImNoaWxkcmVuIjpbeyJpZCI6ImllbHRzIiwibGFiZWwiOiJpZWx0cyIsInN0YXRlIjoidW5rbm93biIsInJlYXNvbiI6InJlY29yZF9taXNzaW5nIiwiY2hpbGRyZW4iOltdLCJmaWVsZCI6ImllbHRzIiwiYWN0dWFsIjpudWxsLCJ1bml0IjoiOSJ9LHsiaWQiOiJ0b2VmbCIsImxhYmVsIjoidG9lZmwiLCJzdGF0ZSI6Im1ldCIsInJlYXNvbiI6Imdyb3VwIiwiY2hpbGRyZW4iOlt7ImlkIjoidG90YWwiLCJsYWJlbCI6InRvdGFsIiwic3RhdGUiOiJtZXQiLCJyZWFzb24iOiJjb21wYXJpc29uIiwiY2hpbGRyZW4iOltdLCJmaWVsZCI6InRvZWZsIiwiYWN0dWFsIjo1LjUsInVuaXQiOiI2IiwicmVxdWlyZWQiOjUuNX0seyJpZCI6InJlYWRpbmciLCJsYWJlbCI6InJlYWRpbmciLCJzdGF0ZSI6Im1ldCIsInJlYXNvbiI6ImNvbXBhcmlzb24iLCJjaGlsZHJlbiI6W10sImZpZWxkIjoidG9lZmwucmVhZGluZyIsImFjdHVhbCI6NSwidW5pdCI6IjYiLCJyZXF1aXJlZCI6NX1dLCJvcGVyYXRvciI6ImFsbE9mIn1dLCJvcGVyYXRvciI6ImFueU9mIn19LCJhZmZvcmRhYmlsaXR5Ijp7ImFubnVhbENvc3RVc2QiOm51bGwsImFubnVhbFR1aXRpb24iOm51bGwsInR1aXRpb25DdXJyZW5jeSI6IlVTRCIsInR1aXRpb25QZXJpb2QiOiJ5ZWFyIiwibGl2aW5nRXN0VXNkIjpudWxsLCJ3aXRoaW5CdWRnZXQiOiJ1bmtub3duIiwiYnVkZ2V0VXNkIjoyNTAwMCwiZmFtaWx5SW5jb21lVXNkIjpudWxsLCJpbmNvbWVWc0FubnVhbENvc3QiOiJ1bmtub3duIiwiZnVuZGluZ05lZWQiOm51bGwsInNjaG9sYXJzaGlwTWF0Y2hlcyI6W119LCJwcm9iYWJpbGl0eSI6eyJhdmFpbGFibGUiOmZhbHNlLCJyZWFzb24iOiJuby12YWxpZGF0ZWQtbWV0aG9kb2xvZ3kifSwibWF0Y2hTY29yZSI6NzMsInJhbmtpbmdGYWN0b3JzIjpbIlN1YmplY3Q6IGRpcmVjdCBzdWJqZWN0IG1hdGNoIiwiUmVxdWlyZW1lbnRzOiAxIG1ldCwgMCB1bm1ldCwgMCB1bmtub3duIiwiTG9jYXRpb246IEdlcm1hbnkgaXMgb24geW91ciBwcmVmZXJyZWQgbGlzdCJdLCJtaXNzaW5nSW5wdXRzIjpbImNvbXBhcmFibGVDb3N0IiwiZnVuZGluZ05lZWQiLCJzdGFydFllYXIiLCJsYW5ndWFnZSJdLCJjb25zaWRlcmF0aW9ucyI6WyJMb2NhdGVkIGluIEJlcmxpbiwgR2VybWFueSIsIk5vIGFwcGxpY2F0aW9uIGN5Y2xlIGluIHRoZSBjYXRhbG9nIHlldCDigJQgY2hlY2sgdGhlIG9mZmljaWFsIHByb2dyYW0gcGFnZSBmb3IgZGVhZGxpbmVzIl0sIm5leHRDeWNsZSI6bnVsbCwicHJvZ3JhbVN0YWxlIjpmYWxzZSwiY3ljbGVTdGFsZSI6ZmFsc2UsInBvc2l0aW9uaW5nU3RhdGUiOiJ1bmtub3duX25vX3ZlcmlmaWVkX2NvaG9ydCJ9LCJub3ciOiIyMDI2LTExLTA5VDExOjA0OjE1LjU5NloifQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "583d0e7f9b70fcfcf07c-87cc6f0235581dfa3d4f",
+          "file": "continuation-contracts.spec.ts",
+          "line": 8,
+          "column": 5
+        },
+        {
+          "title": "university discovery never synthesizes programmes; experimental index is explicit opt-in",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 347,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:04:15.901Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "583d0e7f9b70fcfcf07c-b4922ef4fa79258a6c0d",
+          "file": "continuation-contracts.spec.ts",
+          "line": 42,
+          "column": 5
+        },
+        {
+          "title": "C14 persona matrix keeps originals, unknowns and no personal probability",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 816,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:04:16.267Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "583d0e7f9b70fcfcf07c-35b06ea2c22e1be496da",
+          "file": "continuation-contracts.spec.ts",
+          "line": 55,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "exam-boundaries.spec.ts",
+      "file": "exam-boundaries.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real profile API rejects invalid exams atomically and round-trips zero and original TOEFL/GPA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 913,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:04:17.110Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e3e3a3c88a21b4d24ac-7dfd5217eb0226bdd3d3",
+          "file": "exam-boundaries.spec.ts",
+          "line": 4,
+          "column": 5
+        },
+        {
+          "title": "real recommendation API rejects forged scores rather than clamping; reviewed EN/UZ/RU subject aliases agree",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 389,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:04:18.035Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e3e3a3c88a21b4d24ac-0df8f71069a579457977",
+          "file": "exam-boundaries.spec.ts",
+          "line": 24,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "scoped-award-coverage.spec.ts",
+      "file": "scoped-award-coverage.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real four-surface award scope parity and localized unknown disclosure across themes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 52154,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:04:18.469Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "027d70908696764d4280-560b016210b22c96abb9",
+          "file": "scoped-award-coverage.spec.ts",
+          "line": 8,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-09T11:03:49.124Z",
+    "duration": 81908.015,
+    "expected": 7,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

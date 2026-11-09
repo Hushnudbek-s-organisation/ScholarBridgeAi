@@ -1,0 +1,42 @@
+E2E: using package-bundled NSS/NSPR runtime libraries.
+E2E database: disposable embedded PostgreSQL on 127.0.0.1:37405/sb_e2e_10098
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/user/ScholarBridgeAi/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[✓] Changes applied
+Created disposable E2E fixtures using the application schema and password hasher.
+E2E server ready: http://127.0.0.1:46873/api/health; external AI credentials removed from its environment.
+
+Running 1 test using 1 worker
+
+  ✘  1 e2e/award-field-review.spec.ts:9:5 › exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification (102ms)
+
+
+  1) e2e/award-field-review.spec.ts:9:5 › exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification 
+
+    error: relation "university_programs" does not exist
+
+      12 |  const hadSaved=(await db.query('SELECT id FROM saved_universities WHERE profile_id=$1 AND university_id=$2',[f.studentId,f.verifiedUniversityId])).rows.length>0;
+      13 |  const original=(await db.query('SELECT verification_status,degree_levels FROM scholarships WHERE id=$1',[f.scholarshipId])).rows[0];
+    > 14 |  const programme=(await db.query('SELECT name,degree FROM university_programs WHERE id=$1',[f.fixtureProgramId])).rows[0];expect(programme).toBeTruthy();
+         |                   ^
+      15 |  const admin=await playwright.request.newContext({baseURL:process.env.E2E_BASE_URL});
+      16 |  try{
+      17 |   const endpoint='/api/admin/catalogue-facts/review';
+        at /home/user/ScholarBridgeAi/node_modules/pg-pool/index.js:45:11
+        at /home/user/ScholarBridgeAi/e2e/award-field-review.spec.ts:14:19
+
+    Error Context: test-results/e2e/award-field-review-exact-a-0bf3a-ale-edit-loses-verification/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/e2e/award-field-review-exact-a-0bf3a-ale-edit-loses-verification/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/e2e/award-field-review-exact-a-0bf3a-ale-edit-loses-verification/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e/award-field-review.spec.ts:9:5 › exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification 

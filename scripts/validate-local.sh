@@ -43,6 +43,10 @@ run evidence-render         npm run test:evidence-render
 run finance-unified         npm run test:finance-unified
 run cache-revision          npm run test:cache-revision
 run snapshot-recovery       npm run test:snapshot-recovery
+run exam-boundaries         npm run test:exam-boundaries
+run subject-identities      npm run test:subject-identities
+run verify-summary          npm run test:verify-summary
+run scoped-award-coverage   npm run test:scoped-award-coverage
 run channel                 npm run test:channel
 run profile-recompute       npm run test:profile-recompute
 run chunk-recovery          npm run test:chunk-recovery

@@ -237,7 +237,8 @@
     "showLess": "Show less",
     "showResults": "Show results",
     "stageCount": "Stage {current} of {total}",
-    "elapsedSeconds": "{seconds}s elapsed"
+    "elapsedSeconds": "{seconds}s elapsed",
+    "awardCoverageUnknown": "Award applicability and total-cost coverage are unconfirmed. Check the programme, cycle and applicant rules."
   },
   "forum": {
     "title": "Community Forum",
@@ -8111,7 +8112,7 @@
       "saved": "Saved as review-needed. Verify the exact field against its official source.",
       "failed": "The fact was not saved.",
       "busy": "Saving…",
-      "reviewHint": "Only for requirement_group: manually read the publisher page. This attests the exact saved version, scope, AND/OR relationships and every leaf; it does not claim a network reread. Edits must be saved first.",
+      "reviewHint": "For requirement groups and allowlisted, fully scoped award fields: manually read the publisher page. Attest the exact saved value, version, programme, cycle, applicant scope, AND/OR relationships and every applicable condition. This is not an automatic network reread. Save edits before reviewing.",
       "quote": "Quote from the official source (at least 40 characters)",
       "attest": "I checked this exact saved group, all alternatives, sections, dates and scope against the official source.",
       "review": "Attest exact saved group",

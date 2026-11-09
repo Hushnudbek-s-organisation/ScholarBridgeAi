@@ -1,0 +1,57 @@
+
+Journey
+  ✓ 8 built-in steps, unique ids
+  ✓ new student: step 1 is current, 0%
+  ✓ current step = first not-done step
+  ✓ everything done → no current step, 100%
+  ✓ admin overrides: order, hide, custom text; unknown ids dropped
+  ✓ garbage override JSON is ignored
+  ✓ section help: only known sections survive
+
+Scholarship Autopilot
+  ✓ autopilot funding totals require known USD amounts on a shared award period
+  ✓ closing soon does not turn a funding keyword into verified total coverage
+  ✓ essay detection only from published text
+  ✓ closed recurring scholarship → expected next date, marked reopens
+  ✓ closed one-off scholarship drops out (priority < 0)
+  ✓ open urgent scholarship outranks a reopening one
+  ✓ similar suggestions exclude already-decided ones
+
+Admission stories — twin score
+  ✓ identical profile scores high with reasons
+  ✓ unrelated profile scores low
+  ✓ GPA on different scales is normalised
+  ✓ cleanList trims, dedupes empties and caps length
+
+Goals
+  ✓ steps parse from strings / objects, capped
+  ✓ progress percent
+  ✓ focus rule is 6 active goals
+
+Navigation, seeds & i18n
+  ✓ every section belongs to a known group
+  ✓ new features are still reachable and still carry the NEW badge
+  ✓ every journey step and help section is translated in en/uz/ru
+  ✓ every seed catalogue text has a uz/ru translation
+
+Structural
+  ✓ every growth student route uses guardStudent
+  ✓ every growth admin route is admin-guarded
+  ✓ public story shape never leaks profileId or adminNote
+  ✓ no growth route builds SQL by string concatenation
+
+Profile completeness — single definition
+  ✓ the journey and the chancing engine agree on a rich profile
+  ✓ they agree on a sparse profile too
+  ✓ no profile → 0
+  ✓ a fully filled profile reaches 100
+  ✓ more data never scores lower than less data
+
+Verified 2026-2027 Rich Platform Data Catalogs
+  ✓ unverified synthetic student stories are excluded from public seed data
+  ✓ visa requirements are not published without current official-source review
+  ✓ 34 verified global & Uzbekistan-eligible opportunities in OPPORTUNITY_CATALOG
+  ✓ unverified alumni identities are excluded; provider candidates remain separate
+  ✓ 14 localized FAQ items in en, uz, and ru
+
+growth test passed (39 assertions)

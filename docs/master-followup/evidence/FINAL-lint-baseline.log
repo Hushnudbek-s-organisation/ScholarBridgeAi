@@ -1,0 +1,13 @@
+
+> lint:baseline
+> tsx scripts/check-lint-baseline.ts
+
+Running eslint (same file set as `npm run lint`) …
+
+Current: 0 issues (0 errors, 0 warnings) across 0 files.
+Baseline: 0 issues across 0 files.
+
+Remaining baselined debt (full list — nothing hidden):
+
+Lint gate PASSED — 0 findings remain within the reviewed baseline (see docs/LINT.md).
+
