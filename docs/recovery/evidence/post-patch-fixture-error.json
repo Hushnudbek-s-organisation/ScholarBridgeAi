@@ -1,0 +1,297 @@
+{
+  "config": {
+    "argv": [
+      "/usr/local/bin/node",
+      "/home/user/ScholarBridgeAi/node_modules/@playwright/test/cli.js",
+      "test",
+      "e2e/catalogue-read-diagnostics.spec.ts",
+      "e2e/client-locales.spec.ts",
+      "--output=test-results/recovery-diagnostics-green/artifacts"
+    ],
+    "configFile": "/home/user/ScholarBridgeAi/playwright.config.ts",
+    "rootDir": "/home/user/ScholarBridgeAi/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/user/ScholarBridgeAi/e2e/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-green/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-green/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "snapshotDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "actionTimeout": 20000,
+          "navigationTimeout": 30000,
+          "baseURL": "http://127.0.0.1:36749",
+          "browserName": "chromium",
+          "headless": true,
+          "launchOptions": {
+            "executablePath": "/tmp/chromium",
+            "args": [
+              "--ash-no-nudges",
+              "--disable-domain-reliability",
+              "--disable-print-preview",
+              "--disk-cache-size=33554432",
+              "--no-default-browser-check",
+              "--no-pings",
+              "--font-render-hinting=none",
+              "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+              "--enable-features=SharedArrayBuffer",
+              "--ignore-gpu-blocklist",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader",
+              "--disable-setuid-sandbox",
+              "--headless='shell'",
+              "--no-sandbox",
+              "--no-zygote"
+            ]
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "video": "off"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": ""
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/e2e-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "catalogue-read-diagnostics.spec.ts",
+      "file": "catalogue-read-diagnostics.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "actual catalogue 503 retains its contract and safely correlates a missing relation without stale success",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 710,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m200\u001b[39m\nReceived: \u001b[31m503\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m200\u001b[39m\nReceived: \u001b[31m503\u001b[39m\n    at /home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts:27:84",
+                    "location": {
+                      "file": "/home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts",
+                      "column": 84,
+                      "line": 27
+                    },
+                    "snippet": "  25 |   await db.end();\n  26 |  }\n> 27 |  const recovered=await request.get('/api/universities');expect(recovered.status()).toBe(200);expect(recovered.headers()['x-failure-class']).toBeUndefined();\n     |                                                                                    ^\n  28 | });\n  29 |"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts",
+                        "column": 84,
+                        "line": 27
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m200\u001b[39m\nReceived: \u001b[31m503\u001b[39m\n\n  25 |   await db.end();\n  26 |  }\n> 27 |  const recovered=await request.get('/api/universities');expect(recovered.status()).toBe(200);expect(recovered.headers()['x-failure-class']).toBeUndefined();\n     |                                                                                    ^\n  28 | });\n  29 |\n    at /home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts:27:84"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T09:57:27.455Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-green/artifacts/catalogue-read-diagnostics-33dbc-ation-without-stale-success/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-green/artifacts/catalogue-read-diagnostics-33dbc-ation-without-stale-success/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts",
+                    "column": 84,
+                    "line": 27
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "73bfa047d866bffdd2df-8e4349d250418976d870",
+          "file": "catalogue-read-diagnostics.spec.ts",
+          "line": 7,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "client-locales.spec.ts",
+      "file": "client-locales.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "English catalogue does not download complete Russian/Uzbek admin dictionaries through shared country helpers",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 23643,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-university-id=\"1\"]')\nExpected: visible\nTimeout: 12000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" locator('[data-university-id=\"1\"]') with timeout 12000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-university-id=\"1\"]')\u001b[22m\n",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-university-id=\"1\"]')\nExpected: visible\nTimeout: 12000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" locator('[data-university-id=\"1\"]') with timeout 12000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-university-id=\"1\"]')\u001b[22m\n\n    at /home/user/ScholarBridgeAi/e2e/client-locales.spec.ts:13:122",
+                    "location": {
+                      "file": "/home/user/ScholarBridgeAi/e2e/client-locales.spec.ts",
+                      "column": 122,
+                      "line": 13
+                    },
+                    "snippet": "  11 |  expect((await page.request.post(\"/api/auth/sign-in\",{data:{email:f.studentEmail,password:f.studentPassword}})).status()).toBe(200);\n  12 |  await page.context().addCookies([{name:\"scholarbridge_locale\",value:\"en\",url:process.env.E2E_BASE_URL!}]);\n> 13 |  await page.goto(\"/#universities/search\");await expect(page.locator(`[data-university-id=\"${f.verifiedUniversityId}\"]`)).toBeVisible();\n     |                                                                                                                          ^\n  14 |  // Distinct source-language admin text cannot belong to the small country-name\n  15 |  // projection or catalogue lexicon. Assert multiple sentinels per dictionary.\n  16 |  const sentinels=[ru,uz].flatMap(messages=>leaves(messages.admin).filter(value=>value.length>100&&!/[\\n\"\\\\]/.test(value)).slice(0,2).map(value=>value.slice(0,90)));"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/user/ScholarBridgeAi/e2e/client-locales.spec.ts",
+                        "column": 122,
+                        "line": 13
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-university-id=\"1\"]')\nExpected: visible\nTimeout: 12000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" locator('[data-university-id=\"1\"]') with timeout 12000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-university-id=\"1\"]')\u001b[22m\n\n\n  11 |  expect((await page.request.post(\"/api/auth/sign-in\",{data:{email:f.studentEmail,password:f.studentPassword}})).status()).toBe(200);\n  12 |  await page.context().addCookies([{name:\"scholarbridge_locale\",value:\"en\",url:process.env.E2E_BASE_URL!}]);\n> 13 |  await page.goto(\"/#universities/search\");await expect(page.locator(`[data-university-id=\"${f.verifiedUniversityId}\"]`)).toBeVisible();\n     |                                                                                                                          ^\n  14 |  // Distinct source-language admin text cannot belong to the small country-name\n  15 |  // projection or catalogue lexicon. Assert multiple sentinels per dictionary.\n  16 |  const sentinels=[ru,uz].flatMap(messages=>leaves(messages.admin).filter(value=>value.length>100&&!/[\\n\"\\\\]/.test(value)).slice(0,2).map(value=>value.slice(0,90)));\n    at /home/user/ScholarBridgeAi/e2e/client-locales.spec.ts:13:122"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T09:57:28.568Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-green/artifacts/client-locales-English-cat-c11c1-ough-shared-country-helpers/test-failed-1.png"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-green/artifacts/client-locales-English-cat-c11c1-ough-shared-country-helpers/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-green/artifacts/client-locales-English-cat-c11c1-ough-shared-country-helpers/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/user/ScholarBridgeAi/e2e/client-locales.spec.ts",
+                    "column": 122,
+                    "line": 13
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "bfff756facfea0c20a51-49a57586eecbd5d4adf5",
+          "file": "client-locales.spec.ts",
+          "line": 8,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-09T09:57:21.198Z",
+    "duration": 31714.309,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}
