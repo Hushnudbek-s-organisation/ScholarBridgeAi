@@ -278,7 +278,7 @@ const NAV_HINT_KEYS: Record<string, string> = {
 const PANE_KEYWORDS: Record<string, string> = {
   "universities/careers": "Career & Major Explorer careers majors jobs",
   "universities/matches": "Program Recommender program match recommendations",
-  "universities/outlook": "My Chances chancing admission outlook fit probability",
+  "universities/outlook": "My Assessments programme assessment chancing admission outlook fit probability",
   "universities/countries": "Country Compare compare countries",
   "scholarships/browse": "Scholarship Hub scholarships browse saved",
   "scholarships/recommended": "Scholarship Autopilot autopilot matched queue",

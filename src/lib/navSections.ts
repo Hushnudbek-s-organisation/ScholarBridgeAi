@@ -123,13 +123,13 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
     group: "explore",
     label: "Universities & Programs",
     description:
-      "Start from a subject or a career — or from a university you already know. Search, compare and see your admission outlook in context.",
+      "Start from a subject or a career — or from a university you already know. Search, compare and see how published requirements compare with your profile.",
     stage: "discover",
     panes: [
       { id: "search", label: "Universities & programs", description: "Search the catalog by country, level, subject and tuition. Save what fits." },
       { id: "careers", label: "Careers & majors", description: "Start from the job you want, then see the majors, countries and universities that lead there." },
       { id: "matches", label: "Program match", description: "Programs matched to your interests on four separate dimensions — never a probability." },
-      { id: "outlook", label: "Admission outlook", description: "Your saved shortlist with published requirements you meet, do not meet and where we do not know yet." },
+      { id: "outlook", label: "Programme assessment", description: "Your saved shortlist with published requirements you meet, do not meet and where we do not know yet." },
       { id: "countries", label: "Country compare", description: "Compare countries side by side on published cost, visa and intake data." },
     ],
   },
