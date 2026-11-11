@@ -1,8 +1,8 @@
 # Assessment refactor — natijalar hisoboti (2026-11-11)
 
-Branch: `arena/11d25474-scholarbridgeai` (base `9039fce`).
-Hammasi lokal — **hech narsa production’ga qo‘llanmagan, deploy/push qilinmagan**.
-Yangi SQL migratsiya faqat disposable `embedded-postgres` ustida tekshirilgan.
+Branch: `arena/11d25474-scholarbridgeai` (base `9039fce`), PR #135 (`main`ga, **merge qilinmagan**).
+Additive SQL migratsiya production loyihasida (`zkdguzbdopfkffsatk`) **qo‘llangan**; ilova deploy qilinmagan.
+Tafsilotlar: `docs/ASSESSMENT_MIGRATION_2026-11-11.md`.
 
 ---
 
@@ -10,14 +10,14 @@ Yangi SQL migratsiya faqat disposable `embedded-postgres` ustida tekshirilgan.
 
 | Joy | Eski hisob | Nima qilindi |
 |---|---|---|
-| `src/lib/programChancing.ts` (~516–1222) | `evaluateUniversityAndProgramChance` → `compositeProgramFitScore` = `round(clamp(raw + selectivityPenalty + eligibilityPenalty, 12, 98))`; department multiplier'lar (`PROGRAM_DEPARTMENT_PROFILES`), `effectiveProgramAcceptRatePct = clamp(rate×multiplier, 1.8, 92)`, `cohortPositionTier` (percentil 2–98), `selectivityCategory` (`Safety / Likely`, `Target / Match`, `Reach`, `High Reach`) | **Hech bir route/komponentdan chaqirilmaydi.** `universityProgrammeDiscovery` endi `chance: null` qaytaradi va bu engine'ni import qilmaydi. Fayl faqat ikkita offline guard-skript uchun `@deprecated` deb belgilandi |
+| `src/lib/programChancing.ts` (~516–1222) | `evaluateUniversityAndProgramChance` → `compositeProgramFitScore` = `round(clamp(raw + selectivityPenalty + eligibilityPenalty, 12, 98))`; department multiplier'lar (`PROGRAM_DEPARTMENT_PROFILES`), `effectiveProgramAcceptRatePct = clamp(rate×multiplier, 1.8, 92)`, `cohortPositionTier` (percentil 2–98), `selectivityCategory` (`Safety / Likely`, `Target / Match`, `Reach`, `High Reach`) | **O‘chirilgan.** `universityProgrammeDiscovery` `chance: null` qaytaradi va bu engine'ni import qilmaydi; `evaluatePublishedRequirements` `publishedRequirements.ts` ga ko‘chirildi |
 | `src/app/api/chancing/route.ts` | composite + tier + selectivity + `percentilePositioning` + `PROGRAM_DEPARTMENT_PROFILES` | Butun route canonical `assessProgramme` ustiga qayta yozildi |
 | `src/app/api/universities/route.ts` | `chanceScore: chance.compositeProgramFitScore`, `effectiveAcceptRatePct`, `selectivityCategory`, `studentGpaPercentile` | Olib tashlandi; faqat fit + `programmeDiscovery` |
 | `src/app/api/universities/[id]/route.ts` | `chance: {score, effectiveAcceptRatePct, selectivityCategory, studentGpaPercentile}` | `assessment: ProgrammeAssessment` bilan almashtirildi (`chance` — shu obyektga deprecated alias) |
 | `src/app/api/deadlines/route.ts` | `scoreUniversityRow` → `chanceScore`, `effectiveAcceptRatePct`, `selectivityCategory`; shortlist **`chanceScore >= 60`** (hard gate), `chance` bo‘yicha sort | `assessCatalogueProgramme` + `matchScore`; gate va chance-sort olib tashlandi, suggestion `lowerBound desc → fit → id` bo‘yicha |
 | `src/app/api/dashboard/route.ts` | `evaluateUniversityAndProgramChance` import; `chanceScore: undefined`, `effectiveAcceptRatePct`, `studentGpaPercentile`, `programGpa50` maydonlari | Import va maydonlar olib tashlandi, `combinedScore` = fit |
 | `src/lib/universitySort.ts` | `chance_desc` → `chanceScore` bo‘yicha sort | Endi fit (`matchScore`) bo‘yicha, `applied: "match_desc"` deb halol qaytaradi |
-| `src/components/ChancingPanel.tsx` (1218 qator) | Safety/Reach badge, `compositeProgramFitScore%`, `effectiveProgramAcceptRatePct%`, qattiq kodlangan GPA o‘qi `(gpa-2.4)/1.6`, `MAJOR_PRESETS`, `switcherTitle` 174/2423 | Butunlay `ProgrammeAssessmentScreen` bilan almashtirildi (props o‘zgarmadi) |
+| `src/components/ChancingPanel.tsx` (1218 qator) | Safety/Reach badge, `compositeProgramFitScore%`, `effectiveProgramAcceptRatePct%`, qattiq kodlangan GPA o‘qi `(gpa-2.4)/1.6`, `MAJOR_PRESETS`, `switcherTitle` 174/2423 | Yupqa wrapper — `ProgrammeAssessmentScreen` (props o‘zgarmadi); u `TwinStrategyCard`ni ham mount qiladi |
 | `src/components/UniversityExplorer.tsx` | `chanceBadgeLabel`, `chanceAdmitRate`, selectivity tooltip, `chance_desc` opt-in | Fit badge + "focus programme" chip; sort endi fit |
 | `src/components/UniversityDetail.tsx` | `chanceBadgeLabel` / `chanceAdmitRate` (violet "🎯") | Fit interval + coverage + eligibility holati |
 | `src/components/SmartTimelineCalendar.tsx` | `RECOMMENDED_CHANCE_MIN = 65` hard gate, `planChanceBadge`, `planAdmitBadge`, chance-sort | Gate → "sana bor / to‘liq qoplaydigan grant"; badge → fit; sort → fit |
@@ -55,6 +55,20 @@ Frontend va backend **bir xil** modulni ishlatadi: `/api/chancing` javobidagi `a
 - **Recommendation cards** (`/api/programs/recommend`): har natijada `assessment` + `preferenceFit`; `positioning` o‘chirilgan.
 - **API/eksport**: `/api/chancing`, `/api/universities`, `/api/universities/[id]`, `/api/deadlines`, `/api/dashboard`, `/api/programs/recommend` — hech birida `chanceScore`/`selectivityCategory`/`compositeProgramFitScore` yo‘q (test bilan qo‘riqlanadi).
 
+### 3.1. Terminologiya (uchala til)
+
+| Joy | Avval | Endi (en / uz / ru) |
+|---|---|---|
+| Nav pane `outlook` (`navPanes.outlook`, `navSections` fallback) | "Admission outlook" / "Qabul istiqboli" / "Перспектива поступления" | "Programme assessment" / "Dasturlarni baholash" / "Оценка программ" |
+| Landing feature kartasi `f2Title` | "Admission outlook" / "Qabul istiqboli" / "Перспектива поступления" | "Programme assessment" / "Dasturlarni baholash" / "Оценка программ" |
+| Shortlist banner tugmasi `exCompareOutlook` | "Compare admission outlook" / "Qabul imkoniyatini solishtirish" / "Сравнить шансы поступления" | "Compare programme assessments" / "Dastur baholashlarini solishtirish" / "Сравнить оценки программ" |
+| `hubs.introUniversities`, `universities` bo‘limi tavsifi | "...see your admission outlook in context" | "...see how published requirements compare with your profile" |
+| `navPanes.outlookExplain` | "Admission outlook is shown next to the requirements it comes from." | "Each programme is assessed against the requirements it publishes." |
+| Navbar qidiruv kalitlari | `My Chances chancing ...` | `My Assessments programme assessment chancing ...` |
+
+Pane **id** (`outlook`) va URL (`/universities#outlook`) o‘zgarmagan — bookmark va deep-link buzilmaydi.
+E'lon qilingan accept rate statistikasi (masalan "MIT 4.6%") **tegilmagan**: bu tarixiy fakt, model bashorati emas.
+
 ---
 
 ## 4. Migration va cache
@@ -69,24 +83,33 @@ Frontend va backend **bir xil** modulni ishlatadi: `/api/chancing` javobidagi `a
 
 ## 5. Test natijalari (barchasi haqiqiy run)
 
+Yakuniy holat (`475947f` ustida qayta yurgizilgan):
+
 | Buyruq | Natija |
 |---|---|
-| `npm run test:assessment` (yangi) | **54 passed, 0 failed** |
-| `npm run test:assessment-db` (yangi, embedded postgres) | **passed** (migratsiya additive/idempotent, legacy→prefer, must=filter, cache kalitlari) |
-| `npm run test:chancing` | 28 passed |
+| `npm run test:assessment` (yangi) | **62 passed, 0 failed** |
+| `npm run test:assessment-db` (yangi, embedded postgres) | **passed** |
+| `npm run test:chancing` | 30 passed |
+| `npm run test:visa` | 67 passed |
 | `npm run test:recommend` | 91 passed |
-| `npm run test:admission-probability` | 12 passed |
-| `npm run test:university-sort` | 15 passed |
-| `npm run test:qs-benchmarks` | 13 passed |
-| `npm run test:continuation` | 88 behaviour checks passed |
 | `npm run test:match` | 99 passed |
-| `npm run test:document-coverage` | passed |
-| `npm run test:evidence-policy` / `test:typed-evidence` | 9 / 17 passed |
-| `npm run test:integration` (embedded postgres) | **499 passed, 0 failed** |
-| `npm run typecheck` | exit 0 |
-| `npm run lint` | exit 0 (0 error) |
-| `npm run build` | `✓ Compiled successfully` (DATABASE_URL talab qiladi; dummy URL bilan to‘liq o‘tdi) |
-| `node scripts/check-i18n.mjs` | passed (en/uz/ru parity, 4376 `t()` call) |
+| `npm run test:continuation` | 88 behaviour checks passed |
+| `npm run test:qs-benchmarks` / `test:university-sort` / `test:admission-probability` | 13 / 15 / 12 passed |
+| `npm run test:integration` (embedded postgres) | **500 passed, 0 failed** |
+| `npm run test:differentiators` | **733 passed, 0 failed** |
+| `npm run test:evidence-render` | **18 passed, 0 failed** |
+| `npm run test:evidence-policy` / `test:rendered-copy` / `test:build-gates` | 9 / 6 / 13 passed |
+| `npm run test:schema` | **PASSED** (offline; `assessment_preferences` ustuni `docs/SUPABASE_SCHEMA.md` da) |
+| `npm run test:landing-copy` / `test:localization` / `test:internal-surfaces` | 13 / 18 / 8 passed |
+| `npm run test:journey` / `test:growth` | 115 / 39 assertions passed |
+| `npm run test:e2e` | **14 passed, 2 skipped** (18.0m) |
+| `npm run test:site-completeness` | 1780 fayl, `findings: []`, `reviewCandidates: []` |
+| `npm run typecheck` / `npm run lint` / `npm run build` | exit 0 / 0 error / compiled |
+| `node scripts/check-i18n.mjs` | passed (en/uz/ru parity) |
+
+CI ro‘yxatidagi 85 ta `test:*` skripti bittalab yurgizildi; faqat
+`differentiators`, `evidence-render`, `schema` yiqilgan edi — uchtasi ham
+qo‘riqni **kuchaytirib** tuzatildi (o‘chirilmadi).
 
 ### Uch fit misoli (testdan haqiqiy chiqish)
 
@@ -107,5 +130,5 @@ Qo‘shimcha qo‘riqlar: `0 ≤ lowerBound ≤ upperBound ≤ 100` va `knownFit
 5. **`applicant_category`** uchun profil ustuni yo‘q (faqat `applicants` scope faktlarida) → talablar applicant guruhiga qarab hozircha `unknown` bo‘lishi mumkin.
 6. **`matchScore`** (recommend) va university-fit `fitScore` — alohida legacy ranking raqamlari; ular admission ehtimoli emas va canonical fit bilan almashtirilmadi (mavjud testlar va ish jarayonlari buzilmasligi uchun). Ikkalasi ham `assessment` yonida, izoh bilan turadi.
 7. Finance: `application_fee` chaqiruvchidan kelmasa `null`; living cost — `estimate` deb belgilangan, verified emas. `fundingGapRangeUsd.upper` noma’lum bo‘lsa `null`.
-8. `programChancing.ts` fayli o‘chirilmadi: `scripts/check-document-coverage.ts` va `check-chancing.ts` uning legacy review funksiyalarini tekshiradi. U **user-facing hech qayerda ishlatilmaydi** (test bilan qo‘riqlanadi).
+8. `src/lib/programChancing.ts` (1233 qator) **o‘chirildi**; undan kerakli bo‘lgan yagona halol funksiya `evaluatePublishedRequirements` `src/lib/publishedRequirements.ts` ga ko‘chirildi. Legacy engine qaytmasligi guard-skript bilan qo‘riqlanadi.
 9. Deterministik formulalar **real admission prediction aniqligi emas**; hech qanday "90% aniqlik" da’vosi yo‘q va `admissionProbability` doim `null`.
