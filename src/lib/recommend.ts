@@ -1,5 +1,11 @@
 import {evaluateResolvedAcademicCriteria,type ResolvedAcademicDecisionInput} from "./academicDecision";
 import { hasVerifiedProgramEvidence } from "./catalogEvidence";
+import {
+  assessProgramme,
+  type ProgrammeAssessment,
+} from "./assessment";
+import type { EligibilityProfile, RequirementNode } from "./assessment/eligibility";
+import { financeInputFromCosts } from "./assessment/adapters";
 import { budgetVerdict, evaluateBudgetFit } from "./budgetFit";
 /**
  * Subject-to-program recommender engine (2026-10).
@@ -538,6 +544,149 @@ export interface RecommendationResult {
   /** Stale provenance flags. */
   programStale: boolean;
   cycleStale: boolean;
+  /**
+   * The canonical assessment (spec §10): preference fit with an explicit
+   * interval/coverage, documented eligibility, finance, academic comparison and
+   * `admissionProbability: null`. `matchScore` above is the legacy RANKING key
+   * and is NOT an admission chance; the five dimensions below never blend into
+   * it.
+   */
+  assessment: ProgrammeAssessment;
+}
+
+/**
+ * Build the canonical assessment for one recommended programme.
+ *
+ * The legacy `RecommendRequirement` row is a SCORED envelope: `minGpa` is
+ * already normalised to the 4.0 catalogue convention and the route has applied
+ * `mayAutoReject`, so the values are verified official minimums. Only the ones
+ * that survive that gate are carried over — anything else stays null and the
+ * engine reports `missing_requirement`.
+ */
+function assessmentFor(
+  input: RecommendationInput,
+  program: RecommendProgram,
+  university: RecommendUniversity,
+  reqs: RecommendRequirement[],
+  selectedCycle: RecommendCycle | null,
+  affordability: Affordability
+): ProgrammeAssessment {
+  const row = reqs.find((item) => item.academicYear == null || item.academicYear === (selectedCycle?.academicYear ?? null)) ?? reqs[0] ?? null;
+  const unitFor = (metric: "ielts" | "toefl" | "det" | "sat" | "act" | "gpa") => {
+    if (metric === "ielts") return "9";
+    if (metric === "toefl") return row?.toeflScale ?? null;
+    if (metric === "det") return "160";
+    if (metric === "sat") return "1600";
+    if (metric === "act") return "36";
+    return null;
+  };
+  const requirementNodes: RequirementNode[] = [];
+  if (row) {
+    if (row.minGpa != null) {
+      requirementNodes.push({ id: "gpa", label: "Minimum GPA", kind: "minimum", metric: "gpa", value: row.minGpa, unit: null });
+    }
+    const language: RequirementNode[] = [];
+    for (const [id, label, metric, value] of [
+      ["ielts", "IELTS", "ielts", row.minIelts],
+      ["toefl", "TOEFL", "toefl", row.minToefl],
+      ["det", "Duolingo English Test", "det", row.minDet],
+    ] as const) {
+      if (value == null) continue;
+      language.push({
+        id,
+        label,
+        kind: "minimum",
+        metric,
+        value,
+        unit: unitFor(metric),
+        requireValid: metric === "ielts" || metric === "toefl",
+      });
+    }
+    if (language.length === 1) requirementNodes.push(language[0]);
+    else if (language.length > 1) {
+      requirementNodes.push({
+        id: "language",
+        label: "English language",
+        kind: "group",
+        // The route resolved `englishOperator` from a verified fact; without one
+        // the alternatives are OR, exactly as the catalogue describes them.
+        operator: row.englishOperator === "AND" ? "allOf" : "anyOf",
+        children: language,
+      });
+    }
+    const tests: RequirementNode[] = [];
+    if (row.minSat != null) tests.push({ id: "sat", label: "SAT", kind: "minimum", metric: "sat", value: row.minSat, unit: "1600" });
+    if (row.minAct != null) tests.push({ id: "act", label: "ACT", kind: "minimum", metric: "act", value: row.minAct, unit: "36" });
+    if (tests.length === 1) requirementNodes.push(tests[0]);
+    else if (tests.length > 1) {
+      requirementNodes.push({ id: "standardised_tests", label: "Standardised test", kind: "group", operator: "anyOf", children: tests });
+    }
+  }
+
+  const eligibilityProfile: EligibilityProfile = {
+    gpa:
+      input.gpa != null && input.gpaScale != null
+        ? { value: input.gpa, unit: String(input.gpaScale), minimum: input.gpaMinimum ?? 0 }
+        : null,
+    ielts: input.ielts != null ? { value: input.ielts, unit: "9" } : null,
+    toefl:
+      input.toefl != null
+        ? {
+            value: input.toefl,
+            unit: input.toeflScale ?? input.toeflRecord?.scale ?? null,
+            examDate: input.toeflRecord?.examDate ?? null,
+            validUntil: input.toeflRecord?.validUntil ?? null,
+            sections: input.toeflRecord?.sections ?? null,
+          }
+        : null,
+    det: input.duolingo != null ? { value: input.duolingo, unit: "160" } : null,
+    sat: input.sat != null ? { value: input.sat, unit: "1600" } : null,
+    act: input.act != null ? { value: input.act, unit: "36" } : null,
+    degreeLevel: input.degreeLevel ?? null,
+    requirementDegreeLevel: program.degreeLevel,
+    cycle: selectedCycle?.academicYear ?? (input.startYear ? String(input.startYear) : null),
+    asOfDate: input.asOfDate ?? new Date().toISOString().slice(0, 10),
+  };
+
+  const finance = financeInputFromCosts({
+    tuitionUsd: affordability.annualTuition != null && (program.tuitionCurrency || "USD").toUpperCase() === "USD"
+      ? Number(affordability.annualTuition)
+      : null,
+    tuitionSourceUrl: program.sourceUrl ?? null,
+    livingUsd: affordability.livingEstUsd,
+    budgetUsd: input.budgetUsd ?? null,
+  });
+
+  return assessProgramme({
+    programme: {
+      id: program.id,
+      universityId: program.universityId,
+      name: program.name,
+      field: program.field,
+      degreeLevel: program.degreeLevel,
+      language: program.language,
+      studyMode: program.studyMode,
+      country: university.country,
+      universityName: university.name,
+      officialProgramUrl: program.programUrl ?? program.sourceUrl ?? null,
+      sourceUrl: program.sourceUrl ?? null,
+    },
+    context: {
+      cycle: selectedCycle?.academicYear ?? (input.startYear ? String(input.startYear) : null),
+      applicantCategory: null,
+      degreeLevel: input.degreeLevel ?? null,
+    },
+    applicant: {
+      interests: input.interests ?? [],
+      legacyPreferredCountries: input.countries ?? [],
+      legacyTeachingLanguage: input.languagePref ? [input.languagePref] : [],
+      eligibilityProfile,
+      finance,
+    },
+    requirements: requirementNodes,
+    assessedAt: new Date().toISOString(),
+    asOfDate: input.asOfDate ?? new Date().toISOString().slice(0, 10),
+  });
 }
 
 export function recommend(
@@ -690,6 +839,7 @@ export function recommend(
       affordability,
       probability: ADMISSION_PROBABILITY,
       matchScore,
+      assessment: assessmentFor(input, program, university, reqs, selectedCycle, affordability),
       rankingFactors: factors,
       missingInputs: [...new Set(missing)],
       considerations,

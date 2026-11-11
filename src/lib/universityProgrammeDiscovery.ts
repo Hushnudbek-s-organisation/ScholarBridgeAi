@@ -1,7 +1,7 @@
 import {verifiedQsRankNumber,type QsRankRow} from "./universityRank";
+import type {ChancingProfile} from "./chancing";
 import {supportsDegreeLevel} from "./degreeLevels";
 import {subjectAffinity} from "./subjectAffinity";
-import {evaluateUniversityAndProgramChance} from "./programChancing";
 import {matchQsUniversityBenchmark} from "./qsTop200Benchmarks";
 
 export interface RecordedUniversityProgramme {
@@ -11,11 +11,13 @@ export interface RecordedUniversityProgramme {
  * identity. The experimental index is evaluated only for recorded programmes,
  * after explicit opt-in, and never against legacy minima as official rules. */
 export function universityProgrammeDiscovery(
-  university:Parameters<typeof evaluateUniversityAndProgramChance>[1]&QsRankRow&{verificationStatus?:string|null},
+  university:{id:number;name:string;country?:string|null;worldRanking?:number|null;verificationStatus?:string|null}&QsRankRow,
   programmes:RecordedUniversityProgramme[],
   preferences:{degreeLevel?:string|null;targetMajor?:string|null}|null,
-  profile:Parameters<typeof evaluateUniversityAndProgramChance>[0]|null,
-  experimental:boolean,
+  profile:ChancingProfile|null,
+  /** Retained for call-site compatibility. It no longer enables a composite
+   *  index: the highest-ranking planning score is never computed. */
+  _experimental?:boolean,
 ){
   // Both API callers must feed the same rank visibility policy into the
   // planning model. Raw detail rows previously smuggled an undated rank back
@@ -25,19 +27,15 @@ export function universityProgrammeDiscovery(
   const relevant=actual.map(program=>({program,affinity:subjectAffinity(preferences?.targetMajor?[preferences.targetMajor]:[],program.field).score}));
   const bestAffinity=Math.max(0,...relevant.map(value=>value.affinity));
   const candidates=relevant.filter(value=>value.affinity===bestAffinity).sort((a,b)=>a.program.id-b.program.id);
-  let chance:ReturnType<typeof evaluateUniversityAndProgramChance>|null=null;
-  let selected=candidates[0]?.program??null;
-  if(profile&&experimental){
-    for(const {program} of candidates){
-      if(!program.degreeLevel?.trim())continue;
-      const result=evaluateUniversityAndProgramChance(profile,modelUniversity,{...program,field:program.field??program.name,degreeLevel:program.degreeLevel},null,[],matchQsUniversityBenchmark(modelUniversity));
-      if(!chance||result.compositeProgramFitScore>chance.compositeProgramFitScore){chance=result;selected=program;}
-    }
-  }
-  return {chance,programmeDiscovery:{
+  // The programme the university page highlights is chosen by SUBJECT RELATION
+  // and a stable id — never by the retired composite "chance" index. Two
+  // programmes with equal subject affinity are ordered by id, and the choice is
+  // reported as such, so the page never implies that one is "more likely".
+  const selected=candidates[0]?.program??null;
+  return {chance:null,programmeDiscovery:{
     status:actual.length?"recorded":"no_programmes",programmeCount:actual.length,
     selectedProgrammeId:selected?.id??null,selectedProgrammeName:selected?.name??null,
-    aggregation:chance?"highest_experimental_index_among_best_subject_fit_real_programmes":"preference_discovery_only",
-    modelOptIn:Boolean(chance),personalAdmissionProbability:null,
+    aggregation:"best_subject_relation_then_stable_id",
+    modelOptIn:false,personalAdmissionProbability:null,
   }};
 }

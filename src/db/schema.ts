@@ -1,5 +1,6 @@
 import { pgTable, serial, text, integer, bigint, doublePrecision, boolean, timestamp, date, numeric, jsonb, index, unique, uniqueIndex, foreignKey, check, AnyPgColumn } from "drizzle-orm/pg-core";
 import type { ApplicantContext } from "@/lib/applicantContext";
+import type { StoredAssessmentPreferences } from "@/lib/assessmentStored";
 import { sql } from "drizzle-orm";
 
 export const studentProfiles = pgTable("student_profiles", {
@@ -42,6 +43,16 @@ export const studentProfiles = pgTable("student_profiles", {
   greScore: integer("gre_score"),
   budgetAnnualUsd: integer("budget_annual_usd"),
   preferredCountries: text("preferred_countries"),
+  /**
+   * Versioned preference modes for the canonical programme assessment
+   * (`must` / `prefer` / `no_preference` + the separate `study_load` and
+   * `delivery_mode` axes). Additive and nullable: a profile without it keeps the
+   * legacy behaviour, where the reader migrates `preferred_countries` to
+   * `prefer` — never to `must`.
+   *
+   * Migration: supabase/add_assessment_preferences_2026-11-11.sql
+   */
+  assessmentPreferences: jsonb("assessment_preferences").$type<StoredAssessmentPreferences | null>(),
   needScholarship: boolean("need_scholarship").notNull().default(false),
   extracurriculars: text("extracurriculars"),
   workExperienceYears: integer("work_experience_years"),

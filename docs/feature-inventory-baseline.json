@@ -30,6 +30,10 @@
     "GET /api/admin/analytics",
     "GET /api/admin/audit",
     "POST /api/admin/branding/upload",
+    "POST /api/admin/catalogue-facts/review",
+    "GET /api/admin/catalogue-facts",
+    "POST /api/admin/catalogue-facts",
+    "PATCH /api/admin/catalogue-facts",
     "GET /api/admin/channel/audit",
     "GET /api/admin/channel/content",
     "PUT /api/admin/channel/content",
@@ -657,7 +661,7 @@
   },
   "counts": {
     "pages": 13,
-    "api": 290,
+    "api": 294,
     "nav": 50,
     "admin": 26,
     "locales": 3

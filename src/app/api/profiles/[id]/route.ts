@@ -1,5 +1,6 @@
 import { postgresId } from "@/lib/pagination";
 import { parseApplicantContext } from "@/lib/applicantContext";
+import { normalizeAssessmentPreferencesForWrite } from "@/lib/assessmentStored";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
@@ -142,6 +143,24 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     let applicantContext;
     try{applicantContext=parseApplicantContext(body.applicantContext);}
     catch(error){return privateNoStoreJson({error:error instanceof Error?error.message:"Invalid applicant context",code:"applicant_context_invalid"},{status:400});}
+    // Preference modes (must / prefer / no_preference + the study_load and
+    // delivery_mode axes). Invalid input is rejected rather than silently
+    // dropped, because a lost `must` would quietly change an assessment.
+    let assessmentPreferences: ReturnType<typeof normalizeAssessmentPreferencesForWrite> | undefined;
+    if (body.assessmentPreferences !== undefined) {
+      if (body.assessmentPreferences === null) {
+        assessmentPreferences = null;
+      } else {
+        const normalised = normalizeAssessmentPreferencesForWrite(body.assessmentPreferences);
+        if (!normalised) {
+          return privateNoStoreJson(
+            { error: "Invalid assessment preferences", code: "assessment_preferences_invalid" },
+            { status: 400 }
+          );
+        }
+        assessmentPreferences = normalised;
+      }
+    }
     const hasStudyInterests = body.studyInterests !== undefined;
     const submittedStudyInterests = hasStudyInterests
       ? parseStudyInterestSelections(body.studyInterests)
@@ -297,6 +316,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         onboardingStep:
           optionalNumber(body.onboardingStep, { min: 0, max: 3, integer: true }) ?? undefined,
         onboardingCompleted: body.onboardingCompleted !== undefined ? !!body.onboardingCompleted : undefined,
+        // Preference modes: absent = unchanged, explicit null = cleared (the
+        // legacy reader migration then applies again).
+        assessmentPreferences,
         updatedAt: new Date(),
       })
       .where(eq(studentProfiles.id, profileId))

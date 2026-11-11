@@ -470,7 +470,14 @@ export async function POST(req: Request) {
   const results = recommend(input, catalog, limit);
 
   return NextResponse.json({
-    results: results.map((r) => ({...r, positioning: undefined, positioningState: "unknown_no_verified_cohort"})),
+    results: results.map((r) => ({
+      ...r,
+      positioning: undefined,
+      positioningState: "unknown_no_verified_cohort",
+      // Compatibility alias for clients written against the interim shape; it
+      // points at the SAME canonical assessment, never at a chance score.
+      preferenceFit: r.assessment.preferenceFit,
+    })),
     totalProgramsScanned: totalPrograms,
     // Probability policy (2026-10): the dimension is surfaced as unavailable —
     // no fit score below is an admission probability.

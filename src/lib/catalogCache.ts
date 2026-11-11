@@ -3,6 +3,7 @@ import { loadCatalogueFacts } from "./catalogueFacts.server";
 import type { CatalogueFact } from "./evidencePolicy";
 import { readCacheRevision, bumpCacheRevision, cacheRevisionKeyPart } from "./cacheRevision";
 import { AsyncTtlCache } from "@/lib/asyncTtlCache";
+import { assessedUniversitiesCacheKey } from "@/lib/assessment/version";
 /**
  * In-memory catalogue cache (Priority 1 — 20×–50× faster catalogue reads).
  *
@@ -281,6 +282,23 @@ export async function getCachedUniversitiesBundle(): Promise<UniversitiesBundle>
   return revisionFencedCache(universitiesCache,ensureCatalogRevision,buildUniversitiesBundle);
 }
 
+/**
+ * The SAME catalogue bundle tagged with the assessment scoring version.
+ *
+ * The canonical assessment (`src/lib/assessment`) derives preference fit,
+ * eligibility, finance and academic comparisons from these rows. A bundle cached
+ * before a scoring-version bump must never be reused to build a new assessment:
+ * including the version in the key retires every old entry on deploy, without a
+ * manual flush and without waiting for the TTL.
+ */
+export async function getCachedUniversitiesBundleForAssessment(): Promise<UniversitiesBundle> {
+  return revisionFencedCache(
+    universitiesCache,
+    async () => `${await ensureCatalogRevision()}|${assessedUniversitiesCacheKey()}`,
+    buildUniversitiesBundle,
+  );
+}
+
 /* ------------------------------------------------------------- scholarships */
 
 async function buildScholarshipsBundle(): Promise<ScholarshipsBundle> {
@@ -428,7 +446,9 @@ export async function getCachedOpportunitiesBundle(): Promise<OpportunitiesBundl
 export async function getCachedProfileForMatching(profileId: number): Promise<ProfileMatch | null> {
   if (PROFILE_MATCH_TTL_MS === 0) return loadProfileForMatching(profileId);
   const key=async()=>{const revisions = await Promise.all(([`profile:${profileId}`,"catalogue","evidence"] as const).map(scope=>readCacheRevision(scope)));
-    return `${profileId}:${revisions.map(value=>cacheRevisionKeyPart(value.revision,value.shared)).join(":")}`;};
+    // The scoring version is part of the key: a preference/rule change that
+    // bumps it must never be served from a snapshot built by the old formula.
+    return `${profileId}:${revisions.map(value=>cacheRevisionKeyPart(value.revision,value.shared)).join(":")}|${assessedUniversitiesCacheKey()}`;};
   return revisionFencedCache(profileMatchCache,key,async()=>{invalidateSavedActivities(profileId);return loadProfileForMatching(profileId);});
 }
 

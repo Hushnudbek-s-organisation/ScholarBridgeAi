@@ -64,6 +64,8 @@
     "audit:catalogue-evidence": "tsx scripts/audit-catalogue-evidence.ts",
     "test:api-security": "tsx scripts/check-api-anonymous.ts",
     "test:chancing": "tsx scripts/check-chancing.ts",
+    "test:assessment": "tsx scripts/check-assessment.ts",
+    "test:assessment-db": "tsx scripts/check-assessment-db.ts",
     "test:roadmap": "tsx scripts/check-roadmap.ts",
     "test:documents": "tsx scripts/check-documents.ts",
     "test:essays": "tsx scripts/check-essays.ts",

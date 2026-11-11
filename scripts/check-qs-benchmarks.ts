@@ -213,14 +213,14 @@ check("the rank column is nullable, not a placeholder number", () => {
 });
 
 check("no badge prints a null rank", () => {
-  const panel = readFileSync(join(ROOT, "src/components/ChancingPanel.tsx"), "utf8");
-  assert.match(
-    panel,
-    /activeItem\.worldRanking \?\? qsBench\?\.qsRank \?\? null/,
-    "the chancing badge no longer prefers the verified DB rank"
-  );
-  assert.match(panel, /displayRank != null &&/, "the chancing badge prints an absent rank");
-  assert.doesNotMatch(panel, /QS #\{qsBench\.qsRank\}/, "the chancing badge is back to the raw table rank");
+  // The assessment screen renders no QS badge at all: a rank that is not
+  // recorded is simply absent, instead of being filled from the curated table.
+  const panel = readFileSync(join(ROOT, "src/components/ProgrammeAssessmentScreen.tsx"), "utf8");
+  assert.doesNotMatch(panel, /QS #/, "the assessment screen prints a raw rank");
+  assert.doesNotMatch(panel, /qsRank/, "the assessment screen reads a rank value");
+  // The uniform list row still carries the verified rank for the QS sort.
+  const detail = readFileSync(join(ROOT, "src/components/UniversityDetail.tsx"), "utf8");
+  assert.match(detail, /uni\.worldRanking != null &&/, "the detail badge prints an absent rank");
 
   const similar = readFileSync(join(ROOT, "src/components/SimilarProfiles.tsx"), "utf8");
   assert.match(similar, /bench\?\.qsRank != null &&/, "the similar-profiles badge prints an absent rank");
@@ -245,10 +245,18 @@ check("both APIs prefer the verified rank over the curated table", () => {
   );
 
   const recommend = readFileSync(join(ROOT, "src/app/api/programs/recommend/route.ts"), "utf8");
+  // Programme recommendations no longer publish a rank object at all
+  // (`positioning: undefined`), so the DB-first order is enforced where the
+  // payload still carries one: the chancing assessment rows.
+  assert.match(
+    chancing,
+    /worldRanking: verifiedQsRank\(uni\)\?\.rank \?\? qsBenchmark\.qsRank/,
+    "the assessment rows no longer prefer the verified rank"
+  );
   assert.match(
     recommend,
-    /qsRank: verifiedRankByUniId\.get\(r\.university\.id\) \?\? benchmark\.qsRank \?\? null/,
-    "programme recommendations no longer prefer the verified rank"
+    /positioning: undefined/,
+    "recommendations must not resurrect an unverified rank object"
   );
 });
 

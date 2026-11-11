@@ -98,16 +98,42 @@ interface UniversityDetailData {
     breakdown: MatchBreakdown;
   } | null;
   /**
-   * Module 4 — the positioning half of the dual score (admission chance
-   * inside the department's admitted cohort). Null when signed out; the
-   * UI never paints a score that the API did not compute.
+   * The canonical assessment for the programme this page focuses on: preference
+   * fit with an interval + coverage, documented eligibility, finance, academic
+   * comparison and `admissionProbability: null`. Null when signed out — the UI
+   * never paints a score the API did not compute.
+   *
+   * The retired `chance` object (composite index, effective accept rate,
+   * Safety/Target/Reach category) is no longer produced by the API (spec §8).
    */
-  chance?: {
-    score: number;
-    effectiveAcceptRatePct: number;
-    selectivityCategory: string;
-    studentGpaPercentile: number | null;
+  assessment?: {
+    preferencesFitLabel?: never;
+    preferenceFit?: {
+      pointFit: number | null;
+      knownFit: number | null;
+      coverage: number | null;
+      lowerBound: number | null;
+      upperBound: number | null;
+      missingAxes?: string[];
+    };
+    eligibility?: { status: "met" | "unmet" | "unknown" | "not_applicable" };
+    admissionProbability?: { value: null; reason: string };
   } | null;
+}
+
+
+/** Static keys only — a computed one can ship a missing translation. */
+function assessmentEligibilityLabel(status: string, t: (key: string) => string): string {
+  switch (status) {
+    case "met":
+      return t("assessEligibility_met");
+    case "unmet":
+      return t("assessEligibility_unmet");
+    case "not_applicable":
+      return t("assessEligibility_not_applicable");
+    default:
+      return t("assessEligibility_unknown");
+  }
 }
 
 interface ProgramData {
@@ -250,7 +276,8 @@ interface UniversityDetailPayload {
   scholarships?: ScholarshipData[];
   sources?: SourceData[];
   match?: UniversityDetailData["match"] | null;
-  chance?: UniversityDetailData["chance"] | null;
+  /** Canonical assessment; `chance` is a deprecated alias of the same object. */
+  assessment?: UniversityDetailData["assessment"] | null;
 }
 
 /** Spec §19: verified vs unavailable. NULL is never shown as a value. */
@@ -352,7 +379,7 @@ export function UniversityDetail({
   const [scholarships, setScholarships] = useState<ScholarshipData[]>([]);
   const [sources, setSources] = useState<SourceData[]>([]);
   const [match, setMatch] = useState<UniversityDetailData["match"]>(null);
-  const [chance, setChance] = useState<UniversityDetailData["chance"]>(null);
+  const [assessment, setAssessment] = useState<UniversityDetailData["assessment"]>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryVersion,setRetryVersion]=useState(0);
@@ -388,8 +415,9 @@ export function UniversityDetail({
     setScholarships(data.scholarships || []);
     setSources(data.sources || []);
     setMatch(data.match ?? null);
-    setChance(data.chance ?? null);
-  }, [setUni,setPrograms,setCycles,setUniversityRequirements,setRequirementContexts,setMoney,setScholarships,setSources,setMatch,setChance]);
+    // Older cached payloads carry the same object under `chance`.
+    setAssessment(data.assessment ?? (data as { chance?: UniversityDetailData["assessment"] }).chance ?? null);
+  }, [setUni,setPrograms,setCycles,setUniversityRequirements,setRequirementContexts,setMoney,setScholarships,setSources,setMatch,setAssessment]);
 
   /**
    * Create the application row for this university and hand the workspace to the
@@ -514,7 +542,9 @@ export function UniversityDetail({
       const params = new URLSearchParams();
       if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
       params.set("locale", locale);
-      if(experimentalChancing)params.set("sort","chance_desc");
+      // The assessment is computed for every profile read; the old opt-in
+      // "chance" flag no longer changes the payload, so it is not sent.
+      void experimentalChancing;
       if(scope.programId)params.set("programId",scope.programId);
       if(scope.admissionCycle)params.set("admissionCycle",scope.admissionCycle);
       if(scope.applicantScope)params.set("applicantScope",scope.applicantScope);
@@ -653,23 +683,26 @@ export function UniversityDetail({
                   />
                 </div>
               )}
-              {/* Module 4 — the second, INDEPENDENT number beside fit: how this
-                  profile sits inside the department's admitted cohort (5-layer
-                  positioning engine), with the programme's effective acceptance
-                  rate as context. Shown only when the API computed one. */}
-              {typeof chance?.score === "number" && (
-                <div className="mt-3">
-                  <span
-                    className="inline-flex flex-wrap items-center gap-1.5 rounded-surface bg-violet-500/20 backdrop-blur-md border border-violet-300/30 px-3 py-1.5 text-xs font-bold"
-                    title={chance.selectivityCategory || undefined}
-                  >
-                    🎯 {t("chanceBadgeLabel", { score: chance.score })}
-                    {typeof chance.effectiveAcceptRatePct === "number" && (
-                      <span className="font-semibold opacity-90">
-                        · {t("chanceAdmitRate", { rate: chance.effectiveAcceptRatePct })}
-                      </span>
-                    )}
+              {/* The canonical assessment, shown as two SEPARATE statements: the
+                  preference match (an interval when a factor is unknown) and the
+                  documented-requirements status. No chance percentage and no
+                  Safety/Target/Reach label (spec §8). */}
+              {assessment?.preferenceFit && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-surface bg-indigo-500/20 px-3 py-1.5 text-xs font-bold backdrop-blur-md border border-indigo-300/30">
+                    {t("assessFitLabel")}:{" "}
+                    {assessment.preferenceFit.pointFit != null
+                      ? `${Math.round(assessment.preferenceFit.pointFit * 10) / 10}/100`
+                      : assessment.preferenceFit.lowerBound != null && assessment.preferenceFit.upperBound != null
+                        ? `${Math.round(assessment.preferenceFit.lowerBound * 10) / 10}–${Math.round(assessment.preferenceFit.upperBound * 10) / 10}/100`
+                        : t("assessFitUnknown")}
+                    {assessment.preferenceFit.coverage != null ? ` · ${t("assessCoverage", { pct: Math.round(assessment.preferenceFit.coverage) })}` : ""}
                   </span>
+                  {assessment.eligibility && (
+                    <span className="inline-flex items-center gap-1.5 rounded-surface bg-white/15 px-3 py-1.5 text-xs font-bold backdrop-blur-md border border-white/20">
+                      {t("assessRequirements")}: {assessmentEligibilityLabel(assessment.eligibility.status, t)}
+                    </span>
+                  )}
                 </div>
               )}
               {/* Phase AD: a rank whose edition was never recorded is not a QS

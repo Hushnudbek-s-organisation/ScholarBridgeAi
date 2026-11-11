@@ -123,13 +123,13 @@ export interface JourneyDashboard {
       /** Real fit from the shared match engine — same number as the Explorer. */
       matchScore: number;
       /**
-       * Positioning index from the QS Top 200 + 5-layer program engine.
-       * Optional: older payloads and the catalogue-free preview do not carry it,
-       * and the panel must render either way.
+       * @deprecated The composite positioning index is retired (spec §8): the
+       * dashboard no longer computes it and this panel never renders it.
        */
       chanceScore?: number;
-      /** 55% fit + 45% positioning — the order this list is sorted by. */
+      /** @deprecated Ordering is by fit; no blended composite is produced. */
       combinedScore?: number;
+      /** @deprecated A derived offer rate is not a personal chance. */
       effectiveAcceptRatePct?: number;
       studentGpaPercentile?: number | null;
       programGpa50?: number;
@@ -137,6 +137,8 @@ export interface JourneyDashboard {
       matchIssues: string[];
       /** Optional for the same reason as `chanceScore` — the panel tolerates absence. */
       matchBreakdown?: MatchBreakdown;
+      /** The programme the university card focuses on (subject relation, not a score). */
+      programmeDiscovery?: { selectedProgrammeName: string | null } | null;
     }[];
     scholarships: {
       id: number;
@@ -340,15 +342,12 @@ export function RecommendedPanel({
                     <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
                       {t("ccRecFitChip", { score: u.matchScore })}
                     </span>
-                    {typeof u.chanceScore === "number" && (
-                      <span
-                        className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800 dark:bg-violet-900/60 dark:text-violet-200"
-                        title={t("ccRecCombinedHint")}
-                      >
-                        {t("ccRecChanceChip", { score: u.chanceScore })}
-                        {typeof u.effectiveAcceptRatePct === "number"
-                          ? ` · ${t("ccRecAdmitRate", { rate: u.effectiveAcceptRatePct })}`
-                          : ""}
+                    {/* No chance chip: the recommendation card shows the fit and,
+                        when a real programme is recorded, which one it refers
+                        to. There is no admission percentage to print. */}
+                    {u.programmeDiscovery?.selectedProgrammeName && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        {u.programmeDiscovery.selectedProgrammeName}
                       </span>
                     )}
                     {u.matchBreakdown && (

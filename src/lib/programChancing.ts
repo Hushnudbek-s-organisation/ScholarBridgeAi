@@ -510,8 +510,19 @@ export function summarizeEmpiricalOutcomes(
 }
 
 /**
- * Evaluates a student's profile against a specific university and program (or
- * synthesizes a primary program from the university & student's target major).
+ * @deprecated RETIRED FROM EVERY USER-FACING SURFACE (spec §8).
+ *
+ * This produced a composite "planning index" (department multipliers ×
+ * selectivity penalties × cohort percentiles) plus a Safety/Likely/Target/Reach
+ * category. It is NOT an admission probability, was never validated, and no
+ * screen or API returns it any more: the canonical assessment
+ * (`src/lib/assessment`) replaced it, and `admissionProbability` is null with
+ * reason `no_validated_model`.
+ *
+ * It is kept ONLY because two offline guard scripts still assert its legacy
+ * review behaviour (`evaluatePublishedRequirements` provenance, no invented
+ * portfolio/interview requirements). Do not import it into a route or component;
+ * `scripts/check-assessment.ts` fails if a route computes the composite again.
  */
 export function evaluateUniversityAndProgramChance(
   profile: ChancingProfile & {
