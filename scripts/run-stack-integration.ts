@@ -15,7 +15,7 @@ async function port(): Promise<number> {
     });
   });
 }
-async function main() {
+async function main(): Promise<number> {
   process.env.E2E_NEXT_MODE = "start";
   const databasePort = await port();
   let appPort = await port();
@@ -30,8 +30,14 @@ async function main() {
       const env = { ...isolatedServiceEnvironment(process.env, process.cwd()), DATABASE_URL: url, PROVENANCE_APP_URL: `http://127.0.0.1:${appPort}` };
       const result = spawnSync("npm", ["run", name], { env, stdio: "inherit", timeout: 180_000 });
       if (result.error) throw result.error;
-      if (result.status !== 0) { process.exitCode = result.status ?? 1; return; }
+      if (result.status !== 0) return result.status ?? 1;
     }
+    return 0;
   } finally { await cleanup(); }
 }
-void main().catch((error: unknown) => { console.error(error); process.exitCode = 1; });
+// Embedded Postgres installs a beforeExit hook that can reset exitCode to 0.
+// Cleanup has completed before forwarding the integration result to CI.
+void main().then(
+  (code) => process.exit(code),
+  (error: unknown) => { console.error(error); process.exit(1); },
+);
