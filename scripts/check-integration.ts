@@ -2754,7 +2754,7 @@ async function main() {
       // conversation. Content-based detection is robust to capability flags.
       const wantsJson = body.response_format?.type === "json_object" || /JSON ONLY/i.test(text);
       const content = wantsJson
-        ? JSON.stringify({ confidence: 7, persuasiveness: 6, language_level: 7, estimated_visa_chance: 65, recommendations: "Answer more specifically about funding and home ties." })
+        ? JSON.stringify({ confidence: 7, persuasiveness: 6, language_level: 7, preparation_signal: 65, recommendations: "Answer more specifically about funding and home ties." })
         : "Good morning. May I see your offer letter?";
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
@@ -2809,7 +2809,9 @@ async function main() {
     body: JSON.stringify({ countryCode: "US", messages: [{ role: "user", text: "I will study computer science and fund it myself." }, { role: "assistant", text: "Why that university?" }] }),
   }));
   const vanalyze = { status: vanalyzeRes.status, body: await vanalyzeRes.json().catch(() => null) };
-  check("visa analyze: the model answer keeps its disclaimer and rubric", vanalyze.status === 200 && vanalyze.body?.aiAvailable === true && typeof vanalyze.body?.chanceDisclaimer === "string" && vanalyze.body?.rubric != null, JSON.stringify(vanalyze.body)?.slice(0, 120));
+  check("visa analyze: the model answer keeps its coaching disclosure and rubric", vanalyze.status === 200 && vanalyze.body?.aiAvailable === true && typeof vanalyze.body?.preparationDisclosure === "string" && vanalyze.body?.rubric != null, JSON.stringify(vanalyze.body)?.slice(0, 120));
+  // No approval probability may be produced, even when a model volunteers one.
+  check("visa analyze: no approval percentage is returned", vanalyze.body?.estimated_visa_chance == null && vanalyze.body?.preparation_signal === 65, JSON.stringify(vanalyze.body)?.slice(0, 160));
   // Deliberate, documented policy (audit A21): one interview is a multi-step
   // conversation, so the DAILY AI quota must not cut it off mid-interview.
   await setConfig("ai_free_requests_per_day", "0");

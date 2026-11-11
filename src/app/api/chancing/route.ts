@@ -1,36 +1,31 @@
 import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
 import { NextResponse } from "next/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  applicationOutcomes,
-  applications,
-  essayVersions,
   programRequirements,
   savedUniversities,
   studentProfiles,
-  universities,
   universityPrograms,
 } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
-import { applyMatchScenario, calculateUniversityMatch, majorOverlap, type MatchScenario } from "@/lib/matching";
+import { applyMatchScenario, calculateUniversityMatch, type MatchScenario } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { memoizeMatch } from "@/lib/matchMemo";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
-import { ADMISSION_PROBABILITY, type ChancingProfile } from "@/lib/chancing";
+import { ADMISSION_PROBABILITY } from "@/lib/chancing";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
 import { verifiedQsRank } from "@/lib/universityRank";
-import {
-  evaluateUniversityAndProgramChance,
-  PROGRAM_DEPARTMENT_PROFILES,
-  type EmpiricalOutcomeRowInput,
-  type ProgramCatalogRowInput,
-  type ProgramRequirementRowInput,
-} from "@/lib/programChancing";
 import { countriesMatch } from "@/lib/countries";
-import { ensureOutcomesAndStoriesSeeded } from "@/db/seedOutcomesAndStories";
-import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
+import { getCachedUniversitiesBundleForAssessment } from "@/lib/catalogCache";
+import { assessedUniversitiesCacheKey } from "@/lib/assessment/version";
+import {
+  assessCatalogueProgramme,
+  requirementNodesFromRow,
+} from "@/lib/assessment/adapters";
+import type { ProgrammeAssessment } from "@/lib/assessment";
+import { compareDegreeLevels } from "@/lib/degreeLevels";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +33,17 @@ export const dynamic = "force-dynamic";
  * GET /api/chancing?profileId=N&universityId=M&programId=P → one university / program
  * GET /api/chancing?profileId=N&all=1                      → saved + tracked universities
  *
- * Returns a live profile-to-catalogue comparison plus QS Top 200 & program-level
- * 25th/50th/75th percentile positioning. Keeps `probability: ADMISSION_PROBABILITY`
- * intact and never fabricates a numeric admission probability.
+ * ASSESSMENT SCREEN, NOT A CHANCE CALCULATOR (spec §8)
+ * ---------------------------------------------------
+ * Every programme row is scored by the ONE canonical service
+ * (`src/lib/assessment`): preference fit (with an explicit interval), documented
+ * eligibility, finance, academic comparison against published statistics, and
+ * `admissionProbability: null` with an explicit reason.
+ *
+ * The retired composite "planning" index (`compositeProgramFitScore`), the
+ * Safety/Likely/Target/Reach labels and the cohort-percentile tiers are NOT
+ * returned any more. `probability: ADMISSION_PROBABILITY` stays, so a client
+ * that still looks for the honest "unavailable" state keeps working.
  */
 export async function GET(req: Request) {
   try {
@@ -54,22 +57,17 @@ export async function GET(req: Request) {
     }
     const profileId = access.targetId!;
 
-    await ensureOutcomesAndStoriesSeeded();
-
     const [profile] = await db
       .select()
       .from(studentProfiles)
       .where(eq(studentProfiles.id, profileId));
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-    const [latestEssaySignal] = await db.select({ rubricTotal: essayVersions.rubricTotal })
-      .from(essayVersions)
-      .where(and(eq(essayVersions.profileId, profileId), inArray(essayVersions.essayType, ["private_memory", "sop", "personal_statement", "why_us", "supplemental", "scholarship"])))
-      .orderBy(desc(essayVersions.createdAt), desc(essayVersions.id)).limit(1);
 
     const locale = localeFromRequest(req);
     let matchProfile = await toMatchProfileWithActivities(profile);
 
-    // Optional What-If overrides for SAT, TOEFL, Degree Level, and EC score
+    // Optional What-If overrides. They change the CANONICAL assessment inputs
+    // only — nothing is written back to the profile row.
     let overrideSat: number | null | undefined = undefined;
     let overrideToefl: number | null | undefined = undefined;
     let overrideDegreeLevel: string | null | undefined = undefined;
@@ -121,9 +119,8 @@ export async function GET(req: Request) {
       matchProfile = applyMatchScenario(matchProfile, scenario);
     }
 
-    // Memo key for every fit score below. Taken from the FINAL match profile, so
-    // a scenario override ("what if my IELTS were 7.5?") gets its own cache
-    // entry instead of reusing the real profile's scores.
+    // Memo key for every university-fit score below. Taken from the FINAL match
+    // profile, so a scenario override gets its own cache entry.
     const fingerprint = profileMatchFingerprint(matchProfile);
 
     const singleId = Number(searchParams.get("universityId"));
@@ -138,40 +135,28 @@ export async function GET(req: Request) {
     if (Number.isFinite(singleId) && singleId > 0) {
       universityIds = [singleId];
     } else {
-      const [saved, tracked] = await Promise.all([
-        db
-          .select({ universityId: savedUniversities.universityId })
-          .from(savedUniversities)
-          .where(eq(savedUniversities.profileId, profileId)),
-        db
-          .select({ universityId: applications.universityId })
-          .from(applications)
-          .where(eq(applications.profileId, profileId)),
-      ]);
+      const saved = await db
+        .select({ universityId: savedUniversities.universityId })
+        .from(savedUniversities)
+        .where(eq(savedUniversities.profileId, profileId));
       universityIds = [
         ...new Set(
-          [...saved.map((row) => row.universityId), ...tracked.map((row) => row.universityId)].filter(
-            (id): id is number => typeof id === "number" && id > 0
-          )
+          saved
+            .map((row) => row.universityId)
+            .filter((id): id is number => typeof id === "number" && id > 0)
         ),
       ];
     }
 
-    // Load all catalog universities for switcher & fallback sample — from the
-    // shared catalogue cache, so this screen scores the exact same rows (and
-    // the same resolved costs) the Explorer scores.
-    const allCatalogUnis = (await getCachedUniversitiesBundle()).unis;
+    const allCatalogUnis = (await getCachedUniversitiesBundleForAssessment()).unis;
 
     let unis = universityIds.length
       ? allCatalogUnis.filter((u) => universityIds.includes(u.id))
       : [];
 
-    // If the student has no saved universities or explicitly searches/filters the catalog
     if ((!unis.length && allCatalogUnis.length > 0) || includeCatalog || filterCountry || searchQuery) {
       let pool = allCatalogUnis;
-      if (filterCountry) {
-        pool = pool.filter((u) => countriesMatch(u.country, filterCountry));
-      }
+      if (filterCountry) pool = pool.filter((u) => countriesMatch(u.country, filterCountry));
       if (searchQuery) {
         pool = pool.filter(
           (u) =>
@@ -214,13 +199,11 @@ export async function GET(req: Request) {
         scenario: scenarioEnabled,
         isCatalogSample: false,
         catalogUniversities: [],
-        departments: Object.values(PROGRAM_DEPARTMENT_PROFILES),
+        scoringVersion: assessedUniversitiesCacheKey(),
       });
     }
 
     const activeUniIds = unis.map((u) => u.id);
-
-    // Fetch programs, program_requirements, and consented outcomes for the evaluated universities
     const rawPrograms = await db
       .select()
       .from(universityPrograms)
@@ -229,120 +212,69 @@ export async function GET(req: Request) {
     const programIds = rawPrograms.map((p) => p.id);
     const rawProgramReqs =
       programIds.length > 0
-        ? await db
-            .select()
-            .from(programRequirements)
-            .where(inArray(programRequirements.programId, programIds))
+        ? await db.select().from(programRequirements).where(inArray(programRequirements.programId, programIds))
         : [];
-
-    const reqByProgramId = new Map<number, ProgramRequirementRowInput>();
-    for (const r of rawProgramReqs) {
-      if (!hasVerifiedProgramEvidence(r)) continue;
-      reqByProgramId.set(r.programId, {
-        id: r.id,
-        programId: r.programId,
-        minIelts: r.minIelts,
-        minToefl: r.minToefl,
-        minDet: r.minDet,
-        minSat: r.minSat,
-        minAct: r.minAct,
-        minGpa: r.minGpa,
-        ibRequirement: r.ibRequirement,
-        aLevelRequirement: r.aLevelRequirement,
-        apRequirement: r.apRequirement,
-        subjectRequirements: r.subjectRequirements,
-        portfolioRequired: r.portfolioRequired,
-        interviewRequired: r.interviewRequired,
-        recommendationRequired: r.recommendationRequired,
-        personalStatementRequired: r.personalStatementRequired,
-        otherRequirements: r.otherRequirements,
-        academicYear: r.academicYear,
-        sourceUrl: r.sourceUrl,
-      });
+    const reqByProgramId = new Map<number, (typeof rawProgramReqs)[number]>();
+    for (const row of rawProgramReqs) {
+      // One requirement row per programme/cycle; keep the verified-evidence row
+      // when several exist and never merge values across cycles.
+      const existing = reqByProgramId.get(row.programId);
+      if (!existing || (hasVerifiedProgramEvidence(row) && !hasVerifiedProgramEvidence(existing))) {
+        reqByProgramId.set(row.programId, row);
+      }
     }
 
-    const programsByUniId = new Map<number, ProgramCatalogRowInput[]>();
-    for (const p of rawPrograms) {
-      const list = programsByUniId.get(p.universityId) ?? [];
-      list.push({
-        id: p.id,
-        universityId: p.universityId,
-        name: p.name,
-        degreeLevel: p.degree || "Bachelor",
-        field: p.field,
-        department: p.field,
-        language: p.language,
-        durationYears: hasVerifiedProgramEvidence(p) && p.durationYears != null ? Number(p.durationYears) : null,
-        tuitionAnnualUsd: hasVerifiedProgramEvidence(p) && p.tuitionCurrency === "USD" && p.tuitionAmount != null ? Number(p.tuitionAmount) : null,
+    const programsByUniId = new Map<number, (typeof rawPrograms)[number][]>();
+    for (const program of rawPrograms) {
+      const list = programsByUniId.get(program.universityId) ?? [];
+      list.push(program);
+      programsByUniId.set(program.universityId, list);
+    }
+
+    /** One canonical assessment for a programme row (verified-evidence gated). */
+    const assessRow = (
+      uni: (typeof allCatalogUnis)[number],
+      program: (typeof rawPrograms)[number]
+    ): ProgrammeAssessment => {
+      const verified = hasVerifiedProgramEvidence(program);
+      return assessCatalogueProgramme({
+        programme: {
+          id: program.id,
+          universityId: program.universityId,
+          name: program.name,
+          field: program.field,
+          degree: program.degree,
+          language: program.language,
+          studyMode: program.studyMode,
+          programUrl: program.programUrl ?? program.applicationUrl ?? null,
+          sourceUrl: program.sourceUrl ?? null,
+        },
+        university: {
+          id: uni.id,
+          name: uni.name,
+          country: uni.country,
+          officialWebsiteUrl: uni.officialWebsiteUrl ?? null,
+          websiteUrl: uni.websiteUrl ?? null,
+        },
+        profile: {
+          ...profile,
+          degreeLevel: overrideDegreeLevel ?? profile.degreeLevel ?? null,
+          satScore: overrideSat !== undefined ? overrideSat : profile.satScore,
+          toeflScore: overrideToefl !== undefined ? overrideToefl : profile.toeflScore,
+        },
+        requirementRow: reqByProgramId.get(program.id) ?? null,
+        // A quarantined price is not published as a cost: it stays null, so the
+        // finance total is unknown rather than silently free.
+        tuitionUsd: verified && program.tuitionCurrency === "USD" && program.tuitionAmount != null
+          ? Number(program.tuitionAmount)
+          : null,
         applicationFeeUsd: null,
-        intakeTerms: p.studyMode,
-        applicationType: null,
-        officialProgramUrl: p.programUrl || p.applicationUrl || p.sourceUrl,
-        sourceUrl: p.sourceUrl || p.programUrl,
+        cycle: program.degree ? null : null,
+        applicantCategory: null,
+        degreeLevel: overrideDegreeLevel ?? profile.degreeLevel ?? null,
+        assessedAt: new Date().toISOString(),
+        asOfDate: new Date().toISOString().slice(0, 10),
       });
-      programsByUniId.set(p.universityId, list);
-    }
-
-    // Consented empirical outcomes for active universities (never alters fitScore or probability)
-    const rawOutcomes = await db
-      .select({
-        universityId: applicationOutcomes.universityId,
-        result: applicationOutcomes.result,
-        shareConsent: applicationOutcomes.shareConsent,
-        snapshotGpa: applicationOutcomes.snapshotGpa,
-        snapshotGpaScale: applicationOutcomes.snapshotGpaScale,
-        snapshotIelts: applicationOutcomes.snapshotIelts,
-        snapshotToefl: applicationOutcomes.snapshotToefl,
-        snapshotSat: applicationOutcomes.snapshotSat,
-        snapshotAct: applicationOutcomes.snapshotAct,
-        snapshotMajor: applicationOutcomes.snapshotMajor,
-        snapshotCountry: applicationOutcomes.snapshotCountry,
-      })
-      .from(applicationOutcomes)
-      .where(
-        and(
-          inArray(applicationOutcomes.universityId, activeUniIds),
-          eq(applicationOutcomes.shareConsent, true)
-        )
-      );
-
-    const outcomesByUniId = new Map<number, EmpiricalOutcomeRowInput[]>();
-    for (const o of rawOutcomes) {
-      if (o.universityId == null) continue;
-      const arr = outcomesByUniId.get(o.universityId) ?? [];
-      arr.push(o);
-      outcomesByUniId.set(o.universityId, arr);
-    }
-
-    // Construct ChancingProfile for the 5-layer program positioning engine
-    const chancingProfile: ChancingProfile & { completedCourses?: string | null } = {
-      gpa: matchProfile.gpa !== undefined ? matchProfile.gpa : profile.gpa,
-      gpaScale: matchProfile.gpaScale !== undefined ? matchProfile.gpaScale : profile.gpaScale,
-      satScore: overrideSat !== undefined ? overrideSat : profile.satScore,
-      actScore: profile.actScore,
-      ieltsScore: matchProfile.ieltsScore !== undefined ? matchProfile.ieltsScore : profile.ieltsScore,
-      toeflScore: overrideToefl !== undefined ? overrideToefl : profile.toeflScore,
-      duolingoScore: profile.duolingoScore,
-      targetMajor: matchProfile.targetMajor !== undefined ? matchProfile.targetMajor : profile.targetMajor,
-      degreeLevel:
-        overrideDegreeLevel !== undefined
-          ? overrideDegreeLevel
-          : matchProfile.degreeLevel || profile.degreeLevel,
-      extracurriculars: profile.extracurriculars,
-      leadership: profile.leadership,
-      volunteering: profile.volunteering,
-      sports: profile.sports,
-      clubs: profile.clubs,
-      researchExperience: profile.researchExperience,
-      projects: profile.projects,
-      olympiads: profile.olympiads,
-      awards: profile.awards,
-      competitions: profile.competitions,
-      certificates: profile.certificates,
-      workExperienceYears: profile.workExperienceYears,
-      researchPublications: profile.researchPublications,
-      completedCourses: profile.courseworkNotes || profile.apCourses || profile.ibCourses || profile.aLevelSubjects,
-      privateEssayScore: latestEssaySignal?.rubricTotal ?? null,
     };
 
     const results = unis.map((uni) => {
@@ -351,74 +283,45 @@ export async function GET(req: Request) {
       );
       const qsBenchmark = matchQsUniversityBenchmark(uni);
       const uniPrograms = programsByUniId.get(uni.id) ?? [];
-      const uniOutcomes = outcomesByUniId.get(uni.id) ?? [];
 
-      // Evaluate all catalog programs at this university (or synthesize default programs if none in DB)
-      const effectivePrograms: ProgramCatalogRowInput[] =
-        uniPrograms.length > 0
-          ? uniPrograms
-          : (uni.programMajor || "Computer Science, Business & Economics, Mechanical Engineering")
-              .split(",")
-              .map((m) => m.trim())
-              .filter(Boolean)
-              .slice(0, 6)
-              .map((majorName, idx) => ({
-                id: -(uni.id * 100 + idx + 1),
-                universityId: uni.id,
-                name: `${majorName}`,
-                degreeLevel: chancingProfile.degreeLevel || "Bachelor",
-                field: majorName,
-                department: majorName,
-                language: "English",
-                durationYears: 4,
-                tuitionAnnualUsd: uni.annualTuitionUsd,
-                applicationFeeUsd: uni.applicationFee ? Number(uni.applicationFee) : null,
-                intakeTerms: "Fall",
-                applicationType: null,
-                officialProgramUrl: uni.officialWebsiteUrl || uni.websiteUrl || qsBenchmark.officialUrl,
-                sourceUrl: uni.sourceUrl || uni.websiteUrl || qsBenchmark.officialUrl,
-              }));
+      const assessments = uniPrograms.map((program) => assessRow(uni, program));
 
-      const programMatches = effectivePrograms.map((prog) =>
-        evaluateUniversityAndProgramChance(
-          chancingProfile,
-          uni,
-          prog,
-          prog.id > 0 ? reqByProgramId.get(prog.id) ?? null : null,
-          uniOutcomes,
-          qsBenchmark
-        )
-      );
-
-      // Pick selected program: explicit ?programId=, or best major/degree overlap
-      let selectedProgramAssessment =
+      // Selected programme: explicit ?programId=, else the programme whose
+      // SUBJECT RELATION is strongest, then the assessment's own sort policy.
+      let selected =
         Number.isFinite(requestedProgramId) && requestedProgramId !== 0
-          ? programMatches.find((pm) => pm.programId === requestedProgramId)
+          ? assessments.find((item) => item.programme.id === requestedProgramId)
           : undefined;
-
-      if (!selectedProgramAssessment && programMatches.length > 0) {
-        const targetMaj = chancingProfile.targetMajor || "";
-        const targetDeg = (chancingProfile.degreeLevel || "").toLowerCase();
-        selectedProgramAssessment = [...programMatches].sort((a, b) => {
-          const aMaj = targetMaj ? majorOverlap(targetMaj, `${a.programName} ${a.field}`) ?? 0 : 0;
-          const bMaj = targetMaj ? majorOverlap(targetMaj, `${b.programName} ${b.field}`) ?? 0 : 0;
-          if (Math.abs(bMaj - aMaj) > 0.1) return bMaj - aMaj;
-          const aDeg = targetDeg && a.degreeLevel.toLowerCase().includes(targetDeg) ? 1 : 0;
-          const bDeg = targetDeg && b.degreeLevel.toLowerCase().includes(targetDeg) ? 1 : 0;
-          if (bDeg !== aDeg) return bDeg - aDeg;
-          return b.compositeProgramFitScore - a.compositeProgramFitScore;
-        })[0];
-      }
-
-      if (!selectedProgramAssessment) {
-        selectedProgramAssessment = evaluateUniversityAndProgramChance(
-          chancingProfile,
-          uni,
-          null,
-          null,
-          uniOutcomes,
-          qsBenchmark
-        );
+      if (!selected && assessments.length) selected = assessments[0];
+      if (!selected) {
+        // No recorded programme: assess the university as an institution-level
+        // scope. Requirements stay empty → eligibility `unknown`, never `met`.
+        selected = assessCatalogueProgramme({
+          programme: {
+            id: -uni.id,
+            universityId: uni.id,
+            name: uni.name,
+            field: uni.programMajor ?? null,
+            degree: profile.degreeLevel ?? null,
+            language: null,
+            studyMode: null,
+            programUrl: uni.officialWebsiteUrl ?? null,
+            sourceUrl: uni.sourceUrl ?? null,
+          },
+          university: {
+            id: uni.id,
+            name: uni.name,
+            country: uni.country,
+            officialWebsiteUrl: uni.officialWebsiteUrl ?? null,
+            websiteUrl: uni.websiteUrl ?? null,
+          },
+          profile,
+          requirementRow: null,
+          tuitionUsd: null,
+          degreeLevel: overrideDegreeLevel ?? profile.degreeLevel ?? null,
+          assessedAt: new Date().toISOString(),
+          asOfDate: new Date().toISOString().slice(0, 10),
+        });
       }
 
       return {
@@ -429,10 +332,9 @@ export async function GET(req: Request) {
         flagEmoji: uni.flagEmoji,
         // QS 2026 verified value from the catalogue first; the benchmark table
         // is a gated fallback (Phase AC) and is null for unranked institutions.
-        // Phase AD: "verified" includes the edition — `qs_rank_year` must be
-        // recorded, or the stored number is not a position at all.
         worldRanking: verifiedQsRank(uni)?.rank ?? qsBenchmark.qsRank,
         officialWebsiteUrl: uni.officialWebsiteUrl || uni.websiteUrl || qsBenchmark.officialUrl,
+        /** University-level profile fit — a comparison, never an admission chance. */
         fitScore: fit.matchScore,
         fitReasons: translateReasons(locale, "university", fit.reasonDetails, fit.reasons),
         fitIssues: translateReasons(locale, "university", fit.issueDetails, fit.potentialIssues),
@@ -443,33 +345,24 @@ export async function GET(req: Request) {
         matchBreakdown: fit.breakdown,
         probability: ADMISSION_PROBABILITY,
         qsBenchmark,
-        programs: effectivePrograms,
-        programMatches,
-        selectedProgramAssessment,
-        programAssessment: selectedProgramAssessment,
-        percentilePositioning: {
-          isEstimated: true,
-          estimateBasis: "Legacy planning model, not observed CDS percentiles or personal admission probability",
-          gpa25: selectedProgramAssessment.programGpa25,
-          gpa50: selectedProgramAssessment.programGpa50,
-          gpa75: selectedProgramAssessment.programGpa75,
-          sat25: selectedProgramAssessment.programSat25,
-          sat50: selectedProgramAssessment.programSat50,
-          sat75: selectedProgramAssessment.programSat75,
-          studentGpa4: selectedProgramAssessment.studentGpa4,
-          studentGpaPercentile: selectedProgramAssessment.studentGpaPercentile,
-          studentSat: selectedProgramAssessment.studentSat,
-          studentSatPercentile: selectedProgramAssessment.studentSatPercentile,
-          minIelts: selectedProgramAssessment.effectiveMinIelts,
-          medianIelts: selectedProgramAssessment.medianIelts,
-          studentEnglishLabel: selectedProgramAssessment.studentEnglishLabel,
-          studentEnglishPercentile: selectedProgramAssessment.studentEnglishPercentile,
-          cohortPositionTier: selectedProgramAssessment.cohortPositionTier,
-          selectivityCategory: selectedProgramAssessment.selectivityCategory,
-          universityAcceptRatePct: selectedProgramAssessment.universityAcceptRatePct,
-          effectiveProgramAcceptRatePct: selectedProgramAssessment.effectiveProgramAcceptRatePct,
-        },
-        empiricalOutcomes: selectedProgramAssessment.empiricalOutcomes,
+        programmes: assessments.map((item) => ({
+          id: item.programme.id,
+          name: item.programme.name,
+          degreeLevel: item.programme.degreeLevel,
+          field: item.programme.field,
+          group: item.group,
+          groupKey: item.groupKey,
+          fit: item.preferenceFit,
+          displayFit: item.preferenceFit,
+          eligibilityStatus: item.eligibility.status,
+        })),
+        /** The ONE canonical assessment the screen renders. */
+        assessment: selected,
+        // Deprecated aliases kept for older clients during the migration; both
+        // now point at the same canonical assessment, never at a chance score.
+        selectedProgramAssessment: selected,
+        programAssessment: selected,
+        degreeLevelRelation: compareDegreeLevels(profile.degreeLevel ?? null, selected.programme.degreeLevel),
       };
     });
 
@@ -482,7 +375,6 @@ export async function GET(req: Request) {
           country: u.country,
           flagEmoji: u.flagEmoji,
           worldRanking: verifiedQsRank(u)?.rank ?? b.qsRank,
-          acceptRatePct: b.acceptRatePct,
         };
       })
       .sort((a, b) => (a.worldRanking ?? 999) - (b.worldRanking ?? 999));
@@ -493,7 +385,7 @@ export async function GET(req: Request) {
       scenario: scenarioEnabled,
       isCatalogSample,
       catalogUniversities,
-      departments: Object.values(PROGRAM_DEPARTMENT_PROFILES),
+      scoringVersion: assessedUniversitiesCacheKey(),
     });
   } catch (error) {
     console.error("GET /api/chancing error:", error);

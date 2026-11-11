@@ -43,11 +43,17 @@ test("university discovery never synthesizes programmes; experimental index is e
  expect(f.fixtureProgramId).toBeTruthy();await login(page.request);
  const get=async(sort:string)=>await(await page.request.get(`/api/universities?profileId=${f.studentId}&sort=${sort}`)).json();
  const ordinary=await get("rank_asc"),rows=ordinary.universities;
- expect(rows.find((row:{id:number})=>row.id===f.verifiedUniversityId).chanceScore).toBeNull();
+ // The retired composite index is gone from the payload entirely — not
+ // returned as null, which would invite a client to keep reading it.
+ expect(rows.find((row:{id:number})=>row.id===f.verifiedUniversityId)).not.toHaveProperty("chanceScore");
  const noProgramme=rows.find((row:{id:number})=>row.id===f.unverifiedUniversityId);expect(noProgramme.programmeDiscovery.status).toBe("no_programmes");expect(noProgramme.programmeDiscovery.selectedProgrammeId).toBeNull();
  const experimental=await get("chance_desc"),actual=experimental.universities.find((row:{id:number})=>row.id===f.verifiedUniversityId);
- expect(actual.programmeDiscovery.selectedProgrammeId).toBe(f.fixtureProgramId);expect(actual.programmeDiscovery.modelOptIn).toBe(true);expect(actual.programmeDiscovery.personalAdmissionProbability).toBeNull();
- expect(experimental.universities.find((row:{id:number})=>row.id===f.unverifiedUniversityId).chanceScore).toBeNull();
+ expect(actual.programmeDiscovery.selectedProgrammeId).toBe(f.fixtureProgramId);
+ // No composite index exists to opt into any more, and no personal admission
+ // probability is produced for any programme a student can see.
+ expect(actual.programmeDiscovery.modelOptIn).toBe(false);
+ expect(actual.programmeDiscovery.personalAdmissionProbability).toBeNull();
+ expect(experimental.universities.find((row:{id:number})=>row.id===f.unverifiedUniversityId)).not.toHaveProperty("chanceScore");
 });
 
 /** Cross-persona API invariants. These are fictional profiles against the same

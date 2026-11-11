@@ -317,7 +317,7 @@ const HUD_SECTIONS = [
   { id: "campuses", word: { en: "TOP CAMPUSES", uz: "TOP KAMPUSLAR", ru: "ТОП КАМПУСЫ" } },
   { id: "how", word: { en: "HOW IT WORKS", uz: "QANDAY ISHLAYDI", ru: "КАК РАБОТАЕТ" } },
   { id: "features", word: { en: "HIGHLIGHTS", uz: "IMKONIYATLAR", ru: "ВОЗМОЖНОСТИ" } },
-  { id: "chancing", word: { en: "CHANCING", uz: "QABUL TAHLILI", ru: "ОЦЕНКА ШАНСОВ" } },
+  { id: "chancing", word: { en: "PROGRAMME FIT", uz: "DASTUR MOSLIGI", ru: "СООТВЕТСТВИЕ" } },
   { id: "roadmap", word: { en: "GET STARTED", uz: "YO'L XARITASI", ru: "ДОРОЖНАЯ КАРТА" } },
 ] as const;
 

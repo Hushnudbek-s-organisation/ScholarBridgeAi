@@ -102,16 +102,7 @@ export interface University {
   matchIssues?: string[];
   /** Unclamped total before the display clamp (one decimal). */
   matchRawScore?: number | null;
-  /**
-   * Module 4 — the positioning half of the dual score from the QS Top 200 /
-   * 5-layer programme engine. `null` for signed-out visitors: there is no
-   * profile to place into an admitted cohort, and the UI never shows a fake.
-   */
-  chanceScore?: number | null;
   programmeDiscovery?:{status:string;programmeCount:number;selectedProgrammeId:number|null;selectedProgrammeName:string|null};
-  effectiveAcceptRatePct?: number | null;
-  selectivityCategory?: string | null;
-  studentGpaPercentile?: number | null;
   /**
    * The exact arithmetic behind the score: the unrounded total, one component
    * per scoring dimension (2-dp points), and how many dimensions had data.
@@ -688,8 +679,9 @@ export function UniversityExplorer({
               <option value="tuition_desc">{t("exSortTuitionDesc")}</option>
               <option value="name_asc">{t("exSortNameAsc")}</option>
               <option value="match_desc">{t("exSortMatch")}</option>
-              {/* Experimental programme-positioning INDEX, not a validated
-                  personal admission probability (see programChancing.ts). */}
+              {/* Orders by the profile FIT (a comparison with the saved
+                  profile). The old composite "positioning index" is retired;
+                  this option never returns a chance percentage. */}
               <option value="chance_desc">{t("exSortChanceDesc")}</option>
             </select>
           </div>
@@ -1083,14 +1075,13 @@ export function UniversityExplorer({
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
                       {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")}
                     </span>
-                    {/* Opt-in experimental index for an actual recorded programme.
-                        No cohort percentile or personal admission probability. */}
-                    {typeof uni.chanceScore === "number" && (
-                      <span
-                        className="inline-flex items-center gap-1 rounded-control bg-violet-700 px-2.5 py-1 text-xs font-bold text-white shadow-sm"
-                        title={[uni.programmeDiscovery?.selectedProgrammeName,uni.selectivityCategory].filter(Boolean).join(" · ") || undefined}
-                      >
-                        🎯 {t("chanceBadgeLabel", { score: uni.chanceScore })}
+                    {/* The retired composite index is NOT rendered. A card shows
+                        the profile fit (a comparison) and, when a real programme
+                        is recorded, which one the detail page focuses on. No
+                        Safety/Likely/Target/Reach label, no chance percentage. */}
+                    {uni.programmeDiscovery?.selectedProgrammeName && (
+                      <span className="inline-flex items-center gap-1 rounded-control bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        {t("exProgrammeFocus")}: {uni.programmeDiscovery.selectedProgrammeName}
                       </span>
                     )}
                   </div>
@@ -1333,11 +1324,8 @@ export function UniversityExplorer({
                             points it contributed. Nothing here is rounded-control into
                             vagueness — the components add up to the score on
                             the card header. */}
-                        {typeof uni.effectiveAcceptRatePct === "number" && (
-                          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                            {t("chanceAdmitRate", { rate: uni.effectiveAcceptRatePct })}
-                          </p>
-                        )}
+                        {/* An institution-wide acceptance rate is not this
+                            student's chance and is no longer printed as one. */}
                         {uni.matchBreakdown && (
                           <MatchEvidenceBadge
                             comparedDimensions={uni.matchBreakdown.comparedDimensions}

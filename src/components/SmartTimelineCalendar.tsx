@@ -63,9 +63,11 @@ export interface DeadlineRow {
   saved?: boolean | null;
   /** A small, curated suggestion (full-coverage award / high-chance uni). */
   recommended?: boolean | null;
-  /** Dual scores carried by university rows from the shared engines. */
-  chanceScore?: number | null;
-  effectiveAcceptRatePct?: number | null;
+  /**
+   * Rows carry the university FIT only. The former `chanceScore` /
+   * `effectiveAcceptRatePct` pair is retired: a plan never ranks by a chance
+   * number (spec §8), and an acceptance rate is not this student's odds.
+   */
   matchScore?: number | null;
   country?: string | null;
   rawCountry?: string | null;
@@ -92,8 +94,12 @@ const SEVERITY_TONE: Record<TimelineConflict["severity"], string> = {
  */
 const PLANNED_TYPES = new Set(["application", "scholarship", "visa", "university"]);
 
-/** Recommended rows only earn a card when the shot is genuinely good. */
-const RECOMMENDED_CHANCE_MIN = 65;
+/**
+ * Recommended rows earn a card when they are genuinely useful: a full-coverage
+ * award that pays at a saved university, or a university whose deadline is on
+ * file. A "high chance" threshold is not a criterion any more — there is no
+ * chance score to threshold (spec §8).
+ */
 /** A plan older than this is history, not a to-do — counted, not shown. */
 const EXPIRED_PLAN_GRACE_DAYS = 7;
 /** "What to do this week" never lists steps further out than this. */
@@ -210,14 +216,14 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
     const deadlines: TimelineDeadline[] = rows
       .filter((row) => PLANNED_TYPES.has(String(row.type ?? "")))
       .filter((row) => {
-        // Module 3 — a RECOMMENDED row only joins the plan when it is worth
-        // the student's attention: a high-chance university (≥ 65) or a
-        // full-coverage award that pays at one of their saved universities.
-        // Their own saved rows always pass.
+        // A RECOMMENDED row joins the plan on evidence that it is actionable:
+        // a full-coverage award paying at a saved university, or a university
+        // suggestion that actually has a date on file. The old `chanceScore ≥
+        // 65` gate is gone with the score itself.
         if (!row.saved && row.recommended) {
-          const strongChance = typeof row.chanceScore === "number" && row.chanceScore >= RECOMMENDED_CHANCE_MIN;
           const strongFunding = row.isFullCoverage === true && row.coversSavedUni === true;
-          return strongChance || strongFunding;
+          const hasDate = typeof row.date === "string" && row.date.length > 0;
+          return strongFunding || hasDate;
         }
         return true;
       })
@@ -287,8 +293,10 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
       const ta = tierOf(a);
       const tb = tierOf(b);
       if (ta !== tb) return ta - tb;
-      const ca = metaOf(a)?.chanceScore ?? -1;
-      const cb = metaOf(b)?.chanceScore ?? -1;
+      // Order suggestions by the university FIT (a comparison with the saved
+      // profile), never by a chance number; a missing fit sorts last.
+      const ca = metaOf(a)?.matchScore ?? -1;
+      const cb = metaOf(b)?.matchScore ?? -1;
       if (ca !== cb) return cb - ca;
       const da = a.date ? Date.parse(a.date) : Number.MAX_SAFE_INTEGER;
       const db = b.date ? Date.parse(b.date) : Number.MAX_SAFE_INTEGER;
@@ -512,19 +520,11 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
                         {plan.deadline.country && (
                           <span className="text-slate-500">{plan.deadline.country}</span>
                         )}
-                        {/* Module 3 — the chance half of the dual score,
-                            straight from the positioning engine via the API
-                            row (never recomputed here); fit rides in the
-                            tooltip. Suggestions are labelled as such. */}
-                        {typeof meta?.chanceScore === "number" && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-control bg-violet-100 px-1.5 py-0.5 text-xs font-extrabold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200"
-                            title={typeof meta.matchScore === "number" ? t("planFitBadge", { score: meta.matchScore }) : undefined}
-                          >
-                            🎯 {t("planChanceBadge", { score: meta.chanceScore })}
-                            {typeof meta.effectiveAcceptRatePct === "number" && (
-                              <span className="font-bold opacity-80">· {t("planAdmitBadge", { rate: meta.effectiveAcceptRatePct })}</span>
-                            )}
+                        {/* The profile FIT only — a comparison with the saved
+                            profile, never an admission chance. */}
+                        {typeof meta?.matchScore === "number" && (
+                          <span className="inline-flex items-center gap-1 rounded-control bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                            {t("planFitBadge", { score: meta.matchScore })}
                           </span>
                         )}
                         {!meta?.saved && meta?.recommended && (

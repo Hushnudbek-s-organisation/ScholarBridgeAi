@@ -6,7 +6,7 @@ import EmbeddedPostgres from "embedded-postgres";
 import { QS_TOP_200_BENCHMARKS, matchQsUniversityBenchmark } from "../src/lib/qsTop200Benchmarks";
 import { admissionsStatisticsFor } from "../src/lib/admissionsStatistics";
 import { ESSAY_RUBRIC_SAMPLES, LOR_SAMPLES, SOP_SAMPLES } from "../src/lib/samples/exemplars";
-import { evaluatePublishedRequirements, evaluateUniversityAndProgramChance } from "../src/lib/programChancing";
+import { evaluatePublishedRequirements } from "../src/lib/publishedRequirements";
 import { projectVisaEvidence, validVisaSourceUrl } from "../src/lib/visaEvidence";
 
 async function main() {
@@ -46,11 +46,6 @@ async function main() {
   assert.equal(evaluatePublishedRequirements({ ieltsScore: 5.5 }, { minIelts: 7, sourceUrl: "https://fixture.edu/admissions" }).eligibilityStatus, "below_minimum");
   assert.equal(evaluatePublishedRequirements({ gpa: 3.8, gpaScale: 4 }, { minGpa: 3, minIelts: 7, sourceUrl: "https://fixture.edu/admissions" }).eligibilityStatus, "unknown_inputs", "a missing required test is not satisfied by a GPA");
   assert.equal(evaluatePublishedRequirements({ ieltsScore: 6, toeflScore: 105 }, { minIelts: 7, minToefl: 100, sourceUrl: "https://fixture.edu/admissions" }).eligibilityStatus, "meets_all", "a satisfied alternative must not be overridden by an unused test");
-  const architecture = evaluateUniversityAndProgramChance({ gpa: 3.5, gpaScale: 4 }, { name: "Princeton University", country: "United States" }, { id: 248, universityId: 13, name: "Architecture", degreeLevel: "Bachelor's" }, { sourceUrl: "https://admission.princeton.edu/apply/application-checklist", portfolioRequired: false, interviewRequired: false }, []);
-  assert.equal(architecture.portfolioRequired, false);
-  assert.equal(architecture.interviewRequired, false, "QS rank must not invent a mandatory interview");
-  assert.equal(architecture.ibRequirement, null);
-  assert.equal(architecture.isEstimated, true);
   assert.equal(validVisaSourceUrl("https://tashkent.usembassy.gov/visas/ / https://travel.state.gov"), false);
   assert.equal(validVisaSourceUrl("javascript:alert(1)"), false);
   assert.equal(validVisaSourceUrl("https://user:password@example.com/a"), false);

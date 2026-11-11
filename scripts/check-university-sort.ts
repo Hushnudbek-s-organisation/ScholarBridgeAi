@@ -83,8 +83,20 @@ check("match sort is available explicitly and never becomes the QS default", () 
   assert.notEqual(ids(order("rank_asc", true).rows), ids(order("match_desc", true).rows));
 });
 
-check("chance/position sort uses the index when a profile exists", () => {
-  assert.equal(ids(order("chance_desc", true).rows), "3,2,5,1,4");
+check("the retired chance sort degrades to the fit order, never to a chance percentage", () => {
+  // The composite chance index no longer exists. An old deep link that still
+  // asks for it gets the published fit order and an honest `applied` value.
+  const legacy = order("chance_desc", true);
+  assert.equal(ids(legacy.rows), ids(order("match_desc", true).rows));
+  assert.equal(legacy.applied, "match_desc");
+  // …and the rows' own chanceScore is never consulted, so a fabricated index
+  // cannot influence the order even when a stale payload carries one.
+  const shuffled = [
+    { id: 1, name: "MIT", worldRanking: 1, matchScore: 31, chanceScore: 99 },
+    { id: 3, name: "University #247", worldRanking: 247, matchScore: 96, chanceScore: 1 },
+  ];
+  const sorted = sortUniversities(shuffled, parseUniversitySort("chance_desc"), true);
+  assert.equal(sorted.rows.map((row) => row.id).join(","), "3,1");
 });
 
 check("a personal sort without a verified profile falls back to QS, honestly", () => {

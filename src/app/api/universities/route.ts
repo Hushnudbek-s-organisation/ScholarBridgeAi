@@ -5,7 +5,7 @@ import { authenticate } from "@/lib/auth";
 import { calculateUniversityMatch, type MatchBreakdown, type ReasonDetail } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { seedDatabase } from "@/db/seed";
-import { getCachedUniversitiesBundle, getCachedProfileForMatching } from "@/lib/catalogCache";
+import { getCachedUniversitiesBundleForAssessment, getCachedProfileForMatching } from "@/lib/catalogCache";
 import { paginatedPayload } from "@/lib/pagination";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { countriesMatch } from "@/lib/countries";
@@ -54,7 +54,7 @@ export async function GET(req: Request) {
     // One cached read of the base catalogue (all universities + program fields
     // + source links) instead of 3 full joins per filter change. Treat the
     // cached snapshot as read-only; map into response-local rows below.
-    const bundle = await getCachedUniversitiesBundle();
+    const bundle = await getCachedUniversitiesBundleForAssessment();
     // Values on an unverified university row are not suitable for filters,
     // ordering, or chancing inputs. Preserve the database row; sanitize only
     // this response-local copy. Institution type is handled separately and
@@ -255,18 +255,15 @@ export async function GET(req: Request) {
       }
       const src = sourceMap.get(uni.id) || null;
       const progFields = programFieldsByUni.get(uni.id) ?? [];
-      // Discovery never synthesizes a programme from the student's major.
-      // Experimental model is opt-in via the existing explicit sort choice.
-      const {chance,programmeDiscovery}=universityProgrammeDiscovery(uni,bundle.programsByUni?.get(uni.id)??[],profileData,chancingProfile,parseUniversitySort(sort).sort==="chance_desc");
+      // Discovery never synthesizes a programme from the student's major, and
+      // the retired composite "chance" index is never computed: the list keeps
+      // the university fit plus the programme the page would focus on.
+      const {programmeDiscovery}=universityProgrammeDiscovery(uni,bundle.programsByUni?.get(uni.id)??[],profileData,chancingProfile,false);
       return {
         ...uni,
         programFields: progFields,
         programmeDiscovery,
         matchScore: matchInfo.matchScore,
-        chanceScore: chance ? chance.compositeProgramFitScore : null,
-        effectiveAcceptRatePct: chance ? chance.effectiveProgramAcceptRatePct : null,
-        selectivityCategory: chance ? chance.selectivityCategory : null,
-        studentGpaPercentile: chance ? chance.studentGpaPercentile : null,
         matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
         matchIssues: translateReasons(locale, "university", matchInfo.issueDetails, matchInfo.potentialIssues),
         // The exact arithmetic behind the score (two-decimal points per

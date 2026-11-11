@@ -38,7 +38,6 @@ import { adaptLegacyField, eligibilityCutoff } from "@/lib/typedEvidence";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { sharedDashboardRecommendationCacheKey, getRevisionFencedDashboardRecommendations } from "@/lib/dashboardRecommendationCache";
 import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
-import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import {
   localizeOpportunityRow,
@@ -648,11 +647,12 @@ async function recommendedFor(
     annualTuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
   }));
 
-  // Default discovery ranks fit only; no QS-derived cohort or personal-chance proxy.
+  // Default discovery ranks by FIT only. There is no QS-derived cohort index and
+  // no blended "combined" score: `combinedScore` below is the fit itself, kept
+  // as a field so older clients can read one number that is not a chance.
   let scored: {
     uni: typeof universities.$inferSelect;
     match: ReturnType<typeof calculateUniversityMatch>;
-    chance: null;
     combinedScore: number;
   }[] = [];
   if (hasBasis) {
@@ -668,12 +668,9 @@ async function recommendedFor(
         const match = memoizeMatch("fit", fingerprint, u.id, uniData as unknown as Record<string, unknown>, () =>
           calculateUniversityMatch(matchProfile, uniData)
         );
-        const chance = null; // No synthetic programme or QS-derived positioning in default discovery.
-
         return {
           uni: u,
           match,
-          chance,
           combinedScore: match.matchScore,
         };
       })
@@ -681,7 +678,7 @@ async function recommendedFor(
       .slice(0, uniLimit);
   }
 
-  const universitiesOut = scored.map(({ uni: u, match, chance, combinedScore }) => {
+  const universitiesOut = scored.map(({ uni: u, match, combinedScore }) => {
     const usdCosts = resolvedUsdUniversityCosts(u);
     return {
       id: u.id,
@@ -709,15 +706,11 @@ async function recommendedFor(
       saved: savedIds.has(u.id),
       matchScore: match.matchScore,
       /**
-       * Positioning from the QS Top 200 + 5-layer program engine. `matchScore`
-       * alone cannot see department selectivity or the admitted-cohort GPA band,
-       * so the panel shows both side by side.
+       * FIT only. The retired positioning index, the derived "effective accept
+       * rate" and the cohort percentile are not produced at all — the dashboard
+       * card shows a comparison, never a chance (spec §8).
        */
-      chanceScore: undefined,
       combinedScore,
-      effectiveAcceptRatePct: null,
-      studentGpaPercentile: null,
-      programGpa50: null,
       matchReasons: translateReasons(locale, "university", match.reasonDetails, match.reasons),
       matchIssues: translateReasons(locale, "university", match.issueDetails, match.potentialIssues),
       matchBreakdown: match.breakdown,

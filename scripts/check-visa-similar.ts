@@ -11,7 +11,7 @@
  * Run: npm run test:visa
  */
 
-import { scoreVisaInterview, visaChanceDisclaimer, type VisaTurn } from "../src/lib/visaScoring";
+import { scoreVisaInterview, visaPreparationDisclosure, type VisaTurn } from "../src/lib/visaScoring";
 import { buildInstantOpeningLine, buildOfficerSystemPrompt, getVisaCountry, nextScriptedQuestion, sanitizeApplicantName, VISA_COUNTRIES, type VisaMessage } from "../src/lib/visa-interview";
 import {
   classifySpeechError,
@@ -23,6 +23,13 @@ import {
   speakWatchdogMs,
 } from "../src/lib/visa-mic";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const ROOT = join(import.meta.dirname ?? ".", "..");
+/** Read a repository file as text (used for source-level policy guards). */
+function read(relative: string): string {
+  return readFileSync(join(ROOT, relative), "utf8");
+}
 import { gpaTo40Scale } from "../src/lib/gpa";
 import {
   findSimilarProfiles,
@@ -131,19 +138,40 @@ const empty = scoreVisaInterview([]);
 check("an empty interview scores 0", empty.scores.total === 0);
 check("an empty interview says so", empty.risks[0]?.code === "no_answers");
 
-section("#9.4 The model's probability stays an opinion");
+section("#9.4 No unvalidated visa approval probability");
 
-const disclaimer = visaChanceDisclaimer(72);
+const disclosure = visaPreparationDisclosure();
 check(
-  "a model probability is labelled as the AI's opinion",
-  /opinion/i.test(disclaimer) && /not a prediction/i.test(disclaimer),
-  disclaimer
+  "the coaching analysis is labelled as coaching, not a prediction",
+  /coaching/i.test(disclosure) && /not a prediction/i.test(disclosure),
+  disclosure
 );
-check("the disclaimer still quotes the figure it is qualifying", disclaimer.includes("72%"));
-check("no probability is invented when the model gives none", /No probability is shown/.test(visaChanceDisclaimer(null)));
+check("no approval probability is offered at all", /no approval probability/i.test(disclosure));
 check(
-  "a disclaimer never states a number as fact",
-  !/your chance (?:is|of) \d+%/.test(visaChanceDisclaimer(88))
+  "the disclosure never states a percentage as an outcome",
+  !/\d+\s*%/.test(disclosure),
+  disclosure
+);
+// The retired field must not come back through any code path: no module may
+// still compute, format or read a model approval percentage.
+const visaSources = [
+  read("src/lib/visaScoring.ts"),
+  read("src/lib/visa-interview.ts"),
+  read("src/app/api/visa/analyze/route.ts"),
+  read("src/components/VisaSpeakingAssistant.tsx"),
+];
+check(
+  "no surface produces or displays a model approval percentage",
+  visaSources.every((source) => !/estimated_visa_chance\s*:/.test(source) && !/chanceDisclaimer/.test(source))
+);
+check(
+  "the analysis prompt asks for preparation quality, not a probability",
+  /preparation_signal/.test(read("src/lib/visa-interview.ts")) &&
+    /NOT an approval prediction/i.test(read("src/lib/visa-interview.ts"))
+);
+check(
+  "the visa label no longer promises approval odds",
+  !/approval odds/i.test(read("src/i18n/messages/en.json"))
 );
 
 // ---------------------------------------------------------------------------

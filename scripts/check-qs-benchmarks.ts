@@ -21,7 +21,7 @@
  * Run: npm run test:qs-benchmarks
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   QS_TOP_200_BENCHMARKS,
@@ -213,20 +213,23 @@ check("the rank column is nullable, not a placeholder number", () => {
 });
 
 check("no badge prints a null rank", () => {
-  const panel = readFileSync(join(ROOT, "src/components/ChancingPanel.tsx"), "utf8");
-  assert.match(
-    panel,
-    /activeItem\.worldRanking \?\? qsBench\?\.qsRank \?\? null/,
-    "the chancing badge no longer prefers the verified DB rank"
-  );
-  assert.match(panel, /displayRank != null &&/, "the chancing badge prints an absent rank");
-  assert.doesNotMatch(panel, /QS #\{qsBench\.qsRank\}/, "the chancing badge is back to the raw table rank");
+  // The assessment screen renders no QS badge at all: a rank that is not
+  // recorded is simply absent, instead of being filled from the curated table.
+  const panel = readFileSync(join(ROOT, "src/components/ProgrammeAssessmentScreen.tsx"), "utf8");
+  assert.doesNotMatch(panel, /QS #/, "the assessment screen prints a raw rank");
+  assert.doesNotMatch(panel, /qsRank/, "the assessment screen reads a rank value");
+  // The uniform list row still carries the verified rank for the QS sort.
+  const detail = readFileSync(join(ROOT, "src/components/UniversityDetail.tsx"), "utf8");
+  assert.match(detail, /uni\.worldRanking != null &&/, "the detail badge prints an absent rank");
 
   const similar = readFileSync(join(ROOT, "src/components/SimilarProfiles.tsx"), "utf8");
   assert.match(similar, /bench\?\.qsRank != null &&/, "the similar-profiles badge prints an absent rank");
 
+  // The recommendation card no longer renders a rank at all: the retired
+  // "positioning" block is gone and every number on that card now comes from
+  // the canonical assessment (which never prints a rank).
   const studio = readFileSync(join(ROOT, "src/components/RecommendationStudio.tsx"), "utf8");
-  assert.match(studio, /r\.positioning\.qsRank != null &&/, "the recommendation card prints an absent rank");
+  assert.doesNotMatch(studio, /positioning\.qsRank|QS #/, "the recommendation card prints a rank again");
 });
 
 check("both APIs prefer the verified rank over the curated table", () => {
@@ -245,21 +248,35 @@ check("both APIs prefer the verified rank over the curated table", () => {
   );
 
   const recommend = readFileSync(join(ROOT, "src/app/api/programs/recommend/route.ts"), "utf8");
+  // Programme recommendations no longer publish a rank object at all
+  // (`positioning: undefined`), so the DB-first order is enforced where the
+  // payload still carries one: the chancing assessment rows.
+  assert.match(
+    chancing,
+    /worldRanking: verifiedQsRank\(uni\)\?\.rank \?\? qsBenchmark\.qsRank/,
+    "the assessment rows no longer prefer the verified rank"
+  );
   assert.match(
     recommend,
-    /qsRank: verifiedRankByUniId\.get\(r\.university\.id\) \?\? benchmark\.qsRank \?\? null/,
-    "programme recommendations no longer prefer the verified rank"
+    /positioning: undefined/,
+    "recommendations must not resurrect an unverified rank object"
   );
 });
 
-check("the selectivity band treats an unranked row as unranked, not as a rank", () => {
-  const source = readFileSync(join(ROOT, "src/lib/programChancing.ts"), "utf8");
-  assert.match(
-    source,
-    /const benchmarkRank = qsBenchmark\.qsRank \?\? Number\.POSITIVE_INFINITY;/,
-    "the selectivity band no longer neutralises a null rank"
-  );
-  assert.doesNotMatch(source, /qsBenchmark\.qsRank <= \d+/, "a raw rank comparison on a nullable value came back");
+check("no selectivity band can be derived from a nullable rank any more", () => {
+  // The rank-derived selectivity band lived only in the retired engine, which
+  // is deleted. The invariant it protected still matters, so it is asserted
+  // where it can still break: no module may derive a band from a raw QS rank.
+  assert.equal(existsSync(join(ROOT, "src/lib/programChancing.ts")), false);
+  for (const file of [
+    "src/lib/assessment/adapters.ts",
+    "src/lib/assessment/academicComparison.ts",
+    "src/lib/recommend.ts",
+    "src/lib/universityProgrammeDiscovery.ts",
+  ]) {
+    const source = readFileSync(join(ROOT, file), "utf8");
+    assert.doesNotMatch(source, /selectivity|Safety \/ Likely|High Reach/, `${file} derives a selectivity band`);
+  }
 });
 
 /* ------------------------------------------------ every row is reachable */

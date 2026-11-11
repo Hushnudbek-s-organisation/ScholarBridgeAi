@@ -761,7 +761,7 @@ Score the APPLICANT only, based on their own turns:
 - confidence: how clear, direct and self-assured the answers sound (0-100)
 - persuasiveness: credible study purpose, convincing funding story, strong ties to home country, clear post-study plans (0-100)
 - language_level: grammar, vocabulary and fluency in ${country.language} (0-100)
-- estimated_visa_chance: realistic overall approval likelihood combining all signals (0-100)
+- preparation_signal: how well PREPARED the answers are (0-100) — specificity, concrete evidence, coherence. This is a coaching measure of answer quality, NOT an approval prediction: do not estimate or imply the probability of a visa being granted.
 
 Evaluate every substantive applicant turn for SPECIFICITY — named programme modules, exact sponsor and funding figures, concrete home-country ties (real employers, property, family commitments), a coherent post-study plan — versus red-flag phrasing (rehearsed-sounding recitals, contradictions with the applicant's own earlier turns, "I don't know yet" on purpose or funding).
 Fairness rules: the applicant's turns may contain speech-recognition errors — ignore minor transcription artifacts. DO penalize vague, evasive, contradictory or off-topic answers. If there are almost no applicant answers, score near 0 and say the interview was too short.
@@ -771,7 +771,7 @@ Respond with JSON ONLY (no markdown, no commentary) in exactly this shape:
   "confidence": 0,
   "persuasiveness": 0,
   "language_level": 0,
-  "estimated_visa_chance": 0,
+  "preparation_signal": 0,
   "recommendations": "4-6 short actionable bullet lines written in ${uiLanguage} — each one anchored in something the applicant actually said (quote three to eight words of it), never generic advice that could fit anyone — each line starting with \\u2022 "
 }
 
@@ -783,7 +783,15 @@ export interface VisaAnalysis {
   confidence: number;
   persuasiveness: number;
   language_level: number;
-  estimated_visa_chance: number;
+  /**
+   * AI coaching measure of how prepared the answers are (0–100).
+   *
+   * Replaces `estimated_visa_chance`: a consular decision depends on the
+   * officer, the post's refusal rate and documents no model can see, so a
+   * model-derived approval percentage was an unvalidated probability and is no
+   * longer produced, stored or rendered.
+   */
+  preparation_signal: number;
   recommendations: string;
 }
 
@@ -810,7 +818,7 @@ export function parseAnalysisJson(raw: string): VisaAnalysis | null {
       confidence: clampScore(obj.confidence),
       persuasiveness: clampScore(obj.persuasiveness),
       language_level: clampScore(obj.language_level),
-      estimated_visa_chance: clampScore(obj.estimated_visa_chance),
+      preparation_signal: clampScore(obj.preparation_signal),
       recommendations: rec.slice(0, 2000),
     };
   } catch {

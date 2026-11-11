@@ -48,6 +48,11 @@ export interface SortableUniversity {
   worldRanking?: number | null;
   annualTuitionUsd?: number | null;
   matchScore?: number | null;
+  /**
+   * @deprecated Retired composite "chance" index. The field is still accepted so
+   * an old cached payload cannot crash the list, but no assessment writes it:
+   * ordering by it now falls back to the fit sort and says so.
+   */
   chanceScore?: number | null;
 }
 
@@ -146,7 +151,12 @@ export function sortUniversities<T extends SortableUniversity>(
       out.sort(personal("matchScore"));
       break;
     case "chance_desc":
-      out.sort(personal("chanceScore"));
+      // The old chance index no longer exists (it was a fabricated composite of
+      // department multipliers and selectivity penalties). The request is
+      // honoured as a FIT order — the one profile-derived number that is still
+      // published — instead of resurrecting a chance percentage.
+      out.sort(personal("matchScore"));
+      applied = "match_desc";
       break;
     case "relevance":
       if (hasProfile) {

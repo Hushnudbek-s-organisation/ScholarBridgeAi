@@ -151,10 +151,13 @@ const recordedProgramme={id:10,universityId:1,name:"FICTIONAL Alpha",field:"Comp
 check("list/detail shared discovery: no programme is synthesized from a preferred major",()=>{
  for(const programmes of [[],[{...recordedProgramme,name:""}],[{...recordedProgramme,universityId:999}]]){const result=universityProgrammeDiscovery({id:1,name:"FICTIONAL"},programmes,{targetMajor:"Computer Science"},{},true);assert.equal(result.chance,null);assert.equal(result.programmeDiscovery.selectedProgrammeId,null);assert.equal(result.programmeDiscovery.status,"no_programmes");}
 });
-check("list/detail shared discovery: explicit opt-in only, no model for missing programme degree",()=>{
+check("list/detail shared discovery: no planning index for any caller, and no invented chance",()=>{
+ // The retired composite index is never produced — not for the default path,
+ // not for a sparse programme and not for the old explicit opt-in flag.
  const ordinary=universityProgrammeDiscovery({id:1,name:"FICTIONAL"},[recordedProgramme],null,{},false);assert.equal(ordinary.chance,null);assert.equal(ordinary.programmeDiscovery.selectedProgrammeId,10);
  const sparse=universityProgrammeDiscovery({id:1,name:"FICTIONAL"},[{...recordedProgramme,degreeLevel:null}],null,{},true);assert.equal(sparse.chance,null);assert.equal(sparse.programmeDiscovery.selectedProgrammeId,10);
- const explicit=universityProgrammeDiscovery({id:1,name:"FICTIONAL"},[recordedProgramme],null,{},true);assert.ok(explicit.chance);assert.equal(explicit.programmeDiscovery.personalAdmissionProbability,null);
+ const explicit=universityProgrammeDiscovery({id:1,name:"FICTIONAL"},[recordedProgramme],null,{},true);assert.equal(explicit.chance,null);assert.equal(explicit.programmeDiscovery.selectedProgrammeId,10);
+ assert.equal(explicit.programmeDiscovery.personalAdmissionProbability,null);
 });
 check("detail: impossible values on a recorded scale cannot become official numeric cutoffs",()=>{
  for(const [fieldKey,valueNumeric,unit] of [["min_toefl",95,"6"],["min_gpa",85,"4"],["min_ielts",10,"9"]] as const){
@@ -183,12 +186,17 @@ check("scoped pill: reviewed OR wins without flattening English alternatives int
  const result=evaluateScopedUniversityDecision({academicRequirements:resolved},{ieltsScore:7.5},date);
  assert.equal(result.pills[0].stateKey,"recorded_met");assert.equal(result.eligibility,"partial");
 });
-check("discovery: uneditioned rank cannot change the opt-in model between raw detail and sanitized list",()=>{
+check("discovery: the selected programme never depends on an uneditioned rank or a planning index",()=>{
  const programme={id:10,universityId:1,name:"FICTIONAL Computer Science",degreeLevel:"Bachelor",field:"Computer Science"};
  const profile={gpa:3.5,gpaScale:4,ielts:6.5,targetMajor:"Computer Science",degreeLevel:"Bachelor"};
  const raw={id:1,name:"FICTIONAL",country:"Germany",worldRanking:2};
  const a=universityProgrammeDiscovery(raw,[programme],profile,profile,true),b=universityProgrammeDiscovery({...raw,worldRanking:null},[programme],profile,profile,true);
- assert.equal(a.chance?.compositeProgramFitScore,b.chance?.compositeProgramFitScore);
+ // The retired composite index is gone; the same programme is selected either
+ // way, and no chance score is produced for any caller.
+ assert.equal(a.chance,null);assert.equal(b.chance,null);
+ assert.equal(a.programmeDiscovery.selectedProgrammeId,10);
+ assert.equal(b.programmeDiscovery.selectedProgrammeId,10);
+ assert.equal(a.programmeDiscovery.personalAdmissionProbability,null);
 });
 check("decision envelope: missing eight fields are compact unknown, not repeated empty evidence",()=>{
  const compact=academicDecisionEnvelope(resolveAcademicRequirements([],{}));

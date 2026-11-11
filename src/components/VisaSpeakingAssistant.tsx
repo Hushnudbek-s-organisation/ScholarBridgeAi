@@ -725,9 +725,11 @@ export function VisaSpeakingAssistant({
   const [error, setError] = useState<string | null>(null);
   const [textAnswer, setTextAnswer] = useState("");
   /**
-   * The response now carries a deterministic rubric computed from the transcript
-   * and a disclaimer for the model's own probability. `estimated_visa_chance`
-   * is the model's opinion, not a prediction — see lib/visaScoring.
+   * The response carries a deterministic rubric computed from the transcript,
+   * plus `preparation_signal` — a COACHING measure of how prepared the answers
+   * are. It is explicitly not an approval probability: no validated methodology
+   * for a personal visa percentage exists, so none is produced or displayed
+   * (see lib/visaScoring).
    */
   type VisaAnalysisResponse = VisaAnalysis & {
     aiAvailable?: boolean;
@@ -756,7 +758,8 @@ export function VisaSpeakingAssistant({
       answerCount: number;
       averageAnswerWords: number;
     };
-    chanceDisclaimer?: string;
+    /** One-line disclosure shipped with the coaching scores. */
+    preparationDisclosure?: string;
     openRouterReview?: {
       mercury: { model: string; available: boolean; signals: Record<string, { probabilityPercent: number | null; score: number | null; status: "ok" | "fallback" }> } | null;
       respan: { model: string; available: boolean; signals: Record<string, { probabilityPercent: number | null; score: number | null; status: "ok" | "fallback" }> } | null;
@@ -859,11 +862,16 @@ export function VisaSpeakingAssistant({
       confidence: score(source.confidence),
       persuasiveness: score(source.persuasiveness),
       language_level: score(source.language_level),
-      estimated_visa_chance: score(source.estimated_visa_chance),
+      // Older stored responses may still carry a model percentage. It is
+      // deliberately NOT mapped into the current shape: an unvalidated
+      // approval number must never be revived by a compatibility path.
+      preparation_signal: score(source.preparation_signal),
       recommendations: text(source.recommendations),
       ...(typeof source.aiAvailable === "boolean" ? { aiAvailable: source.aiAvailable } : {}),
       ...(typeof source.aiError === "string" ? { aiError: source.aiError } : {}),
-      ...(typeof source.chanceDisclaimer === "string" ? { chanceDisclaimer: source.chanceDisclaimer } : {}),
+      ...(typeof source.preparationDisclosure === "string"
+        ? { preparationDisclosure: source.preparationDisclosure }
+        : {}),
       ...(rubric ? { rubric } : {}),
       ...(openRouterReview ? { openRouterReview } : {}),
     };
@@ -3386,9 +3394,9 @@ export function VisaSpeakingAssistant({
             </div>
           )}
 
-          {analysis.chanceDisclaimer && (
+          {analysis.preparationDisclosure && (
             <p className="rounded-surface bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800">
-              {analysis.chanceDisclaimer}
+              {analysis.preparationDisclosure}
             </p>
           )}
 
@@ -3403,10 +3411,15 @@ export function VisaSpeakingAssistant({
             <h2 className="mt-2 text-lg font-extrabold text-slate-900 dark:text-slate-100">
               {localizedCountryName(country.name)} · {t("visaChance")}
             </h2>
+            {/*
+              The large ring is now the PREPARATION signal (answer quality), not
+              an approval percentage. The label says so; there is no number here
+              that could be read as "your visa will be approved".
+            */}
             <div className="mt-4 flex justify-center">
               <ScoreRing
-                value={analysis.estimated_visa_chance}
-                label=""
+                value={analysis.preparation_signal}
+                label={t("visaPreparationSignal")}
                 size={150}
                 color={UI_COLORS.success}
               />

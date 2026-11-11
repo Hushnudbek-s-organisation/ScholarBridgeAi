@@ -7,7 +7,7 @@ import {
   parseAnalysisJson,
   sanitizeHistory,
 } from "@/lib/visa-interview";
-import { scoreVisaInterview, visaChanceDisclaimer } from "@/lib/visaScoring";
+import { scoreVisaInterview, visaPreparationDisclosure } from "@/lib/visaScoring";
 import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
@@ -21,16 +21,17 @@ import { reviewVisaConversation } from "@/lib/ai/visaReview";
  * POST /api/visa/analyze
  * Body: { countryCode, messages: [{role, text}], uiLanguage? }
  * Returns: { confidence, persuasiveness, language_level,
- *            estimated_visa_chance, recommendations,
- *            rubric, chanceDisclaimer }
+ *            preparation_signal, recommendations,
+ *            rubric, preparationDisclosure }
  *
  * Two halves, deliberately:
  *   - `rubric` is COMPUTED from the transcript by src/lib/visaScoring.ts and is
  *     returned even when no model is configured, so the student always gets a
  *     real assessment of what they said.
- *   - `estimated_visa_chance` is the model's opinion and is shipped with a
- *     disclaimer, because a consular decision depends on the officer, the post
- *     and documents this endpoint never sees.
+ *   - `preparation_signal` is a COACHING measure of how prepared the answers
+ *     are. It is NOT an approval probability: a consular decision depends on
+ *     the officer, the post and documents this endpoint never sees, and the
+ *     project has no validated methodology for a personal visa percentage.
  *
  * Metering: the router records every model call in `ai_usage` against the
  * signed-in caller (null for anonymous). The daily AI request quota is
@@ -151,8 +152,8 @@ export async function POST(req: Request) {
       return NextResponse.json({
         aiAvailable: false,
         rubric,
-        estimated_visa_chance: null,
-        chanceDisclaimer: visaChanceDisclaimer(null),
+        preparation_signal: null,
+        preparationDisclosure: visaPreparationDisclosure(),
         recommendations: "",
         openRouterReview: await openRouterReviewPromise,
       });
@@ -186,8 +187,8 @@ export async function POST(req: Request) {
         aiAvailable: false,
         aiError: describeAiError(result.error),
         rubric,
-        estimated_visa_chance: null,
-        chanceDisclaimer: visaChanceDisclaimer(null),
+        preparation_signal: null,
+        preparationDisclosure: visaPreparationDisclosure(),
         recommendations: "",
         openRouterReview: await openRouterReviewPromise,
       });
@@ -206,7 +207,7 @@ export async function POST(req: Request) {
       aiAvailable: true,
       rubric,
       // The model's number stays, but never unlabelled.
-      chanceDisclaimer: visaChanceDisclaimer(analysis.estimated_visa_chance),
+      preparationDisclosure: visaPreparationDisclosure(),
       openRouterReview: await openRouterReviewPromise,
     });
   } catch (err) {

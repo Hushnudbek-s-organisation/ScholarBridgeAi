@@ -20,14 +20,10 @@ import { parseListColumn } from "@/lib/chancing";
 import { countriesMatch } from "@/lib/countries";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { resolvedUsdUniversityCosts, resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
-import {
-  chancingProfileWithActivities,
-  toMatchProfileWithActivities,
-  toUniversityData,
-} from "@/lib/profileMapping";
+import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { calculateUniversityMatch } from "@/lib/matching";
-import { evaluateUniversityAndProgramChance } from "@/lib/programChancing";
-import { matchQsUniversityBenchmark } from "@/lib/qsTop200Benchmarks";
+import { assessCatalogueProgramme } from "@/lib/assessment/adapters";
+import { ADMISSION_PROBABILITY } from "@/lib/chancing";
 import { localeFromRequest } from "@/lib/engineText";
 import {
   localizeCountry,
@@ -59,12 +55,13 @@ import {
  *    `recommended: true`) — the previous behaviour dumped every active
  *    catalogue scholarship (60+) onto every student's plan;
  *  • saved universities resolve a REAL date (own application row → next
- *    verified cycle → published deadline) and carry the dual scores
- *    (`chanceScore` from the positioning engine, `matchScore` from the fit
- *    engine), so the backwards planner can order by what the student can
- *    still act on;
- *  • up to four HIGH-CHANCE catalogue universities (chance ≥ 60, sorted by
- *    chance, never by fit or rank) join as suggestions.
+ *    verified cycle → published deadline) and carry the canonical assessment
+ *    (`assessment`: preference fit with interval/coverage, eligibility, finance,
+ *    `admissionProbability: null`) plus the university fit `matchScore`, so the
+ *    backwards planner can order by what the student can still act on;
+ *  • up to four catalogue universities join as suggestions. The retired
+ *    `chanceScore >= 60` gate is gone: a plan suggestion is ordered by its
+ *    cycle deadline and its fit LOWER bound — never by a fabricated chance.
  */
 
 /** Urgency bucket from days remaining — the user asked for 🔴🟠🟡. */
@@ -100,36 +97,54 @@ function isoDateOr(value: unknown): string | null {
 
 type UniRow = typeof universities.$inferSelect;
 
-/** Dual scores for one candidate university, same engines as the Explorer. */
+/**
+ * Scores for one candidate university, from the SAME canonical service the
+ * Explorer and the Chancing screen use. There is no chance score any more: the
+ * row carries the university fit and an institution-level assessment whose
+ * eligibility stays `unknown` (an institution is not a programme), plus
+ * `admissionProbability: null`.
+ */
 function scoreUniversityRow(
   u: UniRow,
   scoring: {
-    chancing: Awaited<ReturnType<typeof chancingProfileWithActivities>>;
+    profile: Parameters<typeof assessCatalogueProgramme>[0]["profile"];
     matchProfile: Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
     targetMajor: string;
     degreeLevel: string | null;
   }
 ) {
-  const chance = evaluateUniversityAndProgramChance(
-    scoring.chancing,
-    u,
-    {
-      id: u.id,
+  const assessedAt = new Date().toISOString();
+  const assessment = assessCatalogueProgramme({
+    programme: {
+      id: -u.id,
       universityId: u.id,
-      name: scoring.targetMajor || u.programMajor || "General Studies",
-      degreeLevel: scoring.degreeLevel || u.degreeLevel || "Bachelor",
+      name: scoring.targetMajor || u.programMajor || u.name,
       field: scoring.targetMajor || u.programMajor || null,
+      degree: scoring.degreeLevel || u.degreeLevel || null,
+      language: null,
+      studyMode: null,
+      programUrl: u.officialWebsiteUrl ?? u.websiteUrl ?? null,
+      sourceUrl: u.sourceUrl ?? null,
     },
-    { minGpa: u.minGpa, minIelts: u.minIelts, minSat: u.minSat },
-    [],
-    matchQsUniversityBenchmark(u)
-  );
+    university: {
+      id: u.id,
+      name: u.name,
+      country: u.country,
+      officialWebsiteUrl: u.officialWebsiteUrl ?? null,
+      websiteUrl: u.websiteUrl ?? null,
+    },
+    profile: scoring.profile,
+    requirementRow: null,
+    tuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
+    livingUsd: resolvedUsdUniversityCosts(u).annualLivingEstUsd,
+    degreeLevel: scoring.degreeLevel,
+    assessedAt,
+    asOfDate: assessedAt.slice(0, 10),
+  });
   const match = calculateUniversityMatch(scoring.matchProfile, toUniversityData(u));
   return {
-    chanceScore: chance.compositeProgramFitScore,
-    effectiveAcceptRatePct: chance.effectiveProgramAcceptRatePct,
-    selectivityCategory: chance.selectivityCategory,
     matchScore: match.matchScore,
+    assessment,
   };
 }
 
@@ -196,22 +211,19 @@ export async function GET(req: Request) {
       annualTuitionUsd: resolvedUsdUniversityCosts(u).annualTuitionUsd,
     }));
 
-    // Scoring context (chance + fit). Best-effort: a profile that cannot be
-    // scored simply means no high-chance shortlist and no score fields.
+    // Scoring context (canonical assessment + university fit). Best-effort: a
+    // profile that cannot be scored simply means no suggestions and no scores.
     let scoring: {
-      chancing: Awaited<ReturnType<typeof chancingProfileWithActivities>>;
+      profile: typeof profile;
       matchProfile: Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
       targetMajor: string;
       degreeLevel: string | null;
     } | null = null;
     if (profile) {
       try {
-        const [chancing, matchProfile] = await Promise.all([
-          chancingProfileWithActivities(profile),
-          toMatchProfileWithActivities(profile),
-        ]);
+        const matchProfile = await toMatchProfileWithActivities(profile);
         scoring = {
-          chancing,
+          profile,
           matchProfile,
           targetMajor: (profile.targetMajor ?? "").trim(),
           degreeLevel: profile.degreeLevel ?? null,
@@ -231,14 +243,17 @@ export async function GET(req: Request) {
     };
 
     /**
-     * High-chance shortlist: active, degree-compatible universities in the
-     * student's preferred countries that are NOT saved yet, ranked by the
-     * positioning engine's chance score (≥ 60 = "worth an application"),
-     * capped at four. With no stated preferences the pool is skipped — an
-     * empty profile gets no suggestions, exactly like the dashboard's
-     * "Recommended for you".
+     * Shortlist suggestions: active, degree-compatible universities in the
+     * student's preferred countries that are NOT saved yet, capped at four and
+     * ordered by the fit LOWER bound (desc), then the university fit, then id.
+     *
+     * The old rule kept only rows whose unvalidated composite index was ≥ 60 —
+     * a fabricated "worth an application" gate. A suggestion is now simply a
+     * plausible next step: it carries its own assessment and an explicit
+     * `admissionProbability: null`. With no stated preferences the pool is
+     * skipped, exactly like the dashboard's "Recommended for you".
      */
-    let recommendedUnis: { row: UniRow; chanceScore: number }[] = [];
+    let recommendedUnis: { row: UniRow; fitScore: number; lowerBound: number | null }[] = [];
     const preferredCountries = profile ? parseListColumn(profile.preferredCountries) : [];
     if (scoring && (preferredCountries.length > 0 || scoring.targetMajor)) {
       const countries = preferredCountries;
@@ -248,11 +263,22 @@ export async function GET(req: Request) {
           .filter((u) => !savedUniIds.includes(u.id))
           .filter((u) => supportsDegreeLevel(u.degreeLevel, scoring!.degreeLevel))
           .filter((u) => (countries.length > 0 ? countries.some((c) => countriesMatch(u.country, c)) : true))
-          .map((u) => ({ row: u, chanceScore: scoreOf(u)?.chanceScore ?? -1 }))
-          .filter((x) => x.chanceScore >= 60)
-          // Sorted by CHANCE descending — the student asked for "where do I
-          // actually have a shot", not for the highest-ranked name.
-          .sort((a, b) => b.chanceScore - a.chanceScore)
+          .map((u) => {
+            const scores = scoreOf(u);
+            return {
+              row: u,
+              fitScore: scores?.matchScore ?? 0,
+              lowerBound: scores?.assessment.preferenceFit.lowerBound ?? null,
+            };
+          })
+          // Lower bound first (a conservative order, not a chance ranking);
+          // an unknown fit is kept last instead of being given a fake 0.
+          .sort(
+            (a, b) =>
+              (b.lowerBound ?? -1) - (a.lowerBound ?? -1) ||
+              b.fitScore - a.fitScore ||
+              a.row.id - b.row.id
+          )
           .slice(0, 4);
       } catch {
         recommendedUnis = [];
@@ -441,10 +467,9 @@ export async function GET(req: Request) {
           country: localizeCountry(u.country, locale),
           rawCountry: u.country,
           universityId: u.id,
-          chanceScore: scores?.chanceScore ?? null,
-          effectiveAcceptRatePct: scores?.effectiveAcceptRatePct ?? null,
-          selectivityCategory: scores?.selectivityCategory ?? null,
           matchScore: scores?.matchScore ?? null,
+          assessment: scores?.assessment ?? null,
+          probability: ADMISSION_PROBABILITY,
         });
       }
     }
@@ -530,11 +555,11 @@ export async function GET(req: Request) {
       }
     }
 
-    // --- High-chance suggestions (outside the student's saved list) ---
+    // --- Shortlist suggestions (outside the student's saved list) ---
     // Placed after the saved sections: the backwards planner shows them with
-    // `recommended: true` and a chance badge, ordered by CHANCE, nearest
-    // verified deadline when one is actually on file.
-    for (const { row: u, chanceScore } of recommendedUnis) {
+    // `recommended: true` and their assessment (fit interval + coverage),
+    // nearest verified deadline when one is actually on file.
+    for (const { row: u } of recommendedUnis) {
       const scores = scoreOf(u);
       const deadline = resolvedUniDeadline(u);
       items.push({
@@ -551,10 +576,9 @@ export async function GET(req: Request) {
         country: localizeCountry(u.country, locale),
         rawCountry: u.country,
         universityId: u.id,
-        chanceScore: scores?.chanceScore ?? chanceScore,
-        effectiveAcceptRatePct: scores?.effectiveAcceptRatePct ?? null,
-        selectivityCategory: scores?.selectivityCategory ?? null,
         matchScore: scores?.matchScore ?? null,
+        assessment: scores?.assessment ?? null,
+        probability: ADMISSION_PROBABILITY,
       });
     }
 

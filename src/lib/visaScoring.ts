@@ -1,10 +1,11 @@
 /**
  * AI Visa Interview scoring (#9) — the deterministic half.
  *
- * The model roleplays the officer and writes feedback prose. It must NOT invent
- * a visa probability: `estimated_visa_chance` from the model is treated as an
- * opinion and is labelled as one, while the rubric below is computed from what
- * the applicant actually said.
+ * The model roleplays the officer and writes feedback prose plus a coaching
+ * `preparation_signal` (how well-prepared the answers are). It must NOT invent
+ * a visa probability: ScholarBridge has no validated methodology for one, so no
+ * approval percentage is requested, produced, stored or displayed. The rubric
+ * below is computed from what the applicant actually said.
  *
  * Consular refusals cluster around a handful of grounds — unclear purpose of
  * study, weak funding, weak home-country ties, immigrant intent. Those are
@@ -391,13 +392,15 @@ export function scoreVisaInterview(turns: VisaTurn[], opts: VisaScoringOptions =
 }
 
 /**
- * The model returns an `estimated_visa_chance`. A consular decision depends on
- * the officer, the post's refusal rate and documents we never see — so this is
- * an opinion, and it must be presented as one rather than as a prediction.
+ * The AI half of the interview analysis now returns a `preparation_signal`
+ * (a coaching measure of answer quality), never an approval probability.
+ *
+ * A consular decision depends on the officer, the post's refusal rate and
+ * documents this tool never sees. ScholarBridge has no validated methodology
+ * for a personal visa-approval percentage, so none is produced, stored or
+ * displayed — this note states that in one line, and there is deliberately no
+ * function that can format such a percentage.
  */
-export function visaChanceDisclaimer(modelChance: number | null): string {
-  if (typeof modelChance !== "number" || !Number.isFinite(modelChance)) {
-    return "No probability is shown: visa decisions depend on the officer, the post and documents this tool cannot see.";
-  }
-  return `The ${modelChance}% figure is the AI's opinion after reading your answers, not a prediction. Refusal rates vary by post and by officer, and nothing here reflects your actual documents.`;
+export function visaPreparationDisclosure(): string {
+  return "This is coaching feedback on how your answers are prepared — not a prediction. Visa decisions depend on the officer, the post and documents this tool cannot see, so no approval probability is shown.";
 }

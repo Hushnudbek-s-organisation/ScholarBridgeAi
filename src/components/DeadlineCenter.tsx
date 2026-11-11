@@ -37,7 +37,6 @@ interface DeadlineItem {
   universityId?: number | null;
   recommended?: boolean | null;
   verificationStatus?: string | null;
-  chanceScore?: number | null;
   matchScore?: number | null;
   coversSavedUni?: boolean | null;
   isFullCoverage?: boolean | null;

@@ -76,11 +76,18 @@ function Field({
   );
 }
 
-/** Explicit label keys — the panel never builds a translation key by string join. */
-const CHANCE_LABEL_KEY: Record<string, string> = {
-  meets: "filterChanceMeets",
-  below: "filterChanceBelow",
-  unknown: "filterChanceUnknown",
+/**
+ * Explicit label keys — the panel never builds a translation key by string join.
+ *
+ * The filter is a PUBLISHED-GATE status, not a chance: `meets` means every
+ * minimum the award publishes could be checked and was met, `unknown` means at
+ * least one minimum could not be checked with the saved profile. It is neither
+ * eligibility for the award nor a probability of being awarded it.
+ */
+const REQUIREMENT_STATUS_LABEL_KEY: Record<string, string> = {
+  meets: "filterRequirementMet",
+  below: "filterRequirementNotMet",
+  unknown: "filterRequirementUnknown",
 };
 
 const FIT_LABEL_KEY: Record<string, string> = {
@@ -219,23 +226,27 @@ export function ScholarshipFiltersPanel({
         </select>
       </Field>
 
-      {/* ---- Chance: published-gate check (personal, profile required) */}
+      {/* ---- Requirement status: the award's published minimums vs the saved
+              profile. A gate that cannot be checked is `unknown`, never a pass. */}
       {hasProfile && (
-        <Field label={t("filterChance")} htmlFor={`${idPrefix}-chance}`}>
+        <Field label={t("filterRequirementStatus")} htmlFor={`${idPrefix}-chance-status`}>
           <select
-            id={`${idPrefix}-chance}`}
+            id={`${idPrefix}-chance-status`}
             value={filters.chance[0] ?? "All"}
             onChange={(event) => setSingle("chance", event.target.value)}
-            aria-label={t("allChance")}
+            aria-label={t("allRequirementStatus")}
             className={SELECT_CLASS}
           >
-            <option value="All">{t("allChance")}</option>
+            <option value="All">{t("allRequirementStatus")}</option>
             {SCHOLARSHIP_CHANCE_OPTIONS.map((bucket) => (
               <option key={bucket} value={bucket}>
-                {t(CHANCE_LABEL_KEY[bucket] ?? bucket)} ({facets.chance[bucket] ?? 0})
+                {t(REQUIREMENT_STATUS_LABEL_KEY[bucket] ?? bucket)} ({facets.chance[bucket] ?? 0})
               </option>
             ))}
           </select>
+          <p className="mt-1 text-sm leading-snug text-slate-500 dark:text-slate-400">
+            {t("requirementStatusNote")}
+          </p>
         </Field>
       )}
 

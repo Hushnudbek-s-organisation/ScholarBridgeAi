@@ -28,7 +28,9 @@ test("detail shares exact scope, native units, conflict/unknown and real-program
   expect((await adminContext.request.post("/api/admin/catalogue-facts/review",{data:{id:ids[2],expectedVersion:String(stored.version),expectedFact:draft,sourceQuote:"FICTIONAL source quotation: IELTS seven OR TOEFL five point five on the original six scale for the international 2027 cycle only. Not a real admissions policy.",confirmsAllLeaves:true}})).status()).toBe(200);
   const path=`/api/universities/${f.verifiedUniversityId}?profileId=${f.studentId}`;
   const read=async(query="")=>{const r=await page.request.get(path+query);expect(r.status()).toBe(200);return r.json();};
-  const ordinary=await read();expect(ordinary.chance).toBeNull();expect(ordinary.universityRequirements.toefl).toBeNull();expect(ordinary.programs.find((p:{id:number})=>p.id===f.fixtureProgramId).minToefl).toBeNull();
+  // `chance` is now only a deprecated ALIAS of the canonical assessment: it
+  // carries the same object and can never revive a probability percentage.
+  const ordinary=await read();expect(ordinary.chance).toEqual(ordinary.assessment);expect(ordinary.assessment.admissionProbability).toEqual({value:null,reason:"no_validated_model",scoringVersion:ordinary.assessment.scoringVersion});expect(ordinary).not.toHaveProperty("chanceScore");expect(ordinary.universityRequirements.toefl).toBeNull();expect(ordinary.programs.find((p:{id:number})=>p.id===f.fixtureProgramId).minToefl).toBeNull();
   const scope=`&programId=${f.fixtureProgramId}&admissionCycle=2027&applicantScope=international`;
   const scoped=await read(scope),row=scoped.programs.find((p:{id:number})=>p.id===f.fixtureProgramId);
   expect(row.minToefl).toBe(5.5);expect(row.minToeflScale).toBe("6");expect(row.minGpa).toBe(85);expect(row.minGpaScale).toBe("100");expect(scoped.universityRequirements.toefl.single).toBe(5.5);expect(scoped.universityRequirements.toefl.unit).toBe("6");expect(row.requirementGroup.value).toBe(JSON.stringify(group));
@@ -44,10 +46,10 @@ test("detail shares exact scope, native units, conflict/unknown and real-program
   await db.query("UPDATE catalogue_facts SET is_active=false WHERE id=$1",[ids[4]]);
   // Same helper and opt-in as the list; opening a detail does not opt in.
   const list=(await(await page.request.get(`/api/universities?profileId=${f.studentId}&sort=chance_desc`)).json()).universities.find((p:{id:number})=>p.id===f.verifiedUniversityId);
-  const opt=await read("&sort=chance_desc");expect(opt.chance.score).toBe(list.chanceScore);expect(opt.programmeDiscovery).toEqual(list.programmeDiscovery);expect(opt.programmeDiscovery.selectedProgrammeId).toBe(f.fixtureProgramId);
+  const opt=await read("&sort=chance_desc");expect(opt.chance).toEqual(opt.assessment);expect(list).not.toHaveProperty("chanceScore");expect(opt.programmeDiscovery).toEqual(list.programmeDiscovery);expect(opt.programmeDiscovery.selectedProgrammeId).toBe(f.fixtureProgramId);
   expect(list.academicRequirements.summary).toEqual(ordinary.university.academicRequirements.summary);
   expect(list.academicRequirements.evidence).toEqual(ordinary.university.academicRequirements.evidence);
-  const noProgramme=await page.request.get(`/api/universities/${f.unverifiedUniversityId}?profileId=${f.studentId}&sort=chance_desc`);expect(noProgramme.status()).toBe(200);const no=await noProgramme.json();expect(no.chance).toBeNull();expect(no.programmeDiscovery.status).toBe("no_programmes");
+  const noProgramme=await page.request.get(`/api/universities/${f.unverifiedUniversityId}?profileId=${f.studentId}&sort=chance_desc`);expect(noProgramme.status()).toBe(200);const no=await noProgramme.json();expect(no.chance).toEqual(no.assessment);expect(no.assessment.admissionProbability.value).toBeNull();expect(no.programmeDiscovery.status).toBe("no_programmes");
   expect((await page.request.get(path+"&programId=2147483647")).status()).toBe(400);
   expect((await page.request.get(path+"&applicantScope=%0Ainvalid")).status()).toBe(400);
   const profileBefore=(await(await page.request.get(`/api/profiles/${f.studentId}`)).json()).profile;

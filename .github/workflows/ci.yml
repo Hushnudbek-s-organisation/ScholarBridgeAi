@@ -138,6 +138,12 @@ jobs:
       - name: Chancing + probability-policy tests (embedded Postgres)
         run: bash ci/run-step.sh "Chancing + probability-policy tests (embedded Postgres)" npm run test:chancing
 
+      - name: Canonical programme assessment — service, surfaces, i18n
+        run: bash ci/run-step.sh "Canonical programme assessment — service, surfaces, i18n" npm run test:assessment
+
+      - name: Assessment preference storage migration (embedded Postgres)
+        run: bash ci/run-step.sh "Assessment preference storage migration (embedded Postgres)" npm run test:assessment-db
+
       - name: Recommender tests — engine + API (embedded Postgres)
         run: bash ci/run-step.sh "Recommender tests — engine + API (embedded Postgres)" npm run test:recommend
 

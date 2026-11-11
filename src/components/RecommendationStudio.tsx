@@ -64,6 +64,17 @@ import {
 import type { StudentProfile } from "@/components/Navbar";
 import { AppNote } from "@/components/AppNote";
 import { Button } from "@/components/ui/Button";
+import {
+  AcademicComparisonList,
+  EligibilityBadge,
+  EligibilitySummaryLine,
+  FitInline,
+  PreferenceFilterList,
+  financeStatusLabel,
+  unknownFieldLabel,
+  unknownReasonLabel,
+  type Assessment,
+} from "@/components/AssessmentParts";
 
 // ---------------------------------------------------------------------------
 // Types (mirrors of the API response — src/app/api/programs/recommend)
@@ -136,18 +147,15 @@ interface RecommendResult {
   };
   probability: { available: boolean };
   /**
-   * QS + department positioning for this university/programme. Optional — an
-   * un-benchmarked university simply omits it, and the card renders without it.
+   * The canonical programme assessment (src/lib/assessment). Every fit,
+   * eligibility, finance and academic figure on this card comes from here — the
+   * card does not recompute anything.
+   *
+   * The retired "positioning" block (QS rank + modelled acceptance rate +
+   * department GPA band) is gone: the route now sends `positioning: undefined`,
+   * so an un-benchmarked university must not blank out the whole card.
    */
-  positioning?: {
-    /** QS 2026 position, or null when the edition does not rank the institution. */
-    qsRank: number | null;
-    universityAcceptRatePct: number | null;
-    departmentLabel: string;
-    gpa25: number;
-    gpa50: number;
-    gpa75: number;
-  };
+  assessment: Assessment;
   matchScore: number;
   rankingFactors: string[];
   missingInputs: string[];
@@ -174,6 +182,11 @@ interface RecommendResponse {
 // ---------------------------------------------------------------------------
 
 const DEGREE_LEVELS = ["Bachelor", "Master", "PhD", "Diploma", "Associate"];
+
+/** USD formatting for the assessment summary; `null` stays unknown. */
+function formatUsd(value: number): string {
+  return `$${Math.round(value).toLocaleString("en-US")}`;
+}
 
 function parseNum(s: string): number | null {
   const n = Number(s);
@@ -278,6 +291,16 @@ function Badge({ tone, children }: { tone: "green" | "red" | "amber" | "slate" |
   );
 }
 
+/** Inline heading for a card section (kept lowercase; the outer case is CSS). */
+function DimensionHeading({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <h5 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
+      {icon ? <span className="text-slate-500 dark:text-slate-400">{icon}</span> : null}
+      {children}
+    </h5>
+  );
+}
+
 function DimHeading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <h4 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -338,6 +361,9 @@ export function RecommendationStudio({
   onProfileSaved?: (profile: StudentProfile) => void;
 }) {
   const t = useTranslations("recommend");
+  // Assessment vocabulary (fit/coverage/eligibility/finance) is shared with the
+  // Outlook screen, so both surfaces describe the same numbers identically.
+  const tAssessment = useTranslations("chancing");
   const tc=useTranslations("profile.context");
   const tStudy = useTranslations("studyInterest");
   const { locale } = useLocaleContext();
@@ -656,7 +682,7 @@ export function RecommendationStudio({
   const inputCls =
     "w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-indigo-900";
   const labelCls = "mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300";
-  const hintCls = "mt-1 text-xs leading-snug text-slate-500 dark:text-slate-400";
+  const hintCls = "mt-1 text-sm leading-snug text-slate-500 dark:text-slate-400";
   const btnPrimary =
     "inline-flex items-center justify-center gap-2 rounded-control bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60";
   const btnGhost =
@@ -1011,178 +1037,111 @@ export function RecommendationStudio({
                           </div>
                         </div>
 
-                        {/* The four separate dimensions */}
-                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                          {/* 1 — Subject fit */}
-                          <div>
-                            <DimHeading icon={<Target className="h-3.5 w-3.5" />}>{t("fit")}</DimHeading>
-                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                              <Badge tone={fitTone(r.subjectFit.level)}>{fitLabel(r.subjectFit.level)}</Badge>
-                              {r.subjectFit.matchedInterests.length > 0 ? (
-                                <span className="text-xs text-slate-500 dark:text-slate-400">{r.subjectFit.matchedInterests.map(localizeStudyTerm).join(", ")}</span>
-                              ) : null}
+                        {/*
+                          The card shows the canonical assessment, compactly. It
+                          is a SUMMARY of the same object the Outlook screen
+                          expands, not a second computation: the fit line, the
+                          `must` filters, the eligibility line, the cost/gap and
+                          ONE academic comparison (opt-in details for the rest).
+                          A missing academic statistic never hides the fit.
+                        */}
+                        <div className="mt-4 space-y-3">
+                          <div className="rounded-control border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
+                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                              <DimensionHeading>{t("assessmentFit")}</DimensionHeading>
+                              <EligibilityBadge status={r.assessment.eligibility.status} />
                             </div>
+                            <div className="mt-1">
+                              <FitInline fit={r.assessment.preferenceFit} />
+                            </div>
+                            <PreferenceFilterList filters={r.assessment.preferenceFilters} />
                           </div>
 
-                          {/* 2 — Eligibility */}
-                          <div>
-                            <DimHeading icon={<ListChecks className="h-3.5 w-3.5" />}>{t("eligibility")}</DimHeading>
-                            {r.eligibility.group?<RequirementGroupView evaluation={r.eligibility.group}/>:r.eligibility.items.length === 0 && r.eligibility.textRequirements.length === 0 ? (
-                              <p className="mt-1.5 flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
-                                <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {t("noReqs")}
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                              <DimensionHeading icon={<ListChecks className="h-3.5 w-3.5" />}>
+                                {t("assessmentRequirements")}
+                              </DimensionHeading>
+                              <div className="mt-1">
+                                <EligibilitySummaryLine assessment={r.assessment} />
+                              </div>
+                              {r.assessment.eligibility.gaps[0] ? (
+                                <p className="mt-1 text-sm text-rose-700 dark:text-rose-300">
+                                  {t("assessmentGapHint")}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            <div>
+                              <DimensionHeading icon={<Coins className="h-3.5 w-3.5" />}>
+                                {t("assessmentCost")}
+                              </DimensionHeading>
+                              <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                                <div>
+                                  <dt className="text-slate-500 dark:text-slate-400">{t("assessmentAnnualCost")}</dt>
+                                  <dd className="font-semibold text-slate-800 dark:text-slate-100">
+                                    {r.assessment.finance.annualTotalUsd == null
+                                      ? t("assessmentCostUnknown", {
+                                          lower: formatUsd(r.assessment.finance.annualTotalLowerBoundUsd),
+                                        })
+                                      : formatUsd(r.assessment.finance.annualTotalUsd)}
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt className="text-slate-500 dark:text-slate-400">{t("assessmentGap")}</dt>
+                                  <dd className="font-semibold text-slate-800 dark:text-slate-100">
+                                    {r.assessment.finance.fundingGapUsd != null
+                                      ? formatUsd(r.assessment.finance.fundingGapUsd)
+                                      : t("assessmentUnknown")}
+                                  </dd>
+                                </div>
+                              </dl>
+                              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                {financeStatusLabel(r.assessment.finance.status, tAssessment)}
                               </p>
-                            ) : (
-                              <ul className="mt-1.5 space-y-1">
-                                {r.eligibility.items.map((item) => (
-                                  <li key={item.key} className="flex items-center justify-between gap-2 text-sm">
-                                    <span className="font-medium capitalize text-slate-700 dark:text-slate-200">
-                                      {item.key} <span className="text-slate-500 dark:text-slate-500">≥ {item.required}</span>
-                                    </span>
-                                    {item.status === "met" ? (
-                                      <Badge tone="green">
-                                        <CheckCircle2 className="h-3 w-3" /> {t("eligibilityMet")}
-                                      </Badge>
-                                    ) : item.status === "unmet" ? (
-                                      <Badge tone="red">
-                                        <AlertTriangle className="h-3 w-3" /> {t("eligibilityUnmet")}
-                                      </Badge>
-                                    ) : (
-                                      <Badge tone="slate">
-                                        <HelpCircle className="h-3 w-3" /> {t("eligibilityUnknown")}
-                                      </Badge>
-                                    )}
-                                  </li>
-                                ))}
-                                {r.eligibility.textRequirements.map((tr, i) => (
-                                  <li key={`${tr.kind}-${i}`} className="text-sm text-slate-500 dark:text-slate-400">
-                                    <span className="font-semibold capitalize">{tr.kind}:</span> {tr.text}
-                                  </li>
-                                ))}
-                                {r.eligibility.items.length > 0 ? (
-                                  <li className="pt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                                    {t("eligibilitySummary", { met: r.eligibility.met, unmet: r.eligibility.unmet, unknown: r.eligibility.unknown })}
-                                  </li>
-                                ) : null}
-                              </ul>
-                            )}
+                            </div>
                           </div>
 
-                          {/* 3 — Affordability + funding */}
-                          <div>
-                            <DimHeading icon={<Coins className="h-3.5 w-3.5" />}>{t("affordability")}</DimHeading>
-                            <ul className="mt-1.5 space-y-1 text-sm">
-                              <li className="flex items-center justify-between gap-2">
-                                <span className="text-slate-500 dark:text-slate-400">{t("tuition")}</span>
-                                <span className="font-semibold text-slate-800 dark:text-slate-100">
-                                  {r.affordability.annualTuition != null
-                                    ? `${r.affordability.annualTuition.toLocaleString(locale)} ${r.affordability.tuitionCurrency}`
-                                    : t("tuitionUnknown")}
-                                </span>
-                              </li>
-                              {r.university.annualLivingEst != null ? (
-                                <li className="flex items-center justify-between gap-2">
-                                  <span className="text-slate-500 dark:text-slate-400">{t("livingEst")}</span>
-                                  <span className="font-semibold text-slate-800 dark:text-slate-100">
-                                    ~{r.university.annualLivingEst.toLocaleString(locale)} {r.university.livingCostCurrency}
-                                  </span>
-                                </li>
-                              ) : null}
-                              <li>
-                                {r.affordability.withinBudget === "yes" ? (
-                                  <Badge tone="green">
-                                    <PiggyBank className="h-3 w-3" /> {t("withinBudget")}
-                                  </Badge>
-                                ) : r.affordability.withinBudget === "no" ? (
-                                  <Badge tone="red">
-                                    <PiggyBank className="h-3 w-3" /> {t("overBudget")}
-                                  </Badge>
+                          <details className="text-xs text-slate-600 dark:text-slate-300">
+                            <summary className="cursor-pointer font-semibold">{t("assessmentDetails")}</summary>
+                            <div className="mt-2 space-y-3">
+                              <div>
+                                <DimensionHeading icon={<Target className="h-3.5 w-3.5" />}>
+                                  {t("assessmentSubject")}
+                                </DimensionHeading>
+                                <p className="mt-1 text-slate-600 dark:text-slate-300">
+                                  {r.assessment.subjectRelation.note}
+                                </p>
+                              </div>
+                              <div>
+                                <DimensionHeading icon={<Scale className="h-3.5 w-3.5" />}>
+                                  {t("assessmentAcademic")}
+                                </DimensionHeading>
+                                <div className="mt-1">
+                                  <AcademicComparisonList comparisons={r.assessment.academicComparisons} />
+                                </div>
+                              </div>
+                              <div>
+                                <DimensionHeading icon={<HelpCircle className="h-3.5 w-3.5" />}>
+                                  {t("assessmentUnknowns")}
+                                </DimensionHeading>
+                                {r.assessment.unknowns.length === 0 ? (
+                                  <p className="mt-1 text-slate-500 dark:text-slate-500">{t("assessmentNoUnknowns")}</p>
                                 ) : (
-                                  <Badge tone="slate">
-                                    <HelpCircle className="h-3 w-3" /> {t("affordabilityUnknown")}
-                                  </Badge>
+                                  // Plain language, not raw field keys: what is
+                                  // missing AND what the student can do next.
+                                  <ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-600 dark:text-slate-300">
+                                    {r.assessment.unknowns.slice(0, 4).map((unknown) => (
+                                      <li key={`${unknown.field}-${unknown.reason}`}>
+                                        {unknownFieldLabel(unknown.field, tAssessment)} —{" "}
+                                        {unknownReasonLabel(unknown.reason, tAssessment)}
+                                      </li>
+                                    ))}
+                                  </ul>
                                 )}
-                              </li>
-                              <li className="pt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">{t("funding")}</li>
-                              {r.affordability.scholarshipMatches.length === 0 ? (
-                                <li className="text-sm text-slate-500 dark:text-slate-400">{t("noFunding")}</li>
-                              ) : (
-                                r.affordability.scholarshipMatches.slice(0, 5).map((s) => (
-                                  <li key={s.id} className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200">
-                                    <Coins className="h-3 w-3 shrink-0 text-amber-500" /> {s.title}
-                                    {s.coverageType ? <span className="text-slate-500 dark:text-slate-500">({s.coverageType})</span> : null}
-                                  </li>
-                                ))
-                              )}
-                            </ul>
-                          </div>
-
-                          {/* 4 — QS & department positioning (was an empty
-                              "probability unavailable" box; the same caption
-                              now sits once, quietly, at the page foot). */}
-                          <div>
-                            <DimHeading icon={<Scale className="h-3.5 w-3.5" />}>{t("positioningLabel")}</DimHeading>
-                            <div className="mt-1.5 rounded-control border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
-                              {r.positioning ? (
-                                <dl className="space-y-1 text-xs leading-snug">
-                                  {r.positioning.qsRank != null && (
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <dt className="text-slate-500 dark:text-slate-400">{t("positioningQsRank")}</dt>
-                                      <dd className="font-semibold text-slate-800 dark:text-slate-100">QS #{r.positioning.qsRank}</dd>
-                                    </div>
-                                  )}
-                                  <div className="flex items-baseline justify-between gap-2">
-                                    <dt className="text-slate-500 dark:text-slate-400">{t("positioningSelectivity")}</dt>
-                                    <dd className="text-right font-semibold text-slate-800 dark:text-slate-100">
-                                      {r.positioning.departmentLabel}
-                                    </dd>
-                                  </div>
-                                  <div className="flex items-baseline justify-between gap-2">
-                                    <dt className="text-slate-500 dark:text-slate-400">{t("positioningGpaBand")}</dt>
-                                    <dd className="font-semibold text-slate-800 dark:text-slate-100">
-                                      {t("positioningGpaRange", {
-                                        low: r.positioning.gpa25.toFixed(2),
-                                        median: r.positioning.gpa50.toFixed(2),
-                                        high: r.positioning.gpa75.toFixed(2),
-                                      })}
-                                    </dd>
-                                  </div>
-                                  {r.positioning.universityAcceptRatePct != null && (
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <dt className="text-slate-500 dark:text-slate-400">{t("positioningAcceptRate")}</dt>
-                                      <dd className="font-semibold text-slate-800 dark:text-slate-100">
-                                        {t("positioningAcceptRateValue", { rate: r.positioning.universityAcceptRatePct })}
-                                      </dd>
-                                    </div>
-                                  )}
-                                </dl>
-                              ) : (
-                                <p className="text-sm leading-snug text-slate-500 dark:text-slate-400">
-                                  {t("positioningNotBenchmarked")}
-                                </p>
-                              )}
+                              </div>
                             </div>
-
-                            {/* Next application cycle */}
-                            <div className="mt-3">
-                              <DimHeading icon={<CalendarClock className="h-3.5 w-3.5" />}>{t("nextCycle")}</DimHeading>
-                              {r.nextCycle ? (
-                                <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-200">
-                                  {r.nextCycle.intake ? `${r.nextCycle.intake}` : null}
-                                  {r.nextCycle.academicYear ? ` ${r.nextCycle.academicYear}` : null} — {t("cycleDeadline")}{" "}
-                                  <span className="font-semibold">{r.nextCycle.deadline ? fmtDate(r.nextCycle.deadline) : "—"}</span>
-                                  {r.nextCycle.isEstimated ? (
-                                    <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">{t("cycleEstimated")}</span>
-                                  ) : r.cycleStale ? (
-                                    <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">{t("stale")}</span>
-                                  ) : null}
-                                </p>
-                              ) : (
-                                <p className="mt-1.5 flex items-start gap-1.5 text-sm text-slate-500 dark:text-slate-400">
-                                  <HelpCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {t("noCycle")}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                          </details>
                         </div>
 
                         {/* Ranking factors / missing inputs / considerations */}

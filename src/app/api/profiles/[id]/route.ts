@@ -1,5 +1,6 @@
 import { postgresId } from "@/lib/pagination";
 import { parseApplicantContext } from "@/lib/applicantContext";
+import { normalizeAssessmentPreferencesForWrite } from "@/lib/assessmentStored";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { db } from "@/db";
 import { studentProfiles } from "@/db/schema";
@@ -49,6 +50,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
+
+/**
+ * Postgres `undefined_column` (42703) — the migration was not applied. Matched on
+ * the SQLSTATE when the driver exposes it, and on the message otherwise, so the
+ * check works with both the pg error and a wrapped driver error.
+ */
+function isMissingColumnError(error: unknown): boolean {
+  const code = (error as { code?: unknown })?.code;
+  if (code === "42703") return true;
+  const message = (error as { message?: unknown })?.message;
+  return typeof message === "string" && /column .* does not exist/i.test(message);
+}
 
 /**
  * Field coercers for the "complete profile" inputs.
@@ -142,6 +155,24 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     let applicantContext;
     try{applicantContext=parseApplicantContext(body.applicantContext);}
     catch(error){return privateNoStoreJson({error:error instanceof Error?error.message:"Invalid applicant context",code:"applicant_context_invalid"},{status:400});}
+    // Preference modes (must / prefer / no_preference + the study_load and
+    // delivery_mode axes). Invalid input is rejected rather than silently
+    // dropped, because a lost `must` would quietly change an assessment.
+    let assessmentPreferences: ReturnType<typeof normalizeAssessmentPreferencesForWrite> | undefined;
+    if (body.assessmentPreferences !== undefined) {
+      if (body.assessmentPreferences === null) {
+        assessmentPreferences = null;
+      } else {
+        const normalised = normalizeAssessmentPreferencesForWrite(body.assessmentPreferences);
+        if (!normalised) {
+          return privateNoStoreJson(
+            { error: "Invalid assessment preferences", code: "assessment_preferences_invalid" },
+            { status: 400 }
+          );
+        }
+        assessmentPreferences = normalised;
+      }
+    }
     const hasStudyInterests = body.studyInterests !== undefined;
     const submittedStudyInterests = hasStudyInterests
       ? parseStudyInterestSelections(body.studyInterests)
@@ -297,6 +328,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         onboardingStep:
           optionalNumber(body.onboardingStep, { min: 0, max: 3, integer: true }) ?? undefined,
         onboardingCompleted: body.onboardingCompleted !== undefined ? !!body.onboardingCompleted : undefined,
+        // Preference modes: absent = unchanged, explicit null = cleared (the
+        // legacy reader migration then applies again).
+        assessmentPreferences,
         updatedAt: new Date(),
       })
       .where(eq(studentProfiles.id, profileId))
@@ -359,11 +393,32 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return response;
   } catch (error) {
     console.error("PUT /api/profiles/[id] error:", error);
+    // Reported before the generic fallback on purpose: a missing column must
+    // never be presented as a plain "failed to update" (nor as a success).
+    // (Handled at the end of this block so the unique-email check stays first.)
     // Race on the unique email index.
     if (isUniqueViolation(error)) {
       return privateNoStoreJson(
         { error: "This email is already used by another account" },
         { status: 409 }
+      );
+    }
+    // A missing column is a DEPLOYMENT problem, not a user error: the migration
+    // that adds `assessment_preferences` has not been applied to this database.
+    // Say so explicitly instead of reporting a generic failure — a silent
+    // "saved" here would be worse than the error, because the student's required
+    // choices would be silently dropped from their assessment.
+    if (isMissingColumnError(error)) {
+      console.error(
+        "PUT /api/profiles/[id]: missing column — apply supabase/add_assessment_preferences_2026-11-11.sql"
+      );
+      return privateNoStoreJson(
+        {
+          error:
+            "Preference storage is not available on this deployment yet. Your previous settings were kept; nothing was saved.",
+          code: "assessment_preferences_unavailable",
+        },
+        { status: 503 }
       );
     }
     return privateNoStoreJson({ error: "Failed to update profile" }, { status: 500 });
