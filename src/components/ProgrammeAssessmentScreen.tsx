@@ -262,7 +262,7 @@ export function ProgrammeAssessmentScreen({
           {t("unavailableTitle")}
         </h3>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{t("unavailableBody")}</p>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t("assessmentPrivacyNote")}</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("assessmentPrivacyNote")}</p>
       </section>
 
       {loading && <p className="text-sm text-slate-500">{t("assessing")}</p>}
@@ -285,7 +285,7 @@ export function ProgrammeAssessmentScreen({
               {group.rows.length}
             </span>
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{groupHintLabel(group.key, t)}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{groupHintLabel(group.key, t)}</p>
 
           {group.rows.map((row) => {
             const isOpen = expanded === row.universityId;
@@ -297,7 +297,8 @@ export function ProgrammeAssessmentScreen({
                 key={row.universityId}
                 className="overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900"
               >
-                <button
+                <Button
+                  variant="unstyled"
                   type="button"
                   onClick={() => setExpanded(isOpen ? null : row.universityId)}
                   aria-expanded={isOpen}
@@ -307,7 +308,7 @@ export function ProgrammeAssessmentScreen({
                     {row.country ? <CountryFlag country={row.country} /> : null}
                     <span className="min-w-0">
                       <span className="block truncate font-bold text-slate-900 dark:text-slate-100">{row.universityName}</span>
-                      <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                      <span className="block truncate text-sm text-slate-500 dark:text-slate-400">
                         {localizeCountry(row.country, locale)}
                         {assessment.programme.name ? ` · ${localizeMajorOrField(assessment.programme.name, locale)}` : ""}
                         {assessment.context.degreeLevel ? ` · ${assessment.context.degreeLevel}` : ""}
@@ -316,13 +317,13 @@ export function ProgrammeAssessmentScreen({
                   </span>
                   <FitBadge fit={assessment.preferenceFit} label={t("fitLabel")} />
                   <EligibilityBadge status={assessment.eligibility.status} />
-                  {isOpen ? <ChevronUp className="h-4 w-4 text-slate-400" aria-hidden /> : <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden />}
-                </button>
+                  {isOpen ? <ChevronUp className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden /> : <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden />}
+                </Button>
 
                 {isOpen && (
                   <div className="space-y-4 border-t border-slate-100 p-4 dark:border-slate-800">
                     {programmeOptions.length > 1 && (
-                      <label className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <label className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
                         <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
                         {t("chooseProgramme")}
                         <select
@@ -333,7 +334,7 @@ export function ProgrammeAssessmentScreen({
                               [row.universityId]: Number(event.target.value),
                             }))
                           }
-                          className="rounded-control border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
+                          className="rounded-control border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
                         >
                           {programmeOptions.map((programme) => (
                             <option key={programme.id} value={programme.id}>
@@ -345,7 +346,7 @@ export function ProgrammeAssessmentScreen({
                       </label>
                     )}
 
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       {t("assessedScope", {
                         cycle: assessment.context.cycle ?? t("notStated"),
                         category: assessment.context.applicantCategory ?? t("notStated"),
@@ -422,7 +423,7 @@ export function ProgrammeAssessmentScreen({
                         </div>
                       )}
                       {assessment.eligibility.limitations.map((line) => (
-                        <p key={line} className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        <p key={line} className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                           {line}
                         </p>
                       ))}
@@ -470,7 +471,7 @@ export function ProgrammeAssessmentScreen({
                           </dd>
                         </div>
                       </dl>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{financeStatusLabel(assessment.finance.status, t)}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{financeStatusLabel(assessment.finance.status, t)}</p>
                       {assessment.finance.excludedFunding.length > 0 && (
                         <details className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                           <summary className="cursor-pointer font-semibold">{t("financeExcludedTitle")}</summary>
@@ -515,9 +516,9 @@ export function ProgrammeAssessmentScreen({
                         {t("sectionUnknowns")}
                       </h4>
                       {assessment.unknowns.length === 0 ? (
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("noUnknowns")}</p>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("noUnknowns")}</p>
                       ) : (
-                        <ul className="mt-1 list-disc pl-4 text-xs text-slate-600 dark:text-slate-300">
+                        <ul className="mt-1 list-disc pl-4 text-sm text-slate-600 dark:text-slate-300">
                           {assessment.unknowns.slice(0, 8).map((unknown) => (
                             <li key={`${unknown.field}-${unknown.reason}`}>
                               {unknownFieldLabel(unknown.field, t)} — {unknownReasonLabel(unknown.reason, t)}
@@ -550,7 +551,7 @@ export function ProgrammeAssessmentScreen({
                       )}
                     </section>
 
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
                       {assessment.programme.officialProgramUrl && (
                         <a
                           className="inline-flex items-center gap-1 font-semibold text-indigo-600 underline dark:text-indigo-300"
@@ -573,7 +574,7 @@ export function ProgrammeAssessmentScreen({
         </section>
       ))}
 
-      <details className="rounded-overlay border border-slate-200 bg-white p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+      <details className="rounded-overlay border border-slate-200 bg-white p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         <summary className="cursor-pointer text-sm font-semibold">{t("methodologyNoteLabel")}</summary>
         <p className="mt-2">{t("methodologyBody")}</p>
       </details>

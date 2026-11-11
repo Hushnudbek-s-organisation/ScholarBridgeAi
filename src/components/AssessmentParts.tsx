@@ -398,7 +398,7 @@ export function FitSummary({ fit }: { fit: FitPoint }) {
   const t = useTranslations("chancing");
   const text = scoreText(fit);
   if (text == null) {
-    return <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("fitNoActivePreferences")}</p>;
+    return <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("fitNoActivePreferences")}</p>;
   }
   const isPoint = fit.pointFit != null;
   return (
@@ -406,7 +406,7 @@ export function FitSummary({ fit }: { fit: FitPoint }) {
       <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
         {t("fitLabel")}: {text}
       </p>
-      <p className="text-xs text-slate-600 dark:text-slate-300">
+      <p className="text-sm text-slate-600 dark:text-slate-300">
         {/* An uncomputed coverage prints nothing rather than a misleading 0%. */}
         {fit.coverage == null ? null : `${t("coverageLine", { pct: Math.round(fit.coverage) })}`}
         {fit.missingAxes.length > 0
@@ -414,9 +414,9 @@ export function FitSummary({ fit }: { fit: FitPoint }) {
           : ""}
       </p>
       {!isPoint && fit.knownFit != null && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">{t("knownFactorsOnly", { fit: oneDecimal(fit.knownFit) })}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t("knownFactorsOnly", { fit: oneDecimal(fit.knownFit) })}</p>
       )}
-      <p className="text-xs text-slate-500 dark:text-slate-400">{t("fitNotProbability")}</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">{t("fitNotProbability")}</p>
     </div>
   );
 }
@@ -451,7 +451,7 @@ export function PreferenceFilterList({ filters }: { filters: PreferenceFilter[] 
   const t = useTranslations("chancing");
   if (filters.length === 0) return null;
   return (
-    <ul className="mt-1.5 space-y-1 text-xs" aria-label={t("mustFiltersLabel")}>
+    <ul className="mt-1.5 space-y-1 text-sm" aria-label={t("mustFiltersLabel")}>
       {filters.map((filter) => (
         <li key={filter.axis} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="font-semibold text-slate-700 dark:text-slate-200">{axisLabel(filter.axis, t)}</span>
@@ -495,7 +495,7 @@ export function EligibilitySummaryLine({ assessment }: { assessment: Assessment 
   const t = useTranslations("chancing");
   if (!assessment.eligibility.requirementsDocumented) {
     return (
-      <p className="text-xs text-amber-700 dark:text-amber-300">{t("eligibilityUndocumented")}</p>
+      <p className="text-sm text-amber-700 dark:text-amber-300">{t("eligibilityUndocumented")}</p>
     );
   }
   const firstGap = assessment.eligibility.gaps[0];
@@ -506,8 +506,8 @@ export function EligibilitySummaryLine({ assessment }: { assessment: Assessment 
   });
   return (
     <div className="space-y-0.5">
-      <p className="text-xs text-slate-600 dark:text-slate-300">{counts}</p>
-      {firstGap ? <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">{firstGap.text}</p> : null}
+      <p className="text-sm text-slate-600 dark:text-slate-300">{counts}</p>
+      {firstGap ? <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">{firstGap.text}</p> : null}
     </div>
   );
 }
@@ -520,10 +520,10 @@ export function CheckRow({ check }: { check: EligibilityCheck }) {
       : check.status === "unmet"
         ? "text-rose-700 dark:text-rose-300"
         : check.status === "not_applicable"
-          ? "text-slate-400"
+          ? "text-slate-500 dark:text-slate-400"
           : "text-amber-700 dark:text-amber-300";
   return (
-    <li className="rounded-control border border-slate-200 p-2 text-xs dark:border-slate-700">
+    <li className="rounded-control border border-slate-200 p-2 text-sm dark:border-slate-700">
       <p className="flex flex-wrap items-center gap-2">
         <span className="font-semibold text-slate-800 dark:text-slate-100">{check.label}</span>
         <span className={`font-semibold ${tone}`}>{eligibilityStatusLabel(check.status, t)}</span>
@@ -566,10 +566,10 @@ export function CheckRow({ check }: { check: EligibilityCheck }) {
 export function AcademicComparisonList({ comparisons }: { comparisons: AcademicComparison[] }) {
   const t = useTranslations("chancing");
   if (comparisons.length === 0) {
-    return <p className="text-xs text-slate-500 dark:text-slate-400">{t("academicNoStatistics")}</p>;
+    return <p className="text-sm text-slate-500 dark:text-slate-400">{t("academicNoStatistics")}</p>;
   }
   return (
-    <ul className="space-y-2 text-xs">
+    <ul className="space-y-2 text-sm">
       {comparisons.map((comparison) => (
         <li key={comparison.metric} className="rounded-control border border-slate-200 p-2 dark:border-slate-700">
           <p className="font-semibold text-slate-800 dark:text-slate-100">
@@ -653,7 +653,7 @@ export function FinanceBlock({ finance }: { finance: Assessment["finance"] }) {
           </dd>
         </div>
       </dl>
-      <p className="text-xs text-slate-500 dark:text-slate-400">{financeStatusLabel(finance.status, t)}</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">{financeStatusLabel(finance.status, t)}</p>
     </div>
   );
 }
@@ -661,5 +661,5 @@ export function FinanceBlock({ finance }: { finance: Assessment["finance"] }) {
 /** The explicit "no probability" statement. Never a blank space. */
 export function AdmissionProbabilityNote() {
   const t = useTranslations("chancing");
-  return <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{t("probabilityNotProvided")}</p>;
+  return <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t("probabilityNotProvided")}</p>;
 }

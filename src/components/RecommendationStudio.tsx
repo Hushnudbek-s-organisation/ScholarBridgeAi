@@ -295,7 +295,7 @@ function Badge({ tone, children }: { tone: "green" | "red" | "amber" | "slate" |
 function DimensionHeading({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <h5 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-      {icon ? <span className="text-slate-400 dark:text-slate-500">{icon}</span> : null}
+      {icon ? <span className="text-slate-500 dark:text-slate-400">{icon}</span> : null}
       {children}
     </h5>
   );
@@ -682,7 +682,7 @@ export function RecommendationStudio({
   const inputCls =
     "w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-indigo-900";
   const labelCls = "mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300";
-  const hintCls = "mt-1 text-xs leading-snug text-slate-500 dark:text-slate-400";
+  const hintCls = "mt-1 text-sm leading-snug text-slate-500 dark:text-slate-400";
   const btnPrimary =
     "inline-flex items-center justify-center gap-2 rounded-control bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60";
   const btnGhost =
@@ -1066,7 +1066,7 @@ export function RecommendationStudio({
                                 <EligibilitySummaryLine assessment={r.assessment} />
                               </div>
                               {r.assessment.eligibility.gaps[0] ? (
-                                <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">
+                                <p className="mt-1 text-sm text-rose-700 dark:text-rose-300">
                                   {t("assessmentGapHint")}
                                 </p>
                               ) : null}
@@ -1096,7 +1096,7 @@ export function RecommendationStudio({
                                   </dd>
                                 </div>
                               </dl>
-                              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                 {financeStatusLabel(r.assessment.finance.status, tAssessment)}
                               </p>
                             </div>

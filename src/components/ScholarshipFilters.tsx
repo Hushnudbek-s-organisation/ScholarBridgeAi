@@ -244,7 +244,7 @@ export function ScholarshipFiltersPanel({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs leading-snug text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm leading-snug text-slate-500 dark:text-slate-400">
             {t("requirementStatusNote")}
           </p>
         </Field>
