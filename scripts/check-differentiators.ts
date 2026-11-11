@@ -684,7 +684,11 @@ check("every fetch added to the journey panels is a relative API call", [...expl
 const similar = read("src/components/SimilarProfiles.tsx");
 const chancing = read("src/components/ChancingPanel.tsx");
 check("similar profiles mounts the twin card", similar.includes("<TwinStrategyCard profileId={activeProfile?.id ?? null}"));
-check("the chancing panel mounts the twin card too", chancing.includes("<TwinStrategyCard profileId={profileId} />"));
+check(
+  "the chancing panel mounts the assessment screen, which mounts the twin card",
+  /<ProgrammeAssessmentScreen/.test(chancing) &&
+    read("src/components/ProgrammeAssessmentScreen.tsx").includes("<TwinStrategyCard profileId={profileId} />")
+);
 
 const opportunities = read("src/components/OpportunitiesPanel.tsx");
 check("the opportunities feed mounts the outreach studio", opportunities.includes("<ProfessorOutreachStudio profile={activeProfile}"));

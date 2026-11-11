@@ -1235,6 +1235,7 @@ and the migration is safely retried.
 | `gre_score` | integer | yes | yes |  |
 | `budget_annual_usd` | integer |  | yes |  |
 | `preferred_countries` | text |  | yes |  |
+| `assessment_preferences` | jsonb | yes | — | Versioned preference modes for the canonical programme assessment (`must` / `prefer` / `no_preference`, plus separate `study_load` and `delivery_mode` axes). NULL means "not set": the reader migrates the legacy `preferred_countries`/language value to `prefer`, never to `must`. CHECK restricts it to a JSON object or NULL. Applied in production as `20261111141353_add_assessment_preferences_20261111`; see `supabase/add_assessment_preferences_2026-11-11.sql` and `docs/ASSESSMENT_MIGRATION_2026-11-11.md`. |
 | `need_scholarship` | boolean |  | yes |  |
 | `extracurriculars` | text | yes | yes |  |
 | `work_experience_years` | integer | yes | yes |  |

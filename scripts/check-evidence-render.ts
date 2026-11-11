@@ -170,7 +170,9 @@ check("§5 — all five remaining panels render EvidenceNote with an explicitly 
   const expected: Record<string, [string, string]> = {
     "src/components/ApplicationTracker.tsx": ["legacy_unknown", "unverified"],
     "src/components/SimilarProfiles.tsx": ["observed", "observed_statistic"],
-    "src/components/ChancingPanel.tsx": ["computed", "computed_fit"],
+    // The chancing panel is a thin wrapper now; the assessment screen it mounts
+    // is the surface that shows numbers, so the envelope guard follows it.
+    "src/components/AssessmentParts.tsx": ["observed", "observed_statistic"],
     "src/components/FeeWaiverStudio.tsx": ["computed", "computed_fit"],
     "src/components/UniversityDetail.tsx": ["legacy_unknown", "unverified"],
   };

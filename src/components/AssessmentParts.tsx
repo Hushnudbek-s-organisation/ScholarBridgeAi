@@ -26,6 +26,8 @@
 import React from "react";
 import { AlertTriangle, CheckCircle2, ExternalLink, HelpCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { EvidenceNote } from "@/components/EvidenceNote";
+import { presentRaw } from "@/lib/factPresentation";
 
 // ---------------------------------------------------------------------------
 // Response shapes (only the fields these components render)
@@ -574,6 +576,25 @@ export function AcademicComparisonList({ comparisons }: { comparisons: AcademicC
             {academicMetricLabel(comparison.metric, t)} · {academicPositionLabel(comparison.position, t)}
           </p>
           <p className="text-slate-600 dark:text-slate-300">{comparison.statement}</p>
+          {/*
+            A published statistic is an OBSERVED cohort value, never an official
+            minimum: it is routed through the shared evidence renderer so the
+            trust and the population/cycle travel with the number.
+          */}
+          <EvidenceNote
+            compact
+            label={academicMetricLabel(comparison.metric, t)}
+            fact={presentRaw({
+              value: comparison.studentValue,
+              fieldLabel: academicMetricLabel(comparison.metric, t),
+              trust: "observed",
+              valueType: "observed_statistic",
+              unit: comparison.unit,
+              admissionCycle: comparison.statisticYear,
+              sourceUrl: comparison.sourceUrl,
+              note: `${comparison.statisticScope.label} · ${comparison.population}`,
+            })}
+          />
           <p className="mt-1 text-slate-500 dark:text-slate-400">
             {t("academicScopeLine", {
               year: comparison.statisticYear ?? t("notStated"),
