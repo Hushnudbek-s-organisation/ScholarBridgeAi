@@ -102,7 +102,7 @@ Yakuniy holat (`475947f` ustida qayta yurgizilgan):
 | `npm run test:schema` | **PASSED** (offline; `assessment_preferences` ustuni `docs/SUPABASE_SCHEMA.md` da) |
 | `npm run test:landing-copy` / `test:localization` / `test:internal-surfaces` | 13 / 18 / 8 passed |
 | `npm run test:journey` / `test:growth` | 115 / 39 assertions passed |
-| `npm run test:e2e` | **14 passed, 2 skipped** (18.0m) |
+| `npm run test:e2e` (production mode, `E2E_NEXT_MODE=start` — CI bilan bir xil) | **52 passed, 2 skipped** (14.3m) |
 | `npm run test:site-completeness` | 1780 fayl, `findings: []`, `reviewCandidates: []` |
 | `npm run typecheck` / `npm run lint` / `npm run build` | exit 0 / 0 error / compiled |
 | `node scripts/check-i18n.mjs` | passed (en/uz/ru parity) |
@@ -110,6 +110,17 @@ Yakuniy holat (`475947f` ustida qayta yurgizilgan):
 CI ro‘yxatidagi 85 ta `test:*` skripti bittalab yurgizildi; faqat
 `differentiators`, `evidence-render`, `schema` yiqilgan edi — uchtasi ham
 qo‘riqni **kuchaytirib** tuzatildi (o‘chirilmadi).
+
+E2E bo‘yicha izoh: `npm run test:e2e` **dev** rejimida yurgizilganda 5 ta test
+vaqti-vaqti bilan yiqildi (`#main-content` ko‘rinmay qolishi, `route.fulfill:
+Route is already handled`, `page.reload: net::ERR_ABORTED`) — bular dev
+kompilyatsiyasining sekinligi, kod xatosi emas. CI aynan
+`E2E_NEXT_MODE=start` bilan ishlaydi; shu rejimda 52/52 test o‘tadi. Ikki e2e
+spetsifikatsiyasi (`continuation-contracts`, `university-detail-contracts`)
+eski `chanceScore` / `chance.score` maydonlarini kutardi — ular endi
+o‘chirilmagan, **yangi invariantga** qaratildi: `chanceScore` javobda umuman
+yo‘q, `chance` esa canonical `assessment` bilan aynan bir xil obyekt va
+`admissionProbability.value = null`.
 
 ### Uch fit misoli (testdan haqiqiy chiqish)
 
