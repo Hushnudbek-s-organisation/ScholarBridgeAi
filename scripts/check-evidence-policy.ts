@@ -156,14 +156,21 @@ check("EN/UZ/RU public features no longer claim a personal admission chance", ()
   }
 });
 
-check("chancing bands no longer use Likely / Ehtimolli / Вероятный labels", () => {
+check("the retired Safety/Target/Reach band labels are gone from every locale", () => {
+  // The bands were deleted with the legacy engine, so the guard asserts the
+  // absence of the whole vocabulary rather than checking strings that no longer
+  // exist. A comeback — under any locale — fails here.
+  // Only the retired BAND vocabulary, not the word "probability": legitimate
+  // policy copy ("probability is not provided") is full of that word on purpose.
+  const banned = /Safety \/ Likely|Target \/ Match|High Reach \/ Ultra|Ehtimolli[^.]{0,20}band|Сверхселективн/i;
   for (const locale of ["en", "uz", "ru"]) {
-    const chancing = (JSON.parse(read(`src/i18n/messages/${locale}.json`)) as any).chancing;
-    for (const key of ["selectSafety", "selectTarget", "selectReach", "selectHighReach"]) {
-      const label = String(chancing[key]);
-      assert.doesNotMatch(label, /Likely|Ehtimolli|Вероятный|Safety \/|Target \/|^Reach$|Сверхселективный|Juda raqobatli|Yuqori daraja/i);
-      assert.match(label, /not probability|ehtimol emas|не вероятность/i);
+    const messages = JSON.parse(read(`src/i18n/messages/${locale}.json`)) as Record<string, unknown>;
+    const chancing = (messages.chancing ?? {}) as Record<string, unknown>;
+    for (const key of ["selectSafety", "selectTarget", "selectReach", "selectHighReach", "chanceBadgeLabel", "chanceAdmitRate"]) {
+      assert.equal(key in chancing, false, `${locale}.chancing.${key} came back`);
     }
+    const strings = collectStrings(messages).join("\n");
+    assert.doesNotMatch(strings, banned, `${locale} reintroduced a selectivity band label`);
   }
 });
 

@@ -48,109 +48,66 @@ import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { TwinStrategyCard } from "./TwinStrategyCard";
 import CountryFlag from "@/components/CountryFlag";
 
+const GROUP_ORDER = ["meets_requirements", "needs_check", "requirement_gaps", "preference_mismatch"] as const;
+
+/** Static lookups: a computed message key can ship a missing locale entry. */
+function groupLabel(key: (typeof GROUP_ORDER)[number], t: (key: string) => string): string {
+  switch (key) {
+    case "meets_requirements":
+      return t("group_meets_requirements");
+    case "needs_check":
+      return t("group_needs_check");
+    case "requirement_gaps":
+      return t("group_requirement_gaps");
+    default:
+      return t("group_preference_mismatch");
+  }
+}
+
+function groupHintLabel(key: (typeof GROUP_ORDER)[number], t: (key: string) => string): string {
+  switch (key) {
+    case "meets_requirements":
+      return t("groupHint_meets_requirements");
+    case "needs_check":
+      return t("groupHint_needs_check");
+    case "requirement_gaps":
+      return t("groupHint_requirement_gaps");
+    default:
+      return t("groupHint_preference_mismatch");
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Response shapes (only the fields this screen renders)
+// Screen-local row types
 // ---------------------------------------------------------------------------
 
-type FitPoint = {
-  pointFit: number | null;
-  knownFit: number | null;
-  coverage: number | null;
-  lowerBound: number | null;
-  upperBound: number | null;
-  weightedSimilarity: number;
-  totalWeight: number;
-  knownWeight: number;
-  reason: string;
-  missingAxes: string[];
-  filters?: { axis: string; state: "pass" | "fail" | "unknown"; reason: string }[];
-  breakdown?: {
-    axis: string;
-    mode: string;
-    weight: number;
-    similarity: number | null;
-    state: string;
-    note: string | null;
-  }[];
-};
-
-type EligibilityCheck = {
-  requirementId: string;
-  label: string;
-  status: "met" | "unmet" | "unknown" | "not_applicable";
-  reason: string;
-  unknownReason: string | null;
-  note: string;
-  userValue: string | null;
-  requiredValue: string | null;
-  sourceUrl: string | null;
-  gap: { metric: string; current: number; required: number; delta: number } | null;
-  children: EligibilityCheck[];
-};
-
-type Assessment = {
-  scoringVersion: string;
-  assessedAt: string;
-  context: { cycle: string | null; applicantCategory: string | null; degreeLevel: string | null };
-  programme: {
-    id: number;
-    name: string;
-    field: string | null;
-    degreeLevel: string | null;
-    language: string | null;
-    country: string | null;
-    universityName: string | null;
-    officialProgramUrl: string | null;
-  };
-  preferenceFit: FitPoint;
-  preferenceFilters: { axis: string; state: "pass" | "fail" | "unknown"; reason: string }[];
-  eligibility: {
-    status: "met" | "unmet" | "unknown" | "not_applicable";
-    requirementsDocumented: boolean;
-    checks: EligibilityCheck[];
-    counts: { met: number; unmet: number; unknown: number; notApplicable: number };
-    unknownReasons: string[];
-    gaps: { requirementId: string; label: string; text: string }[];
-    limitations: string[];
-  };
-  finance: {
-    annualTotalUsd: number | null;
-    annualTotalLowerBoundUsd: number;
-    confirmedFundingUsd: number | null;
-    netAnnualCostUsd: number | null;
-    fundingGapUsd: number | null;
-    fundingGapRangeUsd: { lower: number; upper: number | null } | null;
-    availableBudgetUsd: number | null;
-    status: string;
-    missingCostLines: string[];
-    excludedFunding: { key: string; reason: string }[];
-    scenarios: { key: string; label: string; conditional: boolean; netAnnualCostUsd: number | null; fundingGapUsd: number | null; note: string }[];
-    notes: string[];
-  };
-  academicComparisons: {
-    metric: string;
-    position: "below" | "within" | "above" | "unknown";
-    reason: string | null;
-    studentValue: number | null;
-    p25: number | null;
-    p50: number | null;
-    p75: number | null;
-    unit: string;
-    statisticYear: string | null;
-    statisticScope: { kind: string; label: string };
-    population: string;
-    sourceUrl: string | null;
-    statement: string;
-  }[];
-  admissionProbability: { value: null; reason: string };
-  group: number;
-  groupKey: "meets_requirements" | "needs_check" | "requirement_gaps" | "preference_mismatch";
-  groupReasons: string[];
-  unknowns: { field: string; reason: string }[];
-  evidence: { kind: string; label: string; sourceUrl: string | null; note?: string | null }[];
-  personalData: { recordedMetrics: string[] };
-};
-
+// The assessment SHAPES and the shared renderers live in one place: this
+// screen and the recommendation studio must describe the same numbers with
+// the same words, and neither may re-implement the formula.
+import {
+  AcademicComparisonList,
+  AdmissionProbabilityNote,
+  CheckRow,
+  EligibilityBadge,
+  EligibilitySummaryLine,
+  FitBadge,
+  FitSummary,
+  PreferenceFilterList,
+  FinanceBlock,
+  academicMetricLabel,
+  academicPositionLabel,
+  axisLabel,
+  financeStatusLabel,
+  fundingReasonLabel,
+  modeLabel,
+  money,
+  oneDecimal,
+  unknownFieldLabel,
+  unknownReasonLabel,
+  eligibilityStatusLabel,
+  type Assessment,
+  type FitPoint,
+} from "@/components/AssessmentParts";
 type UniversityRow = {
   universityId: number;
   universityName: string;
@@ -184,18 +141,6 @@ type ChancingResponse = {
   catalogUniversities?: { id: number; name: string; country: string; flagEmoji: string; worldRanking: number | null }[];
   scoringVersion?: string;
 };
-
-const GROUP_ORDER = ["meets_requirements", "needs_check", "requirement_gaps", "preference_mismatch"] as const;
-
-/** Round ONLY at the display edge; the engine keeps full precision. */
-function oneDecimal(value: number): string {
-  return String(Math.round(value * 10) / 10);
-}
-
-function money(value: number | null): string {
-  if (value == null) return "—";
-  return `$${Math.round(value).toLocaleString("en-US")}`;
-}
 
 export function ProgrammeAssessmentScreen({
   profileId: propProfileId,
@@ -335,12 +280,12 @@ export function ProgrammeAssessmentScreen({
       {grouped.map((group) => (
         <section key={group.key} className="space-y-3">
           <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-            {t(`group_${group.key}`)}
+            {groupLabel(group.key, t)}
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               {group.rows.length}
             </span>
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{t(`groupHint_${group.key}`)}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{groupHintLabel(group.key, t)}</p>
 
           {group.rows.map((row) => {
             const isOpen = expanded === row.universityId;
@@ -414,27 +359,7 @@ export function ProgrammeAssessmentScreen({
                         {t("sectionFit")}
                       </h4>
                       <FitSummary fit={assessment.preferenceFit} />
-                      {assessment.preferenceFilters.length > 0 && (
-                        <ul className="mt-2 space-y-1 text-xs">
-                          {assessment.preferenceFilters.map((filter) => (
-                            <li key={filter.axis} className="flex items-center gap-2">
-                              <span className="font-semibold">{t(`axis_${filter.axis}`)}</span>
-                              <span
-                                className={
-                                  filter.state === "pass"
-                                    ? "text-emerald-700 dark:text-emerald-300"
-                                    : filter.state === "fail"
-                                      ? "text-rose-700 dark:text-rose-300"
-                                      : "text-amber-700 dark:text-amber-300"
-                                }
-                              >
-                                {t(`mustState_${filter.state}`)}
-                              </span>
-                              <span className="text-slate-500">{filter.reason}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      <PreferenceFilterList filters={assessment.preferenceFilters} />
                       <details className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                         <summary className="cursor-pointer font-semibold">{t("howFitIsCalculated")}</summary>
                         <div className="mt-2 space-y-2">
@@ -452,8 +377,8 @@ export function ProgrammeAssessmentScreen({
                             <tbody>
                               {(assessment.preferenceFit.breakdown ?? []).map((item) => (
                                 <tr key={item.axis} className="border-t border-slate-100 dark:border-slate-800">
-                                  <th scope="row" className="p-1 font-medium">{t(`axis_${item.axis}`)}</th>
-                                  <td className="p-1">{t(`mode_${item.mode}`)}</td>
+                                  <th scope="row" className="p-1 font-medium">{axisLabel(item.axis, t)}</th>
+                                  <td className="p-1">{modeLabel(item.mode, t)}</td>
                                   <td className="p-1">{item.weight}</td>
                                   <td className="p-1">{item.similarity == null ? t("unknownValue") : oneDecimal(item.similarity)}</td>
                                 </tr>
@@ -476,15 +401,9 @@ export function ProgrammeAssessmentScreen({
                       <h4 id={`elig-${row.universityId}`} className="text-sm font-bold text-slate-900 dark:text-slate-100">
                         {t("sectionEligibility")}
                       </h4>
-                      <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                        {assessment.eligibility.requirementsDocumented
-                          ? t("eligibilityCounts", {
-                              met: assessment.eligibility.counts.met,
-                              unmet: assessment.eligibility.counts.unmet,
-                              unknown: assessment.eligibility.counts.unknown,
-                            })
-                          : t("eligibilityUndocumented")}
-                      </p>
+                      <div className="mt-1">
+                        <EligibilitySummaryLine assessment={assessment} />
+                      </div>
                       {assessment.eligibility.checks.length > 0 && (
                         <ul className="mt-2 space-y-1.5">
                           {assessment.eligibility.checks.map((check) => (
@@ -551,7 +470,7 @@ export function ProgrammeAssessmentScreen({
                           </dd>
                         </div>
                       </dl>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t(`financeStatus_${assessment.finance.status}`)}</p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{financeStatusLabel(assessment.finance.status, t)}</p>
                       {assessment.finance.excludedFunding.length > 0 && (
                         <details className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                           <summary className="cursor-pointer font-semibold">{t("financeExcludedTitle")}</summary>
@@ -584,38 +503,9 @@ export function ProgrammeAssessmentScreen({
                       <h4 id={`acad-${row.universityId}`} className="text-sm font-bold text-slate-900 dark:text-slate-100">
                         {t("sectionAcademic")}
                       </h4>
-                      {assessment.academicComparisons.length === 0 ? (
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("academicNoStatistics")}</p>
-                      ) : (
-                        <ul className="mt-2 space-y-2 text-xs">
-                          {assessment.academicComparisons.map((comparison) => (
-                            <li key={comparison.metric} className="rounded-control border border-slate-200 p-2 dark:border-slate-700">
-                              <p className="font-semibold">
-                                {t(`metric_${comparison.metric}`)} · {t(`position_${comparison.position}`)}
-                              </p>
-                              <p className="text-slate-600 dark:text-slate-300">{comparison.statement}</p>
-                              <p className="mt-1 text-slate-500 dark:text-slate-400">
-                                {t("academicScopeLine", {
-                                  year: comparison.statisticYear ?? t("notStated"),
-                                  scope: comparison.statisticScope.label,
-                                  population: comparison.population,
-                                })}
-                              </p>
-                              {comparison.sourceUrl && (
-                                <a
-                                  className="mt-1 inline-flex items-center gap-1 font-semibold text-indigo-600 underline dark:text-indigo-300"
-                                  href={comparison.sourceUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <ExternalLink className="h-3 w-3" aria-hidden />
-                                  {t("sourceLink")}
-                                </a>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      <div className="mt-2">
+                        <AcademicComparisonList comparisons={assessment.academicComparisons} />
+                      </div>
                     </section>
 
                     {/* 5. What this assessment does not know */}
@@ -692,210 +582,3 @@ export function ProgrammeAssessmentScreen({
 }
 
 
-/**
- * Static lookups instead of computed translation keys: a computed key can ship
- * a missing translation in one locale and only fail at render time.
- */
-type Translator = (key: string) => string;
-
-function fundingReasonLabel(reason: string, t: Translator): string {
-  switch (reason) {
-    case "loan":
-    case "repayable_loan_not_a_reduction":
-      return t("fundingReason_loan");
-    case "reimbursement":
-    case "reimbursement_cannot_pay_an_upfront_bill":
-      return t("fundingReason_reimbursement");
-    case "not_awarded_competitive_grant_is_a_scenario":
-      return t("fundingReason_competitive");
-    case "automatic_award_conditions_not_verified":
-      return t("fundingReason_automatic");
-    case "amount_unknown":
-      return t("fundingReason_amountUnknown");
-    case "not_combinable":
-    case "not_combinable_alternative_selected":
-      return t("fundingReason_notCombinable");
-    default:
-      return t("fundingReason_other");
-  }
-}
-
-function unknownFieldLabel(field: string, t: Translator): string {
-  switch (field.split(".")[0]) {
-    case "preferenceFit":
-      return t("sectionFit");
-    case "subjectRelation":
-      return t("axis_subject");
-    case "eligibility":
-      return t("sectionEligibility");
-    case "finance":
-      return t("sectionFinance");
-    case "academicComparison":
-      return t("sectionAcademic");
-    case "context":
-      return t("assessedScopeLabel");
-    default:
-      return t("sectionUnknowns");
-  }
-}
-
-function unknownReasonLabel(reason: string, t: Translator): string {
-  switch (reason) {
-    case "missing_user_data":
-      return t("reason_missing_user_data");
-    case "missing_requirement":
-      return t("reason_missing_requirement");
-    case "unverified_waiver":
-      return t("reason_unverified_waiver");
-    case "incomparable_scale":
-      return t("reason_incomparable_scale");
-    case "stale_or_wrong_cycle":
-      return t("reason_stale_or_wrong_cycle");
-    case "conflicting_sources":
-      return t("reason_conflicting_sources");
-    case "no_documented_requirements":
-      return t("reason_no_documented_requirements");
-    case "preference_factor_unknown":
-      return t("reason_preference_factor_unknown");
-    case "subject_relation_unknown":
-    case "subject_relation_needs_review":
-      return t("reason_subject_relation_unknown");
-    case "cost_incomplete":
-    case "cost_line_unknown":
-      return t("reason_cost_unknown");
-    case "budget_not_stated":
-      return t("reason_budget_not_stated");
-    case "cycle_not_stated":
-      return t("reason_cycle_not_stated");
-    case "applicant_category_not_stated":
-      return t("reason_applicant_category_not_stated");
-    case "no_active_preferences":
-      return t("reason_no_active_preferences");
-    case "no_published_statistic":
-      return t("reason_no_published_statistic");
-    case "scope_mismatch":
-      return t("reason_scope_mismatch");
-    default:
-      return t("unknownValue");
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Small presentational pieces
-// ---------------------------------------------------------------------------
-
-function FitBadge({ fit, label }: { fit: FitPoint; label: string }) {
-  const t = useTranslations("chancing");
-  if (fit.lowerBound == null || fit.upperBound == null) {
-    return (
-      <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-        {label}: {t("fitNotScored")}
-      </span>
-    );
-  }
-  const isPoint = fit.pointFit != null;
-  const text = isPoint
-    ? `${oneDecimal(fit.pointFit!)}/100`
-    : `${oneDecimal(fit.lowerBound)}–${oneDecimal(fit.upperBound)}/100`;
-  return (
-    <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200">
-      {label}: {text}
-    </span>
-  );
-}
-
-/**
- * The fit number and its coverage, side by side.
- *
- * The interval is shown whenever ANY active factor is unknown — a lone 100 next
- * to an unknown factor reads as "perfect", which is exactly what this project
- * refuses to imply.
- */
-function FitSummary({ fit }: { fit: FitPoint }) {
-  const t = useTranslations("chancing");
-  if (fit.lowerBound == null || fit.upperBound == null) {
-    return <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("fitNoActivePreferences")}</p>;
-  }
-  const isPoint = fit.pointFit != null;
-  return (
-    <div className="mt-1 space-y-1">
-      <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
-        {t("fitLabel")}:{" "}
-        {isPoint
-          ? `${oneDecimal(fit.pointFit!)}/100`
-          : `${oneDecimal(fit.lowerBound)}–${oneDecimal(fit.upperBound)}/100`}
-      </p>
-      <p className="text-xs text-slate-600 dark:text-slate-300">
-        {t("coverageLine", { pct: Math.round(fit.coverage ?? 0) })}
-        {fit.missingAxes.length > 0 ? ` · ${t("missingAxes", { axes: fit.missingAxes.map((axis) => t(`axis_${axis}`)).join(", ") })}` : ""}
-      </p>
-      {!isPoint && fit.knownFit != null && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          {t("knownFactorsOnly", { fit: oneDecimal(fit.knownFit) })}
-        </p>
-      )}
-      <p className="text-xs text-slate-500 dark:text-slate-400">{t("fitNotProbability")}</p>
-    </div>
-  );
-}
-
-function EligibilityBadge({ status }: { status: Assessment["eligibility"]["status"] }) {
-  const t = useTranslations("chancing");
-  const tone =
-    status === "met"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-      : status === "unmet"
-        ? "border-rose-200 bg-rose-50 text-rose-800"
-        : "border-amber-200 bg-amber-50 text-amber-900";
-  const Icon = status === "met" ? CheckCircle2 : status === "unmet" ? AlertTriangle : HelpCircle;
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${tone}`}>
-      <Icon className="h-3 w-3" aria-hidden />
-      {t(`eligibility_${status}`)}
-    </span>
-  );
-}
-
-function CheckRow({ check }: { check: EligibilityCheck }) {
-  const t = useTranslations("chancing");
-  const tone =
-    check.status === "met"
-      ? "text-emerald-700 dark:text-emerald-300"
-      : check.status === "unmet"
-        ? "text-rose-700 dark:text-rose-300"
-        : check.status === "not_applicable"
-          ? "text-slate-400"
-          : "text-amber-700 dark:text-amber-300";
-  return (
-    <li className="rounded-control border border-slate-200 p-2 text-xs dark:border-slate-700">
-      <p className="flex flex-wrap items-center gap-2">
-        <span className="font-semibold text-slate-800 dark:text-slate-100">{check.label}</span>
-        <span className={`font-semibold ${tone}`}>{t(`eligibility_${check.status}`)}</span>
-        {check.userValue != null || check.requiredValue != null ? (
-          <span className="text-slate-500 dark:text-slate-400">
-            {check.userValue ?? "—"} / {check.requiredValue ?? "—"}
-          </span>
-        ) : null}
-        {check.sourceUrl && (
-          <a
-            className="inline-flex items-center gap-1 text-indigo-600 underline dark:text-indigo-300"
-            href={check.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <ExternalLink className="h-3 w-3" aria-hidden />
-            {t("sourceLink")}
-          </a>
-        )}
-      </p>
-      <p className="mt-0.5 text-slate-600 dark:text-slate-300">{check.note}</p>
-      {check.children.length > 0 && (
-        <ul className="mt-1 space-y-1 border-l border-slate-200 pl-3 dark:border-slate-700">
-          {check.children.map((child) => (
-            <CheckRow key={`${check.requirementId}-${child.requirementId}`} check={child} />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}

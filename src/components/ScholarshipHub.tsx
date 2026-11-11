@@ -93,13 +93,17 @@ export interface Scholarship {
   matchScore?: number;
   matchBreakdown?: MatchBreakdown | null;
   isEligible?: boolean;
-  /** Published-gate verdict (meets / below / unknown) — not an admission chance. */
+  /**
+   * Published-gate verdict (meets / below / unknown). Renamed in the UI to
+   * "requirement status": it compares the award's published minimums with the
+   * saved profile — it is not eligibility, and not a chance of being awarded.
+   */
   chanceBucket?: string | null;
   /** The match score in three bands (strong / good / low). */
   fitBucket?: string | null;
   /** Match score of the university this award belongs to, when it links one. */
   universityMatchScore?: number | null;
-  /** Combined fit + university + chance number the list is ordered by. */
+  /** Combined fit + university + requirement-status number the list is ordered by. */
   relevanceScore?: number | null;
   // Why this match (spec §22)
   matchReasons?: string[];

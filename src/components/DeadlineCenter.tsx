@@ -37,8 +37,6 @@ interface DeadlineItem {
   universityId?: number | null;
   recommended?: boolean | null;
   verificationStatus?: string | null;
-  /** @deprecated The composite chance score is retired; only the fit is shown. */
-  chanceScore?: number | null;
   matchScore?: number | null;
   coversSavedUni?: boolean | null;
   isFullCoverage?: boolean | null;

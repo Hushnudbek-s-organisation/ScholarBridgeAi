@@ -881,22 +881,76 @@ check("a stored `must` reaches the assessment as a filter, not as weight", () =>
 console.log("\n19. Surfaces: no legacy chance percentages or Safety labels");
 // ---------------------------------------------------------------------------
 
-const CHANCE_LABEL_KEYS = [
-  "chanceBadgeLabel",
-  "chanceAdmitRate",
-  "ccRecChanceChip",
-  "ccRecAdmitRate",
-  "planChanceBadge",
-  "planAdmitBadge",
-  "selectSafety",
-  "selectTarget",
-  "selectReach",
-  "selectHighReach",
-  "tierAbove75",
-  "tier5075",
-  "tier2550",
-  "tierBelow25",
+/**
+ * Keys that must not exist anywhere any more. They were deleted from all three
+ * locales together with the engine that produced their numbers, so this list is
+ * a "cannot come back" guard rather than a "not rendered right now" guard.
+ */
+const RETIRED_KEYS: { ns: string; key: string }[] = [
+  { ns: "university", key: "chanceBadgeLabel" },
+  { ns: "university", key: "chanceAdmitRate" },
+  { ns: "journey", key: "ccRecChanceChip" },
+  { ns: "journey", key: "ccRecAdmitRate" },
+  { ns: "timeline", key: "planChanceBadge" },
+  { ns: "timeline", key: "planAdmitBadge" },
+  { ns: "chancing", key: "selectSafety" },
+  { ns: "chancing", key: "selectTarget" },
+  { ns: "chancing", key: "selectReach" },
+  { ns: "chancing", key: "selectHighReach" },
+  { ns: "chancing", key: "tierAbove75" },
+  { ns: "chancing", key: "tier5075" },
+  { ns: "chancing", key: "tier2550" },
+  { ns: "chancing", key: "tierBelow25" },
+  { ns: "scholarshipHub", key: "filterChance" },
+  { ns: "scholarshipHub", key: "allChance" },
 ];
+
+check("the retired chance label keys are deleted from every locale", () => {
+  for (const locale of ["en", "uz", "ru"]) {
+    const messages = JSON.parse(read(`src/i18n/messages/${locale}.json`)) as Record<string, Record<string, unknown>>;
+    for (const { ns, key } of RETIRED_KEYS) {
+      assert.equal(key in (messages[ns] ?? {}), false, `${locale}.${ns}.${key} came back`);
+    }
+  }
+});
+
+check("the replacement labels exist in every supported locale", () => {
+  const required: Record<string, string[]> = {
+    scholarshipHub: [
+      "filterRequirementStatus",
+      "allRequirementStatus",
+      "filterRequirementMet",
+      "filterRequirementNotMet",
+      "filterRequirementUnknown",
+      "requirementStatusNote",
+    ],
+    nav: ["chances"],
+    visa: ["visaChance", "visaPreparationSignal"],
+    recommend: [
+      "assessmentFit",
+      "assessmentRequirements",
+      "assessmentCost",
+      "assessmentGap",
+      "assessmentDetails",
+      "assessmentAcademic",
+      "assessmentUnknowns",
+    ],
+    chancing: ["probabilityNotProvided", "mustFiltersLabel"],
+  };
+  for (const locale of ["en", "uz", "ru"]) {
+    const messages = JSON.parse(read(`src/i18n/messages/${locale}.json`)) as Record<string, Record<string, unknown>>;
+    for (const [ns, keys] of Object.entries(required)) {
+      for (const key of keys) {
+        const value = messages[ns]?.[key];
+        assert.equal(typeof value, "string", `${locale}.${ns}.${key} is missing`);
+        assert.ok(String(value).trim().length > 0, `${locale}.${ns}.${key} is empty`);
+      }
+    }
+  }
+  // The renamed navigation entry must stop promising "chances".
+  const navEn = JSON.parse(read("src/i18n/messages/en.json")) as Record<string, Record<string, string>>;
+  assert.doesNotMatch(navEn.nav.chances, /chance/i);
+});
 
 check("no UI component prints a chance score, an admit rate or a Safety/Target/Reach label", () => {
   const files = [
@@ -910,11 +964,8 @@ check("no UI component prints a chance score, an admit rate or a Safety/Target/R
   ];
   for (const file of files) {
     const source = read(file);
-    for (const key of CHANCE_LABEL_KEYS) {
-      assert.ok(
-        !new RegExp(`t\\(\\s*"${key}"`).test(source),
-        `${file} still renders "${key}"`
-      );
+    for (const { key } of RETIRED_KEYS) {
+      assert.ok(!new RegExp(`t\\(\\s*"${key}"`).test(source), `${file} still renders "${key}"`);
     }
     assert.doesNotMatch(source, /chanceScore\s*[})]/, `${file} still reads chanceScore`);
     assert.doesNotMatch(source, /"Safety \/ Likely"|"Reach"|"Target \/ Match"/, `${file} still names a chance tier`);
@@ -955,6 +1006,94 @@ check("every assessed route serves the canonical admission-probability policy", 
   ]) {
     assert.match(read(route), /ADMISSION_PROBABILITY|admissionProbability/, route);
   }
+});
+
+
+// ---------------------------------------------------------------------------
+console.log("\n20. Every surface renders the canonical assessment");
+// ---------------------------------------------------------------------------
+
+const STUDIO = "src/components/RecommendationStudio.tsx";
+const SCREEN = "src/components/ProgrammeAssessmentScreen.tsx";
+const PARTS = "src/components/AssessmentParts.tsx";
+
+check("the recommendation studio renders the assessment, not a positioning block", () => {
+  const studio = read(STUDIO);
+  assert.match(studio, /assessment: Assessment/);
+  assert.match(studio, /assessment\.preferenceFit/);
+  assert.match(studio, /assessment\.eligibility/);
+  assert.match(studio, /assessment\.finance/);
+  assert.match(studio, /assessment\.academicComparisons/);
+  assert.match(studio, /<FitInline /);
+  assert.match(studio, /<PreferenceFilterList /);
+  assert.match(studio, /<EligibilitySummaryLine /);
+  assert.match(studio, /<AcademicComparisonList /);
+  // The retired block and its "not benchmarked" fallback must not return.
+  // (Comments may explain the removal; only executable lines are checked.)
+  const code = studio
+    .split("\n")
+    .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
+    .join("\n");
+  assert.doesNotMatch(code, /positioning/);
+  assert.doesNotMatch(code, /QS #/);
+  assert.doesNotMatch(code, /Not benchmarked/i);
+});
+
+check("both surfaces share one renderer instead of re-implementing the formula", () => {
+  for (const file of [STUDIO, SCREEN]) {
+    const source = read(file);
+    assert.match(source, /from "@\/components\/AssessmentParts"/, `${file} does not import the shared parts`);
+    // No surface may recompute a fit: the arithmetic lives in src/lib/assessment.
+    assert.doesNotMatch(source, /weightedSimilarity\s*\/|\*\s*0\.6\b|\*\s*60\b/, `${file} recomputes a fit`);
+    assert.doesNotMatch(source, /knownWeight\s*[+*-]/, `${file} recomputes coverage`);
+  }
+});
+
+check("the studio has explicit states for missing assessment, no preference and unknown subject", () => {
+  const parts = read(PARTS);
+  // A fit with no active preference has no number and says so.
+  assert.match(parts, /fitNoActivePreferences/);
+  // Unknown never becomes a standalone 0 or 0% number. A coverage percentage is
+  // rendered as a LABEL ("Data coverage: 85%") next to the interval; itself it
+  // is never presented as the fit, so rounding it for the label is safe.
+  assert.doesNotMatch(parts, /coverage\s*\?\?\s*0\s*[,;)]?\s*\}/);
+  assert.match(parts, /scoreText\(fit\)/);
+  // `must` results are their own labelled block, separate from eligibility.
+  assert.match(parts, /mustState_fail/);
+  assert.match(parts, /mustState_unknown/);
+  assert.match(parts, /mustFiltersLabel/);
+});
+
+check("an unknown academic comparison never hides the fit", () => {
+  const parts = read(PARTS);
+  const academic = parts.slice(parts.indexOf("export function AcademicComparisonList"));
+  assert.match(academic, /academicNoStatistics/);
+  // The academic block renders only inside its own section; the fit is rendered
+  // by separate components, so an empty comparison list cannot gate it.
+  assert.doesNotMatch(academic, /preferenceFit/);
+  const studio = read(STUDIO);
+  assert.ok(
+    studio.indexOf("<FitInline ") < studio.indexOf("<AcademicComparisonList "),
+    "the fit must be rendered before (and independently of) the academic block"
+  );
+});
+
+check("a grant's met requirements are never subtracted from the cost", () => {
+  const finance = read("src/lib/assessment/finance.ts");
+  // Only awarded/confirmed funding reduces the bill; a met requirement does not.
+  assert.doesNotMatch(finance, /eligibility[^\n]*netCost/i);
+  assert.doesNotMatch(finance, /requirementMet\s*&&[^\n]*subtract/i);
+  assert.match(finance, /not_awarded_competitive_grant_is_a_scenario/);
+});
+
+check("no surface can print a null as 0 %", () => {
+  for (const file of [PARTS, STUDIO, SCREEN]) {
+    const source = read(file);
+    assert.doesNotMatch(source, /\$\{?[^}\n]*\?\?\s*0\s*\}?\s*%/, `${file} prints a null percentage as 0%`);
+    assert.doesNotMatch(source, /\?\?\s*0\)?\}/, `${file} coerces a null to 0 in output`);
+  }
+  const parts = read(PARTS);
+  assert.match(parts, /if \(value == null\) return "—";/);
 });
 
 console.log(`\n${failures.length === 0 ? "✅" : "❌"} ${passed} passed, ${failures.length} failed`);

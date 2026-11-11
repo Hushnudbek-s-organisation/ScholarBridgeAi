@@ -21,7 +21,7 @@
  * Run: npm run test:qs-benchmarks
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   QS_TOP_200_BENCHMARKS,
@@ -225,8 +225,11 @@ check("no badge prints a null rank", () => {
   const similar = readFileSync(join(ROOT, "src/components/SimilarProfiles.tsx"), "utf8");
   assert.match(similar, /bench\?\.qsRank != null &&/, "the similar-profiles badge prints an absent rank");
 
+  // The recommendation card no longer renders a rank at all: the retired
+  // "positioning" block is gone and every number on that card now comes from
+  // the canonical assessment (which never prints a rank).
   const studio = readFileSync(join(ROOT, "src/components/RecommendationStudio.tsx"), "utf8");
-  assert.match(studio, /r\.positioning\.qsRank != null &&/, "the recommendation card prints an absent rank");
+  assert.doesNotMatch(studio, /positioning\.qsRank|QS #/, "the recommendation card prints a rank again");
 });
 
 check("both APIs prefer the verified rank over the curated table", () => {
@@ -260,14 +263,20 @@ check("both APIs prefer the verified rank over the curated table", () => {
   );
 });
 
-check("the selectivity band treats an unranked row as unranked, not as a rank", () => {
-  const source = readFileSync(join(ROOT, "src/lib/programChancing.ts"), "utf8");
-  assert.match(
-    source,
-    /const benchmarkRank = qsBenchmark\.qsRank \?\? Number\.POSITIVE_INFINITY;/,
-    "the selectivity band no longer neutralises a null rank"
-  );
-  assert.doesNotMatch(source, /qsBenchmark\.qsRank <= \d+/, "a raw rank comparison on a nullable value came back");
+check("no selectivity band can be derived from a nullable rank any more", () => {
+  // The rank-derived selectivity band lived only in the retired engine, which
+  // is deleted. The invariant it protected still matters, so it is asserted
+  // where it can still break: no module may derive a band from a raw QS rank.
+  assert.equal(existsSync(join(ROOT, "src/lib/programChancing.ts")), false);
+  for (const file of [
+    "src/lib/assessment/adapters.ts",
+    "src/lib/assessment/academicComparison.ts",
+    "src/lib/recommend.ts",
+    "src/lib/universityProgrammeDiscovery.ts",
+  ]) {
+    const source = readFileSync(join(ROOT, file), "utf8");
+    assert.doesNotMatch(source, /selectivity|Safety \/ Likely|High Reach/, `${file} derives a selectivity band`);
+  }
 });
 
 /* ------------------------------------------------ every row is reachable */

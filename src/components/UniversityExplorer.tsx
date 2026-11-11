@@ -102,14 +102,7 @@ export interface University {
   matchIssues?: string[];
   /** Unclamped total before the display clamp (one decimal). */
   matchRawScore?: number | null;
-  /** @deprecated The composite chance index is retired; never rendered. */
-  chanceScore?: number | null;
   programmeDiscovery?:{status:string;programmeCount:number;selectedProgrammeId:number|null;selectedProgrammeName:string|null};
-  /** @deprecated The derived offer rate is retired; it was an estimate, not evidence. */
-  effectiveAcceptRatePct?: number | null;
-  /** @deprecated Safety/Likely/Target/Reach labels are retired (spec §8). */
-  selectivityCategory?: string | null;
-  studentGpaPercentile?: number | null;
   /**
    * The exact arithmetic behind the score: the unrounded total, one component
    * per scoring dimension (2-dp points), and how many dimensions had data.

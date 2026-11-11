@@ -7,8 +7,10 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+const ROOT = join(import.meta.dirname ?? ".", "..");
 import {
   ADMISSION_PROBABILITY,
   analyzeExtracurriculars,
@@ -24,11 +26,7 @@ import {
   QS_TOP_200_BENCHMARKS,
   matchQsUniversityBenchmark,
 } from "../src/lib/qsTop200Benchmarks";
-import {
-  PROGRAM_DEPARTMENT_PROFILES,
-  evaluateUniversityAndProgramChance,
-  resolveProgramDepartmentProfile,
-} from "../src/lib/programChancing";
+import { admissionProbability } from "../src/lib/assessment/academicComparison";
 
 let passed = 0;
 const failures: string[] = [];
@@ -197,51 +195,79 @@ check("every QS benchmark carries its estimate provenance", () => {
   assert.match(derived.estimateBasis, /rank/i);
 });
 
-check("14 granular department selectivity profiles differentiate CS/AI from Humanities", () => {
-  assert.equal(Object.keys(PROGRAM_DEPARTMENT_PROFILES).length, 14);
-  const csDept = resolveProgramDepartmentProfile("BSc in Computer Science and AI");
-  const humDept = resolveProgramDepartmentProfile("BA in History and Literature");
-  assert.equal(csDept.key, "cs_ai");
-  assert.equal(humDept.key, "humanities_languages");
-  assert.ok(csDept.acceptRateMultiplier < humDept.acceptRateMultiplier);
+/*
+ * The retired "chancing" engine is DELETED, not merely unused. These guards hold
+ * the replacement invariants instead of pinning the old formulas:
+ *   - no runtime module imports the old aggregate indexes;
+ *   - every surface that shows a fit reads the canonical assessment;
+ *   - a personal admission probability stays explicitly absent.
+ */
+const RUNTIME_FILES = [
+  "src/lib/recommend.ts",
+  "src/lib/assessment/index.ts",
+  "src/lib/assessment/adapters.ts",
+  "src/lib/universityProgrammeDiscovery.ts",
+  "src/lib/universitySort.ts",
+  "src/app/api/chancing/route.ts",
+  "src/app/api/universities/route.ts",
+  "src/app/api/universities/[id]/route.ts",
+  "src/app/api/deadlines/route.ts",
+  "src/app/api/dashboard/route.ts",
+  "src/app/api/programs/recommend/route.ts",
+  "src/components/ProgrammeAssessmentScreen.tsx",
+  "src/components/AssessmentParts.tsx",
+  "src/components/RecommendationStudio.tsx",
+  "src/components/UniversityExplorer.tsx",
+  "src/components/UniversityDetail.tsx",
+  "src/components/SmartTimelineCalendar.tsx",
+  "src/components/journey/JourneyControlCenter.tsx",
+];
+
+const readRuntime = (file: string) => readFileSync(join(ROOT, file), "utf8");
+
+check("the retired chancing engine no longer exists in the repository", () => {
+  assert.equal(existsSync(join(ROOT, "src/lib/programChancing.ts")), false, "programChancing.ts is back");
 });
-check("evaluateUniversityAndProgramChance computes program-specific 25th/50th/75th percentiles and eligibility", () => {
-  const csEval = evaluateUniversityAndProgramChance(
-    profile,
-    { name: "Technical University of Munich", country: "Germany", worldRanking: 23 },
-    {
-      id: 101,
-      universityId: 23,
-      name: "BSc in Computer Science",
-      degreeLevel: "Bachelor",
-      field: "Computer Science",
-    },
-    {
-      minGpa: 3.4,
-      minIelts: 6.5,
-      minSat: 1380,
-      ibRequirement: "36 IB Points (HL Math 6)",
-      aLevelRequirement: "AAA",
+
+check("no runtime module imports or computes a composite opportunity index", () => {
+  for (const file of RUNTIME_FILES) {
+    const source = readRuntime(file)
+      .split("\n")
+      .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
+      .join("\n");
+    for (const banned of [
+      "programChancing",
+      "compositeProgramFitScore",
+      "effectiveAcceptRatePct",
+      "effectiveProgramAcceptRatePct",
+      "selectivityCategory",
+      "cohortPositionTier",
+      "studentGpaPercentile",
+    ]) {
+      assert.ok(!source.includes(banned), `${file} still uses ${banned}`);
     }
-  );
-  const histEval = evaluateUniversityAndProgramChance(
-    profile,
-    { name: "Technical University of Munich", country: "Germany", worldRanking: 23 },
-    {
-      id: 102,
-      universityId: 23,
-      name: "BA in History & Philosophy of Science",
-      degreeLevel: "Bachelor",
-      field: "History",
-    },
-    null
-  );
-  assert.equal(csEval.eligibilityStatus, "unknown_inputs", "an unsourced fixture cannot establish eligibility");
-  assert.ok(csEval.effectiveProgramAcceptRatePct < csEval.universityAcceptRatePct);
-  assert.ok(csEval.effectiveProgramAcceptRatePct < histEval.effectiveProgramAcceptRatePct);
-  assert.ok(csEval.programGpa50 > histEval.programGpa50);
-  assert.ok(csEval.studentGpaPercentile !== null && csEval.studentGpaPercentile >= 50);
-  assert.ok((histEval.studentGpaPercentile ?? 0) > (csEval.studentGpaPercentile ?? 0));
+  }
+});
+
+check("every surface that renders a fit reads the canonical assessment", () => {
+  for (const file of [
+    "src/components/ProgrammeAssessmentScreen.tsx",
+    "src/components/RecommendationStudio.tsx",
+  ]) {
+    assert.match(readRuntime(file), /AssessmentParts/, `${file} does not share the assessment renderers`);
+  }
+  assert.match(readRuntime("src/components/RecommendationStudio.tsx"), /assessment\.preferenceFit/);
+  assert.match(readRuntime("src/app/api/programs/recommend/route.ts"), /assessment\.preferenceFit/);
+  assert.match(readRuntime("src/lib/recommend.ts"), /assessment: assessmentFor\(/);
+});
+
+check("a personal admission probability is explicitly absent everywhere", () => {
+  const probability = admissionProbability();
+  assert.equal(probability.value, null, "a personal probability is never produced");
+  assert.equal(probability.reason, "no_validated_model");
+  const recommend = readRuntime("src/lib/recommend.ts");
+  assert.match(recommend, /ADMISSION_PROBABILITY/);
+  assert.doesNotMatch(recommend, /probability\s*:\s*\{\s*available:\s*true/);
 });
 
 (async () => {

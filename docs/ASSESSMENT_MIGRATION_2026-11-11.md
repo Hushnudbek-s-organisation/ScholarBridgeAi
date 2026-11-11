@@ -1,8 +1,9 @@
 # Programme assessment refactor — 2026-11-11
 
-**Holat:** kod o‘zgarishlari lokal, migratsiya **hali hech bir muhitga qo‘llanmagan**.
-`npm ci` + disposable `embedded-postgres` (port 55453/55454) bilan sinovdan o‘tkazilgan.
-Production apply, deploy, push — qilinmadi.
+**Holat (2026-11-11, yangilangan):** migratsiya **`zkdguzbdopfedkffsatk` production
+loyihasiga qo‘llangan** — Supabase migration runner orqali, versiya
+**`20261111141353_add_assessment_preferences_20261111`**. Ilova deploy’i
+boshlanmagan.
 
 Bu hujjat programme recommendation / preference fit / eligibility / finance va eski
 "Chancing" hisoblarini almashtirgan refactor uchun **apply va rollback** tartibini
@@ -10,9 +11,9 @@ belgilaydi.
 
 ## 1. Bitta yangi SQL fayl
 
-| Fayl | Rol | Apply tartibi |
-|---|---|---|
-| `supabase/add_assessment_preferences_2026-11-11.sql` | **FORWARD / additive schema** | 1 |
+| Fayl | Rol | Apply tartibi | Holat |
+|---|---|---|---|
+| `supabase/add_assessment_preferences_2026-11-11.sql` | **FORWARD / additive schema** | 1 | **QO‘LLANGAN** — `20261111141353_add_assessment_preferences_20261111` |
 
 Fayl **additive**:
 
@@ -31,7 +32,35 @@ Tekshirilgan (`npm run test:assessment-db`): 2 qatorli fixture ustida migratsiya
 avval/keyin `to_jsonb` hash bir xil (yangi ustun chiqarib tashlanganda), ikkinchi
 run no-op, `'["must"]'::jsonb` esa `23514` bilan rad etiladi.
 
-## 2. Apply tartibi
+## 2. Qo‘llanganligi dalili (2026-11-11)
+
+`supabase` loyihasi `zkdguzbdopfedkffsatk` (migration runner orqali):
+
+- `list_migrations` → oxirgi yozuv: `20261111141353  add_assessment_preferences_20261111`;
+- `information_schema.columns` → `student_profiles.assessment_preferences`,
+  `data_type = jsonb`, `is_nullable = YES`, `column_default = NULL`, izoh (COMMENT) yozilgan;
+- `pg_constraint` → `student_profiles_assessment_preferences_object`
+  (`CHECK (assessment_preferences IS NULL OR jsonb_typeof(assessment_preferences) = 'object')`);
+- ma’lumot butunligi: migratsiyadan **oldin** va **keyin**
+  `md5(string_agg((to_jsonb(row) - 'assessment_preferences')::text,'|' order by id))`
+  bir xil — `37ca6c20a80f186576c968f441b2d1b1`, 18 qator, `with_prefs = 0`
+  (backfill yo‘q);
+- CHECK ishlaydi: `'["must"]'::jsonb` yozishga urinish `check_violation` berdi,
+  qator o‘zgarmadi;
+- yozish/o‘qish smoke testi: vaqtinchalik test qatori (`id = 20`,
+  `zz-migration-smoke-20261111@example.invalid`) `assessment_preferences` bilan
+  yaratildi, `NULL` ga tozalandi va o‘chirildi — qoldiq yo‘q (`smoke_rows = 0`),
+  18 qator va hash o‘sha holatga qaytdi.
+
+**Tekshirilmagan:** haqiqiy foydalanuvchi sessiyasi bilan RLS ostidagi read/write.
+`student_profiles` uchun RLS yoqilgan, lekin `pg_policies` da policy yo‘q va
+`anon`/`authenticated` ga `UPDATE/INSERT` grant berilmagan — ya’ni jadvalga faqat
+server (`postgres` roli, `DATABASE_URL` orqali) murojaat qiladi. Smoke test shu
+sabab bilan `postgres` roli orqali bajarilgan (ilovaning haqiqiy yo‘li), API
+route orqali emas. **Test akkaunt yo‘q, shuning uchun “RLS ostidagi write
+tekshirildi” deb da’vo qilinmaydi.**
+
+## 3. Apply tartibi
 
 ```bash
 # 1. Zaxira (ixtiyoriy, lekin tavsiya etiladi) — faqat o‘qish
@@ -50,7 +79,7 @@ psql "$DATABASE_URL" -c "
 
 `with_prefs` apply paytida `0` bo‘lishi normal — hech kim rejim tanlamagan.
 
-## 3. Deploy tartibi va cache
+## 4. Deploy tartibi va cache
 
 1. Migratsiya (yuqorida) → 2. deploy.
 2. **Cache avtomatik yangilanadi**, qo‘lda flush shart emas:
@@ -67,11 +96,25 @@ psql "$DATABASE_URL" -c "
    hamma ekran yangi assessmentdan qayta hisoblaydi (javobda `scoringVersion`
    va `assessedAt` bor).
 
-## 4. Rollback (faqat incident)
+## 5. Rollback (faqat incident)
+
+**Tavsiya etilgan rollback — ustunni JOYIDA QOLDIRISH.** Ilova eski versiyaga
+qaytarilsa, u ustunni shunchaki o‘qimaydi/yozmaydi; saqlangan preference
+ma’lumoti yo‘qolmaydi va keyingi deploy uni qayta ishlatadi. Faqat incident
+bo‘lganda (masalan constraint noto‘g‘ri ishlayotgani isbotlansa) quyidagilar
+bajariladi — va bu **yangi preference ma’lumotini o‘chiradi**, shuning uchun
+avval zaxira olinadi:
 
 ```sql
-ALTER TABLE student_profiles DROP CONSTRAINT IF EXISTS student_profiles_assessment_preferences_object;
-ALTER TABLE student_profiles DROP COLUMN IF EXISTS assessment_preferences;
+-- 1) Zaxira (majburiy, agar preference yozilgan bo'lsa)
+CREATE TABLE IF NOT EXISTS scholarbridge_maintenance.assessment_preferences_backup_20261111 AS
+  SELECT id, assessment_preferences, now() AS backed_up_at
+  FROM public.student_profiles
+  WHERE assessment_preferences IS NOT NULL;
+
+-- 2) Faqat incident uchun
+ALTER TABLE public.student_profiles DROP CONSTRAINT IF EXISTS student_profiles_assessment_preferences_object;
+ALTER TABLE public.student_profiles DROP COLUMN IF EXISTS assessment_preferences;
 ```
 
 Bu **faqat yangi ustunni** o‘chiradi. Boshqa hech qanday foydalanuvchi
@@ -79,7 +122,7 @@ ma’lumoti (profil, saqlangan universitetlar, arizalar) o‘chmaydi. Kod eski
 holatga qaytarilsa, o‘quvchi yana `preferred_countries` → `prefer` yo‘lidan
 ishlaydi.
 
-## 5. Access control va maxfiylik
+## 6. Access control va maxfiylik
 
 - Yangi ustun faqat `requireProfileAccess` bilan o‘tiladigan yo‘llarda o‘qiladi
   (`/api/chancing`, `/api/dashboard`, `/api/deadlines`, `/api/universities*`);
@@ -91,10 +134,10 @@ ishlaydi.
   assessment_preferences_invalid` bilan rad etiladi (jimgina yo‘qotilmaydi —
   yo‘qolgan `must` assessmentni sezdirmasdan o‘zgartirardi).
 
-## 6. Tekshiruv buyruqlari
+## 7. Tekshiruv buyruqlari
 
 ```bash
-npm run test:assessment        # 54 ta shartnoma testi (16 talab + qo‘shimcha)
+npm run test:assessment        # 62 ta shartnoma testi (16 talab + qo‘shimcha)
 npm run test:assessment-db     # migratsiya + cache kalitlari (embedded postgres)
 npm run test:chancing          # 28
 npm run test:recommend         # 91

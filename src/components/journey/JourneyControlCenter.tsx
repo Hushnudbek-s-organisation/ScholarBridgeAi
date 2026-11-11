@@ -122,20 +122,16 @@ export interface JourneyDashboard {
       saved: boolean;
       /** Real fit from the shared match engine — same number as the Explorer. */
       matchScore: number;
-      /**
-       * @deprecated The composite positioning index is retired (spec §8): the
-       * dashboard no longer computes it and this panel never renders it.
+      /*
+       * The retired positioning index, its blended score, the derived offer
+       * rate and the cohort percentiles are NOT declared here any more: the
+       * dashboard stopped computing them and this panel never rendered them, so
+       * a stale cached payload simply has extra fields (harmlessly ignored)
+       * instead of a type that invites their use again.
        */
-      chanceScore?: number;
-      /** @deprecated Ordering is by fit; no blended composite is produced. */
-      combinedScore?: number;
-      /** @deprecated A derived offer rate is not a personal chance. */
-      effectiveAcceptRatePct?: number;
-      studentGpaPercentile?: number | null;
-      programGpa50?: number;
       matchReasons: string[];
       matchIssues: string[];
-      /** Optional for the same reason as `chanceScore` — the panel tolerates absence. */
+      /** Optional because older cached payloads may predate it. */
       matchBreakdown?: MatchBreakdown;
       /** The programme the university card focuses on (subject relation, not a score). */
       programmeDiscovery?: { selectedProgrammeName: string | null } | null;

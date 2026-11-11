@@ -51,6 +51,13 @@ BEGIN
   END IF;
 END $$;
 
+-- APPLIED IN PRODUCTION on 2026-11-11 through the Supabase migration runner as
+--   20261111141353_add_assessment_preferences_20261111
+-- Verified afterwards: jsonb / nullable / no default, the CHECK rejects a
+-- non-object payload, the 18 existing profiles are byte-identical (same
+-- to_jsonb hash before and after) and nothing was backfilled.
+-- See docs/ASSESSMENT_MIGRATION_2026-11-11.md §2 for the exact evidence.
+--
 -- Verify after applying (read-only):
 --   SELECT count(*) FILTER (WHERE assessment_preferences IS NOT NULL) AS with_preferences,
 --          count(*) AS total_profiles
