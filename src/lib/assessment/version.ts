@@ -34,7 +34,7 @@ export const PREFERENCE_SETTINGS_VERSION = "preferences-2026-11-11.1";
 export const SUBJECT_RULES_VERSION = "subject-rules-2026-11-11.1";
 
 /** Version of the eligibility evaluation rules. */
-export const ELIGIBILITY_RULES_VERSION = "eligibility-rules-2026-11-11.1";
+export const ELIGIBILITY_RULES_VERSION = "eligibility-rules-2026-11-11.2";
 
 /** Version of the finance arithmetic. */
 export const FINANCE_RULES_VERSION = "finance-rules-2026-11-11.1";
