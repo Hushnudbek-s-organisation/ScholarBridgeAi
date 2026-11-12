@@ -19,6 +19,7 @@
 
 import { resolveScopedFact, type FactContext } from "@/lib/factResolver";
 import type { CatalogueFact } from "@/lib/evidencePolicy";
+import { resolveAcademicRequirements } from "@/lib/universityDetailRequirements";
 import { isVerifiedOfficialRequirement, mayAutoReject, type TrustedValue } from "@/lib/typedEvidence";
 import { compareDegreeLevels, undergraduateTestApplies } from "@/lib/degreeLevels";
 import { parseListColumn } from "@/lib/chancing";
@@ -376,7 +377,9 @@ export function requirementNodesFromFacts(
   opts: { applicantDegreeLevel?: string | null; programmeDegreeLevel?: string | null } = {}
 ): RequirementNode[] {
   const nodes: RequirementNode[] = [];
-  const described = (field: string) => {
+  const { summary } = resolveAcademicRequirements(facts, context);
+  const described = (field: string, key: keyof typeof summary) => {
+    if (summary[key] == null) return null;
     const resolved = resolveScopedFact(facts, field, context);
     return resolved && mayAutoReject(resolved) ? resolved : null;
   };
@@ -403,15 +406,15 @@ export function requirementNodesFromFacts(
     admissionCycle: resolved.admissionCycle ?? null,
   });
 
-  const gpa = described("min_gpa");
+  const gpa = described("min_gpa", "gpa");
   if (gpa) nodes.push(fromResolved(gpa, "min_gpa", "Minimum GPA", "gpa", null));
 
   const language: RequirementNode[] = [];
-  const ielts = described("min_ielts");
+  const ielts = described("min_ielts", "ielts");
   if (ielts) language.push(fromResolved(ielts, "min_ielts", "IELTS", "ielts", "9"));
-  const toefl = described("min_toefl");
+  const toefl = described("min_toefl", "toefl");
   if (toefl) language.push(fromResolved(toefl, "min_toefl", "TOEFL", "toefl", null));
-  const det = described("min_det");
+  const det = described("min_det", "duolingo");
   if (det) language.push(fromResolved(det, "min_det", "Duolingo English Test", "det", "160"));
   if (language.length === 1) nodes.push(language[0]);
   else if (language.length > 1) {
@@ -429,9 +432,9 @@ export function requirementNodesFromFacts(
 
   if (undergraduateTestApplies(opts.programmeDegreeLevel ?? null, opts.applicantDegreeLevel ?? undefined)) {
     const tests: RequirementNode[] = [];
-    const sat = described("min_sat");
+    const sat = described("min_sat", "sat");
     if (sat) tests.push(fromResolved(sat, "min_sat", "SAT", "sat", "1600"));
-    const act = described("min_act");
+    const act = described("min_act", "act");
     if (act) tests.push(fromResolved(act, "min_act", "ACT", "act", "36"));
     if (tests.length === 1) nodes.push(tests[0]);
     else if (tests.length > 1) {
@@ -715,6 +718,8 @@ export function assessCatalogueProgramme(input: {
   university: AssessmentUniversityRow;
   profile: AssessmentProfileRow | null | undefined;
   requirementRow?: AssessmentRequirementRow | null;
+  /** Scoped field-level evidence. An empty list means no documented minimum. */
+  requirementFacts?: CatalogueFact[];
   /** Already-resolved annual USD costs; null when the source is unknown. */
   tuitionUsd?: number | null;
   livingUsd?: number | null;
@@ -728,12 +733,22 @@ export function assessCatalogueProgramme(input: {
   /** Verified published statistics for THIS programme/scope, when they exist. */
   publishedStatistics?: PublishedStatistic[];
 }): ProgrammeAssessment {
-  const requirements = requirementNodesFromRow(input.requirementRow, {
-    programmeUrl: input.programme.programUrl ?? input.programme.sourceUrl ?? null,
-    cycle: input.cycle ?? null,
+  const degreeContext = {
     programmeDegreeLevel: input.programme.degree ?? null,
     applicantDegreeLevel: input.degreeLevel ?? input.profile?.degreeLevel ?? null,
-  });
+  };
+  const requirements = input.requirementFacts
+    ? requirementNodesFromFacts(input.requirementFacts, {
+      programName: input.programme.name,
+      degreeLevel: input.programme.degree,
+      admissionCycle: input.cycle,
+      applicantScope: input.applicantCategory,
+    }, degreeContext)
+    : requirementNodesFromRow(input.requirementRow, {
+      ...degreeContext,
+      programmeUrl: input.programme.programUrl ?? input.programme.sourceUrl ?? null,
+      cycle: input.cycle ?? null,
+    });
   const budgetUsd = input.profile?.budgetAnnualUsd ?? null;
   const finance = financeInputFromCosts({
     tuitionUsd: input.tuitionUsd ?? null,

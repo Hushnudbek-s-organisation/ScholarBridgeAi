@@ -19,6 +19,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { and, eq } from "drizzle-orm";
+import { academicDecisionEnvelope, resolveAcademicRequirements } from "../src/lib/universityDetailRequirements";
 import {
   subjectAffinity,
   assessEligibility,
@@ -233,6 +234,29 @@ section("5. Provenance and stale flags");
     const r = byName("RECOMMEND-FIXTURE: unverified");
     return r.program.sourceUrl === null && r.program.verificationStatus === "unverified" && r.program.isVerified === false;
   })());
+}
+
+{
+  const p = program({ id: 1, universityId: 1, name: "RECOMMEND-FIXTURE: Scoped SAT" });
+  const sourceUrl = "https://fixture.example.edu/requirements";
+  const cycle = "2027";
+  const academicRequirements = academicDecisionEnvelope(resolveAcademicRequirements([{
+    entityType: "program", entityId: p.id, fieldKey: "min_sat",
+    valueNumeric: 1300, valueText: null, unit: "1600", period: null, currency: null,
+    degreeLevel: null, programName: null, admissionCycle: cycle, sourceUrl,
+    verifiedAt: "2025-01-01T00:00:00Z", verificationStatus: "verified",
+    valueType: "official_requirement", publisherOfficial: true, notes: null,
+  }], { admissionCycle: cycle }));
+  const input = { interests: ["Computer Science"], sat: 1250, asOfDate: "2026-11-11" };
+  const catalogue = makeCatalog([p], new Map([[p.id, [{
+    ...baseReqs[0], academicYear: cycle, academicRequirements,
+  }]]]));
+  const scoped = recommend({ ...input, startYear: 2027 }, catalogue)[0].assessment.eligibility;
+  check("assessment uses the scoped SAT value and its original source",
+    scoped.checks.some((c) => c.status === "unmet" && c.sourceUrl === sourceUrl && c.gap?.delta === 50));
+  const other = recommend({ ...input, startYear: 2028 }, catalogue)[0].assessment.eligibility;
+  check("assessment never falls back to a different admission cycle",
+    other.checks.every((c) => c.status !== "met" && c.status !== "unmet"));
 }
 
 // ---------------------------------------------------------------------------

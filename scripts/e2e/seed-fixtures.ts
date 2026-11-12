@@ -1,4 +1,5 @@
 import { writeFileSync } from "node:fs";
+import { sql } from "drizzle-orm";
 import { db, pool } from "@/db";
 import { appConfig, savedScholarships, scholarships, studentProfiles, universities, userDocuments, courses, courseModules, lessons, auditLogs,universityPrograms,sources } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
@@ -80,6 +81,13 @@ async function main() {
   if(process.env.E2E_CONTINUATION_SCHEMA==="1"){
     const [program]=await db.insert(universityPrograms).values({universityId:verifiedUniversity.id,name:"FICTIONAL browser Computer Science programme",degree:"Bachelor",field:"Computer Science",sourceUrl:"https://verified-e2e.example.test/programme",programUrl:"https://verified-e2e.example.test/programme",lastVerifiedAt:new Date("2026-11-07"),isVerified:true,verificationStatus:"verified",isActive:true}).returning();fixtureProgramId=program.id;
     await db.insert(sources).values({url:"https://verified-e2e.example.test/programme",title:"FICTIONAL isolated publisher ownership",domain:"verified-e2e.example.test",isOfficial:true,isVerified:true,sourceType:"official_university"});
+    await db.execute(sql`
+      INSERT INTO public.catalogue_facts
+        (entity_type, entity_id, field_key, value_numeric, unit, admission_cycle, applicant_scope,
+         source_url, verified_at, verification_status, value_type)
+      VALUES ('program', ${program.id}, 'min_sat', 1300, '1600', '2027', 'international',
+              'https://verified-e2e.example.test/programme', now() at time zone 'UTC', 'verified', 'official_requirement')
+    `);
   }
 
   const deadlineDate = new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10);

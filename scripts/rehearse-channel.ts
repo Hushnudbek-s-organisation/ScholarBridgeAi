@@ -24,7 +24,7 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { eq, inArray, like } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { channelPlan, channelPosts, channelSettings, scholarships } from "@/db/schema";
 import { ensureChannelTables } from "@/lib/channel/db";
@@ -97,21 +97,17 @@ async function messagesTo(base: string, chatId: string): Promise<MockMessage[]> 
   return body.messages ?? [];
 }
 
-/** "HH:MM" now, in Tashkent — the sender compares against the same clock. */
-function nowHhmm(): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Tashkent",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date());
-}
-
 async function main() {
   const databaseUrl = process.env.DATABASE_URL ?? "";
   if (!/127\.0\.0\.1|localhost/.test(databaseUrl)) {
     throw new Error("This rehearsal writes rows; point DATABASE_URL at the local dev database.");
   }
+
+  // Pin every scheduling fixture to 13:00 in Tashkent. CI can start near
+  // midnight, when a 00:01 plan is still in the future.
+  const scheduleNow = new Date();
+  scheduleNow.setUTCHours(8, 0, 0, 0);
+  const today = tashkentDay(scheduleNow);
 
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
@@ -142,7 +138,7 @@ async function main() {
         country: "Germany",
         coverageType: "Full Tuition",
         degreeLevels: '["Master\'s"]',
-        deadlineDate: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10),
+        deadlineDate: new Date(scheduleNow.getTime() + 5 * 86_400_000).toISOString().slice(0, 10),
         deadlineType: "fixed",
         requirements: "Bachelor's degree, motivation letter, English proficiency.",
         englishRequirements: "IELTS 6.5 or equivalent English test",
@@ -151,7 +147,7 @@ async function main() {
         applicationUrl: "https://example.com/apply",
         isActive: true,
         verificationStatus: "verified",
-        lastVerifiedAt: new Date(),
+        lastVerifiedAt: scheduleNow,
         eligibleCountries: "[]",
       })
       .returning({ id: scholarships.id });
@@ -194,9 +190,9 @@ async function main() {
       const [row] = await db
         .insert(channelPlan)
         .values({
-          planDate: tashkentDay(new Date()),
+          planDate: today,
           slot,
-          sendAt: nowHhmm(),
+          sendAt: "13:00",
           kind,
           lane: "editorial",
           origin: "rehearsal",
@@ -221,10 +217,10 @@ async function main() {
     // --- 1. mode `on`: one due row → one channel message -------------------
     console.log("\nmode on");
     await planRow(1, "scholarship_single");
-    const due = await duePlanRows(new Date());
+    const due = await duePlanRows(scheduleNow);
     await check("the due row is picked up", () => assert(due.length === 1, `${due.length} rows due`));
 
-    const first = await runDuePosts(new Date());
+    const first = await runDuePosts(scheduleNow);
     await check("the tick reports one sent post", () => {
       assert(first.length === 1, `${first.length} outcomes`);
       assert(first[0].status === "sent", `status ${first[0].status}: ${first[0].reason ?? ""}`);
@@ -253,7 +249,7 @@ async function main() {
 
     // --- 2. a second tick must not repeat itself --------------------------
     console.log("\na second tick");
-    const again = await runDuePosts(new Date());
+    const again = await runDuePosts(scheduleNow);
     const after = await messagesTo(base, CHANNEL_ID);
     await check("nothing is sent twice", () => {
       assert(after.length === 1, `${after.length} channel messages`);
@@ -271,7 +267,7 @@ async function main() {
     const [late] = await db
       .insert(channelPlan)
       .values({
-        planDate: tashkentDay(new Date()),
+        planDate: today,
         slot: 9,
         sendAt: "00:01",
         kind: "scholarship_single",
@@ -288,7 +284,7 @@ async function main() {
     cleanup.push(async () => {
       await db.delete(channelPlan).where(eq(channelPlan.id, late.id));
     });
-    const lateRun = await runDuePosts(new Date());
+    const lateRun = await runDuePosts(scheduleNow);
     await check("a row whose time passed is still published", async () => {
       assert(lateRun.length === 1, `${lateRun.length} outcomes`);
       assert(lateRun[0].status === "sent", `status ${lateRun[0].status}: ${lateRun[0].reason ?? ""}`);
@@ -297,7 +293,7 @@ async function main() {
 
     // --- 2c. …but a day that was missed is retired, not posted late -------
     console.log("\na missed day");
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const yesterday = tashkentDay(new Date(scheduleNow.getTime() - 86_400_000));
     const [stale] = await db
       .insert(channelPlan)
       .values({
@@ -319,7 +315,7 @@ async function main() {
       await db.delete(channelPlan).where(eq(channelPlan.id, stale.id));
     });
     await check("yesterday's row is retired instead of published", async () => {
-      const retired = await retireStalePlans(tashkentDay(new Date()));
+      const retired = await retireStalePlans(today);
       assert(retired >= 1, "nothing was retired");
       const [row] = await db.select().from(channelPlan).where(eq(channelPlan.id, stale.id));
       assert(row.status === "skipped", `status ${row.status}`);
@@ -331,7 +327,7 @@ async function main() {
     console.log("\nmode approval");
     await persistSettings(mergeChannelSettings({ ...baseSettings, connection: { ...baseSettings.connection, mode: "approval" } }));
     await planRow(2, "fully_funded");
-    const approval = await runDuePosts(new Date());
+    const approval = await runDuePosts(scheduleNow);
     const adminMessages = await messagesTo(base, ADMIN_CHAT_ID);
     const channelAfterApproval = await messagesTo(base, CHANNEL_ID);
 
@@ -380,11 +376,11 @@ async function main() {
     ).find((row) => row.scholarshipId === award.id);
     await check("the approved post reaches the channel", async () => {
       assert(pending, "no post was waiting for approval");
-      const outcome = await approveApproval(pending.id, null);
+      const outcome = await approveApproval(pending.id, null, scheduleNow);
       assert(outcome.ok, `approve failed: ${outcome.reason ?? ""}`);
       const delivered = await messagesTo(base, CHANNEL_ID);
       assert(delivered.length === 3, `${delivered.length} channel messages, expected 3`);
-      assert((delivered[1]?.text ?? "").includes(MARKER), "the approved text was not the stored post");
+      assert(delivered[2]?.text === pending.html, "the approved text was not the stored post");
       const [row] = await db.select().from(channelPosts).where(eq(channelPosts.id, pending.id));
       assert(row.status === "sent", `status ${row.status}`);
     });

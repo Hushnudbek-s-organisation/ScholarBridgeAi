@@ -33,6 +33,8 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 const MARKER = "PROV-FIXTURE:";
 const FIX_DOMAIN_PREFIX = "https://provfixture.example/";
+const ADMISSION_CYCLE = "2026/2027";
+const APPLICANT_SCOPE = "international";
 const NOW = new Date("2026-10-01T00:00:00Z"); // fixed clock for stale unit tests
 
 let failures = 0;
@@ -60,6 +62,7 @@ async function cleanFixtures() {
     const uniIds = unis.rows.map((r) => r.id);
     const progIds = prog.rows.map((r) => r.id);
     if (progIds.length) {
+      await client.query("DELETE FROM catalogue_facts WHERE entity_type = 'program' AND entity_id = ANY($1)", [progIds]);
       await client.query("DELETE FROM program_requirements WHERE program_id = ANY($1)", [progIds]);
       await client.query("DELETE FROM application_cycles WHERE program_id = ANY($1) OR university_id = ANY($2)", [progIds, uniIds]);
       await client.query("DELETE FROM program_sources WHERE program_id = ANY($1)", [progIds]);
@@ -145,6 +148,16 @@ async function seedFixtures(): Promise<{ uniId: number; p1: number; p2: number; 
     [p1, s1.url, p2]
   );
 
+  // A verified legacy row alone must never produce an official minimum.
+  // The canonical result requires a field-level fact with the requested scope.
+  await pool.query(
+    `INSERT INTO catalogue_facts
+       (entity_type, entity_id, field_key, value_numeric, unit, admission_cycle, applicant_scope,
+        source_url, verified_at, verification_status, value_type)
+     VALUES ('program', $1, 'min_ielts', 6.5, '9', $2, $3, $4, now(), 'verified', 'official_requirement')`,
+    [p1, ADMISSION_CYCLE, APPLICANT_SCOPE, s1.url]
+  );
+
   await pool.query(
     `INSERT INTO application_cycles (university_id, program_id, intake, academic_year,
                                      opening_date, deadline, deadline_timezone, application_fee, application_fee_currency,
@@ -200,7 +213,9 @@ async function main() {
   console.log(`  seeded university #${fx.uniId}, programs #${fx.p1} and #${fx.p2}`);
 
   try {
-    const { status, body } = await apiGet(`/api/universities/${fx.uniId}`);
+    const path = `/api/universities/${fx.uniId}`;
+    const scope = new URLSearchParams({ admissionCycle: ADMISSION_CYCLE, applicantScope: APPLICANT_SCOPE });
+    const { status, body } = await apiGet(`${path}?${scope}`);
     check("API responds 200 with fixture university", status === 200 && body?.university?.id === fx.uniId, {
       status,
       id: body?.university?.id,
@@ -231,7 +246,23 @@ async function main() {
     check("p1 requirements all carry sourceUrl + status",
       p1Reqs.length > 0 && p1Reqs.every((r) => r.sourceUrl === fx.s1 && r.verificationStatus === "verified"), p1Reqs);
     const p1Ielts = p1Reqs.find((r) => r.requirementType === "ielts");
-    check("p1 ielts minimum preserved (6.5)", p1Ielts?.minimumValue === 6.5, p1Ielts);
+    check("p1 scoped IELTS minimum is 6.5 on the original scale",
+      p1Ielts?.minimumValue === 6.5 && p1Ielts?.unit === "9" &&
+      p1Ielts?.admissionCycle === ADMISSION_CYCLE && p1Ielts?.evidence?.trust === "official_verified", p1Ielts);
+
+    const { status: unscopedStatus, body: unscoped } = await apiGet(path);
+    const unscopedP1 = unscoped?.programs?.find((p: { id: number }) => p.id === fx.p1);
+    check("a scoped fact cannot become an unscoped minimum",
+      unscopedStatus === 200 && unscopedP1?.minIelts === null && unscopedP1?.requirements?.length === 0);
+    check("the legacy value remains available with legacy trust",
+      unscopedP1?.recordedRequirements?.some((r: { minimumValue: number; evidence?: { trust?: string } }) =>
+        r.minimumValue === 6.5 && r.evidence?.trust === "legacy_unknown") === true);
+
+    scope.set("applicantScope", "domestic");
+    const { status: wrongScopeStatus, body: wrongScope } = await apiGet(`${path}?${scope}`);
+    const wrongScopeP1 = wrongScope?.programs?.find((p: { id: number }) => p.id === fx.p1);
+    check("international minimum stays out of domestic results",
+      wrongScopeStatus === 200 && wrongScopeP1?.minIelts === null && wrongScopeP1?.requirements?.length === 0);
 
     console.log("\nunknown ≠ verified (unverified program, no source):");
     check("p2 present in response", !!p2);

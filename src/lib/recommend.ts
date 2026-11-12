@@ -4,7 +4,9 @@ import {
   assessProgramme,
   type ProgrammeAssessment,
 } from "./assessment";
-import type { EligibilityProfile, RequirementNode } from "./assessment/eligibility";
+import { verifiedEvidenceDate } from "./typedEvidence";
+import type { PreferenceSource } from "./assessment/preferences";
+import type { EligibilityProfile, MinimumRequirementNode, RequirementNode } from "./assessment/eligibility";
 import { financeInputFromCosts } from "./assessment/adapters";
 import { budgetVerdict, evaluateBudgetFit } from "./budgetFit";
 /**
@@ -69,6 +71,8 @@ export type FundingNeed = "none" | "partial" | "full";
 export interface RecommendationInput {
   /** Intended subjects/interests. At least one is needed for subject fit. */
   interests?: string[];
+  preferences?: PreferenceSource | null;
+  applicantScope?: string | null;
   degreeLevel?: string | null; // Bachelor | Master | PhD | ...
   gpa?: number | null;
   /** Scale the GPA is on (4.0, 5.0, 100, ...). Absent → GPA treated as 4.0 only if provided with no scale is unsafe: treated unknown. */
@@ -554,15 +558,7 @@ export interface RecommendationResult {
   assessment: ProgrammeAssessment;
 }
 
-/**
- * Build the canonical assessment for one recommended programme.
- *
- * The legacy `RecommendRequirement` row is a SCORED envelope: `minGpa` is
- * already normalised to the 4.0 catalogue convention and the route has applied
- * `mayAutoReject`, so the values are verified official minimums. Only the ones
- * that survive that gate are carried over — anything else stays null and the
- * engine reports `missing_requirement`.
- */
+/** Build the canonical assessment from the same scoped evidence as discovery. */
 function assessmentFor(
   input: RecommendationInput,
   program: RecommendProgram,
@@ -571,56 +567,45 @@ function assessmentFor(
   selectedCycle: RecommendCycle | null,
   affordability: Affordability
 ): ProgrammeAssessment {
-  const row = reqs.find((item) => item.academicYear == null || item.academicYear === (selectedCycle?.academicYear ?? null)) ?? reqs[0] ?? null;
-  const unitFor = (metric: "ielts" | "toefl" | "det" | "sat" | "act" | "gpa") => {
-    if (metric === "ielts") return "9";
-    if (metric === "toefl") return row?.toeflScale ?? null;
-    if (metric === "det") return "160";
-    if (metric === "sat") return "1600";
-    if (metric === "act") return "36";
-    return null;
-  };
+  const cycle = selectedCycle?.academicYear ?? (input.startYear ? String(input.startYear) : null);
+  const row = reqs.find((item) => (item.academicYear ?? null) === cycle) ?? null;
   const requirementNodes: RequirementNode[] = [];
-  if (row) {
-    if (row.minGpa != null) {
-      requirementNodes.push({ id: "gpa", label: "Minimum GPA", kind: "minimum", metric: "gpa", value: row.minGpa, unit: null });
-    }
-    const language: RequirementNode[] = [];
-    for (const [id, label, metric, value] of [
-      ["ielts", "IELTS", "ielts", row.minIelts],
-      ["toefl", "TOEFL", "toefl", row.minToefl],
-      ["det", "Duolingo English Test", "det", row.minDet],
-    ] as const) {
-      if (value == null) continue;
-      language.push({
-        id,
-        label,
-        kind: "minimum",
-        metric,
-        value,
-        unit: unitFor(metric),
+  if (row?.academicRequirements) {
+    const { evidence, summary } = row.academicRequirements;
+    const minimum = (
+      field: string,
+      metric: "gpa" | "ielts" | "toefl" | "det" | "sat" | "act",
+      label: string,
+    ): MinimumRequirementNode[] => {
+      const fact = evidence[field];
+      const value = summary[field];
+      if (!fact?.isOfficialMinimum || !value || !verifiedEvidenceDate(fact.verifiedAt)) return [];
+      return [{
+        id: field, kind: "minimum", label, metric, value: value.single, unit: value.unit,
         requireValid: metric === "ielts" || metric === "toefl",
-      });
-    }
-    if (language.length === 1) requirementNodes.push(language[0]);
-    else if (language.length > 1) {
-      requirementNodes.push({
-        id: "language",
-        label: "English language",
-        kind: "group",
-        // The route resolved `englishOperator` from a verified fact; without one
-        // the alternatives are OR, exactly as the catalogue describes them.
-        operator: row.englishOperator === "AND" ? "allOf" : "anyOf",
-        children: language,
-      });
-    }
-    const tests: RequirementNode[] = [];
-    if (row.minSat != null) tests.push({ id: "sat", label: "SAT", kind: "minimum", metric: "sat", value: row.minSat, unit: "1600" });
-    if (row.minAct != null) tests.push({ id: "act", label: "ACT", kind: "minimum", metric: "act", value: row.minAct, unit: "36" });
-    if (tests.length === 1) requirementNodes.push(tests[0]);
-    else if (tests.length > 1) {
-      requirementNodes.push({ id: "standardised_tests", label: "Standardised test", kind: "group", operator: "anyOf", children: tests });
-    }
+        admissionCycle: fact.admissionCycle,
+        source: {
+          sourceUrl: fact.sourceUrl, verificationStatus: fact.verificationStatus,
+          valueType: fact.valueType, verifiedAt: fact.verifiedAt,
+        },
+      }];
+    };
+    requirementNodes.push(...minimum("gpa", "gpa", "Minimum GPA"));
+    const language = [
+      ...minimum("ielts", "ielts", "IELTS"),
+      ...minimum("toefl", "toefl", "TOEFL"),
+      ...minimum("duolingo", "det", "Duolingo English Test"),
+    ];
+    const tests = [...minimum("sat", "sat", "SAT"), ...minimum("act", "act", "ACT")];
+    if (language.length === 1) requirementNodes.push(...language);
+    if (language.length > 1) requirementNodes.push({
+      id: "language", label: "English language", kind: "group",
+      operator: row.englishOperator === "AND" ? "allOf" : "anyOf", children: language,
+    });
+    if (tests.length === 1) requirementNodes.push(...tests);
+    if (tests.length > 1) requirementNodes.push({
+      id: "standardised_tests", label: "Standardised test", kind: "group", operator: "anyOf", children: tests,
+    });
   }
 
   const eligibilityProfile: EligibilityProfile = {
@@ -644,7 +629,7 @@ function assessmentFor(
     act: input.act != null ? { value: input.act, unit: "36" } : null,
     degreeLevel: input.degreeLevel ?? null,
     requirementDegreeLevel: program.degreeLevel,
-    cycle: selectedCycle?.academicYear ?? (input.startYear ? String(input.startYear) : null),
+    cycle,
     asOfDate: input.asOfDate ?? new Date().toISOString().slice(0, 10),
   };
 
@@ -672,12 +657,13 @@ function assessmentFor(
       sourceUrl: program.sourceUrl ?? null,
     },
     context: {
-      cycle: selectedCycle?.academicYear ?? (input.startYear ? String(input.startYear) : null),
-      applicantCategory: null,
+      cycle,
+      applicantCategory: input.applicantScope ?? null,
       degreeLevel: input.degreeLevel ?? null,
     },
     applicant: {
       interests: input.interests ?? [],
+      preferences: input.preferences,
       legacyPreferredCountries: input.countries ?? [],
       legacyTeachingLanguage: input.languagePref ? [input.languagePref] : [],
       eligibilityProfile,

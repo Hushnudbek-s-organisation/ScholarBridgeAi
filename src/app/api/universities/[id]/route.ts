@@ -24,13 +24,14 @@ import { localizeDetailPayload, localizeHighlights, localizeUniversityDescriptio
 import { toMatchProfileWithActivities, chancingProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { universityProgrammeDiscovery } from "@/lib/universityProgrammeDiscovery";
 import { assessCatalogueProgramme } from "@/lib/assessment/adapters";
-import type { ProgrammeAssessment } from "@/lib/assessment";
+import type { CatalogueFact } from "@/lib/evidencePolicy";
+import type { FactContext } from "@/lib/factResolver";
 import type { AssessmentProfileRow, AssessmentProgrammeRow } from "@/lib/assessment/adapters";
 import { parseUniversitySort } from "@/lib/universitySort";
 import { verifiedQsRankNumber } from "@/lib/universityRank";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { countriesMatch } from "@/lib/countries";
-import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import { annualUsdAmount, resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import {
   getCachedProfileForMatching,
   getCachedScholarshipsBundle,
@@ -194,25 +195,39 @@ function providerMatchesInstitution(
  * field/level. A missing programme is assessed at institution level, where
  * eligibility stays `unknown` — never `met`.
  */
+type DetailAssessmentProgramme = {
+  id: number;
+  name: string;
+  field: string | null;
+  degree: string | null;
+  language: string | null;
+  studyMode: string | null;
+  programUrl: string | null;
+  sourceUrl: string | null;
+  tuitionAmount: number | null;
+  tuitionCurrency: string | null;
+  tuitionPeriod: string | null;
+};
+
 function assessmentForDiscovery(
   uni: { id: number; name: string; country: string; officialWebsiteUrl?: string | null; websiteUrl?: string | null; sourceUrl?: string | null; programMajor?: string | null },
-  uniId: number,
-  programmes: { id: number; name: string; field?: string | null; degreeLevel?: string | null }[],
-  selectedProgrammeId: number | null,
-  profile: (AssessmentProfileRow & { degreeLevel?: string | null }) | null | undefined
-): ProgrammeAssessment {
-  const selected = programmes.find((programme) => programme.id === selectedProgrammeId) ?? programmes[0] ?? null;
+  selected: DetailAssessmentProgramme | null,
+  profile: AssessmentProfileRow,
+  context: FactContext,
+  requirementFacts: CatalogueFact[],
+) {
+  const uniId = uni.id;
   const assessedAt = new Date().toISOString();
   const programme: AssessmentProgrammeRow = {
     id: selected?.id ?? -uniId,
     universityId: uniId,
     name: selected?.name ?? uni.name,
     field: selected?.field ?? uni.programMajor ?? null,
-    degree: selected?.degreeLevel ?? profile?.degreeLevel ?? null,
-    language: null,
-    studyMode: null,
-    programUrl: uni.officialWebsiteUrl ?? uni.websiteUrl ?? null,
-    sourceUrl: uni.sourceUrl ?? null,
+    degree: selected?.degree ?? profile.degreeLevel ?? null,
+    language: selected?.language ?? null,
+    studyMode: selected?.studyMode ?? null,
+    programUrl: selected?.programUrl ?? uni.officialWebsiteUrl ?? uni.websiteUrl ?? null,
+    sourceUrl: selected?.sourceUrl ?? null,
   };
   const costs = resolvedUsdUniversityCosts(uni as never);
   return assessCatalogueProgramme({
@@ -224,11 +239,15 @@ function assessmentForDiscovery(
       officialWebsiteUrl: uni.officialWebsiteUrl ?? null,
       websiteUrl: uni.websiteUrl ?? null,
     },
-    profile: profile ?? null,
-    requirementRow: null,
-    tuitionUsd: costs.annualTuitionUsd,
+    profile,
+    requirementFacts,
+    tuitionUsd: selected ? annualUsdAmount({
+      value: selected.tuitionAmount, currency: selected.tuitionCurrency, period: selected.tuitionPeriod,
+    }) : costs.annualTuitionUsd,
     livingUsd: costs.annualLivingEstUsd,
-    degreeLevel: profile?.degreeLevel ?? null,
+    degreeLevel: profile.degreeLevel ?? null,
+    cycle: context.admissionCycle ?? null,
+    applicantCategory: context.applicantScope ?? null,
     assessedAt,
     asOfDate: assessedAt.slice(0, 10),
   });
@@ -354,12 +373,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       issues: string[];
       breakdown: MatchBreakdown;
     } | null = null;
-    /**
-     * Experimental programme planning index, never a personal probability or
-     * observed cohort statistic. Same real-programme selection and explicit
-     * sort opt-in as the explorer. Owner/admin profile reads only.
-     */
-    let assessment: ProgrammeAssessment | null = null;
+    let assessmentProfile: AssessmentProfileRow | null = null;
+    let programmeDiscovery: ReturnType<typeof universityProgrammeDiscovery>["programmeDiscovery"] | null = null;
     const locale = localeFromRequest(req);
     const searchParams=new URL(req.url).searchParams;
     const contextText=(key:string,max:number)=>{const value=searchParams.get(key);if(value==null||value==="")return null;if(value.length>max||/[\u0000-\u001f]/.test(value))throw new Error("invalid_requirement_context");return value.trim()||null;};
@@ -367,13 +382,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const programId=selectedProgram==null?null:postgresId(selectedProgram);
     if(selectedProgram!=null&&programId==null)return privateNoStoreJson({error:"Invalid programme id"},{status:400});
     const requirementContext={programId,admissionCycle:contextText("admissionCycle",100),applicantScope:contextText("applicantScope",200),degreeLevel:contextText("degreeLevel",100)};
-    const scopedPayload=async(base:Record<string,unknown>)=>{
-      const rows=(base.programs??[]) as {id:number}[];
-      const [institution,programmes]=await Promise.all([loadCatalogueFacts("university",[uniId]),loadCatalogueFacts("program",rows.map(row=>row.id))]);
-      return withScopedDetailRequirements(base,institution.get(uniId)??[],programmes,requirementContext);
+    const assessedUniversity = uni;
+    const scopedPayload = async (base: Record<string, unknown>) => {
+      const rows = (base.programs ?? []) as DetailAssessmentProgramme[];
+      const [institution, programmes] = await Promise.all([
+        loadCatalogueFacts("university", [uniId]),
+        loadCatalogueFacts("program", rows.map((row) => row.id)),
+      ]);
+      const scoped = withScopedDetailRequirements(base, institution.get(uniId) ?? [], programmes, requirementContext);
+      const selectedId = programId ?? programmeDiscovery?.selectedProgrammeId;
+      const selected = rows.find((row) => row.id === selectedId) ?? null;
+      const assessment = assessmentProfile
+        ? assessmentForDiscovery(assessedUniversity, selected, assessmentProfile, requirementContext, selected ? programmes.get(selected.id) ?? [] : [])
+        : null;
+      return { ...scoped, assessment, chance: assessment };
     };
     const experimental=parseUniversitySort(searchParams.get("sort")).sort==="chance_desc";
-    let programmeDiscovery:ReturnType<typeof universityProgrammeDiscovery>["programmeDiscovery"]|null=null;
     const profileIdParam = searchParams.get("profileId");
     if (profileIdParam) {
       const pId = Number(profileIdParam);
@@ -395,7 +419,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           };
           const discovery=universityProgrammeDiscovery(row,bundle?.programsByUni?.get(uniId)??[],cachedProfile.profileData,cachedProfile.chancingProfile,experimental);
           programmeDiscovery=discovery.programmeDiscovery;
-          assessment=assessmentForDiscovery(row,uniId,bundle?.programsByUni?.get(uniId)??[],programmeDiscovery?.selectedProgrammeId??null,cachedProfile.profileData);
+          assessmentProfile = cachedProfile.profileData;
         } else {
           const [p] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, pId));
           if (p) {
@@ -413,7 +437,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             const bundle=await getCachedUniversitiesBundleForAssessment();
             const discovery=universityProgrammeDiscovery(uni,bundle.programsByUni?.get(uniId)??[],p,await chancingProfileWithActivities(p),experimental);
             programmeDiscovery=discovery.programmeDiscovery;
-            assessment=assessmentForDiscovery(uni,uniId,bundle.programsByUni?.get(uniId)??[],programmeDiscovery?.selectedProgrammeId??null,p);
+            assessmentProfile = p;
           }
         }
       }
@@ -428,10 +452,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             ...await scopedPayload(cachedBase),
             programmeDiscovery:programmeDiscovery??cachedBase.programmeDiscovery,
             match,
-            assessment,
-            // Deprecated alias: older clients read `chance`; it now carries the
-            // canonical assessment, so no composite index can be resurrected.
-            chance: assessment,
           },
           locale
         )
@@ -1061,9 +1081,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           ...await scopedPayload(basePayload),
           programmeDiscovery:programmeDiscovery??basePayload.programmeDiscovery,
           match,
-          assessment,
-          // Deprecated alias: see the cached branch above.
-          chance: assessment,
         },
         locale
       )

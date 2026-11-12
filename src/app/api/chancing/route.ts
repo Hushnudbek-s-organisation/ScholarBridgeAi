@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  programRequirements,
   savedUniversities,
   studentProfiles,
   universityPrograms,
@@ -20,10 +19,8 @@ import { verifiedQsRank } from "@/lib/universityRank";
 import { countriesMatch } from "@/lib/countries";
 import { getCachedUniversitiesBundleForAssessment } from "@/lib/catalogCache";
 import { assessedUniversitiesCacheKey } from "@/lib/assessment/version";
-import {
-  assessCatalogueProgramme,
-  requirementNodesFromRow,
-} from "@/lib/assessment/adapters";
+import { assessCatalogueProgramme } from "@/lib/assessment/adapters";
+import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
 import type { ProgrammeAssessment } from "@/lib/assessment";
 import { compareDegreeLevels } from "@/lib/degreeLevels";
 
@@ -210,18 +207,11 @@ export async function GET(req: Request) {
       .where(and(inArray(universityPrograms.universityId, activeUniIds), eq(universityPrograms.isActive, true)));
 
     const programIds = rawPrograms.map((p) => p.id);
-    const rawProgramReqs =
-      programIds.length > 0
-        ? await db.select().from(programRequirements).where(inArray(programRequirements.programId, programIds))
-        : [];
-    const reqByProgramId = new Map<number, (typeof rawProgramReqs)[number]>();
-    for (const row of rawProgramReqs) {
-      // One requirement row per programme/cycle; keep the verified-evidence row
-      // when several exist and never merge values across cycles.
-      const existing = reqByProgramId.get(row.programId);
-      if (!existing || (hasVerifiedProgramEvidence(row) && !hasVerifiedProgramEvidence(existing))) {
-        reqByProgramId.set(row.programId, row);
-      }
+    const programmeFacts = await loadCatalogueFacts("program", programIds);
+    const cycle = searchParams.get("admissionCycle")?.trim() || null;
+    const applicantScope = searchParams.get("applicantScope")?.trim() || null;
+    if ((cycle?.length ?? 0) > 100 || (applicantScope?.length ?? 0) > 200) {
+      return NextResponse.json({ error: "Invalid assessment scope" }, { status: 400 });
     }
 
     const programsByUniId = new Map<number, (typeof rawPrograms)[number][]>();
@@ -262,15 +252,15 @@ export async function GET(req: Request) {
           satScore: overrideSat !== undefined ? overrideSat : profile.satScore,
           toeflScore: overrideToefl !== undefined ? overrideToefl : profile.toeflScore,
         },
-        requirementRow: reqByProgramId.get(program.id) ?? null,
+        requirementFacts: programmeFacts.get(program.id) ?? [],
         // A quarantined price is not published as a cost: it stays null, so the
         // finance total is unknown rather than silently free.
         tuitionUsd: verified && program.tuitionCurrency === "USD" && program.tuitionAmount != null
           ? Number(program.tuitionAmount)
           : null,
         applicationFeeUsd: null,
-        cycle: program.degree ? null : null,
-        applicantCategory: null,
+        cycle,
+        applicantCategory: applicantScope,
         degreeLevel: overrideDegreeLevel ?? profile.degreeLevel ?? null,
         assessedAt: new Date().toISOString(),
         asOfDate: new Date().toISOString().slice(0, 10),

@@ -226,6 +226,19 @@ const baseInput = (overrides: Partial<AssessmentInput> = {}): AssessmentInput =>
   ...overrides,
 });
 
+check("a saved subject choice drives the fit even when legacy interests differ", () => {
+  const base = baseInput();
+  const result = assessProgramme({
+    ...base,
+    applicant: {
+      ...base.applicant,
+      interests: ["Physics"],
+      preferences: { subject: { mode: "must", value: ["Computer Science"] } },
+    },
+  });
+  assert.equal(result.preferenceFilters.find((item) => item.axis === "subject")?.state, "pass");
+});
+
 check("GPA / IELTS / SAT / budget changes leave preferenceFit identical", () => {
   const base = assessProgramme(baseInput());
   const changed = assessProgramme(
@@ -438,6 +451,24 @@ check("an incomparable GPA scale is unknown, never converted proportionally", ()
   assert.equal(result.status, "unknown");
   assert.ok(result.unknownReasons.includes("incomparable_scale"));
 });
+
+check("TOEFL without its original scale cannot clear a documented minimum", () => {
+  const result = evaluateEligibility(
+    [{ id: "toefl", label: "TOEFL", kind: "minimum", metric: "toefl", value: 5, unit: "6", source: OFFICIAL }],
+    { toefl: { value: 100, unit: null }, asOfDate: "2026-11-11" },
+  );
+  assert.equal(result.status, "unknown");
+  assert.ok(result.unknownReasons.includes("incomparable_scale"));
+});
+
+check("GPA 4.0 and 4 denote the same original scale", () => {
+  const result = evaluateEligibility(
+    [{ id: "gpa", label: "GPA", kind: "minimum", metric: "gpa", value: 3.5, unit: "GPA 4.0", source: OFFICIAL }],
+    { gpa: { value: 3.7, unit: "4" }, asOfDate: "2026-11-11" },
+  );
+  assert.equal(result.status, "met");
+});
+
 
 check("a requirement from another cycle is unknown with stale_or_wrong_cycle", () => {
   const result = evaluateEligibility(

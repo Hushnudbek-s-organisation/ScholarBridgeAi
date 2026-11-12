@@ -320,36 +320,25 @@ function evaluateMinimum(
     };
   }
 
-  // Scale compatibility: a 5.0-scale GPA is not comparable with a 4.0 minimum.
   const requiredUnit = (node.unit ?? "").trim();
   const userUnit = (user.unit ?? "").trim();
-  if (node.metric === "gpa") {
-    const comparable =
-      user.value >= 0 &&
-      (user.minimum ?? 0) === 0 &&
-      (!requiredUnit || !userUnit || requiredUnit === userUnit);
-    if (!comparable) {
-      const unknown = UNKNOWN(
-        "incomparable_scale",
-        "The GPA scale is not comparable with the published minimum, and no published conversion rule applies."
-      );
-      return {
-        ...base,
-        userValue: `${user.value}${userUnit ? `/${userUnit}` : ""}`,
-        requiredValue: `${node.value}${requiredUnit ? `/${requiredUnit}` : ""}`,
-        ...unknown,
-      };
-    }
-  } else if (requiredUnit && userUnit && requiredUnit !== userUnit) {
-    const unknown = UNKNOWN(
-      "incomparable_scale",
-      `The recorded result is on the ${userUnit} scale while the requirement is on the ${requiredUnit} scale.`
-    );
+  const normaliseUnit = (unit: string) => {
+    if (node.metric === "ielts" && unit.toLowerCase() === "ielts band") return "9";
+    if (node.metric === "gpa" && /^GPA 4\.0$/i.test(unit)) return "4";
+    return /^\d+(?:\.\d+)?$/.test(unit) ? String(Number(unit)) : unit;
+  };
+  const requiredScale = normaliseUnit(requiredUnit);
+  const userScale = normaliseUnit(userUnit);
+  const needsExplicitScale = node.metric === "gpa" || node.metric === "toefl";
+  const scaleUnknown = needsExplicitScale && (!requiredScale || !userScale);
+  const scaleMismatch = Boolean(requiredScale && userScale && requiredScale !== userScale);
+  const gpaBasisMismatch = node.metric === "gpa" && (user.value < 0 || (user.minimum ?? 0) !== 0);
+  if (scaleUnknown || scaleMismatch || gpaBasisMismatch) {
     return {
       ...base,
-      userValue: `${user.value} ${userUnit}`,
-      requiredValue: `${node.value} ${requiredUnit}`,
-      ...unknown,
+      userValue: `${user.value}${userUnit ? ` / ${userUnit}` : ""}`,
+      requiredValue: `${node.value}${requiredUnit ? ` / ${requiredUnit}` : ""}`,
+      ...UNKNOWN("incomparable_scale", "The recorded and published score scales cannot be compared."),
     };
   }
 

@@ -266,7 +266,9 @@ function buildPayload(
     const y = parseNum(form.startYear);
     if (y != null) body.startYear = y;
   } else if (baseline.startYear != null) body.startYear = null;
-  if (form.countries.length > 0 || (Array.isArray(baseline.countries) && baseline.countries.length > 0)) {
+  const savedCountries = Array.isArray(baseline.countries) ? baseline.countries : [];
+  if (form.countries.length !== savedCountries.length ||
+      form.countries.some((country) => !savedCountries.includes(country))) {
     body.countries = form.countries;
   }
   return body;
