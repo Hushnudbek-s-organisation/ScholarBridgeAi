@@ -29,6 +29,40 @@ test("real admin author -> exact manual group review -> profile/API grouped crit
   const read=(await(await page.request.get(`/api/profiles/${f.studentId}`)).json()).profile;expect(read.applicantContext.toefl.score).toBe(5.5);expect(read.applicantContext.toefl.scale).toBe("6");expect(read.applicantContext.citizenships).toEqual(["UZ","US"]);
   const recommend=async(extra:Record<string,unknown>={})=>{const response=await page.request.post("/api/programs/recommend",{data:{profileId:f.studentId,interests:["Computer Science"],applicantScope:"international",...extra}});expect(response.status()).toBe(200);const result=await response.json();return result.results.find((row:{program:{id:number}})=>row.program.id===f.fixtureProgramId);};
   const first=await recommend();await test.info().attach("reviewed-group",{body:JSON.stringify({confirmed,first,now:new Date().toISOString()}),contentType:"application/json"});expect(first.eligibility.group.state).toBe("met");
+  expect(first.assessment.context.applicantCategory).toBe("international");
+  const saved = await page.request.put(`/api/profiles/${f.studentId}`, { data: {
+    assessmentPreferences: { version: 1, country: { mode: "must", value: ["Germany"] } },
+  } });
+  expect(saved.status()).toBe(200);
+  try {
+    expect((await recommend()).assessment.preferenceFilters).toContainEqual(
+      expect.objectContaining({ axis: "country", state: "pass" }),
+    );
+    expect((await recommend({ countries: ["Germany"] })).assessment.preferenceFilters).not.toContainEqual(
+      expect.objectContaining({ axis: "country" }),
+    );
+    const scope = new URLSearchParams({
+      profileId: String(f.studentId), programId: String(f.fixtureProgramId),
+      admissionCycle: "2027", applicantScope: "international",
+    });
+    const detail = await page.request.get(`/api/universities/${f.verifiedUniversityId}?${scope}`);
+    expect(detail.status()).toBe(200);
+    const assessment = (await detail.json()).assessment;
+    expect(assessment.programme.id).toBe(f.fixtureProgramId);
+    expect(assessment.context).toMatchObject({ cycle: "2027", applicantCategory: "international" });
+    expect(assessment.preferenceFilters).toContainEqual(expect.objectContaining({ axis: "country", state: "pass" }));
+    expect(assessment.eligibility.checks).toContainEqual(expect.objectContaining({
+      requirementId: "min_sat", sourceUrl: f.fixturePublisherUrl,
+    }));
+    scope.set("applicantScope", "domestic");
+    const other = await page.request.get(`/api/universities/${f.verifiedUniversityId}?${scope}`);
+    expect(other.status()).toBe(200);
+    expect((await other.json()).assessment.eligibility.checks).not.toContainEqual(
+      expect.objectContaining({ requirementId: "min_sat" }),
+    );
+  } finally {
+    expect((await page.request.put(`/api/profiles/${f.studentId}`, { data: { assessmentPreferences: null } })).status()).toBe(200);
+  }
   const unknown=await recommend({applicantScope:null});expect(unknown.eligibility.group).toBeUndefined();expect(unknown.eligibility.met).toBe(0);
   expect((await recommend({toefl:100})).eligibility.group.state).toBe("unknown");
   expect((await recommend({toefl:6,toeflScale:"6",toeflExamDate:"2024-01-01",toeflValidUntil:"2025-01-01"})).eligibility.group.state).toBe("unknown");

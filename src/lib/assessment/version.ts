@@ -25,7 +25,7 @@
  */
 
 /** The single scoring version stamped on every canonical assessment. */
-export const SCORING_VERSION = "programme-assessment-2026-11-11.2";
+export const SCORING_VERSION = "programme-assessment-2026-11-12.1";
 
 /** Version of the preference axes/modes contract. */
 export const PREFERENCE_SETTINGS_VERSION = "preferences-2026-11-11.1";

@@ -1,5 +1,6 @@
 import {resolveAcademicRequirements,academicDecisionEnvelope} from "@/lib/universityDetailRequirements";
 import {parseApplicantContext,recordedToefl} from "@/lib/applicantContext";
+import { parseAssessmentPreferences, storedPreferencesToSource } from "@/lib/assessmentStored";
 import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { resolveScopedFact } from "@/lib/factResolver";
 import { mayAutoReject,isVerifiedOfficialRequirement } from "@/lib/typedEvidence";
@@ -248,8 +249,18 @@ export async function POST(req: Request) {
     fundingNeed = { value: null, source: "unknown" };
   }
 
+  const savedPreferences = storedPreferencesToSource(parseAssessmentPreferences(profile.assessmentPreferences));
+  // The Studio's request controls are temporary filters. Omitted values use
+  // saved preference modes, including an explicit "no preference".
+  const preferences = savedPreferences && {
+    ...savedPreferences,
+    country: countries.source === "request" ? undefined : savedPreferences.country,
+    teaching_language: languagePref.source === "request" ? undefined : savedPreferences.teaching_language,
+  };
   const input: RecommendationInput = {
     interests,
+    preferences,
+    applicantScope,
     degreeLevel: degreeLevel.value as string | null,
     gpa: gpa.value as number | null,
     gpaScale: gpaScale.value as number | null,

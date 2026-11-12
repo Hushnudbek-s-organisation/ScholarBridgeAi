@@ -226,6 +226,19 @@ const baseInput = (overrides: Partial<AssessmentInput> = {}): AssessmentInput =>
   ...overrides,
 });
 
+check("a saved subject choice drives the fit even when legacy interests differ", () => {
+  const base = baseInput();
+  const result = assessProgramme({
+    ...base,
+    applicant: {
+      ...base.applicant,
+      interests: ["Physics"],
+      preferences: { subject: { mode: "must", value: ["Computer Science"] } },
+    },
+  });
+  assert.equal(result.preferenceFilters.find((item) => item.axis === "subject")?.state, "pass");
+});
+
 check("GPA / IELTS / SAT / budget changes leave preferenceFit identical", () => {
   const base = assessProgramme(baseInput());
   const changed = assessProgramme(

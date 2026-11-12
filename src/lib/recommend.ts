@@ -5,6 +5,7 @@ import {
   type ProgrammeAssessment,
 } from "./assessment";
 import { verifiedEvidenceDate } from "./typedEvidence";
+import type { PreferenceSource } from "./assessment/preferences";
 import type { EligibilityProfile, MinimumRequirementNode, RequirementNode } from "./assessment/eligibility";
 import { financeInputFromCosts } from "./assessment/adapters";
 import { budgetVerdict, evaluateBudgetFit } from "./budgetFit";
@@ -70,6 +71,8 @@ export type FundingNeed = "none" | "partial" | "full";
 export interface RecommendationInput {
   /** Intended subjects/interests. At least one is needed for subject fit. */
   interests?: string[];
+  preferences?: PreferenceSource | null;
+  applicantScope?: string | null;
   degreeLevel?: string | null; // Bachelor | Master | PhD | ...
   gpa?: number | null;
   /** Scale the GPA is on (4.0, 5.0, 100, ...). Absent → GPA treated as 4.0 only if provided with no scale is unsafe: treated unknown. */
@@ -655,11 +658,12 @@ function assessmentFor(
     },
     context: {
       cycle,
-      applicantCategory: null,
+      applicantCategory: input.applicantScope ?? null,
       degreeLevel: input.degreeLevel ?? null,
     },
     applicant: {
       interests: input.interests ?? [],
+      preferences: input.preferences,
       legacyPreferredCountries: input.countries ?? [],
       legacyTeachingLanguage: input.languagePref ? [input.languagePref] : [],
       eligibilityProfile,

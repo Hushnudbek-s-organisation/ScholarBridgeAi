@@ -367,7 +367,7 @@ export function assessProgramme(input: AssessmentInput): ProgrammeAssessment {
 
   const describedMode = interpretStudyMode(input.programme.studyMode);
   const subjectRelation = evaluateSubjectRelation(
-    input.applicant.interests,
+    preferences.subject?.value ?? input.applicant.interests,
     input.programme.field ?? input.programme.name,
     preferences.acceptedSubjectEquivalents,
     input.applicant.relatedSubjects ?? []
