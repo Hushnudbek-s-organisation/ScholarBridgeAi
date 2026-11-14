@@ -1,3 +1,4 @@
+import {examRule,validExamNumber} from "./examRecords";
 import { compareDegreeLevels, undergraduateTestApplies } from "./degreeLevels";
 import { parseEligibilityScope } from "./eligibilityScope";
 import { gpaTo40Scale } from "./gpa";
@@ -233,13 +234,11 @@ export function subjectAlignment(
   if (!a || !b || !A.size || !B.size) return { level: "unknown", similarity: null };
 
   const fit = subjectAffinity([a], b);
-  const overlap = [...A].filter((t) => B.has(t)).length;
-  const ratio = overlap / Math.min(A.size, B.size);
-  if (fit.level === "exact" || fit.level === "synonym" || ratio >= 0.5) {
-    return { level: "strong", similarity: Math.max(ratio, fit.score) };
+  if (fit.level === "exact" || fit.level === "synonym") {
+    return { level: "strong", similarity: fit.score };
   }
-  if (fit.level === "partial" || fit.level === "weak" || overlap > 0) {
-    return { level: "partial", similarity: Math.max(ratio, fit.score) };
+  if (fit.level === "partial" || fit.level === "weak") {
+    return { level: "partial", similarity: fit.score };
   }
   if (fit.level === "none") return { level: "none", similarity: 0 };
   return { level: "unknown", similarity: null };
@@ -448,7 +447,7 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   // actually recorded IELTS score is compared, and even that comparison must
   // be verified against the programme's current policy.
   if (uni.minIelts != null) {
-    const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
+    const hasIelts = validExamNumber(profile.ieltsScore,examRule("ielts"));
     if (!hasIelts) {
       const alternative = typeof profile.toeflScore === "number" && Number.isFinite(profile.toeflScore) && profile.toeflScore > 0
         ? { test: "TOEFL", score: profile.toeflScore }
@@ -497,7 +496,7 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
   // UI copy must frame the comparison as something to verify, not a universal
   // requirement.
   if (uni.minSat != null && undergraduateTestApplies(uni.degreeLevel, profile.degreeLevel)) {
-    const hasSat = typeof profile.satScore === "number" && profile.satScore > 0;
+    const hasSat = validExamNumber(profile.satScore,examRule("sat"));
     if (!hasSat) {
       // Missing does not mean required, waived, or failed; leave this
       // university-level catalogue dimension unscored until a programme
@@ -717,7 +716,7 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
   // tests remain alternatives to verify with the award provider, not presumed
   // equivalents and not a penalty in the fit score.
   if (scholarship.minIelts && scholarship.minIelts > 0) {
-    const hasIelts = typeof profile.ieltsScore === "number" && profile.ieltsScore > 0;
+    const hasIelts = validExamNumber(profile.ieltsScore,examRule("ielts"));
     if (!hasIelts) {
       const alternative = typeof profile.toeflScore === "number" && Number.isFinite(profile.toeflScore) && profile.toeflScore > 0
         ? { test: "TOEFL", score: profile.toeflScore }

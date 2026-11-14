@@ -1,0 +1,116 @@
+
+1. Subject matching — synonyms and multiple interests
+  ✓ exact match
+  ✓ related, not synonym: software engineering ↔ Computer Science
+  ✓ related direction reversed
+  ✓ multiple interests: best one wins
+  ✓ multiple interests: synonym tier when no exact
+  ✓ partial: shared meaningful word
+  ✓ no program field → none (not fabricated)
+  ✓ no student interests → unknown (neutral 0.5)
+  ✓ normalization: punctuation/case
+  ✓ unrelated subjects → none
+
+2. Eligibility — met vs unmet vs unknown
+  ✓ met: above every minimum
+  ✓ unmet: below one minimum, others met
+  ✓ unknown: missing student values are NEVER unmet
+  ✓ mixed: known-met + known-unmet + unknown coexist
+  ✓ GPA 3.0/5.0 → 2.4 on 4.0 scale
+  ✓ GPA 85/100 → 3.4 on 4.0 scale
+  ✓ GPA > 4 without a scale → unknown (no assumption)
+  ✓ GPA ≤ 4 without a scale is unknown
+  ✓ text requirements carried through, not scored as numbers
+
+3. Missing data is neutral
+  ✓ unknown eligibility is NOT penalised below the no-requirements baseline
+  ✓ missingInputs lists exactly the unknown inputs
+  ✓ a fully-unknown profile still gets a usable (not zero) match for an exact subject
+
+4. Admission probability is never computed or displayed
+  ✓ every result returns probability.available === false
+  ✓ no numeric probability field anywhere in a result
+  ✓ match score stays a labelled match score (0–100)
+
+5. Provenance and stale flags
+  ✓ verified program keeps sourceUrl + lastVerifiedAt
+  ✓ stale verified (>180d) is flagged programStale
+  ✓ fresh verified is not stale
+  ✓ unverified program: no source invented, status kept
+
+6. Affordability and funding
+  ✓ within budget when the full annual USD cost fits
+  ✓ over budget when the full annual USD cost exceeds the budget
+  ✓ no budget → unknown, not 'no'
+  ✓ missing living cost keeps the full annual cost unknown rather than treating it as zero
+  ✓ family income is not returned or used as budget/contribution
+  ✓ need-based scholarship matches only when funding need is known
+  ✓ country mismatch excluded
+  ✓ degree-level match honoured
+  ✓ scholarship degree aliases compare canonically
+  ✓ non-USD tuition → unknown (no cross-currency fabrication)
+
+7. Ranking order and plain-language factors
+  ✓ exact ranks first
+  ✓ equal related fits use stable IDs before unrelated
+  ✓ ranking factors are plain language
+  ✓ each result carries a nextCycle (null when absent) — never invented
+
+7b. Degree level is the hard constraint
+  ✓ a matching level leads even with a weaker subject fit
+  ✓ the Bachelor programme is flagged as a mismatch
+  ✓ every mismatch sorts below every match
+  ✓ the card explains WHY it is there
+  ✓ a same-level programme says match
+  ✓ an unstated level is 'unknown', not a silent mismatch
+  ✓ an unstated level adds no level penalty
+  ✓ degree aliases compare through the shared canonical helper
+
+7c. Application cycle selection is date-aware and order-independent
+  ✓ nearest upcoming deadline is selected from unsorted input
+  ✓ when every dated cycle has passed, the most recent academic year is selected
+  ✓ when deadlines are absent, the newest academic year is selected
+
+8. i18n: recommend namespace ×3 locales (long-text parity)
+  ✓ all three locales define the recommend namespace
+  ✓ key parity en/uz/ru and a substantial namespace (>=100 keys)
+  ✓ "probabilityUnavailable" present and non-empty in all 3 locales
+  ✓ "matchScoreHint" present and non-empty in all 3 locales
+  ✓ "fitExact" present and non-empty in all 3 locales
+  ✓ "eligibilityUnknown" present and non-empty in all 3 locales
+  ✓ "affordabilityUnknown" present and non-empty in all 3 locales
+  ✓ "errorDataUnavailable" present and non-empty in all 3 locales
+  ✓ "prefilledNote" present and non-empty in all 3 locales
+  ✓ "whyText" present and non-empty in all 3 locales
+  ✓ probability text contains no numeric percentage in any locale
+  ✓ match-score hint disclaims probability/guarantee in all 3 locales
+
+9. API: auth, ownership, validation, save + plan actions (isolated DB :55450)
+  ✓ unauthenticated → 401
+  ✓ missing interests → 400 with guidance (no silent default)
+catalogue facts migration pending: bounded legacy discovery fallback, no official eligibility
+  ✓ authenticated request → 200
+  ✓ returns the fixture programs
+  ✓ CS program ranked first (exact subject tier)
+  ✓ synonym program (Software Engineering) included
+  ✓ legacy row-level verification does not establish typed programme minima
+  ✓ affordability: within budget (9000 ≤ 25000 USD)
+  ✓ next cycle: verified deadline surfaced with source
+  ✓ unverified cycle flagged isEstimated=true
+  ✓ quarantined requirements are not used to assess eligibility
+  ✓ quarantined tuition is not published or scored as affordability
+  ✓ archived cycles are not selected even when they are the only cycle
+  ✓ provenance: program sourceUrl + verificationStatus in response
+  ✓ probability dimension: available=false in the response
+  ✓ no numeric probability anywhere in the payload
+  ✓ input source transparency: ielts from profile, budget from request, fundingNeed from request
+  ✓ bob cannot run the recommender with alice's profileId → 403
+  ✓ save action: alice saves the recommended program
+  ✓ saved row is owned by alice
+  ✓ bob cannot save into alice's shortlist → 403
+  ✓ plan action: convert recommendation to an application plan
+  ✓ plan row owned by alice with the recommended program
+  ✓ bob cannot create a plan in alice's name → 403
+  ✓ program with no requirements: eligibility unknown=0/unmet=0, nextCycle null (not invented)
+
+✅ 91 passed, 0 failed

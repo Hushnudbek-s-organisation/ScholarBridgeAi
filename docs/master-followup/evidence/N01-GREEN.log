@@ -1,0 +1,43 @@
+PASS discovery is not applicability: {"country":"Global","coverageType":"Full ride","amountUsdValue":50000}
+PASS discovery is not applicability: {"country":"US","coverageType":"Full tuition"}
+PASS discovery is not applicability: {"country":"Europe","amountUsdValue":50000}
+PASS discovery is not applicability: {"title":"FICTIONAL University full grant","amountUsdValue":50000}
+PASS discovery is not applicability: {"country":"Global","annualUsdValue":10000,"amountUsdValue":50000}
+PASS exact reviewed scope can prove applicability and annual total coverage
+PASS tuition only is not total-cost funding
+PASS explicit wrong university_id is not applicable
+PASS explicit wrong program_id is not applicable
+PASS wrong fact scope {"programName":"Other programme"} stays unknown
+PASS wrong fact scope {"degreeLevel":"Master"} stays unknown
+PASS wrong fact scope {"admissionCycle":"2028"} stays unknown
+PASS wrong fact scope {"applicantScope":"domestic"} stays unknown
+PASS missing applicant context {"programmeId":null}
+PASS missing applicant context {"programName":null}
+PASS missing applicant context {"admissionCycle":null}
+PASS missing applicant context {"applicantScope":null}
+PASS missing applicant context {"citizenships":[]}
+PASS field evidence is mandatory {"publisherOfficial":false}
+PASS field evidence is mandatory {"verificationStatus":"failed_verification"}
+PASS field evidence is mandatory {"verifiedAt":null}
+PASS field evidence is mandatory {"sourceUrl":null}
+PASS US restriction does not become eligible from destination US
+PASS a second recorded eligible citizenship is considered
+PASS unknown citizenship cannot pass a restriction
+PASS malformed and mixed unrestricted lists are unknown
+PASS scope completeness is evidence, not an inferred checkbox
+PASS programme-total coverage does not prove annual payment
+PASS conflicting official coverage peers do not select a winner
+PASS full total-cost vs explicitly partial tuition is a conflict
+PASS unknown eligibility group cannot prove applicability
+PASS a verified unmet group blocks applicability without an admission prediction
+PASS numeric PostgreSQL ID representation is reviewable without altering identity
+PASS integer-valued PostgreSQL decimal ID retains its identity
+PASS manual review allowlist {"field_key":"admission_probability"}
+PASS manual review allowlist {"entity_type":"university"}
+PASS manual review allowlist {"value_numeric":"0"}
+PASS manual review allowlist {"value_numeric":"1e2"}
+PASS manual review allowlist {"program_name":null}
+PASS manual review allowlist {"admission_cycle":null}
+PASS manual review allowlist {"value_type":"planning_estimate"}
+PASS a full-cost field requires an original supported period
+SCOPED_AWARD_COVERAGE: 42 passed, 0 failed

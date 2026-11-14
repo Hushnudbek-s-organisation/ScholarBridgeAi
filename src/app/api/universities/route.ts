@@ -1,3 +1,4 @@
+import {reportReadFailure} from "@/lib/readFailure.server";
 import {resolveAcademicRequirements,academicDecisionEnvelope} from "@/lib/universityDetailRequirements";
 import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { privateNoStoreJson } from "@/lib/apiResponse";
@@ -357,14 +358,18 @@ export async function GET(req: Request) {
     return privateNoStoreJson(payload);
   } catch (error) {
     if(error instanceof Error&&error.message==="invalid_requirement_context")return privateNoStoreJson({error:"Invalid requirement context"},{status:400});
-    console.error("GET /api/universities error:", error);
+    const diagnostic=reportReadFailure("universities GET",error);
     // Never substitute sample universities: during a database outage students
     // would be shown made-up data as if it were real. Clients show the error
     // (the website's explorer / detail views, and the Telegram bot's
     // \"temporarily unavailable\" message for 503).
-    return privateNoStoreJson(
+    const response=privateNoStoreJson(
       { error: "University data is temporarily unavailable. Please try again shortly.", code: "data_unavailable" },
       { status: 503 },
     );
+    // Keep the existing body/status contract. No raw exception, SQL or IDs.
+    response.headers.set("X-Request-Id",diagnostic.requestId);
+    response.headers.set("X-Failure-Class",diagnostic.category);
+    return response;
   }
 }

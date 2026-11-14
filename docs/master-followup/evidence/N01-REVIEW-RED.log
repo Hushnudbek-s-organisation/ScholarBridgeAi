@@ -1,0 +1,46 @@
+E2E: using package-bundled NSS/NSPR runtime libraries.
+E2E database: disposable embedded PostgreSQL on 127.0.0.1:38093/sb_e2e_10343
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/user/ScholarBridgeAi/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[✓] Changes applied
+Created disposable E2E fixtures using the application schema and password hasher.
+E2E server ready: http://127.0.0.1:33289/api/health; external AI credentials removed from its environment.
+
+Running 1 test using 1 worker
+
+  ✘  1 e2e/award-field-review.spec.ts:9:5 › exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification (1.6s)
+
+
+  1) e2e/award-field-review.spec.ts:9:5 › exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification 
+
+    Error: review university_id
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 200
+    Received: 400
+
+      29 |    const created=await admin.post('/api/admin/catalogue-facts',{data:draft});expect(created.status(),field).toBe(201);const stored=(await created.json()).fact;
+      30 |    const review={id,expectedVersion:String(stored.version),expectedFact:draft,sourceQuote:'FICTIONAL isolated fixture: this exact scope and original value are manually attested solely for the test. No real publisher retrieval or funding promise.',confirmsAllLeaves:true};
+    > 31 |    const reviewed=await admin.post(endpoint,{data:review});expect(reviewed.status(),`review ${field}`).toBe(200);const body=await reviewed.json();expect(body.officialPageReRead).toBe(false);expect(body.fact.verification_status).toBe('verified');
+         |                                                                                                        ^
+      32 |    if(!first)first={draft,version:String(body.fact.version)};
+      33 |   }
+      34 |   const scope=`coverageProgramId=${f.fixtureProgramId}&coverageCycle=2027&coverageApplicantScope=international`;
+        at /home/user/ScholarBridgeAi/e2e/award-field-review.spec.ts:31:104
+
+    Error Context: test-results/e2e/award-field-review-exact-a-0bf3a-ale-edit-loses-verification/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/e2e/award-field-review-exact-a-0bf3a-ale-edit-loses-verification/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/e2e/award-field-review-exact-a-0bf3a-ale-edit-loses-verification/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e/award-field-review.spec.ts:9:5 › exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification 

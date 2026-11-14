@@ -1,0 +1,5 @@
+PASS validate:local
+PASS test:recommend
+PASS test:match
+PASS test:growth
+PASS test:stack-integration

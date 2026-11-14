@@ -237,7 +237,8 @@
     "showLess": "Yig'ish",
     "showResults": "Natijalarni ko‘rsatish",
     "stageCount": "{total} bosqichdan {current}-bosqich",
-    "elapsedSeconds": "{seconds} soniya o‘tdi"
+    "elapsedSeconds": "{seconds} soniya o‘tdi",
+    "awardCoverageUnknown": "Grantning mosligi va jami xarajatlarni qoplashi tasdiqlanmagan. Dastur, qabul davri va arizachi talablarini tekshiring."
   },
   "forum": {
     "title": "Jamoa forumi",
@@ -8160,7 +8161,7 @@
       "saved": "Qayta tekshiruv uchun saqlandi. Aynan shu maydonni rasmiy manba bilan tekshiring.",
       "failed": "Fakt saqlanmadi.",
       "busy": "Saqlanmoqda…",
-      "reviewHint": "Faqat requirement_group uchun: nashriyotning rasmiy sahifasini o‘zingiz o‘qing. Aynan saqlangan versiya, qamrov, VA/YOKI munosabatlari va har bir shart tekshiriladi. Bu tarmoqdan qayta o‘qilganini bildirmaydi. Tahrirni avval saqlang.",
+      "reviewHint": "Talab guruhlari va ruxsat etilgan, qamrovi to‘liq grant maydonlari uchun nashriyot sahifasini o‘zingiz o‘qing. Aynan saqlangan qiymat, versiya, dastur, qabul davri, arizachi qamrovi, VA/YOKI munosabatlari va barcha tegishli shartlarni tekshiring. Bu avtomatik tarmoq tekshiruvi emas. Tahrirni tekshirishdan oldin saqlang.",
       "quote": "Rasmiy manbadan iqtibos (kamida 40 belgi)",
       "attest": "Aynan saqlangan guruh, muqobillar, bo‘limlar, sanalar va qamrovni rasmiy manba bilan tekshirdim.",
       "review": "Saqlangan guruhni qo‘lda tasdiqlash",

@@ -1,0 +1,18 @@
+FAIL discovery is not applicability: {"country":"Global","coverageType":"Full ride","amountUsdValue":50000}: Expected values to be strictly equal:
+
+true !== false
+
+FAIL discovery is not applicability: {"country":"US","coverageType":"Full tuition"}: Expected values to be strictly equal:
+
+true !== false
+
+PASS discovery is not applicability: {"country":"Europe","amountUsdValue":50000}
+FAIL discovery is not applicability: {"title":"FICTIONAL University full grant","amountUsdValue":50000}: Expected values to be strictly equal:
+
+true !== false
+
+FAIL discovery is not applicability: {"country":"Global","annualUsdValue":10000,"amountUsdValue":50000}: Expected values to be strictly equal:
+
+true !== false
+
+SCOPED_AWARD_COVERAGE: 1 passed, 4 failed

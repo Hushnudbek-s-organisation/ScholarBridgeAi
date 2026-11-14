@@ -1,3 +1,4 @@
+import {prepareAwardCoverage} from "@/lib/awardCoverageContext.server";
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { db } from "@/db";
@@ -359,13 +360,14 @@ export async function GET(req: Request) {
     // explicitly saved item visible with its provenance, but recommend only
     // verified dates from the active catalogue.
     const verifiedDatedScholarships = datedScholarships.filter(({ s }) => s.isActive && s.verificationStatus === "verified");
+    const awardCoverage=await prepareAwardCoverage(req,profile,savedUniRefs,allScholarships.map(s=>s.id));
     const coverageOf = new Map<number, SavedUniCoverage | null>();
     const coverageFor = (s: (typeof scholarships.$inferSelect)) => {
       if (!coverageOf.has(s.id)) {
         coverageOf.set(
           s.id,
           savedUniRefs.length > 0
-            ? evaluateScholarshipForSavedUnis({ ...s, amountUsdValue: resolvedUsdScholarshipAmount(s) }, savedUniRefs)
+            ? evaluateScholarshipForSavedUnis({ ...s, amountUsdValue: resolvedUsdScholarshipAmount(s),catalogueFacts:awardCoverage.facts.get(s.id)??[] }, awardCoverage.references)
             : null
         );
       }
@@ -387,6 +389,8 @@ export async function GET(req: Request) {
         saved: true,
         recommended: false,
         verificationStatus: s.verificationStatus ?? "unverified",
+        coverageAssessment:cov,
+        coverageState:cov?.coverageState??"unknown",
         coversSavedUni: cov?.coversSavedUni ?? false,
         isFullCoverage: cov?.isFullCoverage ?? false,
       });
@@ -422,6 +426,8 @@ export async function GET(req: Request) {
           saved: false,
           recommended: true,
           verificationStatus: s.verificationStatus ?? "unverified",
+          coverageAssessment:cov,
+          coverageState:cov?.coverageState??"unknown",
           coversSavedUni: cov?.coversSavedUni ?? false,
           isFullCoverage: cov?.isFullCoverage ?? false,
         });

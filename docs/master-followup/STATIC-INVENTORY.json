@@ -1,0 +1,4839 @@
+{
+  "kind": "static_discovery_only",
+  "branch": "arena/5970dc95-scholarbridgeai",
+  "routes": [
+    {
+      "path": "src/app/api/activities/route.ts",
+      "endpoint": "/api/activities",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "activityEvidence",
+          "table": "activity_evidence"
+        },
+        {
+          "symbol": "studentActivities",
+          "table": "student_activities"
+        },
+        {
+          "symbol": "userDocuments",
+          "table": "user_documents"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-journey.ts",
+        "scripts/check-localization-perf.ts",
+        "scripts/check-samples.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/accounts/[id]/password/route.ts",
+      "endpoint": "/api/admin/accounts/[id]/password",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admin-accounts.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-security.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/accounts/[id]/reset-link/route.ts",
+      "endpoint": "/api/admin/accounts/[id]/reset-link",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "passwordResetTokens",
+          "table": "password_reset_tokens"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admin-accounts.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-security.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/accounts/me/password/route.ts",
+      "endpoint": "/api/admin/accounts/me/password",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admin-accounts.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-security.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/accounts/route.ts",
+      "endpoint": "/api/admin/accounts",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admin-accounts.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-security.ts",
+        "e2e/authenticated-entry.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/ai-costs/route.ts",
+      "endpoint": "/api/admin/ai-costs",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/ai-settings/route.ts",
+      "endpoint": "/api/admin/ai-settings",
+      "methods": [
+        "GET",
+        "PUT",
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-settings.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/analytics/route.ts",
+      "endpoint": "/api/admin/analytics",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/answer-prompts/route.ts",
+      "endpoint": "/api/admin/answer-prompts",
+      "methods": [],
+      "schemaImports": [
+        {
+          "symbol": "answerPrompts",
+          "table": "answer_prompts"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/audit/route.ts",
+      "endpoint": "/api/admin/audit",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/branding/upload/route.ts",
+      "endpoint": "/api/admin/branding/upload",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/catalogue-facts/review/route.ts",
+      "endpoint": "/api/admin/catalogue-facts/review",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "e2e/award-field-review.spec.ts",
+        "e2e/checklist-continuation.spec.ts",
+        "e2e/continuation-contracts.spec.ts",
+        "e2e/university-detail-contracts.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/catalogue-facts/route.ts",
+      "endpoint": "/api/admin/catalogue-facts",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "e2e/award-field-review.spec.ts",
+        "e2e/checklist-continuation.spec.ts",
+        "e2e/continuation-contracts.spec.ts",
+        "e2e/university-detail-contracts.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/channel/audit/route.ts",
+      "endpoint": "/api/admin/channel/audit",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/channel/content/route.ts",
+      "endpoint": "/api/admin/channel/content",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/channel/countries/route.ts",
+      "endpoint": "/api/admin/channel/countries",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/channel/lexicon/route.ts",
+      "endpoint": "/api/admin/channel/lexicon",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "translationLexicon",
+          "table": "translation_lexicon"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-channel.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/channel/links/route.ts",
+      "endpoint": "/api/admin/channel/links",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/channel/polls/route.ts",
+      "endpoint": "/api/admin/channel/polls",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/channel/prefs/route.ts",
+      "endpoint": "/api/admin/channel/prefs",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/channel/queue/route.ts",
+      "endpoint": "/api/admin/channel/queue",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "channelPlan",
+          "table": "channel_plan"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/channel/route.ts",
+      "endpoint": "/api/admin/channel",
+      "methods": [
+        "GET",
+        "PUT",
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-channel.ts",
+        "scripts/check-integration.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/channel/stories/route.ts",
+      "endpoint": "/api/admin/channel/stories",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/checklist/route.ts",
+      "endpoint": "/api/admin/checklist",
+      "methods": [],
+      "schemaImports": [
+        {
+          "symbol": "checklistItems",
+          "table": "checklist_items"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/config/export/route.ts",
+      "endpoint": "/api/admin/config/export",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "aiProviderCredentials",
+          "table": "ai_provider_credentials"
+        },
+        {
+          "symbol": "appConfig",
+          "table": "app_config"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-portability.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/config/import/route.ts",
+      "endpoint": "/api/admin/config/import",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "aiProviderCredentials",
+          "table": "ai_provider_credentials"
+        },
+        {
+          "symbol": "appConfig",
+          "table": "app_config"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-portability.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/config/route.ts",
+      "endpoint": "/api/admin/config",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-portability.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/consulting/route.ts",
+      "endpoint": "/api/admin/consulting",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "consultingRequests",
+          "table": "consulting_requests"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/courses/route.ts",
+      "endpoint": "/api/admin/courses",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "courses",
+          "table": "courses"
+        },
+        {
+          "symbol": "courseModules",
+          "table": "course_modules"
+        },
+        {
+          "symbol": "lessons",
+          "table": "lessons"
+        },
+        {
+          "symbol": "quizzes",
+          "table": "quizzes"
+        },
+        {
+          "symbol": "quizQuestions",
+          "table": "quiz_questions"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/courses/seed/route.ts",
+      "endpoint": "/api/admin/courses/seed",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "courses",
+          "table": "courses"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/diagnostics/route.ts",
+      "endpoint": "/api/admin/diagnostics",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/ensure-schema.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/goal-templates/route.ts",
+      "endpoint": "/api/admin/goal-templates",
+      "methods": [],
+      "schemaImports": [
+        {
+          "symbol": "goalTemplates",
+          "table": "goal_templates"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/guide/route.ts",
+      "endpoint": "/api/admin/guide",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/instructors/route.ts",
+      "endpoint": "/api/admin/instructors",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "instructors",
+          "table": "instructors"
+        },
+        {
+          "symbol": "courseCategories",
+          "table": "course_categories"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/opportunities/route.ts",
+      "endpoint": "/api/admin/opportunities",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "opportunities",
+          "table": "opportunities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-api-anonymous.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-security.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/overview/route.ts",
+      "endpoint": "/api/admin/overview",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "answerVault",
+          "table": "answer_vault"
+        },
+        {
+          "symbol": "consultingRequests",
+          "table": "consulting_requests"
+        },
+        {
+          "symbol": "forumReports",
+          "table": "forum_reports"
+        },
+        {
+          "symbol": "opportunities",
+          "table": "opportunities"
+        },
+        {
+          "symbol": "scholarshipDecisions",
+          "table": "scholarship_decisions"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentChecklist",
+          "table": "student_checklist"
+        },
+        {
+          "symbol": "studentGoals",
+          "table": "student_goals"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "successStories",
+          "table": "success_stories"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/ownership/route.ts",
+      "endpoint": "/api/admin/ownership",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-ownership.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/premium/route.ts",
+      "endpoint": "/api/admin/premium",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "payments",
+          "table": "payments"
+        },
+        {
+          "symbol": "subscriptions",
+          "table": "subscriptions"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/profiles/route.ts",
+      "endpoint": "/api/admin/profiles",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/refresh/route.ts",
+      "endpoint": "/api/admin/refresh",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-official-source-adapter.ts",
+        "scripts/check-refresh-modes.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/research-agent/cancel/route.ts",
+      "endpoint": "/api/admin/research-agent/cancel",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-research-durable.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/research-agent/resume/route.ts",
+      "endpoint": "/api/admin/research-agent/resume",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-research-runtime.ts",
+        "scripts/check-research-worker.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/research-agent/run/route.ts",
+      "endpoint": "/api/admin/research-agent/run",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-research-durable.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/research-agent/status/route.ts",
+      "endpoint": "/api/admin/research-agent/status",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-research-durable.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/review-queue/route.ts",
+      "endpoint": "/api/admin/review-queue",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-observability.ts",
+        "scripts/check-review-queue-runtime.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/scholarships/route.ts",
+      "endpoint": "/api/admin/scholarships",
+      "methods": [
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/stories/route.ts",
+      "endpoint": "/api/admin/stories",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "successStories",
+          "table": "success_stories"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/admin/telegram/route.ts",
+      "endpoint": "/api/admin/telegram",
+      "methods": [
+        "GET",
+        "PUT",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-channel.ts",
+        "scripts/check-telegram-integration.ts",
+        "scripts/check-telegram.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/universities/route.ts",
+      "endpoint": "/api/admin/universities",
+      "methods": [
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-university-rank-year.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/admin/verify/route.ts",
+      "endpoint": "/api/admin/verify",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/ai/admissions-advisor/route.ts",
+      "endpoint": "/api/ai/admissions-advisor",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationOutcomes",
+          "table": "application_outcomes"
+        },
+        {
+          "symbol": "applicationTasks",
+          "table": "application_tasks"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "recommendationRequests",
+          "table": "recommendation_requests"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/ai/chat/route.ts",
+      "endpoint": "/api/ai/chat",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentActivities",
+          "table": "student_activities"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-format.ts",
+        "scripts/check-chancing.ts",
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/ai/draft-sop/route.ts",
+      "endpoint": "/api/ai/draft-sop",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentActivities",
+          "table": "student_activities"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-format.ts",
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/ai/embeddings/route.ts",
+      "endpoint": "/api/ai/embeddings",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireSession"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-settings.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/ai/evaluate-profile/route.ts",
+      "endpoint": "/api/ai/evaluate-profile",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "aiEvaluations",
+          "table": "ai_evaluations"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-ai-format.ts",
+        "scripts/check-chancing.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/ai/review-sop/route.ts",
+      "endpoint": "/api/ai/review-sop",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-format.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/applications/outcome/route.ts",
+      "endpoint": "/api/applications/outcome",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "admissionOffers",
+          "table": "admission_offers"
+        },
+        {
+          "symbol": "applicationOutcomes",
+          "table": "application_outcomes"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "fundingItems",
+          "table": "funding_items"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireRowAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-visa-similar.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/applications/route.ts",
+      "endpoint": "/api/applications",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "applicationCycles",
+          "table": "application_cycles"
+        },
+        {
+          "symbol": "applicationOutcomes",
+          "table": "application_outcomes"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess",
+        "requireRowAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-applications-state.ts",
+        "scripts/check-chunk-recovery.ts",
+        "scripts/check-differentiators.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-recommend.ts",
+        "scripts/check-visa-similar.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/auth/password-reset/confirm/route.ts",
+      "endpoint": "/api/auth/password-reset/confirm",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "passwordResetTokens",
+          "table": "password_reset_tokens"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-password-reset.ts",
+        "scripts/check-security.ts",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/auth/password-reset/request/route.ts",
+      "endpoint": "/api/auth/password-reset/request",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "passwordResetTokens",
+          "table": "password_reset_tokens"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-password-reset.ts",
+        "scripts/check-security.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/auth/session/route.ts",
+      "endpoint": "/api/auth/session",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "e2e/authenticated-entry.spec.ts",
+        "e2e/home-saved-scope.spec.ts",
+        "e2e/site-audit.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/auth/sign-in/route.ts",
+      "endpoint": "/api/auth/sign-in",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-auth-credentials.ts",
+        "e2e/authenticated-entry.spec.ts",
+        "e2e/award-field-review.spec.ts",
+        "e2e/backend-resilience.spec.ts",
+        "e2e/backend-second-pass.spec.ts",
+        "e2e/checklist-continuation.spec.ts",
+        "e2e/client-locales.spec.ts",
+        "e2e/continuation-contracts.spec.ts",
+        "e2e/dashboard-continuation.spec.ts",
+        "e2e/exam-boundaries.spec.ts",
+        "e2e/funding-inputs.spec.ts",
+        "e2e/funding-scenarios.spec.ts",
+        "e2e/home-saved-scope.spec.ts",
+        "e2e/master-dashboard.spec.ts",
+        "e2e/post-admission-funding.spec.ts",
+        "e2e/scoped-award-coverage.spec.ts",
+        "e2e/search-loader-waterfall.spec.ts",
+        "e2e/university-detail-contracts.spec.ts",
+        "e2e/university-request-epochs.spec.ts",
+        "e2e/vault-continuation.spec.ts",
+        "e2e/vault-link-reviews.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/auth/sign-out/route.ts",
+      "endpoint": "/api/auth/sign-out",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/auth/telegram/start/route.ts",
+      "endpoint": "/api/auth/telegram/start",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-telegram.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/auth/telegram/status/route.ts",
+      "endpoint": "/api/auth/telegram/status",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-telegram.ts",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/auth/telegram/verify/route.ts",
+      "endpoint": "/api/auth/telegram/verify",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-telegram.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/autopilot/route.ts",
+      "endpoint": "/api/autopilot",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarshipDecisions",
+          "table": "scholarship_decisions"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-stage7-seed-safety.mjs",
+        "scripts/check-university-costs.ts",
+        "e2e/scoped-award-coverage.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/career-discovery/route.ts",
+      "endpoint": "/api/career-discovery",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "careerDiscoveries",
+          "table": "career_discoveries"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-career-discovery.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/certificates/route.ts",
+      "endpoint": "/api/certificates",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "certificates",
+          "table": "certificates"
+        },
+        {
+          "symbol": "courses",
+          "table": "courses"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/certificates/verify/route.ts",
+      "endpoint": "/api/certificates/verify",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "certificates",
+          "table": "certificates"
+        },
+        {
+          "symbol": "courses",
+          "table": "courses"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/chancing/route.ts",
+      "endpoint": "/api/chancing",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationOutcomes",
+          "table": "application_outcomes"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "programRequirements",
+          "table": "program_requirements"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        },
+        {
+          "symbol": "universityPrograms",
+          "table": "programs"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-chancing.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-localization-perf.ts",
+        "scripts/check-qs-benchmarks.ts",
+        "scripts/check-university-rank-year.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/config/boot/route.ts",
+      "endpoint": "/api/config/boot",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-perf.ts",
+        "scripts/check-security.ts",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/config/branding/route.ts",
+      "endpoint": "/api/config/branding",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-perf.ts",
+        "scripts/check-security.ts",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/config/build/route.ts",
+      "endpoint": "/api/config/build",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-chunk-recovery.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/config/guide/route.ts",
+      "endpoint": "/api/config/guide",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-perf.ts",
+        "scripts/check-security.ts",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/config/nav/route.ts",
+      "endpoint": "/api/config/nav",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-perf.ts",
+        "scripts/check-security.ts",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/config/telegram/route.ts",
+      "endpoint": "/api/config/telegram",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-security.ts",
+        "scripts/check-telegram.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/consulting/route.ts",
+      "endpoint": "/api/consulting",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "consultingRequests",
+          "table": "consulting_requests"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/countries/compare/route.ts",
+      "endpoint": "/api/countries/compare",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-country-facts.ts",
+        "scripts/check-evidence-render.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-university-costs.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/courses/[id]/route.ts",
+      "endpoint": "/api/courses/[id]",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "courses",
+          "table": "courses"
+        },
+        {
+          "symbol": "courseModules",
+          "table": "course_modules"
+        },
+        {
+          "symbol": "lessons",
+          "table": "lessons"
+        },
+        {
+          "symbol": "lessonProgress",
+          "table": "lesson_progress"
+        },
+        {
+          "symbol": "quizzes",
+          "table": "quizzes"
+        },
+        {
+          "symbol": "quizQuestions",
+          "table": "quiz_questions"
+        },
+        {
+          "symbol": "quizAttempts",
+          "table": "quiz_attempts"
+        },
+        {
+          "symbol": "certificates",
+          "table": "certificates"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-journey.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/courses/progress/route.ts",
+      "endpoint": "/api/courses/progress",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "lessonProgress",
+          "table": "lesson_progress"
+        },
+        {
+          "symbol": "lessons",
+          "table": "lessons"
+        },
+        {
+          "symbol": "courseModules",
+          "table": "course_modules"
+        },
+        {
+          "symbol": "courses",
+          "table": "courses"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/courses/route.ts",
+      "endpoint": "/api/courses",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "courses",
+          "table": "courses"
+        },
+        {
+          "symbol": "courseModules",
+          "table": "course_modules"
+        },
+        {
+          "symbol": "lessons",
+          "table": "lessons"
+        },
+        {
+          "symbol": "lessonProgress",
+          "table": "lesson_progress"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-journey.ts",
+        "e2e/backend-resilience.spec.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/cron/channel/route.ts",
+      "endpoint": "/api/cron/channel",
+      "methods": [],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-channel.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/cron/notifications/route.ts",
+      "endpoint": "/api/cron/notifications",
+      "methods": [],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/cron/refresh/route.ts",
+      "endpoint": "/api/cron/refresh",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/cron/research-agent/route.ts",
+      "endpoint": "/api/cron/research-agent",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-research-runtime.ts",
+        "scripts/check-security.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/dashboard/route.ts",
+      "endpoint": "/api/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "admissionOffers",
+          "table": "admission_offers"
+        },
+        {
+          "symbol": "aiEvaluations",
+          "table": "ai_evaluations"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "checklistItems",
+          "table": "checklist_items"
+        },
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "fundingItems",
+          "table": "funding_items"
+        },
+        {
+          "symbol": "journeyDeadlines",
+          "table": "journey_deadlines"
+        },
+        {
+          "symbol": "learningProviderLinks",
+          "table": "learning_provider_links"
+        },
+        {
+          "symbol": "learningProviders",
+          "table": "learning_providers"
+        },
+        {
+          "symbol": "opportunities",
+          "table": "opportunities"
+        },
+        {
+          "symbol": "recommendationRequests",
+          "table": "recommendation_requests"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentChecklist",
+          "table": "student_checklist"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "testPlans",
+          "table": "test_plans"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        },
+        {
+          "symbol": "userDocuments",
+          "table": "user_documents"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-cache-revision.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-journey.ts",
+        "scripts/check-localization-perf.ts",
+        "scripts/check-profile-recompute.ts",
+        "scripts/check-snapshot-recovery.ts",
+        "scripts/check-typed-evidence.ts",
+        "scripts/check-university-costs.ts",
+        "scripts/check-university-rank-year.ts",
+        "scripts/check-ux-redesign.mjs",
+        "e2e/authenticated-entry.spec.ts",
+        "e2e/backend-second-pass.spec.ts",
+        "e2e/master-dashboard.spec.ts",
+        "e2e/phase12.spec.ts",
+        "e2e/scoped-award-coverage.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/deadlines/route.ts",
+      "endpoint": "/api/deadlines",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "universities",
+          "table": "universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "applicationTasks",
+          "table": "application_tasks"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "applicationCycles",
+          "table": "application_cycles"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "testBookings",
+          "table": "test_bookings"
+        },
+        {
+          "symbol": "testPlans",
+          "table": "test_plans"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-catalog-evidence.ts",
+        "scripts/check-deadline-day.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-journey.ts",
+        "scripts/check-stage7-seed-safety.mjs",
+        "scripts/check-telegram-integration.ts",
+        "scripts/check-university-costs.ts",
+        "e2e/scoped-award-coverage.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/departure/route.ts",
+      "endpoint": "/api/departure",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "checklistItems",
+          "table": "checklist_items"
+        },
+        {
+          "symbol": "studentChecklist",
+          "table": "student_checklist"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/documents/route.ts",
+      "endpoint": "/api/documents",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationDocuments",
+          "table": "application_documents"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess",
+        "requireRowAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-documents-readiness.ts",
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/essay-adapter/adapt/route.ts",
+      "endpoint": "/api/essay-adapter/adapt",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/essay-adapter/route.ts",
+      "endpoint": "/api/essay-adapter",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/essays/reviews/route.ts",
+      "endpoint": "/api/essays/reviews",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "essayReviews",
+          "table": "essay_reviews"
+        },
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/essays/route.ts",
+      "endpoint": "/api/essays",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE",
+        "PATCH"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess",
+        "requireRowAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/forum/categories/route.ts",
+      "endpoint": "/api/forum/categories",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "forumCategories",
+          "table": "forum_categories"
+        },
+        {
+          "symbol": "forumThreads",
+          "table": "forum_threads"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireFeatureSession",
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/forum/likes/route.ts",
+      "endpoint": "/api/forum/likes",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "forumLikes",
+          "table": "forum_likes"
+        },
+        {
+          "symbol": "forumThreads",
+          "table": "forum_threads"
+        },
+        {
+          "symbol": "forumReplies",
+          "table": "forum_replies"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireFeatureSession",
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/forum/replies/[id]/route.ts",
+      "endpoint": "/api/forum/replies/[id]",
+      "methods": [
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "forumReplies",
+          "table": "forum_replies"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/forum/replies/route.ts",
+      "endpoint": "/api/forum/replies",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "forumReplies",
+          "table": "forum_replies"
+        },
+        {
+          "symbol": "forumLikes",
+          "table": "forum_likes"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "forumThreads",
+          "table": "forum_threads"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireFeatureSession",
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/forum/reports/[id]/route.ts",
+      "endpoint": "/api/forum/reports/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "forumReports",
+          "table": "forum_reports"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/forum/reports/route.ts",
+      "endpoint": "/api/forum/reports",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "forumReports",
+          "table": "forum_reports"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin",
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/forum/threads/[id]/route.ts",
+      "endpoint": "/api/forum/threads/[id]",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "forumThreads",
+          "table": "forum_threads"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "forumCategories",
+          "table": "forum_categories"
+        },
+        {
+          "symbol": "forumLikes",
+          "table": "forum_likes"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireFeatureSession"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/forum/threads/route.ts",
+      "endpoint": "/api/forum/threads",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "forumThreads",
+          "table": "forum_threads"
+        },
+        {
+          "symbol": "forumReplies",
+          "table": "forum_replies"
+        },
+        {
+          "symbol": "forumLikes",
+          "table": "forum_likes"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "forumCategories",
+          "table": "forum_categories"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireFeatureSession",
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/funding/route.ts",
+      "endpoint": "/api/funding",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "fundingItems",
+          "table": "funding_items"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-differentiators.ts",
+        "scripts/check-journey.ts",
+        "e2e/funding-inputs.spec.ts",
+        "e2e/funding-scenarios.spec.ts",
+        "e2e/post-admission-funding.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/gamification/award/route.ts",
+      "endpoint": "/api/gamification/award",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/gamification/leaderboard/route.ts",
+      "endpoint": "/api/gamification/leaderboard",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/gamification/route.ts",
+      "endpoint": "/api/gamification",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "e2e/backend-second-pass.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/goals/route.ts",
+      "endpoint": "/api/goals",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "goalTemplates",
+          "table": "goal_templates"
+        },
+        {
+          "symbol": "studentGoals",
+          "table": "student_goals"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/health/diagnostics/route.ts",
+      "endpoint": "/api/health/diagnostics",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/health/route.ts",
+      "endpoint": "/api/health",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-deploy.ts",
+        "scripts/check-desktop-app.mjs",
+        "scripts/check-desktop-engine.mjs",
+        "scripts/check-security.ts",
+        "e2e/backend-resilience.spec.ts",
+        "e2e/backend-second-pass.spec.ts",
+        "e2e/global-setup.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/image/route.ts",
+      "endpoint": "/api/image",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/journey/arrival/route.ts",
+      "endpoint": "/api/journey/arrival",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "admissionOffers",
+          "table": "admission_offers"
+        },
+        {
+          "symbol": "arrivalChecklistItems",
+          "table": "arrival_checklist_items"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-arrival.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/journey/route.ts",
+      "endpoint": "/api/journey",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "aiEvaluations",
+          "table": "ai_evaluations"
+        },
+        {
+          "symbol": "answerVault",
+          "table": "answer_vault"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "checklistItems",
+          "table": "checklist_items"
+        },
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarshipDecisions",
+          "table": "scholarship_decisions"
+        },
+        {
+          "symbol": "studentChecklist",
+          "table": "student_checklist"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-arrival.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/learning/providers/route.ts",
+      "endpoint": "/api/learning/providers",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "learningProviderLinks",
+          "table": "learning_provider_links"
+        },
+        {
+          "symbol": "learningProviderScores",
+          "table": "learning_provider_scores"
+        },
+        {
+          "symbol": "learningProviders",
+          "table": "learning_providers"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/mentors/route.ts",
+      "endpoint": "/api/mentors",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "mentorRequests",
+          "table": "mentor_requests"
+        },
+        {
+          "symbol": "mentors",
+          "table": "mentors"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/next-actions/route.ts",
+      "endpoint": "/api/next-actions",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "applicationOutcomes",
+          "table": "application_outcomes"
+        },
+        {
+          "symbol": "applicationTasks",
+          "table": "application_tasks"
+        },
+        {
+          "symbol": "recommendationRequests",
+          "table": "recommendation_requests"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/notifications/route.ts",
+      "endpoint": "/api/notifications",
+      "methods": [
+        "GET",
+        "PATCH",
+        "PUT"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "notifications",
+          "table": "notifications"
+        },
+        {
+          "symbol": "notificationPreferences",
+          "table": "notification_preferences"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-telegram.ts",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/notifications/sweep/route.ts",
+      "endpoint": "/api/notifications/sweep",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/offers/route.ts",
+      "endpoint": "/api/offers",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "admissionOffers",
+          "table": "admission_offers"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "fundingItems",
+          "table": "funding_items"
+        },
+        {
+          "symbol": "journeyDeadlines",
+          "table": "journey_deadlines"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts",
+        "e2e/post-admission-funding.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/opportunities/route.ts",
+      "endpoint": "/api/opportunities",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-opportunity-notes.ts",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/parent-share/route.ts",
+      "endpoint": "/api/parent-share",
+      "methods": [
+        "POST",
+        "PATCH",
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "admissionOffers",
+          "table": "admission_offers"
+        },
+        {
+          "symbol": "applicationOutcomes",
+          "table": "application_outcomes"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-journey.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/payments/click/complete/route.ts",
+      "endpoint": "/api/payments/click/complete",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "payments",
+          "table": "payments"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-payments.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/payments/click/prepare/route.ts",
+      "endpoint": "/api/payments/click/prepare",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "payments",
+          "table": "payments"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-payments.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/payments/initiate/route.ts",
+      "endpoint": "/api/payments/initiate",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "payments",
+          "table": "payments"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-payments.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/payments/payme/webhook/route.ts",
+      "endpoint": "/api/payments/payme/webhook",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-payments.ts",
+        "scripts/check-security.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/payments/route.ts",
+      "endpoint": "/api/payments",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "payments",
+          "table": "payments"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-payments.ts",
+        "scripts/check-security.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/planning/route.ts",
+      "endpoint": "/api/planning",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentActivities",
+          "table": "student_activities"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-chancing.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-journey.ts",
+        "scripts/check-university-costs.ts",
+        "scripts/check-university-rank-year.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/premium/status/route.ts",
+      "endpoint": "/api/premium/status",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-referral.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/profile-strength/route.ts",
+      "endpoint": "/api/profile-strength",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/profiles/[id]/route.ts",
+      "endpoint": "/api/profiles/[id]",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess",
+        "requireAdmin"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admin-accounts.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-ownership.ts",
+        "scripts/check-security.ts",
+        "scripts/check-telegram-integration.ts",
+        "scripts/check-telegram.ts",
+        "scripts/check-university-sort.ts",
+        "scripts/check-ux-redesign.mjs"
+      ]
+    },
+    {
+      "path": "src/app/api/profiles/route.ts",
+      "endpoint": "/api/profiles",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-admin-accounts.ts",
+        "scripts/check-auth-credentials.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-ownership.ts",
+        "scripts/check-security.ts",
+        "scripts/check-telegram-integration.ts",
+        "scripts/check-telegram.ts",
+        "scripts/check-university-sort.ts",
+        "scripts/check-ux-redesign.mjs",
+        "e2e/backend-resilience.spec.ts",
+        "e2e/backend-second-pass.spec.ts",
+        "e2e/checklist-continuation.spec.ts",
+        "e2e/continuation-contracts.spec.ts",
+        "e2e/exam-boundaries.spec.ts",
+        "e2e/university-detail-contracts.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/programs/recommend/route.ts",
+      "endpoint": "/api/programs/recommend",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationCycles",
+          "table": "application_cycles"
+        },
+        {
+          "symbol": "programRequirements",
+          "table": "program_requirements"
+        },
+        {
+          "symbol": "programSources",
+          "table": "program_sources"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "sources",
+          "table": "sources"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        },
+        {
+          "symbol": "universityPrograms",
+          "table": "programs"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-admission-probability.ts",
+        "scripts/check-catalog-evidence.ts",
+        "scripts/check-qs-benchmarks.ts",
+        "scripts/check-recommend.ts",
+        "scripts/check-university-rank-year.ts",
+        "e2e/checklist-continuation.spec.ts",
+        "e2e/continuation-contracts.spec.ts",
+        "e2e/exam-boundaries.spec.ts",
+        "e2e/university-detail-contracts.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/quizzes/attempt/route.ts",
+      "endpoint": "/api/quizzes/attempt",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "quizzes",
+          "table": "quizzes"
+        },
+        {
+          "symbol": "quizQuestions",
+          "table": "quiz_questions"
+        },
+        {
+          "symbol": "quizAttempts",
+          "table": "quiz_attempts"
+        },
+        {
+          "symbol": "lessons",
+          "table": "lessons"
+        },
+        {
+          "symbol": "courseModules",
+          "table": "course_modules"
+        },
+        {
+          "symbol": "courses",
+          "table": "courses"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/recommendation-letter/route.ts",
+      "endpoint": "/api/recommendation-letter",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/recommendations/route.ts",
+      "endpoint": "/api/recommendations",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "recommendationRequests",
+          "table": "recommendation_requests"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/referral/route.ts",
+      "endpoint": "/api/referral",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-referral.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/referrals/route.ts",
+      "endpoint": "/api/referrals",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/requirements/route.ts",
+      "endpoint": "/api/requirements",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationDocumentLinks",
+          "table": "application_document_links"
+        },
+        {
+          "symbol": "applicationRequirements",
+          "table": "application_requirements"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "recommendationRequests",
+          "table": "recommendation_requests"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "testPlans",
+          "table": "test_plans"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        },
+        {
+          "symbol": "userDocuments",
+          "table": "user_documents"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts",
+        "e2e/checklist-continuation.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/roadmap/generate/route.ts",
+      "endpoint": "/api/roadmap/generate",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationTasks",
+          "table": "application_tasks"
+        },
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": []
+    },
+    {
+      "path": "src/app/api/saved-programs/route.ts",
+      "endpoint": "/api/saved-programs",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "savedPrograms",
+          "table": "saved_programs"
+        },
+        {
+          "symbol": "universityPrograms",
+          "table": "programs"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess",
+        "requireRowAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-recommend.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/saved-scholarships/route.ts",
+      "endpoint": "/api/saved-scholarships",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "savedScholarships",
+          "table": "saved_scholarships"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess",
+        "requireRowAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "e2e/phase12.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/saved-universities/route.ts",
+      "endpoint": "/api/saved-universities",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess",
+        "requireRowAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "e2e/award-field-review.spec.ts",
+        "e2e/home-saved-scope.spec.ts",
+        "e2e/scoped-award-coverage.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/scholarships/route.ts",
+      "endpoint": "/api/scholarships",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "savedUniversities",
+          "table": "saved_universities"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-deadline-day.ts",
+        "scripts/check-evidence-render.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-localization-perf.ts",
+        "scripts/check-stage7-seed-safety.mjs",
+        "scripts/check-typed-evidence.ts",
+        "scripts/check-university-costs.ts",
+        "e2e/backend-resilience.spec.ts",
+        "e2e/scoped-award-coverage.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/search/route.ts",
+      "endpoint": "/api/search",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "courses",
+          "table": "courses"
+        },
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "journeyDeadlines",
+          "table": "journey_deadlines"
+        },
+        {
+          "symbol": "scholarships",
+          "table": "scholarships"
+        },
+        {
+          "symbol": "studentActivities",
+          "table": "student_activities"
+        },
+        {
+          "symbol": "successStories",
+          "table": "success_stories"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        },
+        {
+          "symbol": "userDocuments",
+          "table": "user_documents"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-journey.ts",
+        "e2e/vault-continuation.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/sessions/route.ts",
+      "endpoint": "/api/sessions",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "userSessions",
+          "table": "user_sessions"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireSession"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/similar-profiles/route.ts",
+      "endpoint": "/api/similar-profiles",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationOutcomes",
+          "table": "application_outcomes"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-visa-similar.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/stories/route.ts",
+      "endpoint": "/api/stories",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "successStories",
+          "table": "success_stories"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/study-plan/route.ts",
+      "endpoint": "/api/study-plan",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        },
+        {
+          "symbol": "studyPlanPhases",
+          "table": "study_plan_phases"
+        },
+        {
+          "symbol": "studyPlans",
+          "table": "study_plans"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/tasks/route.ts",
+      "endpoint": "/api/tasks",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationTasks",
+          "table": "application_tasks"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess",
+        "requireRowAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts",
+        "scripts/check-security.ts",
+        "scripts/check-task-sync.mjs",
+        "e2e/backend-resilience.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/telegram/me/route.ts",
+      "endpoint": "/api/telegram/me",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE",
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "telegramLinks",
+          "table": "telegram_links"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-render.ts",
+        "scripts/check-telegram-integration.ts",
+        "scripts/check-telegram.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/telegram/miniapp/auth/route.ts",
+      "endpoint": "/api/telegram/miniapp/auth",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-telegram-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/telegram/webhook/route.ts",
+      "endpoint": "/api/telegram/webhook",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-channel.ts",
+        "scripts/check-telegram.ts",
+        "scripts/rehearse-channel.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/test-planner/route.ts",
+      "endpoint": "/api/test-planner",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "testAttempts",
+          "table": "test_attempts"
+        },
+        {
+          "symbol": "testPlans",
+          "table": "test_plans"
+        },
+        {
+          "symbol": "testTasks",
+          "table": "test_tasks"
+        },
+        {
+          "symbol": "universities",
+          "table": "universities"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/track/route.ts",
+      "endpoint": "/api/track",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-security.ts",
+        "e2e/performance.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/universities/[id]/route.ts",
+      "endpoint": "/api/universities/[id]",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "universities",
+          "table": "universities"
+        },
+        {
+          "symbol": "universityPrograms",
+          "table": "programs"
+        },
+        {
+          "symbol": "programRequirements",
+          "table": "program_requirements"
+        },
+        {
+          "symbol": "applicationCycles",
+          "table": "application_cycles"
+        },
+        {
+          "symbol": "universitySources",
+          "table": "university_sources"
+        },
+        {
+          "symbol": "programSources",
+          "table": "program_sources"
+        },
+        {
+          "symbol": "sources",
+          "table": "sources"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-catalog-evidence.ts",
+        "scripts/check-evidence-render.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-typed-evidence.ts",
+        "scripts/check-university-costs.ts",
+        "scripts/check-university-hub.ts",
+        "scripts/check-university-rank-year.ts",
+        "scripts/check-university-rank.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/universities/route.ts",
+      "endpoint": "/api/universities",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-catalog-evidence.ts",
+        "scripts/check-desktop-app.mjs",
+        "scripts/check-evidence-render.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-localization-perf.ts",
+        "scripts/check-provenance.ts",
+        "scripts/check-typed-evidence.ts",
+        "scripts/check-university-costs.ts",
+        "scripts/check-university-hub.ts",
+        "scripts/check-university-list.ts",
+        "scripts/check-university-rank-year.ts",
+        "scripts/check-university-rank.ts",
+        "scripts/check-university-sort.ts",
+        "e2e/backend-resilience.spec.ts",
+        "e2e/backend-second-pass.spec.ts",
+        "e2e/catalogue-read-diagnostics.spec.ts",
+        "e2e/continuation-contracts.spec.ts",
+        "e2e/phase12.spec.ts",
+        "e2e/university-detail-contracts.spec.ts",
+        "e2e/university-request-epochs.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/vault/documents/route.ts",
+      "endpoint": "/api/vault/documents",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "applicationDocumentLinks",
+          "table": "application_document_links"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "userDocuments",
+          "table": "user_documents"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts",
+        "e2e/master-dashboard.spec.ts",
+        "e2e/phase12.spec.ts",
+        "e2e/vault-continuation.spec.ts",
+        "e2e/vault-link-reviews.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/vault/route.ts",
+      "endpoint": "/api/vault",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "answerPrompts",
+          "table": "answer_prompts"
+        },
+        {
+          "symbol": "answerVault",
+          "table": "answer_vault"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts",
+        "e2e/master-dashboard.spec.ts",
+        "e2e/phase12.spec.ts",
+        "e2e/vault-continuation.spec.ts",
+        "e2e/vault-link-reviews.spec.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/visa/analyze/route.ts",
+      "endpoint": "/api/visa/analyze",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "aiEvaluations",
+          "table": "ai_evaluations"
+        },
+        {
+          "symbol": "fundingItems",
+          "table": "funding_items"
+        },
+        {
+          "symbol": "studentProfiles",
+          "table": "student_profiles"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-cost.ts",
+        "scripts/check-ai-format.ts",
+        "scripts/check-ai-settings.ts",
+        "scripts/check-groq.ts",
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/visa/chat/route.ts",
+      "endpoint": "/api/visa/chat",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-cost.ts",
+        "scripts/check-ai-format.ts",
+        "scripts/check-ai-settings.ts",
+        "scripts/check-groq.ts",
+        "scripts/check-integration.ts",
+        "scripts/check-visa-similar.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/visa/history/route.ts",
+      "endpoint": "/api/visa/history",
+      "methods": [
+        "GET"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "aiEvaluations",
+          "table": "ai_evaluations"
+        }
+      ],
+      "permissionCallCandidates": [
+        "requireProfileAccess"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/visa/live-token/route.ts",
+      "endpoint": "/api/visa/live-token",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireSession"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-cost.ts",
+        "scripts/check-integration.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/visa/requirements/route.ts",
+      "endpoint": "/api/visa/requirements",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "visaRequirements",
+          "table": "visa_requirements"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts",
+        "scripts/check-source-followup.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/visa/tts/route.ts",
+      "endpoint": "/api/visa/tts",
+      "methods": [
+        "POST"
+      ],
+      "schemaImports": [],
+      "permissionCallCandidates": [
+        "requireSession"
+      ],
+      "literalEndpointTestReferences": [
+        "scripts/check-ai-settings.ts",
+        "scripts/check-visa-similar.ts"
+      ]
+    },
+    {
+      "path": "src/app/api/workspace/route.ts",
+      "endpoint": "/api/workspace",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "schemaImports": [
+        {
+          "symbol": "admissionOffers",
+          "table": "admission_offers"
+        },
+        {
+          "symbol": "applicationRequirements",
+          "table": "application_requirements"
+        },
+        {
+          "symbol": "applications",
+          "table": "applications"
+        },
+        {
+          "symbol": "essayVersions",
+          "table": "essay_versions"
+        },
+        {
+          "symbol": "fundingItems",
+          "table": "funding_items"
+        },
+        {
+          "symbol": "journeyDeadlines",
+          "table": "journey_deadlines"
+        },
+        {
+          "symbol": "recommendationRequests",
+          "table": "recommendation_requests"
+        },
+        {
+          "symbol": "testPlans",
+          "table": "test_plans"
+        },
+        {
+          "symbol": "userDocuments",
+          "table": "user_documents"
+        },
+        {
+          "symbol": "applicationDocumentLinks",
+          "table": "application_document_links"
+        }
+      ],
+      "permissionCallCandidates": [],
+      "literalEndpointTestReferences": [
+        "scripts/check-journey.ts",
+        "scripts/check-security.ts",
+        "e2e/checklist-continuation.spec.ts",
+        "e2e/vault-continuation.spec.ts",
+        "e2e/vault-link-reviews.spec.ts"
+      ]
+    }
+  ],
+  "pages": [
+    "src/app/certificates/[code]/page.tsx",
+    "src/app/features/page.tsx",
+    "src/app/forgot-password/page.tsx",
+    "src/app/page.tsx",
+    "src/app/parent/[token]/page.tsx",
+    "src/app/privacy/page.tsx",
+    "src/app/reset-password/page.tsx",
+    "src/app/scholarships/[id]/page.tsx",
+    "src/app/scholarships/page.tsx",
+    "src/app/terms/page.tsx",
+    "src/app/tg/page.tsx",
+    "src/app/universities/[id]/page.tsx",
+    "src/app/universities/page.tsx"
+  ],
+  "tables": [
+    {
+      "symbol": "studentProfiles",
+      "table": "student_profiles"
+    },
+    {
+      "symbol": "universities",
+      "table": "universities"
+    },
+    {
+      "symbol": "scholarships",
+      "table": "scholarships"
+    },
+    {
+      "symbol": "savedUniversities",
+      "table": "saved_universities"
+    },
+    {
+      "symbol": "savedPrograms",
+      "table": "saved_programs"
+    },
+    {
+      "symbol": "savedScholarships",
+      "table": "saved_scholarships"
+    },
+    {
+      "symbol": "applicationTasks",
+      "table": "application_tasks"
+    },
+    {
+      "symbol": "aiEvaluations",
+      "table": "ai_evaluations"
+    },
+    {
+      "symbol": "forumCategories",
+      "table": "forum_categories"
+    },
+    {
+      "symbol": "forumThreads",
+      "table": "forum_threads"
+    },
+    {
+      "symbol": "forumReplies",
+      "table": "forum_replies"
+    },
+    {
+      "symbol": "forumLikes",
+      "table": "forum_likes"
+    },
+    {
+      "symbol": "forumReports",
+      "table": "forum_reports"
+    },
+    {
+      "symbol": "courses",
+      "table": "courses"
+    },
+    {
+      "symbol": "courseModules",
+      "table": "course_modules"
+    },
+    {
+      "symbol": "lessons",
+      "table": "lessons"
+    },
+    {
+      "symbol": "lessonProgress",
+      "table": "lesson_progress"
+    },
+    {
+      "symbol": "quizzes",
+      "table": "quizzes"
+    },
+    {
+      "symbol": "quizQuestions",
+      "table": "quiz_questions"
+    },
+    {
+      "symbol": "quizAttempts",
+      "table": "quiz_attempts"
+    },
+    {
+      "symbol": "certificates",
+      "table": "certificates"
+    },
+    {
+      "symbol": "payments",
+      "table": "payments"
+    },
+    {
+      "symbol": "subscriptions",
+      "table": "subscriptions"
+    },
+    {
+      "symbol": "userPoints",
+      "table": "user_points"
+    },
+    {
+      "symbol": "pointsLedger",
+      "table": "points_ledger"
+    },
+    {
+      "symbol": "levels",
+      "table": "levels"
+    },
+    {
+      "symbol": "badges",
+      "table": "badges"
+    },
+    {
+      "symbol": "userBadges",
+      "table": "user_badges"
+    },
+    {
+      "symbol": "referrals",
+      "table": "referrals"
+    },
+    {
+      "symbol": "appConfig",
+      "table": "app_config"
+    },
+    {
+      "symbol": "aiProviderCredentials",
+      "table": "ai_provider_credentials"
+    },
+    {
+      "symbol": "auditLogs",
+      "table": "audit_logs"
+    },
+    {
+      "symbol": "refreshJobs",
+      "table": "refresh_jobs"
+    },
+    {
+      "symbol": "notifications",
+      "table": "notifications"
+    },
+    {
+      "symbol": "notificationPreferences",
+      "table": "notification_preferences"
+    },
+    {
+      "symbol": "aiUsage",
+      "table": "ai_usage"
+    },
+    {
+      "symbol": "applicationDocuments",
+      "table": "application_documents"
+    },
+    {
+      "symbol": "essayVersions",
+      "table": "essay_versions"
+    },
+    {
+      "symbol": "instructors",
+      "table": "instructors"
+    },
+    {
+      "symbol": "courseCategories",
+      "table": "course_categories"
+    },
+    {
+      "symbol": "courseEnrollments",
+      "table": "course_enrollments"
+    },
+    {
+      "symbol": "consultingRequests",
+      "table": "consulting_requests"
+    },
+    {
+      "symbol": "universityPrograms",
+      "table": "programs"
+    },
+    {
+      "symbol": "programRequirements",
+      "table": "program_requirements"
+    },
+    {
+      "symbol": "applicationCycles",
+      "table": "application_cycles"
+    },
+    {
+      "symbol": "universitySources",
+      "table": "university_sources"
+    },
+    {
+      "symbol": "universityScholarships",
+      "table": "university_scholarships"
+    },
+    {
+      "symbol": "sources",
+      "table": "sources"
+    },
+    {
+      "symbol": "universityRankings",
+      "table": "university_rankings"
+    },
+    {
+      "symbol": "programSources",
+      "table": "program_sources"
+    },
+    {
+      "symbol": "scholarshipSources",
+      "table": "scholarship_sources"
+    },
+    {
+      "symbol": "siteVisits",
+      "table": "site_visits"
+    },
+    {
+      "symbol": "applications",
+      "table": "applications"
+    },
+    {
+      "symbol": "applicationOutcomes",
+      "table": "application_outcomes"
+    },
+    {
+      "symbol": "testBookings",
+      "table": "test_bookings"
+    },
+    {
+      "symbol": "mentors",
+      "table": "mentors"
+    },
+    {
+      "symbol": "mentorRequests",
+      "table": "mentor_requests"
+    },
+    {
+      "symbol": "opportunities",
+      "table": "opportunities"
+    },
+    {
+      "symbol": "essayReviews",
+      "table": "essay_reviews"
+    },
+    {
+      "symbol": "successStories",
+      "table": "success_stories"
+    },
+    {
+      "symbol": "goalTemplates",
+      "table": "goal_templates"
+    },
+    {
+      "symbol": "studentGoals",
+      "table": "student_goals"
+    },
+    {
+      "symbol": "answerPrompts",
+      "table": "answer_prompts"
+    },
+    {
+      "symbol": "answerVault",
+      "table": "answer_vault"
+    },
+    {
+      "symbol": "scholarshipDecisions",
+      "table": "scholarship_decisions"
+    },
+    {
+      "symbol": "checklistItems",
+      "table": "checklist_items"
+    },
+    {
+      "symbol": "studentChecklist",
+      "table": "student_checklist"
+    },
+    {
+      "symbol": "telegramLinks",
+      "table": "telegram_links"
+    },
+    {
+      "symbol": "telegramLoginRequests",
+      "table": "telegram_login_requests"
+    },
+    {
+      "symbol": "telegramMessages",
+      "table": "telegram_messages"
+    },
+    {
+      "symbol": "telegramUpdates",
+      "table": "telegram_updates"
+    },
+    {
+      "symbol": "channelPlan",
+      "table": "channel_plan"
+    },
+    {
+      "symbol": "translationLexicon",
+      "table": "translation_lexicon"
+    },
+    {
+      "symbol": "translationLexiconMeta",
+      "table": "translation_lexicon_meta"
+    },
+    {
+      "symbol": "channelPosts",
+      "table": "channel_posts"
+    },
+    {
+      "symbol": "channelPolls",
+      "table": "channel_polls"
+    },
+    {
+      "symbol": "channelPrefs",
+      "table": "channel_prefs"
+    },
+    {
+      "symbol": "channelClicks",
+      "table": "channel_clicks"
+    },
+    {
+      "symbol": "channelStories",
+      "table": "channel_stories"
+    },
+    {
+      "symbol": "scholarshipChannelContent",
+      "table": "scholarship_channel_content"
+    },
+    {
+      "symbol": "channelCountries",
+      "table": "channel_countries"
+    },
+    {
+      "symbol": "channelSettings",
+      "table": "channel_settings"
+    },
+    {
+      "symbol": "channelTemplates",
+      "table": "channel_templates"
+    },
+    {
+      "symbol": "channelTemplateVersions",
+      "table": "channel_template_versions"
+    },
+    {
+      "symbol": "channelLinks",
+      "table": "channel_links"
+    },
+    {
+      "symbol": "channelLinkClicks",
+      "table": "channel_link_clicks"
+    },
+    {
+      "symbol": "channelAudit",
+      "table": "channel_audit"
+    },
+    {
+      "symbol": "platformOwnership",
+      "table": "platform_ownership"
+    },
+    {
+      "symbol": "ownershipTransfers",
+      "table": "ownership_transfers"
+    },
+    {
+      "symbol": "studyPlans",
+      "table": "study_plans"
+    },
+    {
+      "symbol": "studyPlanPhases",
+      "table": "study_plan_phases"
+    },
+    {
+      "symbol": "userDocuments",
+      "table": "user_documents"
+    },
+    {
+      "symbol": "applicationDocumentLinks",
+      "table": "application_document_links"
+    },
+    {
+      "symbol": "testPlans",
+      "table": "test_plans"
+    },
+    {
+      "symbol": "testAttempts",
+      "table": "test_attempts"
+    },
+    {
+      "symbol": "testTasks",
+      "table": "test_tasks"
+    },
+    {
+      "symbol": "studentActivities",
+      "table": "student_activities"
+    },
+    {
+      "symbol": "activityEvidence",
+      "table": "activity_evidence"
+    },
+    {
+      "symbol": "requirementTemplates",
+      "table": "requirement_templates"
+    },
+    {
+      "symbol": "applicationRequirements",
+      "table": "application_requirements"
+    },
+    {
+      "symbol": "recommendationRequests",
+      "table": "recommendation_requests"
+    },
+    {
+      "symbol": "admissionOffers",
+      "table": "admission_offers"
+    },
+    {
+      "symbol": "fundingItems",
+      "table": "funding_items"
+    },
+    {
+      "symbol": "journeyDeadlines",
+      "table": "journey_deadlines"
+    },
+    {
+      "symbol": "learningProviders",
+      "table": "learning_providers"
+    },
+    {
+      "symbol": "learningProviderLinks",
+      "table": "learning_provider_links"
+    },
+    {
+      "symbol": "learningProviderScores",
+      "table": "learning_provider_scores"
+    },
+    {
+      "symbol": "rateLimitHits",
+      "table": "rate_limit_hits"
+    },
+    {
+      "symbol": "userSessions",
+      "table": "user_sessions"
+    },
+    {
+      "symbol": "passwordResetTokens",
+      "table": "password_reset_tokens"
+    },
+    {
+      "symbol": "visaRequirements",
+      "table": "visa_requirements"
+    },
+    {
+      "symbol": "careerDiscoveries",
+      "table": "career_discoveries"
+    },
+    {
+      "symbol": "arrivalChecklistItems",
+      "table": "arrival_checklist_items"
+    }
+  ],
+  "migrationFiles": [
+    "supabase/add_ai_cost_accounting.sql",
+    "supabase/add_ai_usage_quota_index.sql",
+    "supabase/add_analytics.sql",
+    "supabase/add_application_system.sql",
+    "supabase/add_channel.sql",
+    "supabase/add_core_repair.sql",
+    "supabase/add_data_integrity.sql",
+    "supabase/add_documents_essays.sql",
+    "supabase/add_essay_rubric_context.sql",
+    "supabase/add_generic_tuition_columns.sql",
+    "supabase/add_growth_features.sql",
+    "supabase/add_journey_core.sql",
+    "supabase/add_mentors_parent.sql",
+    "supabase/add_opportunities_essay_reviews.sql",
+    "supabase/add_ownership.sql",
+    "supabase/add_password_hash.sql",
+    "supabase/add_payment_provider_lifecycle.sql",
+    "supabase/add_profile_chancing_applications.sql",
+    "supabase/add_referral_columns.sql",
+    "supabase/add_study_interests.sql",
+    "supabase/add_telegram.sql",
+    "supabase/add_university_discovery.sql",
+    "supabase/applicant_context_2026-11-07.sql",
+    "supabase/atomic_cache_revisions_2026-11-07.sql",
+    "supabase/campus_images_wikimedia_2026-10-23.sql",
+    "supabase/catalog_and_integrity_2026_patch.sql",
+    "supabase/catalogue_evidence_repair_2026-11-02.sql",
+    "supabase/catalogue_verification_flags_2026-11-02.sql",
+    "supabase/deadline_correctness_sweep_2026-10-23.sql",
+    "supabase/deadline_fill_remaining_countries_2026-10-23.sql",
+    "supabase/deadline_research_pass_2026-10-23.sql",
+    "supabase/deadline_verification_eu_asia_2026-10-23.sql",
+    "supabase/deadline_verification_us_2026-10-23.sql",
+    "supabase/delete_israel_2026-10-25.sql",
+    "supabase/document_review_records_2026-11-07.sql",
+    "supabase/enable_rls.sql",
+    "supabase/fact_scope_cas_2026-11-07.sql",
+    "supabase/fill_data_gaps_official_sources_2026-10-23.sql",
+    "supabase/fix_align_schema.sql",
+    "supabase/full_data_audit_2026-10-23.sql",
+    "supabase/full_schema.sql",
+    "supabase/integrity_repair_2026-10-23.sql",
+    "supabase/international_scholarships_batch1_2026-10-23.sql",
+    "supabase/link_university_scholarships_2026-10-23.sql",
+    "supabase/merge_duplicate_universities_2026-10-23.sql",
+    "supabase/official_source_corrections_2026-11-06.sql",
+    "supabase/official_source_corrections_2026-11-06_rollback.sql",
+    "supabase/official_source_corrections_2026-11-06_rollback_v2.sql",
+    "supabase/official_source_followup_2026-11-06_v2.sql",
+    "supabase/official_source_program_checks_2026-11-07.sql",
+    "supabase/official_source_review_2026-11-02_batch_01.sql",
+    "supabase/official_uk_visa_review_2026-11-03.sql",
+    "supabase/official_uk_visa_source_url_correction_2026-11-03.sql",
+    "supabase/password_reset_tokens_2026-10-31.sql",
+    "supabase/qs_2026_rank_correction.sql",
+    "supabase/qs_2026_rank_correction_pass2_2026-10-30.sql",
+    "supabase/qs_2027_top5_universities.sql",
+    "supabase/relax_profile_fabricated_defaults.sql",
+    "supabase/remove_profile_match_tiers.sql",
+    "supabase/repair_seeded_fabricated_values.sql",
+    "supabase/scholarship_accuracy_and_linking_pass4_2026-10-23.sql",
+    "supabase/scholarship_accuracy_fixes_2026-10-23.sql",
+    "supabase/scholarship_accuracy_pass5_2026-10-23.sql",
+    "supabase/scholarship_correctness_sweep_2_2026-10-23.sql",
+    "supabase/scholarship_data_quality_sweep_3_2026-10-23.sql",
+    "supabase/scholarship_detail_backfill_2026-10-23.sql",
+    "supabase/scholarship_enrichment_batch10_2026-10-26.sql",
+    "supabase/scholarship_enrichment_batch11_2026-10-26.sql",
+    "supabase/scholarship_enrichment_batch12_2026-10-26.sql",
+    "supabase/scholarship_enrichment_batch13_2026-10-27.sql",
+    "supabase/scholarship_enrichment_batch14_2026-10-27.sql",
+    "supabase/scholarship_enrichment_batch15_2026-10-27.sql",
+    "supabase/scholarship_enrichment_batch16_2026-10-27.sql",
+    "supabase/scholarship_enrichment_batch17_2026-10-27.sql",
+    "supabase/scholarship_enrichment_batch18_2026-10-27.sql",
+    "supabase/scholarship_enrichment_batch19_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch20_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch21_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch22_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch23_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch24_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch25_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch26_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch27_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch28_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch29_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch2_2026-10-23.sql",
+    "supabase/scholarship_enrichment_batch30_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch31_2026-10-28.sql",
+    "supabase/scholarship_enrichment_batch32_2026-10-29.sql",
+    "supabase/scholarship_enrichment_batch33_2026-10-29.sql",
+    "supabase/scholarship_enrichment_batch34_2026-10-29.sql",
+    "supabase/scholarship_enrichment_batch35_2026-10-29.sql",
+    "supabase/scholarship_enrichment_batch36_2026-10-29.sql",
+    "supabase/scholarship_enrichment_batch37_2026-10-29.sql",
+    "supabase/scholarship_enrichment_batch38_2026-10-29.sql",
+    "supabase/scholarship_enrichment_batch39_2026-10-30.sql",
+    "supabase/scholarship_enrichment_batch40_2026-10-30.sql",
+    "supabase/scholarship_enrichment_batch41_2026-10-30.sql",
+    "supabase/scholarship_enrichment_batch42_2026-10-30.sql",
+    "supabase/scholarship_enrichment_batch43_2026-10-30.sql",
+    "supabase/scholarship_enrichment_batch44_2026-11-01.sql",
+    "supabase/scholarship_enrichment_batch5_2026-10-26.sql",
+    "supabase/scholarship_enrichment_batch6_2026-10-26.sql",
+    "supabase/scholarship_enrichment_batch7_2026-10-26.sql",
+    "supabase/scholarship_enrichment_batch8_2026-10-26.sql",
+    "supabase/scholarship_enrichment_batch9_2026-10-26.sql",
+    "supabase/scholarship_format_alignment_2026-11-02.sql",
+    "supabase/scholarship_format_audit.sql",
+    "supabase/scholarship_quality_pass6_2026-10-23.sql",
+    "supabase/security_evidence_research_2026-11-06.sql",
+    "supabase/security_evidence_research_2026-11-06_recovery.sql",
+    "supabase/step3_restore_all.sql",
+    "supabase/top300_pdf_import.sql",
+    "supabase/university_cost_mirror_alignment_2026-10-30.sql",
+    "supabase/university_program_integrity_audit.sql",
+    "supabase/university_schema_data_audit.sql",
+    "supabase/university_schema_preflight.sql",
+    "supabase/university_schema_v2.sql",
+    "supabase/university_scholarships_usd_sync_2026-10-26.sql",
+    "supabase/uzbek_13c_pdf_import.sql",
+    "supabase/visa_practice_evidence_repair_2026-11-02.sql",
+    "supabase/visa_verified_evidence_guard_2026-11-02.sql"
+  ],
+  "jobFiles": [
+    "src/app/api/admin/research-agent/cancel/route.ts",
+    "src/app/api/admin/research-agent/resume/route.ts",
+    "src/app/api/admin/research-agent/run/route.ts",
+    "src/app/api/admin/research-agent/status/route.ts",
+    "src/app/api/cron/research-agent/route.ts",
+    "src/lib/research-agent/ai/decide.ts",
+    "src/lib/research-agent/ai/openrouter.ts",
+    "src/lib/research-agent/ai/types.ts",
+    "src/lib/research-agent/ai/validate.ts",
+    "src/lib/research-agent/audit.ts",
+    "src/lib/research-agent/compare.ts",
+    "src/lib/research-agent/config.ts",
+    "src/lib/research-agent/domain.ts",
+    "src/lib/research-agent/durableStore.ts",
+    "src/lib/research-agent/extract.ts",
+    "src/lib/research-agent/fetch.ts",
+    "src/lib/research-agent/normalize.ts",
+    "src/lib/research-agent/persist.ts",
+    "src/lib/research-agent/prompts.ts",
+    "src/lib/research-agent/providers.ts",
+    "src/lib/research-agent/registry.ts",
+    "src/lib/research-agent/request.ts",
+    "src/lib/research-agent/resumePolicy.ts",
+    "src/lib/research-agent/run-batch.ts",
+    "src/lib/research-agent/run-university.ts",
+    "src/lib/research-agent/scholarship-watchlist.json",
+    "src/lib/research-agent/types.ts",
+    "src/lib/research-agent/urlFilter.ts",
+    "src/lib/research-agent/validate.ts",
+    "src/lib/research-agent/worker.ts",
+    "src/lib/research-agent/writeFence.ts"
+  ],
+  "navigationCandidates": [
+    "src/app/HomeClient.tsx",
+    "src/components/AdminPanel.tsx",
+    "src/components/GroupedDock.tsx"
+  ],
+  "testFiles": [
+    "scripts/apply-full-schema.ts",
+    "scripts/audit-catalogue-evidence.ts",
+    "scripts/audit-live-ranks.ts",
+    "scripts/build-desktop.mjs",
+    "scripts/build-mobile.mjs",
+    "scripts/capture-master-inventory.mjs",
+    "scripts/capture-source-state.mjs",
+    "scripts/check-admin-accounts.ts",
+    "scripts/check-admission-probability.ts",
+    "scripts/check-ai-cost.ts",
+    "scripts/check-ai-format.ts",
+    "scripts/check-ai-settings.ts",
+    "scripts/check-api-anonymous.ts",
+    "scripts/check-applications-state.ts",
+    "scripts/check-arrival.ts",
+    "scripts/check-audit-safety.mjs",
+    "scripts/check-auth-credentials.ts",
+    "scripts/check-backend-resilience.ts",
+    "scripts/check-backend-second-pass.ts",
+    "scripts/check-budget-fit.ts",
+    "scripts/check-build-gates.ts",
+    "scripts/check-cache-revision.ts",
+    "scripts/check-calculations.ts",
+    "scripts/check-career-discovery.ts",
+    "scripts/check-catalog-duplicates.ts",
+    "scripts/check-catalog-evidence.ts",
+    "scripts/check-catalog-gaps.ts",
+    "scripts/check-catalog-localization.ts",
+    "scripts/check-catalogue-language.ts",
+    "scripts/check-catalogue-migrations.ts",
+    "scripts/check-catalogue-order.ts",
+    "scripts/check-catalogue-query-load.ts",
+    "scripts/check-chancing.ts",
+    "scripts/check-channel.ts",
+    "scripts/check-chunk-recovery.ts",
+    "scripts/check-compare.ts",
+    "scripts/check-continuation.ts",
+    "scripts/check-costs.ts",
+    "scripts/check-countries.ts",
+    "scripts/check-country-compare.ts",
+    "scripts/check-country-facts.ts",
+    "scripts/check-cv.ts",
+    "scripts/check-dashboard-cache.ts",
+    "scripts/check-dataset.ts",
+    "scripts/check-deadline-day.ts",
+    "scripts/check-deadline-integrity.ts",
+    "scripts/check-dependency-audit.ts",
+    "scripts/check-deploy.ts",
+    "scripts/check-design-system.mjs",
+    "scripts/check-design-system.ts",
+    "scripts/check-desktop-app.mjs",
+    "scripts/check-desktop-engine.mjs",
+    "scripts/check-differentiators.ts",
+    "scripts/check-document-coverage.ts",
+    "scripts/check-documents-readiness.ts",
+    "scripts/check-documents.ts",
+    "scripts/check-essay-adapter.ts",
+    "scripts/check-essay-reviews.ts",
+    "scripts/check-essays.ts",
+    "scripts/check-evidence-policy.ts",
+    "scripts/check-evidence-render.ts",
+    "scripts/check-exam-boundaries.ts",
+    "scripts/check-feature-inventory.ts",
+    "scripts/check-finance-unified.ts",
+    "scripts/check-groq.ts",
+    "scripts/check-growth.ts",
+    "scripts/check-i18n.mjs",
+    "scripts/check-idle-scheduling.ts",
+    "scripts/check-integration.ts",
+    "scripts/check-internal-surfaces.ts",
+    "scripts/check-isolated-env.ts",
+    "scripts/check-journey.ts",
+    "scripts/check-landing-copy.tsx",
+    "scripts/check-landing-ranks.ts",
+    "scripts/check-lint-baseline.ts",
+    "scripts/check-localization-perf.ts",
+    "scripts/check-master-database.ts",
+    "scripts/check-master-regressions.ts",
+    "scripts/check-match.ts",
+    "scripts/check-mentors.ts",
+    "scripts/check-migration-dry-run.ts",
+    "scripts/check-migration-recovery.ts",
+    "scripts/check-migration-runner.ts",
+    "scripts/check-observability.ts",
+    "scripts/check-official-source-adapter.ts",
+    "scripts/check-official-source-review.ts",
+    "scripts/check-opportunities.ts",
+    "scripts/check-opportunity-notes.ts",
+    "scripts/check-ownership.ts",
+    "scripts/check-panel-placement.ts",
+    "scripts/check-parent.ts",
+    "scripts/check-password-reset.ts",
+    "scripts/check-payments.ts",
+    "scripts/check-perf.ts",
+    "scripts/check-plain-text-sanitizer.ts",
+    "scripts/check-portability.ts",
+    "scripts/check-profile-recompute.ts",
+    "scripts/check-provenance.ts",
+    "scripts/check-qs-benchmarks.ts",
+    "scripts/check-qs-catalogue-ranks.ts",
+    "scripts/check-rec-letter.ts",
+    "scripts/check-recommend.ts",
+    "scripts/check-referral.ts",
+    "scripts/check-refresh-modes.ts",
+    "scripts/check-remote-mode.mjs",
+    "scripts/check-render.ts",
+    "scripts/check-rendered-copy.ts",
+    "scripts/check-research-durable.ts",
+    "scripts/check-research-runtime.ts",
+    "scripts/check-research-worker.ts",
+    "scripts/check-responsive.mjs",
+    "scripts/check-review-queue-runtime.ts",
+    "scripts/check-review-queue.ts",
+    "scripts/check-roadmap.ts",
+    "scripts/check-samples.ts",
+    "scripts/check-schema-apply-safety.mjs",
+    "scripts/check-schema-repair.ts",
+    "scripts/check-scholarship-degrees.ts",
+    "scripts/check-scholarship-detail.ts",
+    "scripts/check-scholarship-ranking.ts",
+    "scripts/check-scoped-award-coverage.ts",
+    "scripts/check-security.ts",
+    "scripts/check-seed-catalog.ts",
+    "scripts/check-site-completeness.mjs",
+    "scripts/check-snapshot-recovery.ts",
+    "scripts/check-source-followup.ts",
+    "scripts/check-source-recheck.ts",
+    "scripts/check-stage3-performance.ts",
+    "scripts/check-stage6-localization.mjs",
+    "scripts/check-stage7-seed-safety.mjs",
+    "scripts/check-streak.ts",
+    "scripts/check-study-interests.ts",
+    "scripts/check-subject-identities.ts",
+    "scripts/check-supabase-schema.ts",
+    "scripts/check-task-sync.mjs",
+    "scripts/check-telegram-integration.ts",
+    "scripts/check-telegram.ts",
+    "scripts/check-typed-evidence.ts",
+    "scripts/check-university-costs.ts",
+    "scripts/check-university-hub.ts",
+    "scripts/check-university-list.ts",
+    "scripts/check-university-prose.ts",
+    "scripts/check-university-rank-year.ts",
+    "scripts/check-university-rank.ts",
+    "scripts/check-university-sort.ts",
+    "scripts/check-ux-redesign.mjs",
+    "scripts/check-verify-summary.mjs",
+    "scripts/check-video-player.ts",
+    "scripts/check-visa-render.tsx",
+    "scripts/check-visa-scoring.ts",
+    "scripts/check-visa-similar.ts",
+    "scripts/dark-audit.mjs",
+    "scripts/dev-db.mjs",
+    "scripts/dev-db.ts",
+    "scripts/e2e/continuation-schema.ts",
+    "scripts/e2e/seed-fixtures.ts",
+    "scripts/e2e/start-built.mjs",
+    "scripts/ensure-schema.ts",
+    "scripts/fixtures/research-fence-child.ts",
+    "scripts/fixtures/revision-cache-child.ts",
+    "scripts/gen-core-repair-sql.ts",
+    "scripts/gen-full-schema-sql.ts",
+    "scripts/generate-english-stages.mjs",
+    "scripts/inventory-backend.mjs",
+    "scripts/lib/env.ts",
+    "scripts/lib/official-qs-table.ts",
+    "scripts/lib/schema-tools.ts",
+    "scripts/lib/sql-safety.ts",
+    "scripts/phase11-preflight.mjs",
+    "scripts/proofs/cache-revision-races.ts",
+    "scripts/proofs/fact-cas.ts",
+    "scripts/proofs/research-write-fence.ts",
+    "scripts/rehearse-channel.ts",
+    "scripts/research-agent-ai-tests.ts",
+    "scripts/research-agent-dryrun.ts",
+    "scripts/research-agent-simulation.ts",
+    "scripts/run-api-security-isolated.ts",
+    "scripts/run-backend-audit.ts",
+    "scripts/run-browser-perf.mjs",
+    "scripts/run-e2e.mjs",
+    "scripts/run-master-validation.ts",
+    "scripts/run-stack-integration.ts",
+    "scripts/seed-catalog.ts",
+    "scripts/seed-db.ts",
+    "scripts/seed-lexicon.ts",
+    "scripts/seed-programs.ts",
+    "scripts/summarize-browser-perf.mjs",
+    "scripts/telegram-mock.mjs",
+    "scripts/validate-local.sh",
+    "scripts/verify-seed-growth.ts",
+    "e2e/authenticated-entry.spec.ts",
+    "e2e/award-field-review.spec.ts",
+    "e2e/backend-resilience.spec.ts",
+    "e2e/backend-second-pass.spec.ts",
+    "e2e/catalogue-read-diagnostics.spec.ts",
+    "e2e/checklist-continuation.spec.ts",
+    "e2e/client-locales.spec.ts",
+    "e2e/continuation-contracts.spec.ts",
+    "e2e/dashboard-continuation.spec.ts",
+    "e2e/exam-boundaries.spec.ts",
+    "e2e/first-paint.spec.ts",
+    "e2e/funding-inputs.spec.ts",
+    "e2e/funding-scenarios.spec.ts",
+    "e2e/global-setup.ts",
+    "e2e/home-saved-scope.spec.ts",
+    "e2e/isolated-env.ts",
+    "e2e/master-dashboard.spec.ts",
+    "e2e/navigation-continuation.spec.ts",
+    "e2e/performance.spec.ts",
+    "e2e/phase12.spec.ts",
+    "e2e/post-admission-funding.spec.ts",
+    "e2e/scoped-award-coverage.spec.ts",
+    "e2e/search-loader-waterfall.spec.ts",
+    "e2e/shell-paint.spec.ts",
+    "e2e/site-audit.spec.ts",
+    "e2e/university-detail-contracts.spec.ts",
+    "e2e/university-request-epochs.spec.ts",
+    "e2e/vault-continuation.spec.ts",
+    "e2e/vault-link-reviews.spec.ts",
+    "e2e/visual-acceptance-2026.spec.ts"
+  ],
+  "limitations": [
+    "No entry is marked authorized merely because a matching function name was found.",
+    "Indirect wrappers, raw SQL, dynamic endpoints and role-specific runtime behavior require separate tests.",
+    "No production connection, source merge, model request or deployment was performed."
+  ]
+}

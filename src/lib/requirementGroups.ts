@@ -1,11 +1,13 @@
+import {calendarDate,examDatesState,requirementExamRule,validExamNumber} from "./examRecords";
 import type { ApplicantContext } from "./applicantContext";
 /** Minimum sufficient declarative grouping, not an executable rules language. */
 export type RequirementState="met"|"unmet"|"unknown"|"not_applicable";
-export type RequirementReason="comparison"|"record_missing"|"scale_unknown"|"expired"|"validity_unknown"|"unknown_operator"|"malformed"|"group";
+export type RequirementReason="comparison"|"record_missing"|"scale_unknown"|"expired"|"validity_unknown"|"unknown_operator"|"malformed"|"invalid_input"|"group";
 export interface RequirementEvaluation {id:string;label:string;state:RequirementState;reason:RequirementReason;children:RequirementEvaluation[];field?:string;required?:number;actual?:number|boolean|null;unit?:string|null;operator?:string;}
 export interface RequirementFact {value:number|boolean|null;unit?:string|null;validUntil?:string|null;examDate?:string|null;}
 export type RequirementFacts=Record<string,RequirementFact|undefined>;
 export function evaluateRequirementGroup(raw:unknown,facts:RequirementFacts,asOfDate:string):RequirementEvaluation{
+  if(!calendarDate(asOfDate))return {id:"unknown",label:"unknown",state:"unknown",reason:"malformed",children:[]};
   let nodes=0;const seen=new Set<string>();
   const walk=(raw:unknown,depth:number):RequirementEvaluation=>{
     const node=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw as Record<string,unknown>:{};
@@ -38,9 +40,11 @@ export function evaluateRequirementGroup(raw:unknown,facts:RequirementFacts,asOf
     if(out.unit&&out.unit!==fact.unit)return {...out,reason:"scale_unknown"};
     // TOEFL and GPA must explicitly name a scale on BOTH sides.
     if((node.field.startsWith("toefl")||node.field==="gpa")&&(!out.unit||!fact.unit))return {...out,reason:"scale_unknown"};
-    if(fact.examDate&&fact.examDate>asOfDate)return {...out,reason:"validity_unknown"};
-    if(fact.validUntil&&fact.validUntil<asOfDate)return {...out,reason:"expired"};
-    if(node.requireValid===true&&(!fact.validUntil||!fact.examDate))return {...out,reason:"validity_unknown"};
+    const rule=requirementExamRule(node.field,fact.unit),requiredRule=requirementExamRule(node.field,out.unit);
+    if(rule!==undefined&&(!validExamNumber(fact.value,rule)||!validExamNumber(node.value,requiredRule??rule)))return {...out,reason:rule===null?"scale_unknown":"invalid_input"};
+    const dates=examDatesState(fact,asOfDate,node.requireValid===true);
+    if(dates==="invalid"||dates==="missing")return {...out,reason:"validity_unknown"};
+    if(dates==="expired")return {...out,reason:"expired"};
     return {...out,state:fact.value>=node.value?"met":"unmet",reason:"comparison"};
   };
   return walk(raw,0);

@@ -16,19 +16,24 @@
  *      we inserted ourselves.
  *
  * Safety:
- *   - Runs against the LOCAL dev DB from DATABASE_URL only.
+ *   - Runs only against the disposable sb_e2e database via test:stack-integration.
  *   - All fixture rows carry the marker "PROV-FIXTURE:" / provfixture.example
  *     and are deleted on entry AND on exit (self-cleaning, repeatable).
  *   - Needs the dev server (default http://127.0.0.1:3000, override with
  *     PROVENANCE_APP_URL).
  *
- * Usage: npm run test:provenance
+ * Usage: npm run test:stack-integration
  */
 import pg from "pg";
 import "./lib/env";
 import { isStaleVerified } from "../src/lib/provenance";
 
 const APP_URL = process.env.PROVENANCE_APP_URL || "http://127.0.0.1:3000";
+// This script deletes marked fixtures: never accept a hosted or ordinary dev DB.
+let disposableUrl: URL;
+try { disposableUrl = new URL(process.env.DATABASE_URL ?? ""); }
+catch { throw new Error("Run test:stack-integration with its disposable database"); }
+if (disposableUrl.hostname !== "127.0.0.1" || !/^\/sb_e2e_\d+$/.test(disposableUrl.pathname)) throw new Error("Disposable stack-integration database required");
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 
 const MARKER = "PROV-FIXTURE:";
@@ -60,6 +65,7 @@ async function cleanFixtures() {
     const uniIds = unis.rows.map((r) => r.id);
     const progIds = prog.rows.map((r) => r.id);
     if (progIds.length) {
+      await client.query("DELETE FROM catalogue_facts WHERE entity_type='program' AND entity_id=ANY($1)", [progIds]);
       await client.query("DELETE FROM program_requirements WHERE program_id = ANY($1)", [progIds]);
       await client.query("DELETE FROM application_cycles WHERE program_id = ANY($1) OR university_id = ANY($2)", [progIds, uniIds]);
       await client.query("DELETE FROM program_sources WHERE program_id = ANY($1)", [progIds]);
@@ -145,6 +151,14 @@ async function seedFixtures(): Promise<{ uniId: number; p1: number; p2: number; 
     [p1, s1.url, p2]
   );
 
+  // A legacy verified row remains labelled discovery. Only a separately
+  // recorded exact original field can populate an official scoped minimum.
+  await pool.query(
+    `INSERT INTO catalogue_facts(entity_type,entity_id,field_key,value_numeric,unit,program_name,degree_level,admission_cycle,applicant_scope,source_url,verification_status,value_type,verified_at,is_active)
+     VALUES('program',$1,'min_ielts',6.5,'9',$2,'Bachelor','2026/2027','international',$3,'verified','official_requirement',now(),true)`,
+    [p1, `${MARKER} BSc Computer Science`, s1.url]
+  );
+
   await pool.query(
     `INSERT INTO application_cycles (university_id, program_id, intake, academic_year,
                                      opening_date, deadline, deadline_timezone, application_fee, application_fee_currency,
@@ -227,11 +241,18 @@ async function main() {
       third?.isOfficial === false && String(third?.accessedAt).startsWith("2025-11-01"), third);
 
     console.log("\nper-requirement provenance:");
-    const p1Reqs: any[] = p1?.requirements ?? [];
-    check("p1 requirements all carry sourceUrl + status",
+    const recorded: Record<string,unknown>[] = p1?.recordedRequirements ?? [];
+    check("legacy originals retain their recorded source + status",
+      recorded.length > 0 && recorded.every((r) => r.sourceUrl === fx.s1 && r.verificationStatus === "verified"), recorded);
+    check("legacy IELTS original retained (6.5)", recorded.find(r => r.requirementType === "ielts")?.minimumValue === 6.5);
+    check("an unselected scope does not turn a verified legacy row into an official cutoff", p1?.requirements?.length === 0 && p1?.minIelts === null);
+    const scoped = await apiGet(`/api/universities/${fx.uniId}?programId=${fx.p1}&admissionCycle=2026%2F2027&applicantScope=international`);
+    check("exact-scope provenance response succeeds", scoped.status === 200);
+    const p1Reqs: any[] = scoped.body?.programs?.find((p: {id:number}) => p.id === fx.p1)?.requirements ?? [];
+    check("p1 requirements all carry sourceUrl + status in exact scope",
       p1Reqs.length > 0 && p1Reqs.every((r) => r.sourceUrl === fx.s1 && r.verificationStatus === "verified"), p1Reqs);
     const p1Ielts = p1Reqs.find((r) => r.requirementType === "ielts");
-    check("p1 ielts minimum preserved (6.5)", p1Ielts?.minimumValue === 6.5, p1Ielts);
+    check("p1 scoped IELTS minimum preserved (6.5)", p1Ielts?.minimumValue === 6.5 && p1Ielts?.unit === "9", p1Ielts);
 
     console.log("\nunknown ≠ verified (unverified program, no source):");
     check("p2 present in response", !!p2);

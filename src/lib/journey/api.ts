@@ -5,8 +5,7 @@
  * same three rules: tables ready, caller may act on this profile, writes are
  * throttled. A route file then only contains its own logic.
  */
-import {randomUUID} from "node:crypto";
-import {classifyReadFailure} from "@/lib/readFailure";
+import {reportReadFailure} from "@/lib/readFailure.server";
 import { NextResponse } from "next/server";
 import { requireAdmin, requireProfileAccess, type AuthResult, type Session } from "@/lib/auth";
 import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
@@ -138,14 +137,7 @@ export function isoDate(d: Date | null | undefined): string | null {
 /** Internal error taxonomy without SQL, credentials, PII or raw error dumps.
  * A revision conflict remains a rejected read, never an old successful payload. */
 export function serverError(where: string, err: unknown) {
-  const category=classifyReadFailure(err),requestId=randomUUID();
-  const error=err as {name?:string;code?:string;cause?:{code?:string}}|null;
-  const kind=["TypeError","RangeError","CacheRevisionChangedError","DrizzleQueryError"].includes(error?.name??"")?error!.name!:"Error";
-  const rawCode=error?.cause?.code??error?.code;
-  const dbCode=["23505","23503","22P02","22007","40001","40P01","28P01","42P01","42703","53300","57P01","08006"].includes(rawCode??"")?rawCode:"other";
-  // Production console removal must not erase this fixed safe diagnostic.
-  // `where` is a route-owned constant, not a URL/profile/body/error message.
-  process.stderr.write(`[journey-failure] ${JSON.stringify({requestId,category,kind,dbCode,where:/^[a-zA-Z/ -]{1,100}$/.test(where)?where:"route"})}\n`);
+  const {category,requestId}=reportReadFailure(where,err);
   const response=category==="snapshot_changed"?jsonError(409,"Data changed while loading. Please retry.","snapshot_changed")
     :category==="schema_unavailable"?jsonError(503,"Required data schema is unavailable. Please try again later.","migration_pending")
     :category==="database_auth"||category==="database_transient"?jsonError(503,"Data is temporarily unavailable. Please try again later.","data_unavailable")

@@ -1,0 +1,64 @@
+E2E: using package-bundled NSS/NSPR runtime libraries.
+E2E database: disposable embedded PostgreSQL on 127.0.0.1:38867/sb_e2e_10715
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/home/user/ScholarBridgeAi/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] Pulling schema from database...
+[2K[1G[✓] Pulling schema from database...
+[✓] Changes applied
+Created disposable E2E fixtures using the application schema and password hasher.
+E2E server ready: http://127.0.0.1:36165/api/health; external AI credentials removed from its environment.
+
+Running 7 tests using 1 worker
+
+  ✓  1 e2e/award-field-review.spec.ts:9:5 › exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification (3.2s)
+  ✓  2 e2e/continuation-contracts.spec.ts:8:5 › real admin author -> exact manual group review -> profile/API grouped criteria and CAS (2.5s)
+  ✓  3 e2e/continuation-contracts.spec.ts:42:5 › university discovery never synthesizes programmes; experimental index is explicit opt-in (377ms)
+  ✓  4 e2e/continuation-contracts.spec.ts:55:5 › C14 persona matrix keeps originals, unknowns and no personal probability (595ms)
+  ✓  5 e2e/exam-boundaries.spec.ts:4:5 › real profile API rejects invalid exams atomically and round-trips zero and original TOEFL/GPA (881ms)
+  ✓  6 e2e/exam-boundaries.spec.ts:24:5 › real recommendation API rejects forged scores rather than clamping; reviewed EN/UZ/RU subject aliases agree (374ms)
+  ✘  7 e2e/scoped-award-coverage.spec.ts:8:5 › real four-surface award scope parity and localized unknown disclosure across themes (22.4s)
+
+
+  1) e2e/scoped-award-coverage.spec.ts:8:5 › real four-surface award scope parity and localized unknown disclosure across themes 
+
+    Error: expect(locator).not.toHaveClass(expected) failed
+
+    Locator: locator('html')
+    Expected pattern: not /dark/
+    Received string: "dark"
+    Timeout: 12000ms
+
+    Call log:
+      - Expect "not toHaveClass" locator('html') with timeout 12000ms
+      - waiting for locator('html')
+        27 × locator resolved to <html lang="en" class="dark">…</html>
+           - unexpected value "dark"
+
+
+      34 |     const card=page.locator(`[data-scholarship-id="${f.scholarshipId}"]`),note=card.locator('[data-award-coverage="unknown"]');
+      35 |     await expect(note).toHaveText(messages.common.awardCoverageUnknown);await expect(page.locator('html')).toHaveAttribute('lang',locale);
+    > 36 |     if(theme==='light')await expect(page.locator('html')).not.toHaveClass(/dark/);else await expect(page.locator('html')).toHaveClass(/dark/);
+         |                                                               ^
+      37 |     await note.scrollIntoViewIfNeeded();await expect(note).toBeVisible();
+      38 |     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+      39 |     await note.screenshot({path:`test-results/master-followup/screens/award-${locale}-${theme}.png`,animations:'disabled'});
+        at /home/user/ScholarBridgeAi/e2e/scoped-award-coverage.spec.ts:36:63
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/e2e/scoped-award-coverage-real-e0f69-wn-disclosure-across-themes/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/e2e/scoped-award-coverage-real-e0f69-wn-disclosure-across-themes/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/e2e/scoped-award-coverage-real-e0f69-wn-disclosure-across-themes/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/e2e/scoped-award-coverage-real-e0f69-wn-disclosure-across-themes/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e/scoped-award-coverage.spec.ts:8:5 › real four-surface award scope parity and localized unknown disclosure across themes 
+  6 passed (38.6s)

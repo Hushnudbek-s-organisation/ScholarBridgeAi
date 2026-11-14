@@ -1,0 +1,341 @@
+{
+  "config": {
+    "argv": [
+      "/usr/local/bin/node",
+      "/home/user/ScholarBridgeAi/node_modules/@playwright/test/cli.js",
+      "test",
+      "e2e/catalogue-read-diagnostics.spec.ts",
+      "e2e/client-locales.spec.ts",
+      "e2e/master-dashboard.spec.ts",
+      "--grep",
+      "actual catalogue|English catalogue|actual dashboard",
+      "--output=test-results/recovery-diagnostics-production/artifacts"
+    ],
+    "configFile": "/home/user/ScholarBridgeAi/playwright.config.ts",
+    "rootDir": "/home/user/ScholarBridgeAi/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/user/ScholarBridgeAi/e2e/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-production/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-production/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "snapshotDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "actionTimeout": 20000,
+          "navigationTimeout": 30000,
+          "baseURL": "http://127.0.0.1:37783",
+          "browserName": "chromium",
+          "headless": true,
+          "launchOptions": {
+            "executablePath": "/tmp/chromium",
+            "args": [
+              "--ash-no-nudges",
+              "--disable-domain-reliability",
+              "--disable-print-preview",
+              "--disk-cache-size=33554432",
+              "--no-default-browser-check",
+              "--no-pings",
+              "--font-render-hinting=none",
+              "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+              "--enable-features=SharedArrayBuffer",
+              "--ignore-gpu-blocklist",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader",
+              "--disable-setuid-sandbox",
+              "--headless='shell'",
+              "--no-sandbox",
+              "--no-zygote"
+            ]
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "video": "off"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": ""
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/e2e-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "catalogue-read-diagnostics.spec.ts",
+      "file": "catalogue-read-diagnostics.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "actual catalogue 503 retains its contract and safely correlates a missing relation without stale success",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 147,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T10:03:49.719Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "73bfa047d866bffdd2df-8e4349d250418976d870",
+          "file": "catalogue-read-diagnostics.spec.ts",
+          "line": 7,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "client-locales.spec.ts",
+      "file": "client-locales.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "English catalogue does not download complete Russian/Uzbek admin dictionaries through shared country helpers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3603,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T10:03:49.922Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "client-locale-boundary",
+                      "contentType": "application/json",
+                      "body": "eyJsb2NhbGUiOiJlbiIsImxvYWRlZFNjcmlwdENvdW50IjozMCwiZGVjb2RlZFNjcmlwdEJ5dGVzIjoxNjM2NjQ3LCJmdWxsRGljdGlvbmFyeVNlbnRpbmVsc0Fic2VudCI6NCwibm90ZSI6IkRlY29kZWQgYm9kaWVzLCBub3QgY29tcHJlc3NlZCB0cmFuc2Zlci4gVGhlIHNtYWxsIHRocmVlLWxvY2FsZSBjb3VudHJ5LWxhYmVsIHByb2plY3Rpb24gaXMgaW50ZW50aW9uYWwuIn0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bfff756facfea0c20a51-49a57586eecbd5d4adf5",
+          "file": "client-locales.spec.ts",
+          "line": 8,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "master-dashboard.spec.ts",
+      "file": "master-dashboard.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "actual dashboard, disclosure focus and responsive layout: en",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15744,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T10:03:53.594Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-f519407a30c9f7977ca9",
+          "file": "master-dashboard.spec.ts",
+          "line": 46,
+          "column": 7
+        },
+        {
+          "title": "actual dashboard, disclosure focus and responsive layout: uz",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 14887,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T10:04:09.350Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-ae393e008388731fe664",
+          "file": "master-dashboard.spec.ts",
+          "line": 46,
+          "column": 7
+        },
+        {
+          "title": "actual dashboard, disclosure focus and responsive layout: ru",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15896,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T10:04:24.246Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-7a1022adb05174cbaad8",
+          "file": "master-dashboard.spec.ts",
+          "line": 46,
+          "column": 7
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-09T10:03:46.312Z",
+    "duration": 54081.202,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

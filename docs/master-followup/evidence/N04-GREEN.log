@@ -1,0 +1,21 @@
+PASS Cyrillic is not erased
+PASS Cyrillic tokens survive
+PASS NFKC full-width ASCII is equivalent
+PASS reviewed alias Computer Science / Компьютерные науки
+PASS reviewed alias Kompyuter fanlari / Computer Science
+PASS reviewed alias Informatika / Информатика
+PASS reviewed alias Dasturiy injiniring / Software Engineering
+PASS reviewed alias Kompyuter muhandisligi / Computer Engineering
+PASS reviewed alias Axborot texnologiyalari / Information Technology
+PASS reviewed alias Машиностроение / Mechanical Engineering
+PASS reviewed alias Matematika / Математика
+PASS reviewed alias Sun’iy intellekt / Sunʻiy intellekt
+PASS related is not identical Computer Science / Software Engineering
+PASS related is not identical Computer Science / Computer Engineering
+PASS related is not identical Computer Science / Information Technology
+PASS related is not identical Computer Engineering / Mechanical Engineering
+PASS related is not identical Electrical Engineering / Mechanical Engineering
+PASS unrelated canonical fields do not match
+PASS blank preference remains unknown
+PASS mixed-script spoof is not a reviewed alias
+SUBJECT_IDENTITIES: 20 passed, 0 failed

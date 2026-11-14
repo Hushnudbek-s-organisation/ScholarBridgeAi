@@ -1,0 +1,81 @@
+{
+  "branch": "arena/5970dc95-scholarbridgeai",
+  "testedHead": "9039fce7ffe1bc3136b3910b554d985ab0dfdb56",
+  "buildId": "icvIuPfQABf26uu7BsPvC",
+  "sourceHashes": {
+    "runtime": "16c5592d5888ccbe53bd08d7724ccaf61c02e073e5fb24be334a306147c56fb3",
+    "verification": "1dee68354d6634432c04b86b1bbeb7fa61dfd8c02a61719950385bc3cad15309",
+    "migrations": "2593f3819fb237a7159411e54895cada92959b1b1da09bdc1d13334a321bddb0"
+  },
+  "sourceMatchedBeforeAfter": true,
+  "localGates": 38,
+  "localTotalFails": 0,
+  "pure": 18,
+  "dev": {
+    "pass": 2,
+    "fail": 0
+  },
+  "productionTargeted": {
+    "pass": 5,
+    "fail": 0,
+    "mode": "local Next start / disposable PostgreSQL",
+    "budgetChanged": false
+  },
+  "fullNotRun": true,
+  "scopeComplete": false,
+  "releaseReady": false,
+  "lostWorkRecovered": false,
+  "checkpointOnlyCoversNewDiagnosticChange": true,
+  "files": [
+    {
+      "file": "docs/recovery/evidence/red-fixture-error.json",
+      "sha256": "ec525cf747f394c253e740295b8d4b36c424851e674b38cef1545583e570ecdb",
+      "bytes": 7869
+    },
+    {
+      "file": "docs/recovery/evidence/actual-red.json",
+      "sha256": "47f932daac012e2ddb0bd91700fdd2ef10274459ab2146ddcd4b429a70283d52",
+      "bytes": 9113
+    },
+    {
+      "file": "docs/recovery/evidence/post-patch-fixture-error.json",
+      "sha256": "5529b49c710f88d5ceb4d1c5b550f99db5bafb768fcd071e127531de0fbc9355",
+      "bytes": 14681
+    },
+    {
+      "file": "docs/recovery/evidence/dev-green.json",
+      "sha256": "857883dae114ee07211019523f326f9bd8944f034ad76b346f6176ef1ef29221",
+      "bytes": 6869
+    },
+    {
+      "file": "docs/recovery/evidence/production-targeted.json",
+      "sha256": "9bffba9f6a5afd31a0886733cb1f0bf944c96d802db774395bee7bd23d10d308",
+      "bytes": 10316
+    },
+    {
+      "file": "docs/recovery/evidence/local.log",
+      "sha256": "fc7c6474b90672324c8fa2e8ed50382a452a4484e1d59f14a12d759226d2f57f",
+      "bytes": 2282
+    },
+    {
+      "file": "docs/recovery/evidence/pure.log",
+      "sha256": "6b3c483dc80d5619494ceeab36fae09c51a828dd974299936ddc078d59e32c50",
+      "bytes": 1009
+    },
+    {
+      "file": "docs/recovery/evidence/source-before.json",
+      "sha256": "ab4ebecadb1be977d8bd50a6ceef8bc8405e711e6ad7fc54b2936294a89266ca",
+      "bytes": 248107
+    },
+    {
+      "file": "docs/recovery/evidence/source-after.json",
+      "sha256": "d488ace6aa7edbceeedd102f2192d82102146892a2c6a43485e7790984347f0e",
+      "bytes": 248126
+    },
+    {
+      "file": "docs/recovery/evidence/build.log",
+      "sha256": "7dea5ba8248bfa448bfb093687e97dfa734fff15dc24efbee7d54b59a4ba2089",
+      "bytes": 5795
+    }
+  ]
+}

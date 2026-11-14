@@ -1,4 +1,5 @@
 "use client";
+import {examRule} from "@/lib/examRecords";
 
 import { ApplicantContextFields } from "@/components/ApplicantContextFields";
 import type {ApplicantContext} from "@/lib/applicantContext";
@@ -798,12 +799,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">{te("ieltsScore")}</label>
                 <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="9.0"
-                  value={formData.ieltsScore || ""}
-                  onChange={(e) => setFormData({ ...formData, ieltsScore: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
+                  type="number" min={examRule("ielts","120")!.min} max={examRule("ielts","120")!.max} step={examRule("ielts","120")!.step}
+                  value={formData.ieltsScore ?? ""}
+                  onChange={(e) => setFormData({ ...formData, ieltsScore: e.target.value === "" ? "" : e.target.value })}
                   className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="7.5"
                 />
@@ -811,11 +809,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">{te("toeflScore")}</label>
                 <input
-                  type="number"
-                  min="0"
-                  max="120"
-                  value={formData.toeflScore || ""}
-                  onChange={(e) => setFormData({ ...formData, toeflScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  type="number" min={examRule("toefl","120")!.min} max={examRule("toefl","120")!.max} step={examRule("toefl","120")!.step}
+                  value={formData.toeflScore ?? ""}
+                  onChange={(e) => setFormData({ ...formData, toeflScore: e.target.value === "" ? "" : e.target.value })}
                   className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="100"
                 />
@@ -823,11 +819,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">{te("satScore")}</label>
                 <input
-                  type="number"
-                  min="400"
-                  max="1600"
-                  value={formData.satScore || ""}
-                  onChange={(e) => setFormData({ ...formData, satScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  type="number" min={examRule("sat","120")!.min} max={examRule("sat","120")!.max} step={examRule("sat","120")!.step}
+                  value={formData.satScore ?? ""}
+                  onChange={(e) => setFormData({ ...formData, satScore: e.target.value === "" ? "" : e.target.value })}
                   className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="1420"
                 />
@@ -836,10 +830,11 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
                 <label className="block text-sm font-semibold text-slate-600 mb-1">{te("greGeneral")}</label>
                 <input
                   type="number"
-                  min="260"
-                  max="340"
-                  value={formData.greScore || ""}
-                  onChange={(e) => setFormData({ ...formData, greScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  min={examRule("gre")!.min}
+                  max={examRule("gre")!.max}
+                  step={examRule("gre")!.step}
+                  value={formData.greScore ?? ""}
+                  onChange={(e) => setFormData({ ...formData, greScore: e.target.value })}
                   className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="320"
                 />
@@ -847,11 +842,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">{te("actScore")}</label>
                 <input
-                  type="number"
-                  min="1"
-                  max="36"
-                  value={formData.actScore || ""}
-                  onChange={(e) => setFormData({ ...formData, actScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  type="number" min={examRule("act","120")!.min} max={examRule("act","120")!.max} step={examRule("act","120")!.step}
+                  value={formData.actScore ?? ""}
+                  onChange={(e) => setFormData({ ...formData, actScore: e.target.value === "" ? "" : e.target.value })}
                   className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="32"
                 />
@@ -859,11 +852,9 @@ export function ProfileModal({ isOpen, isNew, onClose, profile, onSave }: Profil
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">{te("duolingoEnglish")}</label>
                 <input
-                  type="number"
-                  min="10"
-                  max="160"
-                  value={formData.duolingoScore || ""}
-                  onChange={(e) => setFormData({ ...formData, duolingoScore: e.target.value === "" ? "" : parseInt(e.target.value, 10) || 0 })}
+                  type="number" min={examRule("duolingo","120")!.min} max={examRule("duolingo","120")!.max} step={examRule("duolingo","120")!.step}
+                  value={formData.duolingoScore ?? ""}
+                  onChange={(e) => setFormData({ ...formData, duolingoScore: e.target.value === "" ? "" : e.target.value })}
                   className="sb-field min-h-11 w-full rounded-control border px-3 py-1.5 text-sm text-slate-900 focus:outline-none sm:text-sm"
                   placeholder="120"
                 />

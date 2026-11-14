@@ -1,0 +1,5 @@
+PASS .github/workflows/supabase-verify.yml: verifier=0, summary safe, original exit preserved
+PASS .github/workflows/supabase-verify.yml: verifier=2, summary safe, original exit preserved
+PASS ci/supabase-verify.yml: verifier=0, summary safe, original exit preserved
+PASS ci/supabase-verify.yml: verifier=2, summary safe, original exit preserved
+VERIFY_SUMMARY: 4 passed, 0 failed

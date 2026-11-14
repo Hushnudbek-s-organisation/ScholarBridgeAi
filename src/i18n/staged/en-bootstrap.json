@@ -237,7 +237,8 @@
     "showLess": "Show less",
     "showResults": "Show results",
     "stageCount": "Stage {current} of {total}",
-    "elapsedSeconds": "{seconds}s elapsed"
+    "elapsedSeconds": "{seconds}s elapsed",
+    "awardCoverageUnknown": "Award applicability and total-cost coverage are unconfirmed. Check the programme, cycle and applicant rules."
   },
   "forum": {
     "title": "Community Forum",

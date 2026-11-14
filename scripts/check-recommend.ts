@@ -59,8 +59,9 @@ function section(title: string) {
 section("1. Subject matching — synonyms and multiple interests");
 
 check("exact match", subjectAffinity(["Computer Science"], "Computer Science").level === "exact");
-check("synonym: software engineering ↔ Computer Science", subjectAffinity(["Software Engineering"], "Computer Science").level === "synonym");
-check("synonym direction reversed", subjectAffinity(["Computer Science"], "Software Engineering").level === "synonym");
+// Master N04: related disciplines are not aliases of one subject identity.
+check("related, not synonym: software engineering ↔ Computer Science", subjectAffinity(["Software Engineering"], "Computer Science").level === "partial" && subjectAffinity(["Software Engineering"], "Computer Science").score < 0.85);
+check("related direction reversed", subjectAffinity(["Computer Science"], "Software Engineering").level === "partial" && subjectAffinity(["Computer Science"], "Software Engineering").score < 0.85);
 check(
   "multiple interests: best one wins",
   subjectAffinity(["Biology", "Data Science"], "Data Science").level === "exact" &&
@@ -301,7 +302,7 @@ section("7. Ranking order and plain-language factors");
   const results = recommend({ interests: ["Computer Science"] }, makeCatalog([none, partial, synonym, exact], new Map()));
   const order = results.map((r) => r.program.id);
   check("exact ranks first", order[0] === 1, JSON.stringify(order));
-  check("synonym ranks before partial/none", order.indexOf(2) < order.indexOf(3) && order.indexOf(2) < order.indexOf(4), JSON.stringify(order));
+  check("equal related fits use stable IDs before unrelated", order.indexOf(2) < order.indexOf(3) && order.indexOf(2) < order.indexOf(4), JSON.stringify(order));
   check("ranking factors are plain language", results[0].rankingFactors.some((f) => f.includes("direct subject match")));
   check("each result carries a nextCycle (null when absent) — never invented", results.every((r) => r.nextCycle === null));
 }

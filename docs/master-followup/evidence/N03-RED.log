@@ -1,0 +1,93 @@
+FAIL domain rejects forged IELTS 99: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL domain rejects forged IELTS -1: Expected values to be strictly equal:
+
+'unmet' !== 'unknown'
+
+FAIL domain rejects forged IELTS 7.25: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+PASS domain rejects forged IELTS null
+PASS domain rejects forged IELTS null
+PASS domain rejects forged IELTS true
+PASS domain rejects forged IELTS "7"
+PASS domain rejects forged IELTS []
+PASS domain rejects forged IELTS {}
+FAIL sat range/step 0 not met/unmet: Expected values to be strictly equal:
+
+'unmet' !== 'unknown'
+
+FAIL sat range/step 399 not met/unmet: Expected values to be strictly equal:
+
+'unmet' !== 'unknown'
+
+FAIL sat range/step 9999 not met/unmet: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL sat range/step 1205 not met/unmet: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL act range/step 0 not met/unmet: Expected values to be strictly equal:
+
+'unmet' !== 'unknown'
+
+FAIL act range/step 37 not met/unmet: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL act range/step 25.5 not met/unmet: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL duolingo range/step 0 not met/unmet: Expected values to be strictly equal:
+
+'unmet' !== 'unknown'
+
+FAIL duolingo range/step 9 not met/unmet: Expected values to be strictly equal:
+
+'unmet' !== 'unknown'
+
+FAIL duolingo range/step 165 not met/unmet: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL duolingo range/step 112 not met/unmet: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL generic AST cannot bypass exam boundary: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL invalid published threshold is not a valid pass comparison: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+FAIL malformed calendar 2026-02-30: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+PASS malformed calendar 2026-13-01
+PASS malformed calendar bad-date
+PASS future exam is unknown
+PASS reversed exam validity is unknown
+FAIL bad section band cannot pass: Expected values to be strictly equal:
+
+'met' !== 'unknown'
+
+PASS IELTS OR missing TOEFL remains met
+PASS valid low score is unmet not unknown
+PASS explicit IELTS zero is a valid zero
+PASS original GPA 1–5 is not converted
+FAIL applicant score rejects coercion "0x64": Missing expected exception.
+FAIL applicant score rejects coercion "1e2": Missing expected exception.
+PASS applicant score rejects coercion true
+PASS applicant score rejects coercion []
+PASS applicant score rejects coercion {}
+PASS six-scale TOEFL is preserved
+EXAM_BOUNDARIES: 18 passed, 20 failed

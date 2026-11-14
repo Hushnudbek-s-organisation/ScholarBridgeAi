@@ -25,12 +25,40 @@
 /** Normalise a subject label for comparison (case, punctuation, spacing). */
 export function normalizeSubject(s: string | null | undefined): string {
   return (s || "")
+    .normalize("NFKC")
     .toLowerCase()
+    .replace(/['’‘ʻʼ]/g, "")
     .replace(/&/g, " and ")
-    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/[^\p{L}\p{N}\p{M}\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/** Explicit, versioned label identities. These refine the existing broad
+ * interest categories; category IDs/storage and custom labels are unchanged.
+ * Translation aliases are NOT statements of programme equivalence. */
+export const SUBJECT_IDENTITY_VERSION="subject-identities-v1";
+export const REVIEWED_SUBJECT_IDENTITIES:Record<string,{aliases:string[];families:string[]}>= {
+ computer_science:{aliases:["Computer Science","Computing","CS","Informatics","Компьютерные науки","Информатика","Kompyuter fanlari","Informatika"],families:["computing"]},
+ software_engineering:{aliases:["Software Engineering","Программная инженерия","Dasturiy injiniring","Dasturiy ta'minot muhandisligi"],families:["computing","engineering"]},
+ computer_engineering:{aliases:["Computer Engineering","Компьютерная инженерия","Kompyuter muhandisligi"],families:["computing","engineering"]},
+ information_technology:{aliases:["Information Technology","IT","Информационные технологии","Axborot texnologiyalari"],families:["computing"]},
+ data_science:{aliases:["Data Science","Наука о данных","Ma'lumotlar ilmi"],families:["computing"]},
+ artificial_intelligence:{aliases:["Artificial Intelligence","AI","Искусственный интеллект","Sun'iy intellekt"],families:["computing"]},
+ mechanical_engineering:{aliases:["Mechanical Engineering","Машиностроение","Mexanika muhandisligi"],families:["engineering"]},
+ electrical_engineering:{aliases:["Electrical Engineering","Электротехника","Elektr muhandisligi"],families:["engineering"]},
+ civil_engineering:{aliases:["Civil Engineering","Строительная инженерия","Qurilish muhandisligi"],families:["engineering"]},
+ mathematics:{aliases:["Mathematics","Math","Математика","Matematika"],families:["mathematics"]},
+ law:{aliases:["Law","Право","Юриспруденция","Huquq","Huquqshunoslik"],families:["law"]},
+ psychology:{aliases:["Psychology","Психология","Psixologiya"],families:["psychology"]},
+};
+const REVIEWED_ALIAS_IDS=new Map<string,string>();
+for(const [id,entry] of Object.entries(REVIEWED_SUBJECT_IDENTITIES))for(const alias of entry.aliases){
+ const key=normalizeSubject(alias),previous=REVIEWED_ALIAS_IDS.get(key);
+ if(previous&&previous!==id)throw new Error("Ambiguous reviewed subject alias");
+ REVIEWED_ALIAS_IDS.set(key,id);
+}
+export function canonicalSubjectId(label:string|null|undefined):string|null{return REVIEWED_ALIAS_IDS.get(normalizeSubject(label))??null;}
 
 /**
  * Conservative synonym groups. A student writing any member matches the
@@ -149,7 +177,7 @@ export function subjectTokens(value: string | null | undefined): string[] {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/&/g, " and ")
-    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/[^\p{L}\p{N}\p{M}\s]/gu, " ")
     .split(/\s+/)
     .map((w) => w.trim())
     .filter((w) => w.length >= 2 && !SUBJECT_STOP_WORDS.has(w));
@@ -181,7 +209,13 @@ export function subjectAffinity(
   for (const interest of interestList) {
     let level: SubjectFitLevel = "none";
     let score = 0;
-    if (interest === field) {
+    const interestId=canonicalSubjectId(interest),fieldId=canonicalSubjectId(field);
+    if(interestId&&fieldId){
+      if(interestId===fieldId){level=interest===field?"exact":"synonym";score=1;}
+      else if(REVIEWED_SUBJECT_IDENTITIES[interestId].families.some(family=>REVIEWED_SUBJECT_IDENTITIES[fieldId].families.includes(family))){level="partial";score=0.65;}
+      // A reviewed distinct identity cannot be upgraded by broad legacy
+      // groups or the shared word "engineering" below.
+    } else if (interest === field) {
       level = "exact";
       score = 1;
     } else {

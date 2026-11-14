@@ -1,0 +1,13 @@
+
+> check:i18n
+> node scripts/check-i18n.mjs
+
+English bootstrap/deferred and country-label projection parity verified
+  locales: en, uz, ru
+  keys per locale (en): 7223
+  careerDiscovery path cards: nested title/body checked in all locales
+  namespaces: admin, adminAccounts, adminChannel, adminDiagnostics, adminGrowth, adminOwnership, adminRefresh, adminReviewQueue, adminReviewQueue.factEditor, adminTelegram, ai, apostille, applications, applications.tracker, arrival, autopilot, bell, careerDiscovery, careers, certificateVerify, certificates, chancing, common, consultingPanel, costPlanner, countryCompare, countryNames, courses, cvBuilder, dashboard, deadlineCenter, degrees, departure, disclaimers, documentChecklist, evidence, faq, feeWaiver, forum, goals, growthSeed, guidedJourney, help, hubs, journey, landing, language, mentorMarketplace, meta, nav, navHints, navPanes, nextActions, onboarding, opportunities, outreach, pagination, parentDashboard, parentDashboard.share, passwordReset, payments, picker, premiumGate, profile, profile.context, profile.editor, publicCatalog, publicFeatures, recLetter, recommend, rewards, samples, scholarshipHub, sessions, similarOutcomes, stories, strength, studyInterest, taskRoadmap, telegram, theme, timeline, twin, university, vault, visa
+  translated component files: 141
+  t() call sites checked: 4374
+
+i18n check passed.
