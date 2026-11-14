@@ -1,3 +1,4 @@
+import {subjectSimilarity} from "./subjectAffinity";
 /**
  * Profile data utilities and a transparent profile-record coverage view.
  * This module deliberately does not estimate or classify admission chances.
@@ -116,20 +117,9 @@ export function normalizedGpa(profile: ChancingProfile): number | null {
   return gpaTo40Scale(profile.gpa, profile.gpaScale, profile.applicantContext?.gpa ? profile.applicantContext.gpa.minimum : 0);
 }
 
-/** Rough word-overlap similarity (0–1) between two free-text majors. */
+/** Legacy utility delegates to the same subject comparator; not probability. */
 export function majorSimilarity(a?: string | null, b?: string | null): number {
-  const norm = (s?: string | null) =>
-    (s || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 2);
-  const A = norm(a);
-  const B = norm(b);
-  if (!A.length || !B.length) return 0.5; // unknown → neutral, never punitive
-  const setB = new Set(B);
-  const overlap = A.filter((w) => setB.has(w)).length;
-  return clamp(overlap / Math.min(A.length, B.length), 0, 1);
+  return subjectSimilarity(a,b);
 }
 
 /** Count distinct extracurricular/achievement items across all columns. */

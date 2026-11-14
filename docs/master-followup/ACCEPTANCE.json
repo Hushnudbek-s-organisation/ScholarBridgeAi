@@ -1,0 +1,143 @@
+{
+  "releaseReady": false,
+  "scopeComplete": false,
+  "branch": "arena/5970dc95-scholarbridgeai",
+  "sourceBaseHead": "211d9b792dc3c74453fc5ba1408fb02b088ac13a",
+  "source": {
+    "finalSnapshot": "evidence/SOURCE-FINAL.json",
+    "runtimeSha256": "bb4b53499aeac382249cc2fffc6c97b521bac18e697c8d6aca88e8ba8089f5ae",
+    "verificationSha256": "539a09d60d1b4902807d48a0e08b11c8024cb39e6206ca0cd2f417309911415d",
+    "migrationSha256": "2593f3819fb237a7159411e54895cada92959b1b1da09bdc1d13334a321bddb0",
+    "lockfileSha256": "f7cd1eca949308856fc0a55bf09d523f44a5e0e098034327c9ada3e571d17b93",
+    "node": "v22.22.3"
+  },
+  "build": {
+    "exit": 0,
+    "id": "-in0p13ZiY6NvnPFx99bd",
+    "report": "evidence/BUILD-FINAL.log",
+    "sourceSnapshot": "evidence/SOURCE-BUILT-FINAL.json",
+    "runtimeMatchesCurrent": true,
+    "laterVerificationHarnessChangesTypecheckedByOriginalBuild": false,
+    "deployment": false
+  },
+  "browser": {
+    "kind": "default_full_production_mode_suite",
+    "report": "evidence/E2E-PRODUCTION-FULL.json",
+    "buildId": "-in0p13ZiY6NvnPFx99bd",
+    "sourceSnapshot": "evidence/SOURCE-BUILT-FINAL.json",
+    "passed": 58,
+    "failed": 0,
+    "flaky": 0,
+    "skipped": 2,
+    "skipReason": "two pre-existing explicit-opt-in performance tests; no new skip was introduced",
+    "durationMs": 835557.74,
+    "isPerformanceAcceptance": false,
+    "runtimeAndMigrationSourcesUnchangedAfterRun": true,
+    "verificationHarnessChangedAfterRun": true
+  },
+  "correctedLocal": {
+    "gates": 42,
+    "failedGates": 0,
+    "report": "evidence/CORRECTED-FINAL-validate-local.log",
+    "semanticFailureScannerEnabled": true
+  },
+  "finalStandalone": {
+    "typecheck": "evidence/FINAL-typecheck.log",
+    "lint": "evidence/FINAL-lint-baseline.log",
+    "lintFindings": 0,
+    "runner": "evidence/FINAL-TYPE-LINT-runner.log"
+  },
+  "focused": {
+    "examBoundaries": {
+      "passed": 50,
+      "failed": 0
+    },
+    "subjectIdentities": {
+      "passed": 20,
+      "failed": 0
+    },
+    "scopedAwardCoverage": {
+      "passed": 42,
+      "failed": 0
+    },
+    "verificationSummaryAndRunnerNegativeControls": {
+      "passed": 8,
+      "failed": 0
+    },
+    "recommend": {
+      "passed": 91,
+      "failed": 0
+    },
+    "match": {
+      "passed": 99,
+      "failed": 0
+    },
+    "growth": {
+      "assertions": 39
+    },
+    "note": "These checks also occur in broader gates where applicable; repeated runs are not additive unique coverage."
+  },
+  "integration": {
+    "report": "evidence/CORRECTED-FINAL-test-stack-integration.log",
+    "provenance": "PASS; 37 positive checks including original legacy metadata and exact scoped 6.5/9 cutoff",
+    "telegram": {
+      "kind": "local_mock_only",
+      "passed": 21,
+      "failed": 0,
+      "realMessagesSent": 0
+    },
+    "originalFalseGreenAccepted": false,
+    "originalFalseGreenReceipt": "evidence/GATES-FALSE-GREEN-REPORTED.log",
+    "genuineRed": "evidence/STACK-CORRECTED-STATUS-RED.log",
+    "cleanupOriginalExitControl": {
+      "before": 0,
+      "after": 7,
+      "expected": 7,
+      "red": "evidence/STACK-CLEANUP-EXIT-CONTROL-RED.log",
+      "green": "evidence/STACK-CLEANUP-EXIT-CONTROL-GREEN.log",
+      "reproduce": "STACK-EXIT-CONTROL.md"
+    }
+  },
+  "visual": {
+    "kind": "award_unknown_disclosure_only",
+    "localeThemeCases": 9,
+    "viewportByLocale": {
+      "en": 1440,
+      "uz": 390,
+      "ru": 1440
+    },
+    "themes": [
+      "dark",
+      "light",
+      "system with emulated OS dark"
+    ],
+    "screens": "evidence/screens/",
+    "fullVisualRiskMatrixComplete": false,
+    "physicalWindowsEdgeScalingTested": false,
+    "systemIsIndependentPalette": false
+  },
+  "production": {
+    "writes": 0,
+    "historicalRepairRepeated": false,
+    "deployment": false,
+    "secretsReadOrRotated": false,
+    "githubWorkflow28P01Resolved": false,
+    "additionalHostedScopeMetadataVerified": false,
+    "receipt": "evidence/N06-READONLY.json"
+  },
+  "remainingCritical": [
+    "Exact assessment-v2 and all-consumer ranking/coverage contract (N02)",
+    "Auth serialization, server generations, ABA/delete/rollback/idempotency/multitab delayed matrix (N05)",
+    "Hosted workflow credential, missing schema/evidence and complete backend-grant verification (N06)",
+    "Official publisher/current-cycle identity review; no automatic candidate merge (N10)",
+    "Published-default native-money CostScenario, allocation and consumer parity (N12)",
+    "Transitive worker await/cancel/incurred usage/crash-resume and complete document security acceptance (N13)",
+    "Full settled visual/manual/platform matrix, matched production performance/stress and ten final deliverables"
+  ],
+  "limitations": [
+    "The original build did not typecheck the subsequently corrected verification harness. Final standalone typecheck/lint and corrected integration checks cover that harness separately.",
+    "This is not strict all-final-tree full Master release acceptance.",
+    "Sandbox timestamps do not attest publisher reread dates.",
+    "No PR/merge/release is authorized by these partial green results."
+  ]
+}

@@ -12,6 +12,16 @@ export function classifyReadFailure(error:unknown):ReadFailureClass {
  return "internal";
 }
 
+/** Fixed allowlist only: never serialize the error, message, SQL or cause.
+ * `where` must be a route-owned constant, not a request URL or user input. */
+export function readFailureDiagnostic(where:string,error:unknown){
+ const value=error as {name?:unknown;code?:unknown;cause?:{code?:unknown}}|null;
+ const rawCode=value?.cause?.code??value?.code;
+ const codes=["23505","23503","22P02","22007","40001","40P01","28P01","42P01","42703","53300","57P01","08006"];
+ const names=["TypeError","RangeError","CacheRevisionChangedError","DrizzleQueryError"];
+ return {category:classifyReadFailure(error),kind:typeof value?.name==="string"&&names.includes(value.name)?value.name:"Error",dbCode:typeof rawCode==="string"&&codes.includes(rawCode)?rawCode:"other",where:/^[a-zA-Z/ -]{1,100}$/.test(where)?where:"route"};
+}
+
 /** Only an explicitly rejected moving-snapshot GET is read once more.
  * No retry for generic 500, permissions, CAS conflicts, or mutations. No sleep,
  * unbounded loop, increased timeout, or stale-success fallback. */

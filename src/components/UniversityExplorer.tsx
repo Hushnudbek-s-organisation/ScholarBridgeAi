@@ -333,6 +333,7 @@ export function UniversityExplorer({
   // True once a response has been rendered — from then on the existing cards
   // stay mounted during a refresh instead of being replaced by a placeholder.
   const hasLoadedRef = useRef(false);
+  const fetchEpochRef = useRef(0);
 
   // Profile edits must re-score what is on screen. Cached slices were computed
   // from the OLD profile data, so drop them before the fingerprint refetch —
@@ -347,6 +348,11 @@ export function UniversityExplorer({
   }, [profileFingerprint]);
 
   const fetchUniversities = async (signal?: AbortSignal) => {
+    // StrictMode may clean up before its queued microtask starts. Such a call
+    // must not supersede a live request or write loading/cache state.
+    if (signal?.aborted) return;
+    const epoch = ++fetchEpochRef.current;
+    const isCurrent = () => epoch === fetchEpochRef.current && !signal?.aborted;
     const params = buildFilterParams();
     params.set("page", page.toString());
     params.set("perPage", perPage.toString());
@@ -379,6 +385,7 @@ export function UniversityExplorer({
     try {
       const res = await fetch(`/api/universities?${queryKey}`, { signal });
       const data = await res.json();
+      if (!isCurrent()) return;
       hasLoadedRef.current = true;
       if (!res.ok) {
         // Show the real server error instead of a misleading empty message.
@@ -410,17 +417,22 @@ export function UniversityExplorer({
           setPage(data.page);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (!isCurrent()) return;
       // An aborted request is a superseded request, not a failure: the newer
       // one is already in flight and will render the correct slice.
-      if (err?.name === "AbortError") return;
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Error fetching universities:", err);
       if (!cached) {
-        setFetchError(err?.message || t("exLoadError"));
+        setFetchError(err instanceof Error ? err.message : t("exLoadError"));
       }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      // In particular, an old AbortError must not hide a newer request's
+      // loading indicator or publish an apparently settled empty catalogue.
+      if (isCurrent()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -432,7 +444,7 @@ export function UniversityExplorer({
     // synchronously (React's rule for effects — the first state write is the
     // "refreshing" flag at the top of the fetch).
     void Promise.resolve().then(() => fetchUniversities(controller.signal));
-    return () => controller.abort();
+    return () => { controller.abort(); fetchEpochRef.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeProfile?.id,

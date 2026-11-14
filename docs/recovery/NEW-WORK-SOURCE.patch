@@ -1,0 +1,158 @@
+diff --git a/e2e/catalogue-read-diagnostics.spec.ts b/e2e/catalogue-read-diagnostics.spec.ts
+new file mode 100644
+index 0000000..bcbd8fe
+--- /dev/null
++++ b/e2e/catalogue-read-diagnostics.spec.ts
+@@ -0,0 +1,28 @@
++import {test,expect} from '@playwright/test';
++import {readFileSync} from 'node:fs';
++import {Pool} from 'pg';
++
++/** Destructive fault is exclusively inside the global setup's disposable DB.
++ * Never use a hosted DATABASE_URL or silently skip a missing fixture. */
++test('actual catalogue 503 retains its contract and safely correlates a missing relation without stale success',async({request})=>{
++ const url=process.env.E2E_DATABASE_URL!;
++ const parsed=new URL(url);
++ expect(parsed.hostname).toBe('127.0.0.1');expect(parsed.pathname).toMatch(/^\/sb_e2e_\d+$/);
++ const db=new Pool({connectionString:url});let hidden=false;
++ const bump=()=>db.query("UPDATE cache_revisions SET revision=revision+1 WHERE scope IN ('catalogue','universities','evidence')");
++ try{
++  const warm=await request.get('/api/universities');expect(warm.status()).toBe(200);
++  await db.query('ALTER TABLE universities RENAME TO fixture_hidden_universities');hidden=true;
++  await bump();
++  const failed=await request.get('/api/universities');
++  expect(failed.status()).toBe(503);
++  expect(await failed.json()).toEqual({error:'University data is temporarily unavailable. Please try again shortly.',code:'data_unavailable'});
++  expect(failed.headers()['x-failure-class']).toBe('schema_unavailable');
++  const id=failed.headers()['x-request-id'];expect(id).toMatch(/^[0-9a-f-]{36}$/);
++  await expect.poll(()=>readFileSync('test-results/e2e-safe-failures.jsonl','utf8').split('\n').filter(Boolean).map(line=>JSON.parse(line)).find(row=>row.requestId===id)).toMatchObject({requestId:id,category:'schema_unavailable',dbCode:'42P01',where:'universities GET'});
++ }finally{
++  if(hidden){await db.query('ALTER TABLE fixture_hidden_universities RENAME TO universities');await bump();expect((await db.query("SELECT to_regclass('public.universities') AS table_name")).rows[0].table_name).toBe('universities');}
++  await db.end();
++ }
++ const recovered=await request.get('/api/universities');expect(recovered.status()).toBe(200);expect(recovered.headers()['x-failure-class']).toBeUndefined();
++});
+diff --git a/scripts/check-snapshot-recovery.ts b/scripts/check-snapshot-recovery.ts
+index 20d0b36..89c2dad 100644
+--- a/scripts/check-snapshot-recovery.ts
++++ b/scripts/check-snapshot-recovery.ts
+@@ -1,5 +1,5 @@
+ import assert from "node:assert/strict";
+-import {classifyReadFailure,readJsonWithSnapshotRecovery} from "../src/lib/readFailure";
++import {classifyReadFailure,readFailureDiagnostic,readJsonWithSnapshotRecovery} from "../src/lib/readFailure";
+ let passed=0;
+ async function check(name:string,fn:()=>void|Promise<void>){await fn();passed++;console.log(`PASS ${name}`);}
+ function replies(values:{status:number;body:unknown}[]){let calls=0;const methods:string[]=[];const fetcher:typeof fetch=async(_url,init)=>{methods.push(init?.method??"GET");const value=values[calls++];assert.ok(value,"read attempts exceeded the supplied bound");return new Response(JSON.stringify(value.body),{status:value.status,headers:{"Content-Type":"application/json"}});};return {fetcher,count:()=>calls,methods};}
+@@ -11,6 +11,15 @@ async function main(){
+   assert.equal(classifyReadFailure({code:"40001"}),"database_transient");
+   assert.equal(classifyReadFailure(new TypeError("private profile body")),"internal");
+  });
++ await check("diagnostic contains only fixed taxonomy, never raw errors or unknown codes",()=>{
++  const error={name:"DrizzleQueryError",message:"FICTIONAL_SECRET_MESSAGE",query:"FICTIONAL_PRIVATE_SQL",cause:{code:"28P01",message:"FICTIONAL_PASSWORD"}};
++  assert.deepEqual(readFailureDiagnostic("universities GET",error),{category:"database_auth",kind:"DrizzleQueryError",dbCode:"28P01",where:"universities GET"});
++  assert.equal(JSON.stringify(readFailureDiagnostic("universities GET",error)).includes("FICTIONAL"),false);
++  assert.deepEqual(readFailureDiagnostic("https://private.invalid/profile/123",{name:"UNTRUSTED_NAME",code:"UNTRUSTED_CODE"}),{category:"internal",kind:"Error",dbCode:"other",where:"route"});
++ });
++ for(const [code,category] of [["42P01","schema_unavailable"],["42703","schema_unavailable"],["28P01","database_auth"],["40001","database_transient"],["40P01","database_transient"],["53300","database_transient"],["57P01","database_transient"],["08006","database_transient"]])await check(`safe diagnostic preserves distinct ${code}`,()=>{
++  const d=readFailureDiagnostic("universities GET",{cause:{code}});assert.equal(d.category,category);assert.equal(d.dbCode,code);
++ });
+  await check("one rejected moving snapshot GET recovers to the new payload",async()=>{
+   const f=replies([{status:409,body:{code:"snapshot_changed"}},{status:200,body:{revision:2,value:"new"}}]);
+   assert.deepEqual(await readJsonWithSnapshotRecovery("/api/dashboard","fallback",f.fetcher),{revision:2,value:"new"});assert.equal(f.count(),2);assert.deepEqual(f.methods,["GET","GET"]);
+diff --git a/src/app/api/universities/route.ts b/src/app/api/universities/route.ts
+index 481b02c..d91aa6f 100644
+--- a/src/app/api/universities/route.ts
++++ b/src/app/api/universities/route.ts
+@@ -1,3 +1,4 @@
++import {reportReadFailure} from "@/lib/readFailure.server";
+ import {resolveAcademicRequirements,academicDecisionEnvelope} from "@/lib/universityDetailRequirements";
+ import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
+ import { privateNoStoreJson } from "@/lib/apiResponse";
+@@ -360,14 +361,18 @@ export async function GET(req: Request) {
+     return privateNoStoreJson(payload);
+   } catch (error) {
+     if(error instanceof Error&&error.message==="invalid_requirement_context")return privateNoStoreJson({error:"Invalid requirement context"},{status:400});
+-    console.error("GET /api/universities error:", error);
++    const diagnostic=reportReadFailure("universities GET",error);
+     // Never substitute sample universities: during a database outage students
+     // would be shown made-up data as if it were real. Clients show the error
+     // (the website's explorer / detail views, and the Telegram bot's
+     // \"temporarily unavailable\" message for 503).
+-    return privateNoStoreJson(
++    const response=privateNoStoreJson(
+       { error: "University data is temporarily unavailable. Please try again shortly.", code: "data_unavailable" },
+       { status: 503 },
+     );
++    // Keep the existing body/status contract. No raw exception, SQL or IDs.
++    response.headers.set("X-Request-Id",diagnostic.requestId);
++    response.headers.set("X-Failure-Class",diagnostic.category);
++    return response;
+   }
+ }
+diff --git a/src/lib/journey/api.ts b/src/lib/journey/api.ts
+index 03fe396..610641e 100644
+--- a/src/lib/journey/api.ts
++++ b/src/lib/journey/api.ts
+@@ -5,8 +5,7 @@
+  * same three rules: tables ready, caller may act on this profile, writes are
+  * throttled. A route file then only contains its own logic.
+  */
+-import {randomUUID} from "node:crypto";
+-import {classifyReadFailure} from "@/lib/readFailure";
++import {reportReadFailure} from "@/lib/readFailure.server";
+ import { NextResponse } from "next/server";
+ import { requireAdmin, requireProfileAccess, type AuthResult, type Session } from "@/lib/auth";
+ import { checkRateLimit, LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+@@ -138,14 +137,7 @@ export function isoDate(d: Date | null | undefined): string | null {
+ /** Internal error taxonomy without SQL, credentials, PII or raw error dumps.
+  * A revision conflict remains a rejected read, never an old successful payload. */
+ export function serverError(where: string, err: unknown) {
+-  const category=classifyReadFailure(err),requestId=randomUUID();
+-  const error=err as {name?:string;code?:string;cause?:{code?:string}}|null;
+-  const kind=["TypeError","RangeError","CacheRevisionChangedError","DrizzleQueryError"].includes(error?.name??"")?error!.name!:"Error";
+-  const rawCode=error?.cause?.code??error?.code;
+-  const dbCode=["23505","23503","22P02","22007","40001","40P01","28P01","42P01","42703","53300","57P01","08006"].includes(rawCode??"")?rawCode:"other";
+-  // Production console removal must not erase this fixed safe diagnostic.
+-  // `where` is a route-owned constant, not a URL/profile/body/error message.
+-  process.stderr.write(`[journey-failure] ${JSON.stringify({requestId,category,kind,dbCode,where:/^[a-zA-Z/ -]{1,100}$/.test(where)?where:"route"})}\n`);
++  const {category,requestId}=reportReadFailure(where,err);
+   const response=category==="snapshot_changed"?jsonError(409,"Data changed while loading. Please retry.","snapshot_changed")
+     :category==="schema_unavailable"?jsonError(503,"Required data schema is unavailable. Please try again later.","migration_pending")
+     :category==="database_auth"||category==="database_transient"?jsonError(503,"Data is temporarily unavailable. Please try again later.","data_unavailable")
+diff --git a/src/lib/readFailure.server.ts b/src/lib/readFailure.server.ts
+new file mode 100644
+index 0000000..18a022e
+--- /dev/null
++++ b/src/lib/readFailure.server.ts
+@@ -0,0 +1,10 @@
++import {randomUUID} from 'node:crypto';
++import {readFailureDiagnostic} from './readFailure';
++
++/** Server-only fixed diagnostic, using the existing safe E2E/operator channel.
++ * Console stripping in production must not remove the correlation record. */
++export function reportReadFailure(where:string,error:unknown){
++ const diagnostic={requestId:randomUUID(),...readFailureDiagnostic(where,error)};
++ process.stderr.write(`[journey-failure] ${JSON.stringify(diagnostic)}\n`);
++ return diagnostic;
++}
+diff --git a/src/lib/readFailure.ts b/src/lib/readFailure.ts
+index 6bb5ae0..d96510e 100644
+--- a/src/lib/readFailure.ts
++++ b/src/lib/readFailure.ts
+@@ -12,6 +12,16 @@ export function classifyReadFailure(error:unknown):ReadFailureClass {
+  return "internal";
+ }
+ 
++/** Fixed allowlist only: never serialize the error, message, SQL or cause.
++ * `where` must be a route-owned constant, not a request URL or user input. */
++export function readFailureDiagnostic(where:string,error:unknown){
++ const value=error as {name?:unknown;code?:unknown;cause?:{code?:unknown}}|null;
++ const rawCode=value?.cause?.code??value?.code;
++ const codes=["23505","23503","22P02","22007","40001","40P01","28P01","42P01","42703","53300","57P01","08006"];
++ const names=["TypeError","RangeError","CacheRevisionChangedError","DrizzleQueryError"];
++ return {category:classifyReadFailure(error),kind:typeof value?.name==="string"&&names.includes(value.name)?value.name:"Error",dbCode:typeof rawCode==="string"&&codes.includes(rawCode)?rawCode:"other",where:/^[a-zA-Z/ -]{1,100}$/.test(where)?where:"route"};
++}
++
+ /** Only an explicitly rejected moving-snapshot GET is read once more.
+  * No retry for generic 500, permissions, CAS conflicts, or mutations. No sleep,
+  * unbounded loop, increased timeout, or stale-success fallback. */

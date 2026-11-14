@@ -1,0 +1,213 @@
+{
+  "config": {
+    "argv": [
+      "/usr/local/bin/node",
+      "/home/user/ScholarBridgeAi/node_modules/@playwright/test/cli.js",
+      "test",
+      "e2e/award-field-review.spec.ts"
+    ],
+    "configFile": "/home/user/ScholarBridgeAi/playwright.config.ts",
+    "rootDir": "/home/user/ScholarBridgeAi/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/user/ScholarBridgeAi/e2e/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "snapshotDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "actionTimeout": 20000,
+          "navigationTimeout": 30000,
+          "baseURL": "http://127.0.0.1:46873",
+          "browserName": "chromium",
+          "headless": true,
+          "launchOptions": {
+            "executablePath": "/tmp/chromium",
+            "args": [
+              "--ash-no-nudges",
+              "--disable-domain-reliability",
+              "--disable-print-preview",
+              "--disk-cache-size=33554432",
+              "--no-default-browser-check",
+              "--no-pings",
+              "--font-render-hinting=none",
+              "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+              "--enable-features=SharedArrayBuffer",
+              "--ignore-gpu-blocklist",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader",
+              "--disable-setuid-sandbox",
+              "--headless='shell'",
+              "--no-sandbox",
+              "--no-zygote"
+            ]
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "video": "off"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": ""
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/e2e-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "award-field-review.spec.ts",
+      "file": "award-field-review.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 102,
+                  "error": {
+                    "message": "error: relation \"university_programs\" does not exist",
+                    "stack": "error: relation \"university_programs\" does not exist\n    at /home/user/ScholarBridgeAi/node_modules/pg-pool/index.js:45:11\n    at /home/user/ScholarBridgeAi/e2e/award-field-review.spec.ts:14:19",
+                    "location": {
+                      "file": "/home/user/ScholarBridgeAi/e2e/award-field-review.spec.ts",
+                      "column": 19,
+                      "line": 14
+                    },
+                    "snippet": "  12 |  const hadSaved=(await db.query('SELECT id FROM saved_universities WHERE profile_id=$1 AND university_id=$2',[f.studentId,f.verifiedUniversityId])).rows.length>0;\n  13 |  const original=(await db.query('SELECT verification_status,degree_levels FROM scholarships WHERE id=$1',[f.scholarshipId])).rows[0];\n> 14 |  const programme=(await db.query('SELECT name,degree FROM university_programs WHERE id=$1',[f.fixtureProgramId])).rows[0];expect(programme).toBeTruthy();\n     |                   ^\n  15 |  const admin=await playwright.request.newContext({baseURL:process.env.E2E_BASE_URL});\n  16 |  try{\n  17 |   const endpoint='/api/admin/catalogue-facts/review';"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/user/ScholarBridgeAi/e2e/award-field-review.spec.ts",
+                        "column": 19,
+                        "line": 14
+                      },
+                      "message": "error: relation \"university_programs\" does not exist\n\n  12 |  const hadSaved=(await db.query('SELECT id FROM saved_universities WHERE profile_id=$1 AND university_id=$2',[f.studentId,f.verifiedUniversityId])).rows.length>0;\n  13 |  const original=(await db.query('SELECT verification_status,degree_levels FROM scholarships WHERE id=$1',[f.scholarshipId])).rows[0];\n> 14 |  const programme=(await db.query('SELECT name,degree FROM university_programs WHERE id=$1',[f.fixtureProgramId])).rows[0];expect(programme).toBeTruthy();\n     |                   ^\n  15 |  const admin=await playwright.request.newContext({baseURL:process.env.E2E_BASE_URL});\n  16 |  try{\n  17 |   const endpoint='/api/admin/catalogue-facts/review';\n    at /home/user/ScholarBridgeAi/node_modules/pg-pool/index.js:45:11\n    at /home/user/ScholarBridgeAi/e2e/award-field-review.spec.ts:14:19"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T10:55:04.874Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/user/ScholarBridgeAi/test-results/e2e/award-field-review-exact-a-0bf3a-ale-edit-loses-verification/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/user/ScholarBridgeAi/test-results/e2e/award-field-review-exact-a-0bf3a-ale-edit-loses-verification/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/user/ScholarBridgeAi/e2e/award-field-review.spec.ts",
+                    "column": 19,
+                    "line": 14
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "21d42585e140d41f11f6-40047d3624c9b3347125",
+          "file": "award-field-review.spec.ts",
+          "line": 9,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-09T10:54:58.387Z",
+    "duration": 7128.499,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

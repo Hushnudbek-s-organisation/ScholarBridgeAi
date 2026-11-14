@@ -279,6 +279,7 @@ export function twinScore(me: TwinProfile, story: TwinInput): { score: number; r
 // ---------------------------------------------------------------------------
 
 export interface AutopilotScholarship {
+  verifiedTotalCostCoverage?:boolean;
   id: number;
   title: string;
   provider: string;
@@ -355,7 +356,7 @@ export function autopilotTags(s: AutopilotScholarship, now: Date = new Date()) {
   const expected = closed && recurring ? nextExpectedDeadline(s.deadlineDate, s.recurrence, now) : null;
   return {
     essay: essayListed(s),
-    fullFunding: /full/i.test(s.coverageType ?? ""),
+    fullFunding: s.verifiedTotalCostCoverage === true,
     closingSoon: !closed && days != null && days >= 0 && days <= 30,
     closed,
     recurring,

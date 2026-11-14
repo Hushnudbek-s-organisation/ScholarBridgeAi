@@ -1,3 +1,4 @@
+import {parseExamInput} from "@/lib/examRecords";
 import { postgresId } from "@/lib/pagination";
 import { parseApplicantContext } from "@/lib/applicantContext";
 import { normalizeAssessmentPreferencesForWrite } from "@/lib/assessmentStored";
@@ -8,7 +9,7 @@ import { eq, sql } from "drizzle-orm";
 import { hashPassword, passwordPolicyProblem, sanitizeProfile } from "@/lib/password";
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
 import { requireAdmin, requireProfileAccess, sessionCookieHeader, invalidateAuthCacheForProfile, revokeAllSessionsForProfile } from "@/lib/auth";
-import { clampString, optionalNumber, optionalScore, readJsonBody } from "@/lib/request";
+import { clampString, optionalNumber, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { currentOwnerId } from "@/lib/ownership/service";
 import { writeAudit } from "@/lib/audit";
@@ -155,6 +156,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     let applicantContext;
     try{applicantContext=parseApplicantContext(body.applicantContext);}
     catch(error){return privateNoStoreJson({error:error instanceof Error?error.message:"Invalid applicant context",code:"applicant_context_invalid"},{status:400});}
+    let exams;
+    try{exams={greScore:parseExamInput("gre",body.greScore),ieltsScore:parseExamInput("ielts",body.ieltsScore),satScore:parseExamInput("sat",body.satScore),actScore:parseExamInput("act",body.actScore),duolingoScore:parseExamInput("duolingo",body.duolingoScore),toeflScore:parseExamInput("toefl",body.toeflScore,"120")};}
+    catch{return privateNoStoreJson({error:"Invalid exam range, step or numeric format",code:"academic_input_invalid"},{status:400});}
     // Preference modes (must / prefer / no_preference + the study_load and
     // delivery_mode axes). Invalid input is rejected rather than silently
     // dropped, because a lost `must` would quietly change an assessment.
@@ -277,10 +281,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         gpaScale: patchNumber(body.gpaScale, { min: 1, max: 100 }),
         // Test scores: null/0/negative -> NULL (a 0 is not a real score).
         // Integer columns are rounded — "95.5" would otherwise be a 500.
-        ieltsScore: optionalScore(body.ieltsScore, 9),
-        toeflScore: roundOpt(optionalScore(body.toeflScore, 120)),
-        satScore: roundOpt(optionalScore(body.satScore, 1600)),
-        greScore: roundOpt(optionalScore(body.greScore, 340)),
+        ieltsScore: exams.ieltsScore,
+        toeflScore: exams.toeflScore,
+        satScore: exams.satScore,
+        greScore: exams.greScore,
         budgetAnnualUsd: patchNumber(body.budgetAnnualUsd, { min: 0, max: 10_000_000, integer: true }),
         preferredCountries: countriesStr,
         needScholarship:
@@ -295,8 +299,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         // --- Complete profile (Academic / Personal / Financial / Activities /
         //     Achievements / Goals). Never invent values: absent fields stay
         //     untouched, empty ones become NULL (spec §19).
-        actScore: roundOpt(numField(body.actScore)),
-        duolingoScore: roundOpt(numField(body.duolingoScore)),
+        actScore: exams.actScore,
+        duolingoScore: exams.duolingoScore,
         apCourses: jsonListField(body.apCourses),
         ibCourses: jsonListField(body.ibCourses),
         aLevelSubjects: jsonListField(body.aLevelSubjects),

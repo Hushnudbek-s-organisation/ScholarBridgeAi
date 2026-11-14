@@ -1,0 +1,210 @@
+▲ Next.js 16.4.2 (Turbopack)
+✓ Running next.config.ts took 29ms
+Warning: Custom Cache-Control headers detected for the following routes:
+  - /_next/static/:path*
+
+Setting a custom Cache-Control header can break Next.js development behavior.
+- Experiments (use with caution):
+  · optimizePackageImports
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 21.9s
+  Running TypeScript ...
+  Finished TypeScript in 35.6s ...
+  Collecting page data using 1 worker ...
+  Generating static pages using 1 worker (0/79) ...
+  Generating static pages using 1 worker (19/79) 
+  Generating static pages using 1 worker (39/79) 
+  Generating static pages using 1 worker (59/79) 
+✓ Generating static pages using 1 worker (79/79) in 168ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /api/activities
+├ ƒ /api/admin/accounts
+├ ƒ /api/admin/accounts/[id]/password
+├ ƒ /api/admin/accounts/[id]/reset-link
+├ ƒ /api/admin/accounts/me/password
+├ ƒ /api/admin/ai-costs
+├ ƒ /api/admin/ai-settings
+├ ƒ /api/admin/analytics
+├ ƒ /api/admin/answer-prompts
+├ ƒ /api/admin/audit
+├ ƒ /api/admin/branding/upload
+├ ƒ /api/admin/catalogue-facts
+├ ƒ /api/admin/catalogue-facts/review
+├ ƒ /api/admin/channel
+├ ƒ /api/admin/channel/audit
+├ ƒ /api/admin/channel/content
+├ ƒ /api/admin/channel/countries
+├ ƒ /api/admin/channel/lexicon
+├ ƒ /api/admin/channel/links
+├ ƒ /api/admin/channel/polls
+├ ƒ /api/admin/channel/prefs
+├ ƒ /api/admin/channel/queue
+├ ƒ /api/admin/channel/stories
+├ ƒ /api/admin/checklist
+├ ƒ /api/admin/config
+├ ƒ /api/admin/config/export
+├ ƒ /api/admin/config/import
+├ ƒ /api/admin/consulting
+├ ƒ /api/admin/courses
+├ ƒ /api/admin/courses/seed
+├ ƒ /api/admin/diagnostics
+├ ƒ /api/admin/goal-templates
+├ ƒ /api/admin/guide
+├ ƒ /api/admin/instructors
+├ ƒ /api/admin/opportunities
+├ ƒ /api/admin/overview
+├ ƒ /api/admin/ownership
+├ ƒ /api/admin/premium
+├ ƒ /api/admin/profiles
+├ ƒ /api/admin/refresh
+├ ƒ /api/admin/research-agent/cancel
+├ ƒ /api/admin/research-agent/resume
+├ ƒ /api/admin/research-agent/run
+├ ƒ /api/admin/research-agent/status
+├ ƒ /api/admin/review-queue
+├ ƒ /api/admin/scholarships
+├ ƒ /api/admin/stories
+├ ƒ /api/admin/telegram
+├ ƒ /api/admin/universities
+├ ƒ /api/admin/verify
+├ ƒ /api/ai/admissions-advisor
+├ ƒ /api/ai/chat
+├ ƒ /api/ai/draft-sop
+├ ƒ /api/ai/embeddings
+├ ƒ /api/ai/evaluate-profile
+├ ƒ /api/ai/review-sop
+├ ƒ /api/applications
+├ ƒ /api/applications/outcome
+├ ƒ /api/auth/password-reset/confirm
+├ ƒ /api/auth/password-reset/request
+├ ƒ /api/auth/session
+├ ƒ /api/auth/sign-in
+├ ƒ /api/auth/sign-out
+├ ƒ /api/auth/telegram/start
+├ ƒ /api/auth/telegram/status
+├ ƒ /api/auth/telegram/verify
+├ ƒ /api/autopilot
+├ ƒ /api/career-discovery
+├ ƒ /api/certificates
+├ ƒ /api/certificates/verify
+├ ƒ /api/chancing
+├ ƒ /api/config/boot
+├ ƒ /api/config/branding
+├ ƒ /api/config/build
+├ ƒ /api/config/guide
+├ ƒ /api/config/nav
+├ ƒ /api/config/telegram
+├ ƒ /api/consulting
+├ ƒ /api/countries/compare
+├ ƒ /api/courses
+├ ƒ /api/courses/[id]
+├ ƒ /api/courses/progress
+├ ƒ /api/cron/channel
+├ ƒ /api/cron/notifications
+├ ƒ /api/cron/refresh
+├ ƒ /api/cron/research-agent
+├ ƒ /api/dashboard
+├ ƒ /api/deadlines
+├ ƒ /api/departure
+├ ƒ /api/documents
+├ ƒ /api/essay-adapter
+├ ƒ /api/essay-adapter/adapt
+├ ƒ /api/essays
+├ ƒ /api/essays/reviews
+├ ƒ /api/forum/categories
+├ ƒ /api/forum/likes
+├ ƒ /api/forum/replies
+├ ƒ /api/forum/replies/[id]
+├ ƒ /api/forum/reports
+├ ƒ /api/forum/reports/[id]
+├ ƒ /api/forum/threads
+├ ƒ /api/forum/threads/[id]
+├ ƒ /api/funding
+├ ƒ /api/gamification
+├ ƒ /api/gamification/award
+├ ƒ /api/gamification/leaderboard
+├ ƒ /api/goals
+├ ƒ /api/health
+├ ƒ /api/health/diagnostics
+├ ƒ /api/image
+├ ƒ /api/journey
+├ ƒ /api/journey/arrival
+├ ƒ /api/learning/providers
+├ ƒ /api/mentors
+├ ƒ /api/next-actions
+├ ƒ /api/notifications
+├ ƒ /api/notifications/sweep
+├ ƒ /api/offers
+├ ƒ /api/opportunities
+├ ƒ /api/parent-share
+├ ƒ /api/payments
+├ ƒ /api/payments/click/complete
+├ ƒ /api/payments/click/prepare
+├ ƒ /api/payments/initiate
+├ ƒ /api/payments/payme/webhook
+├ ƒ /api/planning
+├ ƒ /api/premium/status
+├ ƒ /api/profile-strength
+├ ƒ /api/profiles
+├ ƒ /api/profiles/[id]
+├ ƒ /api/programs/recommend
+├ ƒ /api/quizzes/attempt
+├ ƒ /api/recommendation-letter
+├ ƒ /api/recommendations
+├ ƒ /api/referral
+├ ƒ /api/referrals
+├ ƒ /api/requirements
+├ ƒ /api/roadmap/generate
+├ ƒ /api/saved-programs
+├ ƒ /api/saved-scholarships
+├ ƒ /api/saved-universities
+├ ƒ /api/scholarships
+├ ƒ /api/search
+├ ƒ /api/sessions
+├ ƒ /api/similar-profiles
+├ ƒ /api/stories
+├ ƒ /api/study-plan
+├ ƒ /api/tasks
+├ ƒ /api/telegram/me
+├ ƒ /api/telegram/miniapp/auth
+├ ƒ /api/telegram/webhook
+├ ƒ /api/test-planner
+├ ƒ /api/track
+├ ƒ /api/universities
+├ ƒ /api/universities/[id]
+├ ƒ /api/vault
+├ ƒ /api/vault/documents
+├ ƒ /api/visa/analyze
+├ ƒ /api/visa/chat
+├ ƒ /api/visa/history
+├ ƒ /api/visa/live-token
+├ ƒ /api/visa/requirements
+├ ƒ /api/visa/tts
+├ ƒ /api/workspace
+├ ƒ /certificates/[code]
+├ ƒ /features
+├ ƒ /forgot-password
+├ ƒ /go/[code]
+├ ƒ /parent/[token]
+├ ƒ /privacy
+├ ƒ /r/[code]
+├ ƒ /reset-password
+├ ƒ /robots.txt
+├ ƒ /scholarships
+├ ƒ /scholarships/[id]
+├ ƒ /sitemap.xml
+├ ƒ /terms
+├ ƒ /tg
+├ ƒ /universities
+└ ƒ /universities/[id]
+
+
+ƒ Proxy (Middleware)
+
+ƒ  (Dynamic)  server-rendered on demand
+

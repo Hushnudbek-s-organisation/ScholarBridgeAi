@@ -1,0 +1,214 @@
+{
+  "config": {
+    "argv": [
+      "/usr/local/bin/node",
+      "/home/user/ScholarBridgeAi/node_modules/@playwright/test/cli.js",
+      "test",
+      "e2e/catalogue-read-diagnostics.spec.ts",
+      "--output=test-results/recovery-diagnostics-red/artifacts"
+    ],
+    "configFile": "/home/user/ScholarBridgeAi/playwright.config.ts",
+    "rootDir": "/home/user/ScholarBridgeAi/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/user/ScholarBridgeAi/e2e/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-red/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-red/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "snapshotDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "actionTimeout": 20000,
+          "navigationTimeout": 30000,
+          "baseURL": "http://127.0.0.1:34999",
+          "browserName": "chromium",
+          "headless": true,
+          "launchOptions": {
+            "executablePath": "/tmp/chromium",
+            "args": [
+              "--ash-no-nudges",
+              "--disable-domain-reliability",
+              "--disable-print-preview",
+              "--disk-cache-size=33554432",
+              "--no-default-browser-check",
+              "--no-pings",
+              "--font-render-hinting=none",
+              "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+              "--enable-features=SharedArrayBuffer",
+              "--ignore-gpu-blocklist",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader",
+              "--disable-setuid-sandbox",
+              "--headless='shell'",
+              "--no-sandbox",
+              "--no-zygote"
+            ]
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "video": "off"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": ""
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/e2e-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "catalogue-read-diagnostics.spec.ts",
+      "file": "catalogue-read-diagnostics.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "actual catalogue 503 retains its contract and safely correlates a missing relation without stale success",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 677,
+                  "error": {
+                    "message": "error: relation \"university_programs\" does not exist",
+                    "stack": "error: relation \"university_programs\" does not exist\n    at /home/user/ScholarBridgeAi/node_modules/pg-pool/index.js:45:11\n    at /home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts:15:3",
+                    "location": {
+                      "file": "/home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts",
+                      "column": 3,
+                      "line": 15
+                    },
+                    "snippet": "  13 |  try{\n  14 |   const warm=await request.get('/api/universities');expect(warm.status()).toBe(200);\n> 15 |   await db.query('ALTER TABLE university_programs RENAME TO fixture_hidden_university_programs');hidden=true;\n     |   ^\n  16 |   await bump();\n  17 |   const failed=await request.get('/api/universities');\n  18 |   expect(failed.status()).toBe(503);"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts",
+                        "column": 3,
+                        "line": 15
+                      },
+                      "message": "error: relation \"university_programs\" does not exist\n\n  13 |  try{\n  14 |   const warm=await request.get('/api/universities');expect(warm.status()).toBe(200);\n> 15 |   await db.query('ALTER TABLE university_programs RENAME TO fixture_hidden_university_programs');hidden=true;\n     |   ^\n  16 |   await bump();\n  17 |   const failed=await request.get('/api/universities');\n  18 |   expect(failed.status()).toBe(503);\n    at /home/user/ScholarBridgeAi/node_modules/pg-pool/index.js:45:11\n    at /home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts:15:3"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T09:56:18.202Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-red/artifacts/catalogue-read-diagnostics-33dbc-ation-without-stale-success/error-context.md"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/user/ScholarBridgeAi/test-results/recovery-diagnostics-red/artifacts/catalogue-read-diagnostics-33dbc-ation-without-stale-success/trace.zip"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/home/user/ScholarBridgeAi/e2e/catalogue-read-diagnostics.spec.ts",
+                    "column": 3,
+                    "line": 15
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "73bfa047d866bffdd2df-8e4349d250418976d870",
+          "file": "catalogue-read-diagnostics.spec.ts",
+          "line": 7,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-09T09:56:11.482Z",
+    "duration": 7627.254,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

@@ -1,0 +1,51 @@
+PASS domain rejects forged IELTS 99
+PASS domain rejects forged IELTS -1
+PASS domain rejects forged IELTS 7.25
+PASS domain rejects forged IELTS null
+PASS domain rejects forged IELTS null
+PASS domain rejects forged IELTS true
+PASS domain rejects forged IELTS "7"
+PASS domain rejects forged IELTS []
+PASS domain rejects forged IELTS {}
+PASS sat range/step 0 not met/unmet
+PASS sat range/step 399 not met/unmet
+PASS sat range/step 9999 not met/unmet
+PASS sat range/step 1205 not met/unmet
+PASS act range/step 0 not met/unmet
+PASS act range/step 37 not met/unmet
+PASS act range/step 25.5 not met/unmet
+PASS duolingo range/step 0 not met/unmet
+PASS duolingo range/step 9 not met/unmet
+PASS duolingo range/step 165 not met/unmet
+PASS duolingo range/step 112 not met/unmet
+PASS generic AST cannot bypass exam boundary
+PASS invalid published threshold is not a valid pass comparison
+PASS malformed calendar 2026-02-30
+PASS malformed calendar 2026-13-01
+PASS malformed calendar bad-date
+PASS future exam is unknown
+PASS reversed exam validity is unknown
+PASS bad section band cannot pass
+PASS IELTS OR missing TOEFL remains met
+PASS valid low score is unmet not unknown
+PASS explicit IELTS zero is a valid zero
+PASS original GPA 1–5 is not converted
+PASS applicant score rejects coercion "0x64"
+PASS applicant score rejects coercion "1e2"
+PASS applicant score rejects coercion true
+PASS applicant score rejects coercion []
+PASS applicant score rejects coercion {}
+PASS six-scale TOEFL is preserved
+PASS flat recommender boundary 99
+PASS flat recommender boundary 7.25
+PASS flat recommender boundary true
+PASS flat recommender boundary "7"
+PASS flat recommender boundary null
+PASS flat invalid official band threshold cannot pass
+PASS GRE input 259 is invalid
+PASS GRE input 341 is invalid
+PASS GRE input 300.5 is invalid
+PASS GRE input "0x12c" is invalid
+PASS GRE input true is invalid
+PASS GRE original valid composite is unchanged
+EXAM_BOUNDARIES: 50 passed, 0 failed

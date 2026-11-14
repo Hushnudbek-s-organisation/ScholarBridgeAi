@@ -1,4 +1,5 @@
 "use client";
+import {AwardCoverageNote} from "@/components/AwardCoverageNote";
 
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
@@ -114,6 +115,7 @@ export interface Scholarship {
   expectedLabel?: string | null;
   // Saved-university coverage (Module 1) — present on personalised payloads.
   coveredUniversities?: string[];
+  coverageState?:"applicable"|"not_applicable"|"unknown";
   coversSavedUni?: boolean;
   isFullForSavedUni?: boolean;
   sourceUrl?: string | null;
@@ -899,6 +901,7 @@ export function ScholarshipHub({
                   </p>
                 )}
 
+                <AwardCoverageNote state={s.coverageState}/>
                 {/* Key Details Cards */}
                 <div className="mt-auto grid grid-cols-2 gap-3 rounded-surface border border-slate-100 bg-slate-50 p-3 text-xs">
                   <div className="min-w-0">

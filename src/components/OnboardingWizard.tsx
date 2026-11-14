@@ -177,7 +177,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
     studyInterests: resumeStudyInterests,
     gpa: profile?.gpa ? String(profile.gpa) : "",
     gpaScale: profile?.gpaScale ? String(profile.gpaScale) : "",
-    ieltsScore: profile?.ieltsScore ? String(profile.ieltsScore) : "",
+    ieltsScore: profile?.ieltsScore != null ? String(profile.ieltsScore) : "",
     toeflScore: profile?.toeflScore ? String(profile.toeflScore) : "",
     satScore: profile?.satScore ? String(profile.satScore) : "",
     greScore: profile?.greScore ? String(profile.greScore) : "",

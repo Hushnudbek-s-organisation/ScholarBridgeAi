@@ -1,4 +1,5 @@
 "use client";
+import {AwardCoverageNote} from "@/components/AwardCoverageNote";
 
 /**
  * JourneyControlCenter — the dashboard (spec §3).
@@ -168,7 +169,8 @@ export interface JourneyDashboard {
       /** Module 1 — which SAVED universities this award pays for. Absent on
        *  legacy/cold payloads, so every reader must tolerate `undefined`. */
       coveredUniversities?: string[];
-      coversSavedUni?: boolean;
+      coverageState?:"applicable"|"not_applicable"|"unknown";
+  coversSavedUni?: boolean;
       isFullForSavedUni?: boolean;
     }[];
     opportunities: {
@@ -415,6 +417,7 @@ export function RecommendedPanel({
                       </span>
                     </p>
                   )}
+                  <AwardCoverageNote state={s.coverageState}/>
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{s.title}</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300">{s.provider}</p>
                   <p className="mt-1 text-sm font-bold text-emerald-700 dark:text-emerald-300">

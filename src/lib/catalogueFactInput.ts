@@ -1,3 +1,4 @@
+import {normalizeFinancePeriod} from "./financeModel";
 import {parseRequirementGroup,evaluateRequirementGroup} from "./requirementGroups";
 const TYPES=new Set(["official_requirement","recommended_score","observed_statistic","computed_fit","planning_estimate","evidence_coverage","experimental_index","historical_acceptance_rate","unknown","not_published","not_applicable","unverified"]);
 const text=(v:unknown,max=300)=>{if(v==null||v==="")return null;if(typeof v!=="string"||v.length>max)throw new Error("Invalid fact text");return v.trim()||null;};
@@ -17,4 +18,19 @@ export function catalogueFactInput(input:Record<string,unknown>):Record<string,u
     applicant_scope:text(input.applicantScope,200),program_name:text(input.programName),degree_level:text(input.degreeLevel,100),admission_cycle:text(input.admissionCycle,100),unit:text(input.unit,100),currency:text(input.currency,20),period:text(input.period,100),source_url:source,notes:text(input.notes,2000),
     // Editing invalidates verification. A JSON checkbox cannot manufacture review.
     verification_status:"review_needed",verified_at:null,is_active:input.isActive!==false};
+}
+
+/** Narrow extension of the existing review route. Unsupported field names,
+ * incomplete scope and malformed award records cannot gain verification. */
+export function manuallyReviewableAwardFact(row:Record<string,unknown>):boolean{
+ if(row.entity_type!=="scholarship"||row.value_type!=="official_requirement"||!["program_name","degree_level","admission_cycle","applicant_scope"].every(key=>typeof row[key]==="string"&&row[key].trim()))return false;
+ const field=row.field_key,value=row.value_text,numeric=row.value_numeric;
+ if(field==="university_id"||field==="program_id")return numeric==null?value==="*":value==null&&/^\d+(?:\.0+)?$/.test(String(numeric))&&Number.isSafeInteger(Number(numeric))&&Number(numeric)>0&&Number(numeric)<=2147483647;
+ if(numeric!=null)return false;
+ if(field==="scope_complete")return value==="documented_complete";
+ if(field==="tuition_coverage"||field==="total_cost_coverage")return ["full","partial","none"].includes(String(value))&&normalizeFinancePeriod(typeof row.period==="string"?row.period:null)!=null;
+ if(field==="eligible_citizenships"||field==="eligible_residencies"){
+  try{const list=JSON.parse(String(value));return Array.isArray(list)&&list.length>0&&list.length<=250&&list.every(v=>typeof v==="string"&&v.trim().length>0&&v.length<=80)&&(!list.includes("*")||list.length===1);}catch{return false;}
+ }
+ return false;
 }

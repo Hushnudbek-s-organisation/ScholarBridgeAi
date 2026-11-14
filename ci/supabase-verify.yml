@@ -97,7 +97,7 @@ jobs:
           npm run db:verify 2>&1 | tee /tmp/verify.log
           code="${PIPESTATUS[0]}"
           {
-            echo "## Supabase live schema verify — exit `$code`"
+            printf '## Supabase live schema verify — exit %s\n' "$code"
             echo
             echo "### Gaps between src/db/schema.ts and the live database"
             echo

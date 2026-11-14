@@ -1,0 +1,4 @@
+FAIL test:stack-integration
+  FAIL p1 requirements all carry sourceUrl + status — got: []
+  FAIL p1 ielts minimum preserved (6.5)
+

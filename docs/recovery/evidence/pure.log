@@ -1,0 +1,19 @@
+PASS moving snapshot is a distinct failure; SQL/auth messages are not copied
+PASS diagnostic contains only fixed taxonomy, never raw errors or unknown codes
+PASS safe diagnostic preserves distinct 42P01
+PASS safe diagnostic preserves distinct 42703
+PASS safe diagnostic preserves distinct 28P01
+PASS safe diagnostic preserves distinct 40001
+PASS safe diagnostic preserves distinct 40P01
+PASS safe diagnostic preserves distinct 53300
+PASS safe diagnostic preserves distinct 57P01
+PASS safe diagnostic preserves distinct 08006
+PASS one rejected moving snapshot GET recovers to the new payload
+PASS continuous writes stop after one recovery read, never serve a stale success
+PASS HTTP 401 is not automatically retried
+PASS HTTP 403 is not automatically retried
+PASS HTTP 500 is not automatically retried
+PASS HTTP 503 is not automatically retried
+PASS ordinary 409 CAS conflict is not treated as a moving snapshot
+PASS transport failures propagate without retry
+18 snapshot classification/recovery checks passed

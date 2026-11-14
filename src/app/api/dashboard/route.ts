@@ -1,3 +1,4 @@
+import {prepareAwardCoverage,awardCoverageRequestKey} from "@/lib/awardCoverageContext.server";
 import {getCachedProfileForMatching} from "@/lib/catalogCache";
 import { loadDocumentReviewContext, documentIdentity } from "@/lib/documentReviews.server";
 import { effectiveDocumentStatus } from "@/lib/documentStatus";
@@ -344,7 +345,7 @@ export async function GET(req: Request) {
     // assembly runs. It is profile-scoped and has independent data sources.
     const locale = localeFromRequest(req);
     const recommendedPromise = profile && matchProfile && chancingProfile
-      ? cachedRecommendedFor(profileId, profile, locale, todayIso, { matchProfile, chancingProfile })
+      ? cachedRecommendedFor(profileId, profile, locale, todayIso, { matchProfile, chancingProfile }, req)
       : Promise.resolve({
           personalised: false,
           basis: [] as string[],
@@ -560,6 +561,7 @@ function cachedRecommendedFor(
     matchProfile: Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
     chancingProfile: Awaited<ReturnType<typeof chancingProfileWithActivities>>;
   },
+  coverageRequest?:Request,
 ): Promise<Awaited<ReturnType<typeof recommendedFor>>> {
   // Every score-relevant profile edit changes the fingerprint. The 15 s TTL is
   // a load-shedding bound, not a freshness promise. The key ALSO carries the
@@ -569,11 +571,11 @@ function cachedRecommendedFor(
   // result. The function stays async because the revision is a cheap DB read.
   void derivedProfiles;
   return getRevisionFencedDashboardRecommendations(
-    ()=>sharedDashboardRecommendationCacheKey(profileId,locale,todayIso,profileMatchFingerprint(profile)),
+    async()=>`${await sharedDashboardRecommendationCacheKey(profileId,locale,todayIso,profileMatchFingerprint(profile))}:${awardCoverageRequestKey(coverageRequest)}`,
     async()=>{
       const [fresh,rows]=await Promise.all([getCachedProfileForMatching(profileId),db.select().from(studentProfiles).where(eq(studentProfiles.id,profileId))]);
       if(!fresh||!rows[0])throw new Error("Profile disappeared during recommendation load");
-      return recommendedFor(profileId,rows[0],locale,todayIso,{matchProfile:fresh.matchProfile,chancingProfile:fresh.chancingProfile});
+      return recommendedFor(profileId,rows[0],locale,todayIso,{matchProfile:fresh.matchProfile,chancingProfile:fresh.chancingProfile},coverageRequest);
     }
   );
 }
@@ -587,6 +589,7 @@ async function recommendedFor(
     matchProfile: Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
     chancingProfile: Awaited<ReturnType<typeof chancingProfileWithActivities>>;
   },
+  coverageRequest?:Request,
 ) {
   const countries = parseList(profile.preferredCountries);
   const major = (profile.targetMajor ?? "").trim();
@@ -728,6 +731,7 @@ async function recommendedFor(
     )
     .limit(100);
 
+  const awardCoverage=await prepareAwardCoverage(coverageRequest,profile,savedUniRefs,schRows.map(s=>s.id));
   const seenScholarships = new Set<string>();
   const relevantScholarships = schRows
     .filter((s) => {
@@ -751,8 +755,8 @@ async function recommendedFor(
       // Coverage of the student's SAVED universities (shared rules with the
       // Scholarship Hub and the deadlines feed — one source of truth).
       cov: evaluateScholarshipForSavedUnis(
-        { ...s, amountUsdValue: resolvedUsdScholarshipAmount(s) },
-        savedUniRefs
+        { ...s, amountUsdValue: resolvedUsdScholarshipAmount(s),catalogueFacts:awardCoverage.facts.get(s.id)??[] },
+        awardCoverage.references
       ),
     }))
     // Four tiers, then fit score: full coverage AT a saved university always
@@ -808,6 +812,8 @@ async function recommendedFor(
       /** "open-to-all" | "citizenship-match" | "unknown" — never a claim. */
       countryEligibility: scholarshipCountryVerdict(s.eligibleCountries, applicantCountry),
       /** Saved-university coverage (Module 1): which rows this award pays for. */
+      coverageAssessment:cov,
+      coverageState:cov.coverageState,
       coveredUniversities: cov.coveredUniNames,
       coversSavedUni: cov.coversSavedUni,
       isFullForSavedUni: cov.isFullForSavedUni,

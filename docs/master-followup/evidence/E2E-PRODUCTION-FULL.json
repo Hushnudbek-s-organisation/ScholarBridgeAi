@@ -1,0 +1,2640 @@
+{
+  "config": {
+    "argv": [
+      "/usr/local/bin/node",
+      "/home/user/ScholarBridgeAi/node_modules/@playwright/test/cli.js",
+      "test"
+    ],
+    "configFile": "/home/user/ScholarBridgeAi/playwright.config.ts",
+    "rootDir": "/home/user/ScholarBridgeAi/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/user/ScholarBridgeAi/e2e/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/home/user/ScholarBridgeAi/test-results/e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "",
+        "testDir": "/home/user/ScholarBridgeAi/e2e",
+        "snapshotDir": "/home/user/ScholarBridgeAi/e2e",
+        "testIgnore": [
+          "**/visual-acceptance-2026.spec.ts"
+        ],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 60000,
+        "use": {
+          "actionTimeout": 20000,
+          "navigationTimeout": 30000,
+          "baseURL": "http://127.0.0.1:45423",
+          "browserName": "chromium",
+          "headless": true,
+          "launchOptions": {
+            "executablePath": "/tmp/chromium",
+            "args": [
+              "--ash-no-nudges",
+              "--disable-domain-reliability",
+              "--disable-print-preview",
+              "--disk-cache-size=33554432",
+              "--no-default-browser-check",
+              "--no-pings",
+              "--font-render-hinting=none",
+              "--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process",
+              "--enable-features=SharedArrayBuffer",
+              "--ignore-gpu-blocklist",
+              "--in-process-gpu",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+              "--enable-unsafe-swiftshader",
+              "--disable-setuid-sandbox",
+              "--headless='shell'",
+              "--no-sandbox",
+              "--no-zygote"
+            ]
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure",
+          "video": "off"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": ""
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/e2e-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "authenticated-entry.spec.ts",
+      "file": "authenticated-entry.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "fresh server-authenticated sign-in enters the shell without a redundant session probe; backend permissions remain authoritative",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 25541,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:09:46.202Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83a8a8d8ff2bd8960dc1-f8f40347b082da8dd53e",
+          "file": "authenticated-entry.spec.ts",
+          "line": 24,
+          "column": 1
+        },
+        {
+          "title": "malformed login success without a matching session envelope cannot enter a profile",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 36999,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:10:11.792Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83a8a8d8ff2bd8960dc1-5d96b73d63d6d1951fe7",
+          "file": "authenticated-entry.spec.ts",
+          "line": 38,
+          "column": 1
+        },
+        {
+          "title": "real invalid credentials remain a visible failure and never enter the shell",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 36995,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:10:48.808Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83a8a8d8ff2bd8960dc1-6f4b298946063a8058d6",
+          "file": "authenticated-entry.spec.ts",
+          "line": 47,
+          "column": 1
+        },
+        {
+          "title": "closing sign-in before a real response arrives cannot apply an unmounted picker callback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 37334,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:11:25.816Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83a8a8d8ff2bd8960dc1-9acd453cfad7a24612c8",
+          "file": "authenticated-entry.spec.ts",
+          "line": 53,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "award-field-review.spec.ts",
+      "file": "award-field-review.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "exact admin award-field reviews feed actual scoped coverage in four APIs and a stale edit loses verification",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 832,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:03.185Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "21d42585e140d41f11f6-40047d3624c9b3347125",
+          "file": "award-field-review.spec.ts",
+          "line": 9,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "backend-resilience.spec.ts",
+      "file": "backend-resilience.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "malformed JSON envelopes never turn public forms into server 500s",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 205,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:04.043Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "invalid-payload-results",
+                      "contentType": "application/json",
+                      "body": "WwogIHsKICAgICJwYXRoIjogIi9hcGkvYXV0aC9zaWduLWluIiwKICAgICJib2R5IjogIm51bGwiLAogICAgInN0YXR1cyI6IDQwMAogIH0sCiAgewogICAgInBhdGgiOiAiL2FwaS9hdXRoL3NpZ24taW4iLAogICAgImJvZHkiOiAiW10iLAogICAgInN0YXR1cyI6IDQwMAogIH0sCiAgewogICAgInBhdGgiOiAiL2FwaS9hdXRoL3NpZ24taW4iLAogICAgImJvZHkiOiAidHJ1ZSIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL2F1dGgvc2lnbi1pbiIsCiAgICAiYm9keSI6ICI0MiIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL2F1dGgvc2lnbi1pbiIsCiAgICAiYm9keSI6ICJcInRleHRcIiIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL2F1dGgvc2lnbi1pbiIsCiAgICAiYm9keSI6ICJ7IiwKICAgICJzdGF0dXMiOiA0MDAKICB9LAogIHsKICAgICJwYXRoIjogIi9hcGkvcHJvZmlsZXMiLAogICAgImJvZHkiOiAibnVsbCIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL3Byb2ZpbGVzIiwKICAgICJib2R5IjogIltdIiwKICAgICJzdGF0dXMiOiA0MDAKICB9LAogIHsKICAgICJwYXRoIjogIi9hcGkvcHJvZmlsZXMiLAogICAgImJvZHkiOiAidHJ1ZSIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL3Byb2ZpbGVzIiwKICAgICJib2R5IjogIjQyIiwKICAgICJzdGF0dXMiOiA0MDAKICB9LAogIHsKICAgICJwYXRoIjogIi9hcGkvcHJvZmlsZXMiLAogICAgImJvZHkiOiAiXCJ0ZXh0XCIiLAogICAgInN0YXR1cyI6IDQwMAogIH0sCiAgewogICAgInBhdGgiOiAiL2FwaS9wcm9maWxlcyIsCiAgICAiYm9keSI6ICJ7IiwKICAgICJzdGF0dXMiOiA0MDAKICB9LAogIHsKICAgICJwYXRoIjogIi9hcGkvYXV0aC90ZWxlZ3JhbS9zdGF0dXMiLAogICAgImJvZHkiOiAibnVsbCIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL2F1dGgvdGVsZWdyYW0vc3RhdHVzIiwKICAgICJib2R5IjogIltdIiwKICAgICJzdGF0dXMiOiA0MDAKICB9LAogIHsKICAgICJwYXRoIjogIi9hcGkvYXV0aC90ZWxlZ3JhbS9zdGF0dXMiLAogICAgImJvZHkiOiAidHJ1ZSIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL2F1dGgvdGVsZWdyYW0vc3RhdHVzIiwKICAgICJib2R5IjogIjQyIiwKICAgICJzdGF0dXMiOiA0MDAKICB9LAogIHsKICAgICJwYXRoIjogIi9hcGkvYXV0aC90ZWxlZ3JhbS9zdGF0dXMiLAogICAgImJvZHkiOiAiXCJ0ZXh0XCIiLAogICAgInN0YXR1cyI6IDQwMAogIH0sCiAgewogICAgInBhdGgiOiAiL2FwaS9hdXRoL3RlbGVncmFtL3N0YXR1cyIsCiAgICAiYm9keSI6ICJ7IiwKICAgICJzdGF0dXMiOiA0MDAKICB9LAogIHsKICAgICJwYXRoIjogIi9hcGkvYXV0aC9wYXNzd29yZC1yZXNldC9jb25maXJtIiwKICAgICJib2R5IjogIm51bGwiLAogICAgInN0YXR1cyI6IDQwMAogIH0sCiAgewogICAgInBhdGgiOiAiL2FwaS9hdXRoL3Bhc3N3b3JkLXJlc2V0L2NvbmZpcm0iLAogICAgImJvZHkiOiAiW10iLAogICAgInN0YXR1cyI6IDQwMAogIH0sCiAgewogICAgInBhdGgiOiAiL2FwaS9hdXRoL3Bhc3N3b3JkLXJlc2V0L2NvbmZpcm0iLAogICAgImJvZHkiOiAidHJ1ZSIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL2F1dGgvcGFzc3dvcmQtcmVzZXQvY29uZmlybSIsCiAgICAiYm9keSI6ICI0MiIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL2F1dGgvcGFzc3dvcmQtcmVzZXQvY29uZmlybSIsCiAgICAiYm9keSI6ICJcInRleHRcIiIsCiAgICAic3RhdHVzIjogNDAwCiAgfSwKICB7CiAgICAicGF0aCI6ICIvYXBpL2F1dGgvcGFzc3dvcmQtcmVzZXQvY29uZmlybSIsCiAgICAiYm9keSI6ICJ7IiwKICAgICJzdGF0dXMiOiA0MDAKICB9Cl0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a84aabbf6319bcdbe28e-5085c126d5a44fa8a2f3",
+          "file": "backend-resilience.spec.ts",
+          "line": 8,
+          "column": 5
+        },
+        {
+          "title": "public boot/catalogue APIs survive cold, warm and concurrent local reads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 248,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:04.258Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "public-api-observations",
+                      "contentType": "application/json",
+                      "body": "ewogICJzY29wZSI6ICJzbWFsbCBkaXNwb3NhYmxlIGZpeHR1cmVzOyBub3QgYSBwcm9kdWN0aW9uLXNjYWxlIGxvYWQgYmVuY2htYXJrIiwKICAicmVzdWx0cyI6IFsKICAgIHsKICAgICAgInBoYXNlIjogImNvbGQiLAogICAgICAicGF0aCI6ICIvYXBpL2hlYWx0aCIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJtcyI6IDYuMjQxODU2OTk5OTg2MzM5CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAiY29sZCIsCiAgICAgICJwYXRoIjogIi9hcGkvY29uZmlnL2Jvb3QiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibXMiOiA3LjExNDgwMDk5OTk4ODgwMgogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogImNvbGQiLAogICAgICAicGF0aCI6ICIvYXBpL2NvbmZpZy9icmFuZGluZyIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJtcyI6IDguOTI1NTU3MDAwMDA5NTc2CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAiY29sZCIsCiAgICAgICJwYXRoIjogIi9hcGkvY29uZmlnL25hdiIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJtcyI6IDcuMTQ5MjI5MDAwMDAyMzc5CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAiY29sZCIsCiAgICAgICJwYXRoIjogIi9hcGkvY29uZmlnL2d1aWRlIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogNy4xNjEwMzQwMDAwMTg4NDQKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJjb2xkIiwKICAgICAgInBhdGgiOiAiL2FwaS9jb3Vyc2VzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogOC45MTA4NDUwMDAwMDU3OTMKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJjb2xkIiwKICAgICAgInBhdGgiOiAiL2FwaS9zdG9yaWVzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogOC44NTk1NDE5OTk5OTEwNTIKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJjb2xkIiwKICAgICAgInBhdGgiOiAiL2FwaS9vcHBvcnR1bml0aWVzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogMTQuNjg1NDExMDAwMDEzMTE5CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAiY29sZCIsCiAgICAgICJwYXRoIjogIi9hcGkvc2Nob2xhcnNoaXBzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogMTAuMTIzMjE0OTk5OTk5NjE4CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAiY29sZCIsCiAgICAgICJwYXRoIjogIi9hcGkvdW5pdmVyc2l0aWVzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogMTkuOTA0OTk1OTk5OTk3NDgKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJ3YXJtIiwKICAgICAgInBhdGgiOiAiL2FwaS9oZWFsdGgiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibXMiOiA1LjkwOTEwMzAwMDAxMjY5MgogICAgfSwKICAgIHsKICAgICAgInBoYXNlIjogIndhcm0iLAogICAgICAicGF0aCI6ICIvYXBpL2NvbmZpZy9ib290IiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogOS4xMTMyMTI5OTk5NzUwNzYKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJ3YXJtIiwKICAgICAgInBhdGgiOiAiL2FwaS9jb25maWcvYnJhbmRpbmciLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibXMiOiA2LjUyMzU5OTAwMDAwNzM4CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAid2FybSIsCiAgICAgICJwYXRoIjogIi9hcGkvY29uZmlnL25hdiIsCiAgICAgICJzdGF0dXMiOiAyMDAsCiAgICAgICJtcyI6IDcuMjk1MzE0OTk5OTk1NzUzCiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAid2FybSIsCiAgICAgICJwYXRoIjogIi9hcGkvY29uZmlnL2d1aWRlIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogNC4zODUwODQ5OTk5ODcxNTcKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJ3YXJtIiwKICAgICAgInBhdGgiOiAiL2FwaS9jb3Vyc2VzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogNi40Mzk5ODYwMDAwMTIxNDEKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJ3YXJtIiwKICAgICAgInBhdGgiOiAiL2FwaS9zdG9yaWVzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogNC43NDI1ODcwMDAwMTUxOTIKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJ3YXJtIiwKICAgICAgInBhdGgiOiAiL2FwaS9vcHBvcnR1bml0aWVzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogMTEuMTQzNjY1OTk5OTg5MDI1CiAgICB9LAogICAgewogICAgICAicGhhc2UiOiAid2FybSIsCiAgICAgICJwYXRoIjogIi9hcGkvc2Nob2xhcnNoaXBzIiwKICAgICAgInN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogNS43MjA4OTM5OTk5OTgyMjUKICAgIH0sCiAgICB7CiAgICAgICJwaGFzZSI6ICJ3YXJtIiwKICAgICAgInBhdGgiOiAiL2FwaS91bml2ZXJzaXRpZXMiLAogICAgICAic3RhdHVzIjogMjAwLAogICAgICAibXMiOiA1Ljk0NTY2MDk5OTk3NjA5ODUKICAgIH0KICBdLAogICJidXJzdFN0YXR1c2VzIjogWwogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwLAogICAgMjAwCiAgXQp9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a84aabbf6319bcdbe28e-a2b818f5b030611c7b13",
+          "file": "backend-resilience.spec.ts",
+          "line": 23,
+          "column": 5
+        },
+        {
+          "title": "authenticated backend reads remain private, owned and available after invalid writes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 355,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:04.519Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "private-api-observations",
+                      "contentType": "application/json",
+                      "body": "ewogICJyZXN1bHRzIjogWwogICAgewogICAgICAicGF0aCI6ICJkYXNoYm9hcmQiLAogICAgICAib3duU3RhdHVzIjogMjAwLAogICAgICAibXMiOiAyNS4xNzA3MDcwMDAwMTIwNDQKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogInNhdmVkLXVuaXZlcnNpdGllcyIsCiAgICAgICJvd25TdGF0dXMiOiAyMDAsCiAgICAgICJtcyI6IDcuNjEyMzYxOTk5OTg1Mjk2CiAgICB9LAogICAgewogICAgICAicGF0aCI6ICJzYXZlZC1zY2hvbGFyc2hpcHMiLAogICAgICAib3duU3RhdHVzIjogMjAwLAogICAgICAibXMiOiA1Ljg2ODE1NTk5OTk4MjI2NAogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAiYXBwbGljYXRpb25zIiwKICAgICAgIm93blN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogOS40NTMzMDE5OTk5Nzk4ODUKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogImRvY3VtZW50cyIsCiAgICAgICJvd25TdGF0dXMiOiAyMDAsCiAgICAgICJtcyI6IDE3LjkwMDIyNDAwMDAxMTgwNAogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAidGFza3MiLAogICAgICAib3duU3RhdHVzIjogMjAwLAogICAgICAibXMiOiA3Ljg5NzI1NDAwMDAxMDQzNDUKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogImdvYWxzIiwKICAgICAgIm93blN0YXR1cyI6IDIwMCwKICAgICAgIm1zIjogOC40MTQ5NjgwMDAwMjY0MgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAidmF1bHQiLAogICAgICAib3duU3RhdHVzIjogMjAwLAogICAgICAibXMiOiAxMS4wMDQ4ODk5OTk5ODE5NwogICAgfQogIF0sCiAgImJ1cnN0U3RhdHVzZXMiOiBbCiAgICAyMDAsCiAgICAyMDAsCiAgICAyMDAsCiAgICAyMDAsCiAgICAyMDAsCiAgICAyMDAsCiAgICAyMDAsCiAgICAyMDAKICBdCn0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a84aabbf6319bcdbe28e-db8839fb65fb2cbb1227",
+          "file": "backend-resilience.spec.ts",
+          "line": 38,
+          "column": 5
+        },
+        {
+          "title": "admin branding rejects malformed/oversized multipart without storage calls",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 131,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:04.885Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a84aabbf6319bcdbe28e-f2c52e9935627dc8ca56",
+          "file": "backend-resilience.spec.ts",
+          "line": 71,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "backend-second-pass.spec.ts",
+      "file": "backend-second-pass.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "strict profile, numeric paths and forum pagination reject malformed HTTP requests",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 206,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:05.029Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bf074b6969848fc4319b-7afc4bb53b7b512b0a1e",
+          "file": "backend-second-pass.spec.ts",
+          "line": 5,
+          "column": 5
+        },
+        {
+          "title": "parallel learning HTTP retries complete once, keep time monotonic and grant one reward/certificate",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 247,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:05.246Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bf074b6969848fc4319b-232acfd4e823f033eb7c",
+          "file": "backend-second-pass.spec.ts",
+          "line": 15,
+          "column": 5
+        },
+        {
+          "title": "admin malformed audit/research parameters fail before background work starts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 163,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:05.503Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bf074b6969848fc4319b-9e6754b34a0129d7f6b1",
+          "file": "backend-second-pass.spec.ts",
+          "line": 32,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "catalogue-read-diagnostics.spec.ts",
+      "file": "catalogue-read-diagnostics.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "actual catalogue 503 retains its contract and safely correlates a missing relation without stale success",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 45,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:05.678Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "73bfa047d866bffdd2df-8e4349d250418976d870",
+          "file": "catalogue-read-diagnostics.spec.ts",
+          "line": 7,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "checklist-continuation.spec.ts",
+      "file": "checklist-continuation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "checklist and workspace share scoped programme criteria, units, provenance, refresh and atomic generation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 150000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 835,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:05.737Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "checklist-contract-summary",
+                      "contentType": "application/json",
+                      "body": "eyJwYXJhbGxlbExvYWRzIjo2LCJleGFjdFByb2dyYW1tZSI6dHJ1ZSwibGVnYWN5TWluaW1hVW5rbm93biI6dHJ1ZSwibmF0aXZlR3BhUG9zaXRpdmUiOnRydWUsInBsYW5uaW5nR3BhVW5rbm93biI6dHJ1ZSwiZ3JvdXBTdGF0ZVBhcml0eSI6dHJ1ZSwibWFudWFsQ29tcGxldGlvblByZXNlcnZlZCI6dHJ1ZSwicm9sbGJhY2siOnRydWUsInJlY292ZXJ5Ijp0cnVlLCJyZXZpZXdXaXRoZHJhd2FsIjp0cnVlfQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6500f9eeccb2de714f4e-a691ac69378d929013d4",
+          "file": "checklist-continuation.spec.ts",
+          "line": 9,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "client-locales.spec.ts",
+      "file": "client-locales.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "English catalogue does not download complete Russian/Uzbek admin dictionaries through shared country helpers",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4124,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:06.640Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "client-locale-boundary",
+                      "contentType": "application/json",
+                      "body": "eyJsb2NhbGUiOiJlbiIsImxvYWRlZFNjcmlwdENvdW50IjozMSwiZGVjb2RlZFNjcmlwdEJ5dGVzIjoxNjYzODcxLCJmdWxsRGljdGlvbmFyeVNlbnRpbmVsc0Fic2VudCI6NCwibm90ZSI6IkRlY29kZWQgYm9kaWVzLCBub3QgY29tcHJlc3NlZCB0cmFuc2Zlci4gVGhlIHNtYWxsIHRocmVlLWxvY2FsZSBjb3VudHJ5LWxhYmVsIHByb2plY3Rpb24gaXMgaW50ZW50aW9uYWwuIn0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bfff756facfea0c20a51-49a57586eecbd5d4adf5",
+          "file": "client-locales.spec.ts",
+          "line": 8,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "continuation-contracts.spec.ts",
+      "file": "continuation-contracts.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real admin author -> exact manual group review -> profile/API grouped criteria and CAS",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 444,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:10.787Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "reviewed-group",
+                      "contentType": "application/json",
+                      "body": "eyJjb25maXJtZWQiOnsiZmFjdCI6eyJpZCI6IjM3NWJlZmU5LTRjYzEtNGMyYy05OGJlLWFkZGM3NDRmZWE5NiIsImVudGl0eV90eXBlIjoicHJvZ3JhbSIsImVudGl0eV9pZCI6MSwiZmllbGRfa2V5IjoicmVxdWlyZW1lbnRfZ3JvdXAiLCJ2YWx1ZV9udW1lcmljIjpudWxsLCJ2YWx1ZV90ZXh0Ijoie1wiaWRcIjpcImVuZ2xpc2hcIixcIm9wZXJhdG9yXCI6XCJhbnlPZlwiLFwibGFiZWxcIjpcIkZJQ1RJT05BTCBmaXh0dXJlIEVuZ2xpc2ggYWx0ZXJuYXRpdmVzXCIsXCJjaGlsZHJlblwiOlt7XCJpZFwiOlwiaWVsdHNcIixcImtpbmRcIjpcIm1pbmltdW1cIixcImZpZWxkXCI6XCJpZWx0c1wiLFwidmFsdWVcIjo3LFwidW5pdFwiOlwiOVwifSx7XCJpZFwiOlwidG9lZmxcIixcIm9wZXJhdG9yXCI6XCJhbGxPZlwiLFwiY2hpbGRyZW5cIjpbe1wiaWRcIjpcInRvdGFsXCIsXCJraW5kXCI6XCJtaW5pbXVtXCIsXCJmaWVsZFwiOlwidG9lZmxcIixcInZhbHVlXCI6NS41LFwidW5pdFwiOlwiNlwifSx7XCJpZFwiOlwicmVhZGluZ1wiLFwia2luZFwiOlwibWluaW11bVwiLFwiZmllbGRcIjpcInRvZWZsLnJlYWRpbmdcIixcInZhbHVlXCI6NSxcInVuaXRcIjpcIjZcIn1dfV19IiwidW5pdCI6bnVsbCwiY3VycmVuY3kiOm51bGwsInBlcmlvZCI6bnVsbCwiZGVncmVlX2xldmVsIjpudWxsLCJwcm9ncmFtX25hbWUiOm51bGwsImFkbWlzc2lvbl9jeWNsZSI6bnVsbCwic291cmNlX3VybCI6Imh0dHBzOi8vdmVyaWZpZWQtZTJlLmV4YW1wbGUudGVzdC9wcm9ncmFtbWUiLCJ2ZXJpZmllZF9hdCI6IjIwMjYtMTEtMDkgMTE6MTI6MTEuMDI5NDkxIiwidmVyaWZpY2F0aW9uX3N0YXR1cyI6InZlcmlmaWVkIiwidmFsdWVfdHlwZSI6Im9mZmljaWFsX3JlcXVpcmVtZW50Iiwibm90ZXMiOiJGSUNUSU9OQUwgaXNvbGF0ZWQgQVBJIHByb29mLCBub3QgYWRtaXNzaW9ucyBpbmZvcm1hdGlvbiIsImlzX2FjdGl2ZSI6dHJ1ZSwiY3JlYXRlZF9hdCI6IjIwMjYtMTEtMDkgMTE6MTI6MTEuMDA0Mzc3IiwidXBkYXRlZF9hdCI6IjIwMjYtMTEtMDkgMTE6MTI6MTEuMDMxNDE4IiwiYXBwbGljYW50X3Njb3BlIjoiaW50ZXJuYXRpb25hbCIsInZlcnNpb24iOiIyIn0sInJldmlld1R5cGUiOiJtYW51YWxfc291cmNlX2F0dGVzdGF0aW9uIiwib2ZmaWNpYWxQYWdlUmVSZWFkIjpmYWxzZX0sImZpcnN0Ijp7InByb2dyYW0iOnsiaWQiOjEsInVuaXZlcnNpdHlJZCI6MSwibmFtZSI6IkZJQ1RJT05BTCBicm93c2VyIENvbXB1dGVyIFNjaWVuY2UgcHJvZ3JhbW1lIiwiZmllbGQiOiJDb21wdXRlciBTY2llbmNlIiwiZGVncmVlTGV2ZWwiOiJCYWNoZWxvciIsImR1cmF0aW9uWWVhcnMiOm51bGwsImR1cmF0aW9uVW5pdCI6InllYXJzIiwic3R1ZHlNb2RlIjpudWxsLCJsYW5ndWFnZSI6bnVsbCwiYW5udWFsVHVpdGlvbiI6bnVsbCwidHVpdGlvbkN1cnJlbmN5IjoiVVNEIiwidHVpdGlvblBlcmlvZCI6InllYXIiLCJwcm9ncmFtVXJsIjoiaHR0cHM6Ly92ZXJpZmllZC1lMmUuZXhhbXBsZS50ZXN0L3Byb2dyYW1tZSIsImFwcGxpY2F0aW9uVXJsIjpudWxsLCJpc1ZlcmlmaWVkIjp0cnVlLCJzb3VyY2VVcmwiOiJodHRwczovL3ZlcmlmaWVkLWUyZS5leGFtcGxlLnRlc3QvcHJvZ3JhbW1lIiwibGFzdFZlcmlmaWVkQXQiOiIyMDI2LTExLTA3VDAwOjAwOjAwLjAwMFoiLCJ2ZXJpZmljYXRpb25TdGF0dXMiOiJ2ZXJpZmllZCIsInNvdXJjZXMiOltdfSwidW5pdmVyc2l0eSI6eyJpZCI6MSwibmFtZSI6IlBoYXNlMTIgRTJFIFZlcmlmaWVkIFVuaXZlcnNpdHkiLCJjb3VudHJ5IjoiR2VybWFueSIsImNpdHkiOiJCZXJsaW4iLCJ3ZWJzaXRlVXJsIjoiaHR0cHM6Ly92ZXJpZmllZC1lMmUuZXhhbXBsZS50ZXN0IiwiYW5udWFsTGl2aW5nRXN0IjpudWxsLCJsaXZpbmdDb3N0Q3VycmVuY3kiOiJVU0QiLCJsaXZpbmdDb3N0UGVyaW9kIjoieWVhciJ9LCJzdWJqZWN0Rml0Ijp7ImxldmVsIjoiZXhhY3QiLCJzY29yZSI6MSwibWF0Y2hlZEludGVyZXN0cyI6WyJjb21wdXRlciBzY2llbmNlIl19LCJkZWdyZWVMZXZlbE1hdGNoIjoibWF0Y2giLCJlbGlnaWJpbGl0eSI6eyJpdGVtcyI6W10sIm1ldCI6MSwidW5tZXQiOjAsInVua25vd24iOjAsInRleHRSZXF1aXJlbWVudHMiOltdLCJncm91cCI6eyJpZCI6ImVuZ2xpc2giLCJsYWJlbCI6IkZJQ1RJT05BTCBmaXh0dXJlIEVuZ2xpc2ggYWx0ZXJuYXRpdmVzIiwic3RhdGUiOiJtZXQiLCJyZWFzb24iOiJncm91cCIsImNoaWxkcmVuIjpbeyJpZCI6ImllbHRzIiwibGFiZWwiOiJpZWx0cyIsInN0YXRlIjoidW5rbm93biIsInJlYXNvbiI6InJlY29yZF9taXNzaW5nIiwiY2hpbGRyZW4iOltdLCJmaWVsZCI6ImllbHRzIiwiYWN0dWFsIjpudWxsLCJ1bml0IjoiOSJ9LHsiaWQiOiJ0b2VmbCIsImxhYmVsIjoidG9lZmwiLCJzdGF0ZSI6Im1ldCIsInJlYXNvbiI6Imdyb3VwIiwiY2hpbGRyZW4iOlt7ImlkIjoidG90YWwiLCJsYWJlbCI6InRvdGFsIiwic3RhdGUiOiJtZXQiLCJyZWFzb24iOiJjb21wYXJpc29uIiwiY2hpbGRyZW4iOltdLCJmaWVsZCI6InRvZWZsIiwiYWN0dWFsIjo1LjUsInVuaXQiOiI2IiwicmVxdWlyZWQiOjUuNX0seyJpZCI6InJlYWRpbmciLCJsYWJlbCI6InJlYWRpbmciLCJzdGF0ZSI6Im1ldCIsInJlYXNvbiI6ImNvbXBhcmlzb24iLCJjaGlsZHJlbiI6W10sImZpZWxkIjoidG9lZmwucmVhZGluZyIsImFjdHVhbCI6NSwidW5pdCI6IjYiLCJyZXF1aXJlZCI6NX1dLCJvcGVyYXRvciI6ImFsbE9mIn1dLCJvcGVyYXRvciI6ImFueU9mIn19LCJhZmZvcmRhYmlsaXR5Ijp7ImFubnVhbENvc3RVc2QiOm51bGwsImFubnVhbFR1aXRpb24iOm51bGwsInR1aXRpb25DdXJyZW5jeSI6IlVTRCIsInR1aXRpb25QZXJpb2QiOiJ5ZWFyIiwibGl2aW5nRXN0VXNkIjpudWxsLCJ3aXRoaW5CdWRnZXQiOiJ1bmtub3duIiwiYnVkZ2V0VXNkIjoyNTAwMCwiZmFtaWx5SW5jb21lVXNkIjpudWxsLCJpbmNvbWVWc0FubnVhbENvc3QiOiJ1bmtub3duIiwiZnVuZGluZ05lZWQiOm51bGwsInNjaG9sYXJzaGlwTWF0Y2hlcyI6W119LCJwcm9iYWJpbGl0eSI6eyJhdmFpbGFibGUiOmZhbHNlLCJyZWFzb24iOiJuby12YWxpZGF0ZWQtbWV0aG9kb2xvZ3kifSwibWF0Y2hTY29yZSI6NzMsInJhbmtpbmdGYWN0b3JzIjpbIlN1YmplY3Q6IGRpcmVjdCBzdWJqZWN0IG1hdGNoIiwiUmVxdWlyZW1lbnRzOiAxIG1ldCwgMCB1bm1ldCwgMCB1bmtub3duIiwiTG9jYXRpb246IEdlcm1hbnkgaXMgb24geW91ciBwcmVmZXJyZWQgbGlzdCJdLCJtaXNzaW5nSW5wdXRzIjpbImNvbXBhcmFibGVDb3N0IiwiZnVuZGluZ05lZWQiLCJzdGFydFllYXIiLCJsYW5ndWFnZSJdLCJjb25zaWRlcmF0aW9ucyI6WyJMb2NhdGVkIGluIEJlcmxpbiwgR2VybWFueSIsIk5vIGFwcGxpY2F0aW9uIGN5Y2xlIGluIHRoZSBjYXRhbG9nIHlldCDigJQgY2hlY2sgdGhlIG9mZmljaWFsIHByb2dyYW0gcGFnZSBmb3IgZGVhZGxpbmVzIl0sIm5leHRDeWNsZSI6bnVsbCwicHJvZ3JhbVN0YWxlIjpmYWxzZSwiY3ljbGVTdGFsZSI6ZmFsc2UsInBvc2l0aW9uaW5nU3RhdGUiOiJ1bmtub3duX25vX3ZlcmlmaWVkX2NvaG9ydCJ9LCJub3ciOiIyMDI2LTExLTA5VDExOjEyOjExLjA2NloifQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "583d0e7f9b70fcfcf07c-87cc6f0235581dfa3d4f",
+          "file": "continuation-contracts.spec.ts",
+          "line": 8,
+          "column": 5
+        },
+        {
+          "title": "university discovery never synthesizes programmes; experimental index is explicit opt-in",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 223,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:11.242Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "583d0e7f9b70fcfcf07c-b4922ef4fa79258a6c0d",
+          "file": "continuation-contracts.spec.ts",
+          "line": 42,
+          "column": 5
+        },
+        {
+          "title": "C14 persona matrix keeps originals, unknowns and no personal probability",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 414,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:11.480Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "583d0e7f9b70fcfcf07c-35b06ea2c22e1be496da",
+          "file": "continuation-contracts.spec.ts",
+          "line": 55,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "dashboard-continuation.spec.ts",
+      "file": "dashboard-continuation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "C01–C07 real dashboard geometry, settled states and bottom hit tests en",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13247,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:11.909Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IlNob3cgbW9yZSAoKzcpIiwicmVjdCI6eyJ4Ijo2MTIuMTI1LCJ5Ijo5Mi41MzEyNSwid2lkdGgiOjE0MS43MzQzNzUsImhlaWdodCI6NDQsInRvcCI6OTIuNTMxMjUsInJpZ2h0Ijo3NTMuODU5Mzc1LCJib3R0b20iOjEzNi41MzEyNSwibGVmdCI6NjEyLjEyNX0sIm9jY2x1ZGVyIjoiPGJ1dHRvbiB0eXBlPVwiYnV0dG9uXCIgY2xhc3M9XCJzYi1idXR0b24gdG91Y2gtbWFuaXB1bGF0aW9uIGRpc2FibGVkOmN1cnNvci1ub3QtYWxsb3dlZCBkaXNhYmxlZDpvcGFjaXR5LTYwIGlubGluZS1mbGV4IG1pbi1oLTExIGl0ZW1zLWNlbnRlciBnYXAtMS41IHJvdW5kZWQtY29udHJvbCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBiZy1zbGF0ZS01MC84MCBweC0zLjUgcHktMiB0ZXh0LXhzIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS02MDAgdHJhbnNpdGlvbi1jb2xvcnMgaG92ZXI6Ymctc2xhdGUtMTAwIGRhcms6Ym9yZGVyLXNsYXRlLTgwMCBkYXJrOmJnLXNsYXRlLTkwMC82MCBkYXJrOnRleHQtc2xhdGUtMzAwIGRhcms6aG92ZXI6Ymctc2xhdGUtODAwXCIgYXJpYS1leHBhbmRlZD1cImZhbHNlXCI+UyIsInNjcm9sbFkiOjE5NDR9"
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IlNob3cgbW9yZSAoKzcpIiwicmVjdCI6eyJ4Ijo2NDkuMTI1LCJ5IjoyMDcuMjUsIndpZHRoIjoxNDEuNzM0Mzc1LCJoZWlnaHQiOjQ0LCJ0b3AiOjIwNy4yNSwicmlnaHQiOjc5MC44NTkzNzUsImJvdHRvbSI6MjUxLjI1LCJsZWZ0Ijo2NDkuMTI1fSwib2NjbHVkZXIiOiI8YnV0dG9uIHR5cGU9XCJidXR0b25cIiBjbGFzcz1cInNiLWJ1dHRvbiB0b3VjaC1tYW5pcHVsYXRpb24gZGlzYWJsZWQ6Y3Vyc29yLW5vdC1hbGxvd2VkIGRpc2FibGVkOm9wYWNpdHktNjAgaW5saW5lLWZsZXggbWluLWgtMTEgaXRlbXMtY2VudGVyIGdhcC0xLjUgcm91bmRlZC1jb250cm9sIGJvcmRlciBib3JkZXItc2xhdGUtMjAwIGJnLXNsYXRlLTUwLzgwIHB4LTMuNSBweS0yIHRleHQteHMgZm9udC1zZW1pYm9sZCB0ZXh0LXNsYXRlLTYwMCB0cmFuc2l0aW9uLWNvbG9ycyBob3ZlcjpiZy1zbGF0ZS0xMDAgZGFyazpib3JkZXItc2xhdGUtODAwIGRhcms6Ymctc2xhdGUtOTAwLzYwIGRhcms6dGV4dC1zbGF0ZS0zMDAgZGFyazpob3ZlcjpiZy1zbGF0ZS04MDBcIiBhcmlhLWV4cGFuZGVkPVwiZmFsc2VcIj5TIiwic2Nyb2xsWSI6MTc4Nn0="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IlNob3cgbW9yZSAoKzcpIiwicmVjdCI6eyJ4IjozMTMuMTI1LCJ5IjoxMjQuMTg3NSwid2lkdGgiOjE0MS43MzQzNzUsImhlaWdodCI6NDQsInRvcCI6MTI0LjE4NzUsInJpZ2h0Ijo0NTQuODU5Mzc1LCJib3R0b20iOjE2OC4xODc1LCJsZWZ0IjozMTMuMTI1fSwib2NjbHVkZXIiOiI8YnV0dG9uIHR5cGU9XCJidXR0b25cIiBjbGFzcz1cInNiLWJ1dHRvbiB0b3VjaC1tYW5pcHVsYXRpb24gZGlzYWJsZWQ6Y3Vyc29yLW5vdC1hbGxvd2VkIGRpc2FibGVkOm9wYWNpdHktNjAgaW5saW5lLWZsZXggbWluLWgtMTEgaXRlbXMtY2VudGVyIGdhcC0xLjUgcm91bmRlZC1jb250cm9sIGJvcmRlciBib3JkZXItc2xhdGUtMjAwIGJnLXNsYXRlLTUwLzgwIHB4LTMuNSBweS0yIHRleHQteHMgZm9udC1zZW1pYm9sZCB0ZXh0LXNsYXRlLTYwMCB0cmFuc2l0aW9uLWNvbG9ycyBob3ZlcjpiZy1zbGF0ZS0xMDAgZGFyazpib3JkZXItc2xhdGUtODAwIGRhcms6Ymctc2xhdGUtOTAwLzYwIGRhcms6dGV4dC1zbGF0ZS0zMDAgZGFyazpob3ZlcjpiZy1zbGF0ZS04MDBcIiBhcmlhLWV4cGFuZGVkPVwiZmFsc2VcIj5TIiwic2Nyb2xsWSI6Mjc3OH0="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IlNob3cgbW9yZSAoKzcpIiwicmVjdCI6eyJ4IjoxMjQuMTI1LCJ5IjozMzYuNjI1LCJ3aWR0aCI6MTQxLjczNDM3NSwiaGVpZ2h0Ijo0NCwidG9wIjozMzYuNjI1LCJyaWdodCI6MjY1Ljg1OTM3NSwiYm90dG9tIjozODAuNjI1LCJsZWZ0IjoxMjQuMTI1fSwib2NjbHVkZXIiOiI8YnV0dG9uIHR5cGU9XCJidXR0b25cIiBjbGFzcz1cInNiLWJ1dHRvbiB0b3VjaC1tYW5pcHVsYXRpb24gZGlzYWJsZWQ6Y3Vyc29yLW5vdC1hbGxvd2VkIGRpc2FibGVkOm9wYWNpdHktNjAgaW5saW5lLWZsZXggbWluLWgtMTEgaXRlbXMtY2VudGVyIGdhcC0xLjUgcm91bmRlZC1jb250cm9sIGJvcmRlciBib3JkZXItc2xhdGUtMjAwIGJnLXNsYXRlLTUwLzgwIHB4LTMuNSBweS0yIHRleHQteHMgZm9udC1zZW1pYm9sZCB0ZXh0LXNsYXRlLTYwMCB0cmFuc2l0aW9uLWNvbG9ycyBob3ZlcjpiZy1zbGF0ZS0xMDAgZGFyazpib3JkZXItc2xhdGUtODAwIGRhcms6Ymctc2xhdGUtOTAwLzYwIGRhcms6dGV4dC1zbGF0ZS0zMDAgZGFyazpob3ZlcjpiZy1zbGF0ZS04MDBcIiBhcmlhLWV4cGFuZGVkPVwiZmFsc2VcIj5TIiwic2Nyb2xsWSI6MzY0MH0="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IlNob3cgbW9yZSAoKzcpIiwicmVjdCI6eyJ4IjoxMDkuMTI1LCJ5IjozMTQuNDY4NzUsIndpZHRoIjoxNDEuNzM0Mzc1LCJoZWlnaHQiOjQ0LCJ0b3AiOjMxNC40Njg3NSwicmlnaHQiOjI1MC44NTkzNzUsImJvdHRvbSI6MzU4LjQ2ODc1LCJsZWZ0IjoxMDkuMTI1fSwib2NjbHVkZXIiOiI8YnV0dG9uIHR5cGU9XCJidXR0b25cIiBjbGFzcz1cInNiLWJ1dHRvbiB0b3VjaC1tYW5pcHVsYXRpb24gZGlzYWJsZWQ6Y3Vyc29yLW5vdC1hbGxvd2VkIGRpc2FibGVkOm9wYWNpdHktNjAgaW5saW5lLWZsZXggbWluLWgtMTEgaXRlbXMtY2VudGVyIGdhcC0xLjUgcm91bmRlZC1jb250cm9sIGJvcmRlciBib3JkZXItc2xhdGUtMjAwIGJnLXNsYXRlLTUwLzgwIHB4LTMuNSBweS0yIHRleHQteHMgZm9udC1zZW1pYm9sZCB0ZXh0LXNsYXRlLTYwMCB0cmFuc2l0aW9uLWNvbG9ycyBob3ZlcjpiZy1zbGF0ZS0xMDAgZGFyazpib3JkZXItc2xhdGUtODAwIGRhcms6Ymctc2xhdGUtOTAwLzYwIGRhcms6dGV4dC1zbGF0ZS0zMDAgZGFyazpob3ZlcjpiZy1zbGF0ZS04MDBcIiBhcmlhLWV4cGFuZGVkPVwiZmFsc2VcIj5TIiwic2Nyb2xsWSI6MzgwNX0="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IlNob3cgbW9yZSAoKzcpIiwicmVjdCI6eyJ4Ijo4OS4xMjUsInkiOjI3NC4zNDM3NSwid2lkdGgiOjE0MS43MzQzNzUsImhlaWdodCI6NDQsInRvcCI6Mjc0LjM0Mzc1LCJyaWdodCI6MjMwLjg1OTM3NSwiYm90dG9tIjozMTguMzQzNzUsImxlZnQiOjg5LjEyNX0sIm9jY2x1ZGVyIjoiPGJ1dHRvbiB0eXBlPVwiYnV0dG9uXCIgY2xhc3M9XCJzYi1idXR0b24gdG91Y2gtbWFuaXB1bGF0aW9uIGRpc2FibGVkOmN1cnNvci1ub3QtYWxsb3dlZCBkaXNhYmxlZDpvcGFjaXR5LTYwIGlubGluZS1mbGV4IG1pbi1oLTExIGl0ZW1zLWNlbnRlciBnYXAtMS41IHJvdW5kZWQtY29udHJvbCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBiZy1zbGF0ZS01MC84MCBweC0zLjUgcHktMiB0ZXh0LXhzIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS02MDAgdHJhbnNpdGlvbi1jb2xvcnMgaG92ZXI6Ymctc2xhdGUtMTAwIGRhcms6Ym9yZGVyLXNsYXRlLTgwMCBkYXJrOmJnLXNsYXRlLTkwMC82MCBkYXJrOnRleHQtc2xhdGUtMzAwIGRhcms6aG92ZXI6Ymctc2xhdGUtODAwXCIgYXJpYS1leHBhbmRlZD1cImZhbHNlXCI+UyIsInNjcm9sbFkiOjQyMzN9"
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IiIsInJlY3QiOnsieCI6NTMsInkiOjMzLCJ3aWR0aCI6MjU2LCJoZWlnaHQiOjQ4LCJ0b3AiOjMzLCJyaWdodCI6MzA5LCJib3R0b20iOjgxLCJsZWZ0Ijo1M30sIm9jY2x1ZGVyIjoiPGlucHV0IHBsYWNlaG9sZGVyPVwiVHlwZSB3aGF0IHlvdSBuZWVkOiBzY2hvbGFyc2hpcCwgdmlzYSwgZXNzYXnigKZcIiBjbGFzcz1cImgtMTIgdy1mdWxsIGJnLXRyYW5zcGFyZW50IHRleHQtc20gdGV4dC1zbGF0ZS05MDAgcGxhY2Vob2xkZXI6dGV4dC1zbGF0ZS01MDAgZm9jdXM6b3V0bGluZS1ub25lXCIgYXJpYS1sYWJlbD1cIlR5cGUgd2hhdCB5b3UgbmVlZDogc2Nob2xhcnNoaXAsIHZpc2EsIGVzc2F54oCmXCIgdmFsdWU9XCJGSUNUSU9OQUxcIj4iLCJzY3JvbGxZIjozOTg5fQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1954b970af8cc8f7129d-6e97043bf094ae30a140",
+          "file": "dashboard-continuation.spec.ts",
+          "line": 6,
+          "column": 42
+        },
+        {
+          "title": "C01–C07 real dashboard geometry, settled states and bottom hit tests uz",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11281,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:25.167Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IllhbmEgNyB0YSBrbydyc2F0aXNoIiwicmVjdCI6eyJ4Ijo2MDEuNTQ2ODc1LCJ5Ijo5Mi41LCJ3aWR0aCI6MTYyLjg5MDYyNSwiaGVpZ2h0Ijo0NCwidG9wIjo5Mi41LCJyaWdodCI6NzY0LjQzNzUsImJvdHRvbSI6MTM2LjUsImxlZnQiOjYwMS41NDY4NzV9LCJvY2NsdWRlciI6IjxidXR0b24gdHlwZT1cImJ1dHRvblwiIGNsYXNzPVwic2ItYnV0dG9uIHRvdWNoLW1hbmlwdWxhdGlvbiBkaXNhYmxlZDpjdXJzb3Itbm90LWFsbG93ZWQgZGlzYWJsZWQ6b3BhY2l0eS02MCBpbmxpbmUtZmxleCBtaW4taC0xMSBpdGVtcy1jZW50ZXIgZ2FwLTEuNSByb3VuZGVkLWNvbnRyb2wgYm9yZGVyIGJvcmRlci1zbGF0ZS0yMDAgYmctc2xhdGUtNTAvODAgcHgtMy41IHB5LTIgdGV4dC14cyBmb250LXNlbWlib2xkIHRleHQtc2xhdGUtNjAwIHRyYW5zaXRpb24tY29sb3JzIGhvdmVyOmJnLXNsYXRlLTEwMCBkYXJrOmJvcmRlci1zbGF0ZS04MDAgZGFyazpiZy1zbGF0ZS05MDAvNjAgZGFyazp0ZXh0LXNsYXRlLTMwMCBkYXJrOmhvdmVyOmJnLXNsYXRlLTgwMFwiIGFyaWEtZXhwYW5kZWQ9XCJmYWxzZVwiPlkiLCJzY3JvbGxZIjoyMDI3fQ=="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IllhbmEgNyB0YSBrbydyc2F0aXNoIiwicmVjdCI6eyJ4Ijo2MzguNTQ2ODc1LCJ5IjoyMDYuNSwid2lkdGgiOjE2Mi44OTA2MjUsImhlaWdodCI6NDQsInRvcCI6MjA2LjUsInJpZ2h0Ijo4MDEuNDM3NSwiYm90dG9tIjoyNTAuNSwibGVmdCI6NjM4LjU0Njg3NX0sIm9jY2x1ZGVyIjoiPGJ1dHRvbiB0eXBlPVwiYnV0dG9uXCIgY2xhc3M9XCJzYi1idXR0b24gdG91Y2gtbWFuaXB1bGF0aW9uIGRpc2FibGVkOmN1cnNvci1ub3QtYWxsb3dlZCBkaXNhYmxlZDpvcGFjaXR5LTYwIGlubGluZS1mbGV4IG1pbi1oLTExIGl0ZW1zLWNlbnRlciBnYXAtMS41IHJvdW5kZWQtY29udHJvbCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBiZy1zbGF0ZS01MC84MCBweC0zLjUgcHktMiB0ZXh0LXhzIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS02MDAgdHJhbnNpdGlvbi1jb2xvcnMgaG92ZXI6Ymctc2xhdGUtMTAwIGRhcms6Ym9yZGVyLXNsYXRlLTgwMCBkYXJrOmJnLXNsYXRlLTkwMC82MCBkYXJrOnRleHQtc2xhdGUtMzAwIGRhcms6aG92ZXI6Ymctc2xhdGUtODAwXCIgYXJpYS1leHBhbmRlZD1cImZhbHNlXCI+WSIsInNjcm9sbFkiOjE4NDZ9"
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IllhbmEgNyB0YSBrbydyc2F0aXNoIiwicmVjdCI6eyJ4IjozMDIuNTQ2ODc1LCJ5IjoxMjQuNDM3NSwid2lkdGgiOjE2Mi44OTA2MjUsImhlaWdodCI6NDQsInRvcCI6MTI0LjQzNzUsInJpZ2h0Ijo0NjUuNDM3NSwiYm90dG9tIjoxNjguNDM3NSwibGVmdCI6MzAyLjU0Njg3NX0sIm9jY2x1ZGVyIjoiPGJ1dHRvbiB0eXBlPVwiYnV0dG9uXCIgY2xhc3M9XCJzYi1idXR0b24gdG91Y2gtbWFuaXB1bGF0aW9uIGRpc2FibGVkOmN1cnNvci1ub3QtYWxsb3dlZCBkaXNhYmxlZDpvcGFjaXR5LTYwIGlubGluZS1mbGV4IG1pbi1oLTExIGl0ZW1zLWNlbnRlciBnYXAtMS41IHJvdW5kZWQtY29udHJvbCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBiZy1zbGF0ZS01MC84MCBweC0zLjUgcHktMiB0ZXh0LXhzIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS02MDAgdHJhbnNpdGlvbi1jb2xvcnMgaG92ZXI6Ymctc2xhdGUtMTAwIGRhcms6Ym9yZGVyLXNsYXRlLTgwMCBkYXJrOmJnLXNsYXRlLTkwMC82MCBkYXJrOnRleHQtc2xhdGUtMzAwIGRhcms6aG92ZXI6Ymctc2xhdGUtODAwXCIgYXJpYS1leHBhbmRlZD1cImZhbHNlXCI+WSIsInNjcm9sbFkiOjI5MjN9"
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IllhbmEgNyB0YSBrbydyc2F0aXNoIiwicmVjdCI6eyJ4IjoxMTMuNTQ2ODc1LCJ5IjozMzYuMjE4NzUsIndpZHRoIjoxNjIuODkwNjI1LCJoZWlnaHQiOjQ0LCJ0b3AiOjMzNi4yMTg3NSwicmlnaHQiOjI3Ni40Mzc1LCJib3R0b20iOjM4MC4yMTg3NSwibGVmdCI6MTEzLjU0Njg3NX0sIm9jY2x1ZGVyIjoiPGJ1dHRvbiB0eXBlPVwiYnV0dG9uXCIgY2xhc3M9XCJzYi1idXR0b24gdG91Y2gtbWFuaXB1bGF0aW9uIGRpc2FibGVkOmN1cnNvci1ub3QtYWxsb3dlZCBkaXNhYmxlZDpvcGFjaXR5LTYwIGlubGluZS1mbGV4IG1pbi1oLTExIGl0ZW1zLWNlbnRlciBnYXAtMS41IHJvdW5kZWQtY29udHJvbCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBiZy1zbGF0ZS01MC84MCBweC0zLjUgcHktMiB0ZXh0LXhzIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS02MDAgdHJhbnNpdGlvbi1jb2xvcnMgaG92ZXI6Ymctc2xhdGUtMTAwIGRhcms6Ym9yZGVyLXNsYXRlLTgwMCBkYXJrOmJnLXNsYXRlLTkwMC82MCBkYXJrOnRleHQtc2xhdGUtMzAwIGRhcms6aG92ZXI6Ymctc2xhdGUtODAwXCIgYXJpYS1leHBhbmRlZD1cImZhbHNlXCI+WSIsInNjcm9sbFkiOjM4NDB9"
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IllhbmEgNyB0YSBrbydyc2F0aXNoIiwicmVjdCI6eyJ4Ijo5OC41NDY4NzUsInkiOjMxNC41OTM3NSwid2lkdGgiOjE2Mi44OTA2MjUsImhlaWdodCI6NDQsInRvcCI6MzE0LjU5Mzc1LCJyaWdodCI6MjYxLjQzNzUsImJvdHRvbSI6MzU4LjU5Mzc1LCJsZWZ0Ijo5OC41NDY4NzV9LCJvY2NsdWRlciI6IjxidXR0b24gdHlwZT1cImJ1dHRvblwiIGNsYXNzPVwic2ItYnV0dG9uIHRvdWNoLW1hbmlwdWxhdGlvbiBkaXNhYmxlZDpjdXJzb3Itbm90LWFsbG93ZWQgZGlzYWJsZWQ6b3BhY2l0eS02MCBpbmxpbmUtZmxleCBtaW4taC0xMSBpdGVtcy1jZW50ZXIgZ2FwLTEuNSByb3VuZGVkLWNvbnRyb2wgYm9yZGVyIGJvcmRlci1zbGF0ZS0yMDAgYmctc2xhdGUtNTAvODAgcHgtMy41IHB5LTIgdGV4dC14cyBmb250LXNlbWlib2xkIHRleHQtc2xhdGUtNjAwIHRyYW5zaXRpb24tY29sb3JzIGhvdmVyOmJnLXNsYXRlLTEwMCBkYXJrOmJvcmRlci1zbGF0ZS04MDAgZGFyazpiZy1zbGF0ZS05MDAvNjAgZGFyazp0ZXh0LXNsYXRlLTMwMCBkYXJrOmhvdmVyOmJnLXNsYXRlLTgwMFwiIGFyaWEtZXhwYW5kZWQ9XCJmYWxzZVwiPlkiLCJzY3JvbGxZIjozOTc0fQ=="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IllhbmEgNyB0YSBrbydyc2F0aXNoIiwicmVjdCI6eyJ4Ijo3OC41NDY4NzUsInkiOjI3NC44NzUsIndpZHRoIjoxNjIuODkwNjI1LCJoZWlnaHQiOjQ0LCJ0b3AiOjI3NC44NzUsInJpZ2h0IjoyNDEuNDM3NSwiYm90dG9tIjozMTguODc1LCJsZWZ0Ijo3OC41NDY4NzV9LCJvY2NsdWRlciI6IjxidXR0b24gdHlwZT1cImJ1dHRvblwiIGNsYXNzPVwic2ItYnV0dG9uIHRvdWNoLW1hbmlwdWxhdGlvbiBkaXNhYmxlZDpjdXJzb3Itbm90LWFsbG93ZWQgZGlzYWJsZWQ6b3BhY2l0eS02MCBpbmxpbmUtZmxleCBtaW4taC0xMSBpdGVtcy1jZW50ZXIgZ2FwLTEuNSByb3VuZGVkLWNvbnRyb2wgYm9yZGVyIGJvcmRlci1zbGF0ZS0yMDAgYmctc2xhdGUtNTAvODAgcHgtMy41IHB5LTIgdGV4dC14cyBmb250LXNlbWlib2xkIHRleHQtc2xhdGUtNjAwIHRyYW5zaXRpb24tY29sb3JzIGhvdmVyOmJnLXNsYXRlLTEwMCBkYXJrOmJvcmRlci1zbGF0ZS04MDAgZGFyazpiZy1zbGF0ZS05MDAvNjAgZGFyazp0ZXh0LXNsYXRlLTMwMCBkYXJrOmhvdmVyOmJnLXNsYXRlLTgwMFwiIGFyaWEtZXhwYW5kZWQ9XCJmYWxzZVwiPlkiLCJzY3JvbGxZIjo0NDgxfQ=="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IiIsInJlY3QiOnsieCI6NTMsInkiOjMzLCJ3aWR0aCI6MjU2LCJoZWlnaHQiOjQ4LCJ0b3AiOjMzLCJyaWdodCI6MzA5LCJib3R0b20iOjgxLCJsZWZ0Ijo1M30sIm9jY2x1ZGVyIjoiPGlucHV0IHBsYWNlaG9sZGVyPVwiTmltYSBrZXJha2xpZ2luaSB5b3ppbmc6IHN0aXBlbmRpeWEsIHZpemEsIGluc2hv4oCmXCIgY2xhc3M9XCJoLTEyIHctZnVsbCBiZy10cmFuc3BhcmVudCB0ZXh0LXNtIHRleHQtc2xhdGUtOTAwIHBsYWNlaG9sZGVyOnRleHQtc2xhdGUtNTAwIGZvY3VzOm91dGxpbmUtbm9uZVwiIGFyaWEtbGFiZWw9XCJOaW1hIGtlcmFrbGlnaW5pIHlvemluZzogc3RpcGVuZGl5YSwgdml6YSwgaW5zaG/igKZcIiB2YWx1ZT1cIkZJQ1RJT05BTFwiPiIsInNjcm9sbFkiOjQyMDl9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1954b970af8cc8f7129d-1b8ad84f984af3673186",
+          "file": "dashboard-continuation.spec.ts",
+          "line": 6,
+          "column": 42
+        },
+        {
+          "title": "C01–C07 real dashboard geometry, settled states and bottom hit tests ru",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12263,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:36.477Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6ItCf0L7QutCw0LfQsNGC0Ywg0LXRidGRICgrNykiLCJyZWN0Ijp7IngiOjYwMi45Mzc1LCJ5Ijo5My4wMzEyNSwid2lkdGgiOjE2MC4xMDkzNzUsImhlaWdodCI6NDQsInRvcCI6OTMuMDMxMjUsInJpZ2h0Ijo3NjMuMDQ2ODc1LCJib3R0b20iOjEzNy4wMzEyNSwibGVmdCI6NjAyLjkzNzV9LCJvY2NsdWRlciI6IjxidXR0b24gdHlwZT1cImJ1dHRvblwiIGNsYXNzPVwic2ItYnV0dG9uIHRvdWNoLW1hbmlwdWxhdGlvbiBkaXNhYmxlZDpjdXJzb3Itbm90LWFsbG93ZWQgZGlzYWJsZWQ6b3BhY2l0eS02MCBpbmxpbmUtZmxleCBtaW4taC0xMSBpdGVtcy1jZW50ZXIgZ2FwLTEuNSByb3VuZGVkLWNvbnRyb2wgYm9yZGVyIGJvcmRlci1zbGF0ZS0yMDAgYmctc2xhdGUtNTAvODAgcHgtMy41IHB5LTIgdGV4dC14cyBmb250LXNlbWlib2xkIHRleHQtc2xhdGUtNjAwIHRyYW5zaXRpb24tY29sb3JzIGhvdmVyOmJnLXNsYXRlLTEwMCBkYXJrOmJvcmRlci1zbGF0ZS04MDAgZGFyazpiZy1zbGF0ZS05MDAvNjAgZGFyazp0ZXh0LXNsYXRlLTMwMCBkYXJrOmhvdmVyOmJnLXNsYXRlLTgwMFwiIGFyaWEtZXhwYW5kZWQ9XCJmYWxzZVwiPtCfIiwic2Nyb2xsWSI6MjE1M30="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6ItCf0L7QutCw0LfQsNGC0Ywg0LXRidGRICgrNykiLCJyZWN0Ijp7IngiOjYzOS45Mzc1LCJ5IjoxODUuNzgxMjUsIndpZHRoIjoxNjAuMTA5Mzc1LCJoZWlnaHQiOjQ0LCJ0b3AiOjE4NS43ODEyNSwicmlnaHQiOjgwMC4wNDY4NzUsImJvdHRvbSI6MjI5Ljc4MTI1LCJsZWZ0Ijo2MzkuOTM3NX0sIm9jY2x1ZGVyIjoiPGJ1dHRvbiB0eXBlPVwiYnV0dG9uXCIgY2xhc3M9XCJzYi1idXR0b24gdG91Y2gtbWFuaXB1bGF0aW9uIGRpc2FibGVkOmN1cnNvci1ub3QtYWxsb3dlZCBkaXNhYmxlZDpvcGFjaXR5LTYwIGlubGluZS1mbGV4IG1pbi1oLTExIGl0ZW1zLWNlbnRlciBnYXAtMS41IHJvdW5kZWQtY29udHJvbCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBiZy1zbGF0ZS01MC84MCBweC0zLjUgcHktMiB0ZXh0LXhzIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS02MDAgdHJhbnNpdGlvbi1jb2xvcnMgaG92ZXI6Ymctc2xhdGUtMTAwIGRhcms6Ym9yZGVyLXNsYXRlLTgwMCBkYXJrOmJnLXNsYXRlLTkwMC82MCBkYXJrOnRleHQtc2xhdGUtMzAwIGRhcms6aG92ZXI6Ymctc2xhdGUtODAwXCIgYXJpYS1leHBhbmRlZD1cImZhbHNlXCI+0J8iLCJzY3JvbGxZIjoxOTc3fQ=="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6ItCf0L7QutCw0LfQsNGC0Ywg0LXRidGRICgrNykiLCJyZWN0Ijp7IngiOjMwMy45Mzc1LCJ5IjoxMjMuOTM3NSwid2lkdGgiOjE2MC4xMDkzNzUsImhlaWdodCI6NDQsInRvcCI6MTIzLjkzNzUsInJpZ2h0Ijo0NjQuMDQ2ODc1LCJib3R0b20iOjE2Ny45Mzc1LCJsZWZ0IjozMDMuOTM3NX0sIm9jY2x1ZGVyIjoiPGJ1dHRvbiB0eXBlPVwiYnV0dG9uXCIgY2xhc3M9XCJzYi1idXR0b24gdG91Y2gtbWFuaXB1bGF0aW9uIGRpc2FibGVkOmN1cnNvci1ub3QtYWxsb3dlZCBkaXNhYmxlZDpvcGFjaXR5LTYwIGlubGluZS1mbGV4IG1pbi1oLTExIGl0ZW1zLWNlbnRlciBnYXAtMS41IHJvdW5kZWQtY29udHJvbCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBiZy1zbGF0ZS01MC84MCBweC0zLjUgcHktMiB0ZXh0LXhzIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS02MDAgdHJhbnNpdGlvbi1jb2xvcnMgaG92ZXI6Ymctc2xhdGUtMTAwIGRhcms6Ym9yZGVyLXNsYXRlLTgwMCBkYXJrOmJnLXNsYXRlLTkwMC82MCBkYXJrOnRleHQtc2xhdGUtMzAwIGRhcms6aG92ZXI6Ymctc2xhdGUtODAwXCIgYXJpYS1leHBhbmRlZD1cImZhbHNlXCI+0J8iLCJzY3JvbGxZIjozMDE3fQ=="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6ItCf0L7QutCw0LfQsNGC0Ywg0LXRidGRICgrNykiLCJyZWN0Ijp7IngiOjExNC45Mzc1LCJ5IjozMzYsIndpZHRoIjoxNjAuMTA5Mzc1LCJoZWlnaHQiOjQ0LCJ0b3AiOjMzNiwicmlnaHQiOjI3NS4wNDY4NzUsImJvdHRvbSI6MzgwLCJsZWZ0IjoxMTQuOTM3NX0sIm9jY2x1ZGVyIjoiPGJ1dHRvbiB0eXBlPVwiYnV0dG9uXCIgY2xhc3M9XCJzYi1idXR0b24gdG91Y2gtbWFuaXB1bGF0aW9uIGRpc2FibGVkOmN1cnNvci1ub3QtYWxsb3dlZCBkaXNhYmxlZDpvcGFjaXR5LTYwIGlubGluZS1mbGV4IG1pbi1oLTExIGl0ZW1zLWNlbnRlciBnYXAtMS41IHJvdW5kZWQtY29udHJvbCBib3JkZXIgYm9yZGVyLXNsYXRlLTIwMCBiZy1zbGF0ZS01MC84MCBweC0zLjUgcHktMiB0ZXh0LXhzIGZvbnQtc2VtaWJvbGQgdGV4dC1zbGF0ZS02MDAgdHJhbnNpdGlvbi1jb2xvcnMgaG92ZXI6Ymctc2xhdGUtMTAwIGRhcms6Ym9yZGVyLXNsYXRlLTgwMCBkYXJrOmJnLXNsYXRlLTkwMC82MCBkYXJrOnRleHQtc2xhdGUtMzAwIGRhcms6aG92ZXI6Ymctc2xhdGUtODAwXCIgYXJpYS1leHBhbmRlZD1cImZhbHNlXCI+0J8iLCJzY3JvbGxZIjo0MDY3fQ=="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6ItCf0L7QutCw0LfQsNGC0Ywg0LXRidGRICgrNykiLCJyZWN0Ijp7IngiOjk5LjkzNzUsInkiOjMxNC41OTM3NSwid2lkdGgiOjE2MC4xMDkzNzUsImhlaWdodCI6NDQsInRvcCI6MzE0LjU5Mzc1LCJyaWdodCI6MjYwLjA0Njg3NSwiYm90dG9tIjozNTguNTkzNzUsImxlZnQiOjk5LjkzNzV9LCJvY2NsdWRlciI6IjxidXR0b24gdHlwZT1cImJ1dHRvblwiIGNsYXNzPVwic2ItYnV0dG9uIHRvdWNoLW1hbmlwdWxhdGlvbiBkaXNhYmxlZDpjdXJzb3Itbm90LWFsbG93ZWQgZGlzYWJsZWQ6b3BhY2l0eS02MCBpbmxpbmUtZmxleCBtaW4taC0xMSBpdGVtcy1jZW50ZXIgZ2FwLTEuNSByb3VuZGVkLWNvbnRyb2wgYm9yZGVyIGJvcmRlci1zbGF0ZS0yMDAgYmctc2xhdGUtNTAvODAgcHgtMy41IHB5LTIgdGV4dC14cyBmb250LXNlbWlib2xkIHRleHQtc2xhdGUtNjAwIHRyYW5zaXRpb24tY29sb3JzIGhvdmVyOmJnLXNsYXRlLTEwMCBkYXJrOmJvcmRlci1zbGF0ZS04MDAgZGFyazpiZy1zbGF0ZS05MDAvNjAgZGFyazp0ZXh0LXNsYXRlLTMwMCBkYXJrOmhvdmVyOmJnLXNsYXRlLTgwMFwiIGFyaWEtZXhwYW5kZWQ9XCJmYWxzZVwiPtCfIiwic2Nyb2xsWSI6NDI2OH0="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6ItCf0L7QutCw0LfQsNGC0Ywg0LXRidGRICgrNykiLCJyZWN0Ijp7IngiOjc5LjkzNzUsInkiOjI3MS41MzEyNSwid2lkdGgiOjE2MC4xMDkzNzUsImhlaWdodCI6NDQsInRvcCI6MjcxLjUzMTI1LCJyaWdodCI6MjQwLjA0Njg3NSwiYm90dG9tIjozMTUuNTMxMjUsImxlZnQiOjc5LjkzNzV9LCJvY2NsdWRlciI6IjxidXR0b24gdHlwZT1cImJ1dHRvblwiIGNsYXNzPVwic2ItYnV0dG9uIHRvdWNoLW1hbmlwdWxhdGlvbiBkaXNhYmxlZDpjdXJzb3Itbm90LWFsbG93ZWQgZGlzYWJsZWQ6b3BhY2l0eS02MCBpbmxpbmUtZmxleCBtaW4taC0xMSBpdGVtcy1jZW50ZXIgZ2FwLTEuNSByb3VuZGVkLWNvbnRyb2wgYm9yZGVyIGJvcmRlci1zbGF0ZS0yMDAgYmctc2xhdGUtNTAvODAgcHgtMy41IHB5LTIgdGV4dC14cyBmb250LXNlbWlib2xkIHRleHQtc2xhdGUtNjAwIHRyYW5zaXRpb24tY29sb3JzIGhvdmVyOmJnLXNsYXRlLTEwMCBkYXJrOmJvcmRlci1zbGF0ZS04MDAgZGFyazpiZy1zbGF0ZS05MDAvNjAgZGFyazp0ZXh0LXNsYXRlLTMwMCBkYXJrOmhvdmVyOmJnLXNsYXRlLTgwMFwiIGFyaWEtZXhwYW5kZWQ9XCJmYWxzZVwiPtCfIiwic2Nyb2xsWSI6NDcwMn0="
+                    },
+                    {
+                      "name": "bottom-hit",
+                      "contentType": "application/json",
+                      "body": "eyJoaXQiOnRydWUsInRhcmdldCI6IiIsInJlY3QiOnsieCI6NTMsInkiOjMzLCJ3aWR0aCI6MjU2LCJoZWlnaHQiOjQ4LCJ0b3AiOjMzLCJyaWdodCI6MzA5LCJib3R0b20iOjgxLCJsZWZ0Ijo1M30sIm9jY2x1ZGVyIjoiPGlucHV0IHBsYWNlaG9sZGVyPVwi0KfRgtC+INC90YPQttC90L46INGB0YLQuNC/0LXQvdC00LjRjywg0LLQuNC30LAsINGN0YHRgdC14oCmXCIgY2xhc3M9XCJoLTEyIHctZnVsbCBiZy10cmFuc3BhcmVudCB0ZXh0LXNtIHRleHQtc2xhdGUtOTAwIHBsYWNlaG9sZGVyOnRleHQtc2xhdGUtNTAwIGZvY3VzOm91dGxpbmUtbm9uZVwiIGFyaWEtbGFiZWw9XCLQp9GC0L4g0L3Rg9C20L3Qvjog0YHRgtC40L/QtdC90LTQuNGPLCDQstC40LfQsCwg0Y3RgdGB0LXigKZcIiB2YWx1ZT1cIkZJQ1RJT05BTFwiPiIsInNjcm9sbFkiOjQ0NTd9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1954b970af8cc8f7129d-40896dcd442e82721576",
+          "file": "dashboard-continuation.spec.ts",
+          "line": 6,
+          "column": 42
+        }
+      ]
+    },
+    {
+      "title": "exam-boundaries.spec.ts",
+      "file": "exam-boundaries.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real profile API rejects invalid exams atomically and round-trips zero and original TOEFL/GPA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 562,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:48.785Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e3e3a3c88a21b4d24ac-7dfd5217eb0226bdd3d3",
+          "file": "exam-boundaries.spec.ts",
+          "line": 4,
+          "column": 5
+        },
+        {
+          "title": "real recommendation API rejects forged scores rather than clamping; reviewed EN/UZ/RU subject aliases agree",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 208,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:49.369Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e3e3a3c88a21b4d24ac-0df8f71069a579457977",
+          "file": "exam-boundaries.spec.ts",
+          "line": 24,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "first-paint.spec.ts",
+      "file": "first-paint.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "landing hero and primary actions paint even before JavaScript runs",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4735,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:49.589Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "af92d1b6ccb537fd4efc-dcfe9d3da55c2abf9f5e",
+          "file": "first-paint.spec.ts",
+          "line": 3,
+          "column": 5
+        },
+        {
+          "title": "campus photos are deferred, then load when their cards approach the viewport",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11238,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:12:54.333Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "af92d1b6ccb537fd4efc-d5e95c23a69443c47f87",
+          "file": "first-paint.spec.ts",
+          "line": 15,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "funding-inputs.spec.ts",
+      "file": "funding-inputs.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "funding writes reject unknown/coercible/invalid amounts atomically while keeping explicit zero and legacy rounding",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 585,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:13:05.615Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "funding-input-matrix",
+                      "contentType": "application/json",
+                      "body": "eyJwb3N0UmVzdWx0cyI6W3sibGFiZWwiOiJtaXNzaW5nIiwic3RhdHVzIjo0MDB9LHsibGFiZWwiOiJudWxsIiwic3RhdHVzIjo0MDB9LHsibGFiZWwiOiJmYWxzZSIsInN0YXR1cyI6NDAwfSx7ImxhYmVsIjoidHJ1ZSIsInN0YXR1cyI6NDAwfSx7ImxhYmVsIjoiYmxhbmsiLCJzdGF0dXMiOjQwMH0seyJsYWJlbCI6IndoaXRlc3BhY2UiLCJzdGF0dXMiOjQwMH0seyJsYWJlbCI6ImFycmF5Iiwic3RhdHVzIjo0MDB9LHsibGFiZWwiOiJvYmplY3QiLCJzdGF0dXMiOjQwMH0seyJsYWJlbCI6Im5lZ2F0aXZlIiwic3RhdHVzIjo0MDB9LHsibGFiZWwiOiJub25udW1lcmljIiwic3RhdHVzIjo0MDB9LHsibGFiZWwiOiJpbnRlZ2VyLW92ZXJmbG93Iiwic3RhdHVzIjo0MDB9XSwicGF0Y2hSZXN1bHRzIjpbeyJsYWJlbCI6Im51bGwiLCJzdGF0dXMiOjQwMCwiYW1vdW50Ijo3NywiZnVuZGluZ1N0YXR1cyI6InBsYW5uZWQifSx7ImxhYmVsIjoiZmFsc2UiLCJzdGF0dXMiOjQwMCwiYW1vdW50Ijo3NywiZnVuZGluZ1N0YXR1cyI6InBsYW5uZWQifSx7ImxhYmVsIjoidHJ1ZSIsInN0YXR1cyI6NDAwLCJhbW91bnQiOjc3LCJmdW5kaW5nU3RhdHVzIjoicGxhbm5lZCJ9LHsibGFiZWwiOiJibGFuayIsInN0YXR1cyI6NDAwLCJhbW91bnQiOjc3LCJmdW5kaW5nU3RhdHVzIjoicGxhbm5lZCJ9LHsibGFiZWwiOiJ3aGl0ZXNwYWNlIiwic3RhdHVzIjo0MDAsImFtb3VudCI6NzcsImZ1bmRpbmdTdGF0dXMiOiJwbGFubmVkIn0seyJsYWJlbCI6ImFycmF5Iiwic3RhdHVzIjo0MDAsImFtb3VudCI6NzcsImZ1bmRpbmdTdGF0dXMiOiJwbGFubmVkIn0seyJsYWJlbCI6Im9iamVjdCIsInN0YXR1cyI6NDAwLCJhbW91bnQiOjc3LCJmdW5kaW5nU3RhdHVzIjoicGxhbm5lZCJ9LHsibGFiZWwiOiJuZWdhdGl2ZSIsInN0YXR1cyI6NDAwLCJhbW91bnQiOjc3LCJmdW5kaW5nU3RhdHVzIjoicGxhbm5lZCJ9LHsibGFiZWwiOiJub25udW1lcmljIiwic3RhdHVzIjo0MDAsImFtb3VudCI6NzcsImZ1bmRpbmdTdGF0dXMiOiJwbGFubmVkIn0seyJsYWJlbCI6ImludGVnZXItb3ZlcmZsb3ciLCJzdGF0dXMiOjQwMCwiYW1vdW50Ijo3NywiZnVuZGluZ1N0YXR1cyI6InBsYW5uZWQifV19"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0de3af19232fa6e5bc83-5868e7806f057d15bfd5",
+          "file": "funding-inputs.spec.ts",
+          "line": 9,
+          "column": 5
+        },
+        {
+          "title": "funding amount precision and invalid-input feedback are accessible in EN UZ RU without submitting an invalid write",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 14719,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:13:06.217Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0de3af19232fa6e5bc83-8e7736637eebe32e5265",
+          "file": "funding-inputs.spec.ts",
+          "line": 48,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "funding-scenarios.spec.ts",
+      "file": "funding-scenarios.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "funding defaults to confirmed, keeps restricted gaps, and fences optimistic reads without losing drafts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8841,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:13:20.959Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "3a4110bb8b7be6390f74-e6b53c39e846579c80df",
+          "file": "funding-scenarios.spec.ts",
+          "line": 9,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "home-saved-scope.spec.ts",
+      "file": "home-saved-scope.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a held real saved-university response from A cannot mark B's catalogue saved",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7949,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:13:29.826Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2a89486c987522945ed1-208e467925a14de55f97",
+          "file": "home-saved-scope.spec.ts",
+          "line": 20,
+          "column": 5
+        },
+        {
+          "title": "a failed saved-university DELETE cannot falsely remove the saved marker",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8590,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:13:37.791Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2a89486c987522945ed1-152bca847ba05dcd3b35",
+          "file": "home-saved-scope.spec.ts",
+          "line": 51,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "master-dashboard.spec.ts",
+      "file": "master-dashboard.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "actual dashboard, disclosure focus and responsive layout: en",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 22867,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:13:46.404Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-f519407a30c9f7977ca9",
+          "file": "master-dashboard.spec.ts",
+          "line": 46,
+          "column": 7
+        },
+        {
+          "title": "actual dashboard, disclosure focus and responsive layout: uz",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 22392,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:14:09.282Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-ae393e008388731fe664",
+          "file": "master-dashboard.spec.ts",
+          "line": 46,
+          "column": 7
+        },
+        {
+          "title": "actual dashboard, disclosure focus and responsive layout: ru",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 22292,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:14:31.687Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-7a1022adb05174cbaad8",
+          "file": "master-dashboard.spec.ts",
+          "line": 46,
+          "column": 7
+        },
+        {
+          "title": "light dashboard and original public catalogue layouts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4617,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:14:53.991Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-9ace81466346dd585e4e",
+          "file": "master-dashboard.spec.ts",
+          "line": 117,
+          "column": 5
+        },
+        {
+          "title": "vault self-claims, expiry, ownership and atomic failed application links",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2419,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:14:58.618Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-6feb8e2cc5ed509691ee",
+          "file": "master-dashboard.spec.ts",
+          "line": 141,
+          "column": 5
+        },
+        {
+          "title": "dashboard data error keeps navigation and retry functional",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3347,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:15:01.058Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0589fed4eda597060e52-c048f485ba41d7eee83a",
+          "file": "master-dashboard.spec.ts",
+          "line": 196,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "navigation-continuation.spec.ts",
+      "file": "navigation-continuation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "URL, shell and pane stay aligned during rapid navigation 1440",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8230,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:21:58.876Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8d87969a17fb58f0262e-6ab7767af848027f23bd",
+          "file": "navigation-continuation.spec.ts",
+          "line": 9,
+          "column": 6
+        },
+        {
+          "title": "URL, shell and pane stay aligned during rapid navigation 390",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 34769,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:22:07.203Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "8d87969a17fb58f0262e-2c167cc6b7a54b37d720",
+          "file": "navigation-continuation.spec.ts",
+          "line": 9,
+          "column": 6
+        }
+      ]
+    },
+    {
+      "title": "performance.spec.ts",
+      "file": "performance.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "browser performance (desktop)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "Opt-in repeatable browser benchmark: set PERF_STAGE=before or after",
+                  "location": {
+                    "file": "/home/user/ScholarBridgeAi/e2e/performance.spec.ts",
+                    "line": 16,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:22:42.001Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Opt-in repeatable browser benchmark: set PERF_STAGE=before or after",
+                      "location": {
+                        "file": "/home/user/ScholarBridgeAi/e2e/performance.spec.ts",
+                        "line": 16,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "b15d6361b2fc38288977-02890d573680a3663160",
+          "file": "performance.spec.ts",
+          "line": 22,
+          "column": 7
+        },
+        {
+          "title": "browser performance (mobile)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "skip",
+                  "description": "Opt-in repeatable browser benchmark: set PERF_STAGE=before or after",
+                  "location": {
+                    "file": "/home/user/ScholarBridgeAi/e2e/performance.spec.ts",
+                    "line": 16,
+                    "column": 6
+                  }
+                }
+              ],
+              "expectedStatus": "skipped",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:22:42.001Z",
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Opt-in repeatable browser benchmark: set PERF_STAGE=before or after",
+                      "location": {
+                        "file": "/home/user/ScholarBridgeAi/e2e/performance.spec.ts",
+                        "line": 16,
+                        "column": 6
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "b15d6361b2fc38288977-ad87e949d7597db8dc6c",
+          "file": "performance.spec.ts",
+          "line": 22,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "title": "phase12.spec.ts",
+      "file": "phase12.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "public university catalogue searches and filters real seeded records",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 19607,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:15:04.435Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "75881452727ae762f163-b85007755874e0a7251c",
+          "file": "phase12.spec.ts",
+          "line": 54,
+          "column": 5
+        },
+        {
+          "title": "authenticated dashboard and saved scholarship/deadline state are profile-scoped",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 16536,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:15:24.064Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "75881452727ae762f163-43be98f8ed46b9500804",
+          "file": "phase12.spec.ts",
+          "line": 89,
+          "column": 5
+        },
+        {
+          "title": "document vault renders only the signed-in profile's documents",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 22985,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:15:40.613Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "75881452727ae762f163-b481c59fd8186fd38698",
+          "file": "phase12.spec.ts",
+          "line": 112,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "post-admission-funding.spec.ts",
+      "file": "post-admission-funding.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "post-admission offers and comparison use confirmed restricted allocations, explicit periods, loans and owned application scope",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 24442,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:16:03.672Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f2f8ae0165918a738e23-181fdec260677398a7d4",
+          "file": "post-admission-funding.spec.ts",
+          "line": 10,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "scoped-award-coverage.spec.ts",
+      "file": "scoped-award-coverage.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real four-surface award scope parity and localized unknown disclosure across themes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 33952,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:16:28.148Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "027d70908696764d4280-560b016210b22c96abb9",
+          "file": "scoped-award-coverage.spec.ts",
+          "line": 8,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "search-loader-waterfall.spec.ts",
+      "file": "search-loader-waterfall.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "university search chunk starts on navigation intent without waiting for the real hub module response",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3787,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:17:02.117Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d670dac0e849756e785e-ef8f42fc0e2c650b3813",
+          "file": "search-loader-waterfall.spec.ts",
+          "line": 10,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "shell-paint.spec.ts",
+      "file": "shell-paint.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "mobile sign-in dispatch, shell DOM and frame timeline remain observable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15452,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:22:50.443Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "shell-diagnostic-marks",
+                      "contentType": "application/json",
+                      "body": "W3sibmFtZSI6InNoZWxsLmRpc3BhdGNoIiwibXMiOjcyMDUuMTAwMDAwMDAwMDkzfSx7Im5hbWUiOiJzaGVsbC5kb20iLCJtcyI6ODg4MS44OTk5OTk5OTk5MDd9LHsibmFtZSI6InNoZWxsLmZyYW1lcyIsIm1zIjo5MTcwLjg5OTk5OTk5OTkwN31d"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "/home/user/ScholarBridgeAi/test-results/e2e/shell-paint-mobile-sign-in-47bc0--timeline-remain-observable/trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "dd5488f67100d156df15-9899c6711283253ed2d0",
+          "file": "shell-paint.spec.ts",
+          "line": 10,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "site-audit.spec.ts",
+      "file": "site-audit.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "public routes, mobile overflow and recovery states (en)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10602,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:17:05.924Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "public-routes-en",
+                      "contentType": "application/json",
+                      "body": "WwogIHsKICAgICJyb3V0ZSI6ICIvIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMzYKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvdW5pdmVyc2l0aWVzIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTYKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvc2Nob2xhcnNoaXBzIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTIKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvZmVhdHVyZXMiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMgogIH0sCiAgewogICAgInJvdXRlIjogIi9mb3Jnb3QtcGFzc3dvcmQiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMgogIH0sCiAgewogICAgInJvdXRlIjogIi9yZXNldC1wYXNzd29yZCIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDEwCiAgfSwKICB7CiAgICAicm91dGUiOiAiL3ByaXZhY3kiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA1CiAgfSwKICB7CiAgICAicm91dGUiOiAiL3Rlcm1zIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogNQogIH0sCiAgewogICAgInJvdXRlIjogIi90ZyIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvdW5pdmVyc2l0aWVzLzEiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMQogIH0sCiAgewogICAgInJvdXRlIjogIi9zY2hvbGFyc2hpcHMvMSIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDE4CiAgfSwKICB7CiAgICAicm91dGUiOiAiL2NlcnRpZmljYXRlcy9ub3QtYS1yZWFsLWNlcnRpZmljYXRlIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMQogIH0sCiAgewogICAgInJvdXRlIjogIi9jZXJ0aWZpY2F0ZXMvJTI1IiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMQogIH0sCiAgewogICAgInJvdXRlIjogIi9wYXJlbnQvbm90LWEtdmFsaWQtdG9rZW4iLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxCiAgfSwKICB7CiAgICAicm91dGUiOiAiL2F1ZGl0LW5vdC1hLXJlYWwtcGFnZSIsCiAgICAic3RhdHVzIjogNDA0LAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9Cl0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-c45fcf8e6f18e9dc55e2",
+          "file": "site-audit.spec.ts",
+          "line": 25,
+          "column": 7
+        },
+        {
+          "title": "public routes, mobile overflow and recovery states (uz)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10177,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:17:16.537Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "public-routes-uz",
+                      "contentType": "application/json",
+                      "body": "WwogIHsKICAgICJyb3V0ZSI6ICIvIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMzYKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvdW5pdmVyc2l0aWVzIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTYKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvc2Nob2xhcnNoaXBzIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTIKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvZmVhdHVyZXMiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMgogIH0sCiAgewogICAgInJvdXRlIjogIi9mb3Jnb3QtcGFzc3dvcmQiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMgogIH0sCiAgewogICAgInJvdXRlIjogIi9yZXNldC1wYXNzd29yZCIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDEwCiAgfSwKICB7CiAgICAicm91dGUiOiAiL3ByaXZhY3kiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA1CiAgfSwKICB7CiAgICAicm91dGUiOiAiL3Rlcm1zIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogNQogIH0sCiAgewogICAgInJvdXRlIjogIi90ZyIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvdW5pdmVyc2l0aWVzLzEiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMQogIH0sCiAgewogICAgInJvdXRlIjogIi9zY2hvbGFyc2hpcHMvMSIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDE4CiAgfSwKICB7CiAgICAicm91dGUiOiAiL2NlcnRpZmljYXRlcy9ub3QtYS1yZWFsLWNlcnRpZmljYXRlIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMQogIH0sCiAgewogICAgInJvdXRlIjogIi9jZXJ0aWZpY2F0ZXMvJTI1IiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMQogIH0sCiAgewogICAgInJvdXRlIjogIi9wYXJlbnQvbm90LWEtdmFsaWQtdG9rZW4iLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxCiAgfSwKICB7CiAgICAicm91dGUiOiAiL2F1ZGl0LW5vdC1hLXJlYWwtcGFnZSIsCiAgICAic3RhdHVzIjogNDA0LAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9Cl0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-ae62e8fb8b1d68f1d324",
+          "file": "site-audit.spec.ts",
+          "line": 25,
+          "column": 7
+        },
+        {
+          "title": "public routes, mobile overflow and recovery states (ru)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8721,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:17:26.725Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "public-routes-ru",
+                      "contentType": "application/json",
+                      "body": "WwogIHsKICAgICJyb3V0ZSI6ICIvIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMzYKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvdW5pdmVyc2l0aWVzIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTYKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvc2Nob2xhcnNoaXBzIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTIKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvZmVhdHVyZXMiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMgogIH0sCiAgewogICAgInJvdXRlIjogIi9mb3Jnb3QtcGFzc3dvcmQiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMgogIH0sCiAgewogICAgInJvdXRlIjogIi9yZXNldC1wYXNzd29yZCIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDEwCiAgfSwKICB7CiAgICAicm91dGUiOiAiL3ByaXZhY3kiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA1CiAgfSwKICB7CiAgICAicm91dGUiOiAiL3Rlcm1zIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogNQogIH0sCiAgewogICAgInJvdXRlIjogIi90ZyIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9LAogIHsKICAgICJyb3V0ZSI6ICIvdW5pdmVyc2l0aWVzLzEiLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxMQogIH0sCiAgewogICAgInJvdXRlIjogIi9zY2hvbGFyc2hpcHMvMSIsCiAgICAic3RhdHVzIjogMjAwLAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDE4CiAgfSwKICB7CiAgICAicm91dGUiOiAiL2NlcnRpZmljYXRlcy9ub3QtYS1yZWFsLWNlcnRpZmljYXRlIiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMQogIH0sCiAgewogICAgInJvdXRlIjogIi9jZXJ0aWZpY2F0ZXMvJTI1IiwKICAgICJzdGF0dXMiOiAyMDAsCiAgICAiZGltZW5zaW9ucyI6IHsKICAgICAgInZpZXdwb3J0IjogMzkwLAogICAgICAiY29udGVudCI6IDM5MAogICAgfSwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMQogIH0sCiAgewogICAgInJvdXRlIjogIi9wYXJlbnQvbm90LWEtdmFsaWQtdG9rZW4iLAogICAgInN0YXR1cyI6IDIwMCwKICAgICJkaW1lbnNpb25zIjogewogICAgICAidmlld3BvcnQiOiAzOTAsCiAgICAgICJjb250ZW50IjogMzkwCiAgICB9LAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxCiAgfSwKICB7CiAgICAicm91dGUiOiAiL2F1ZGl0LW5vdC1hLXJlYWwtcGFnZSIsCiAgICAic3RhdHVzIjogNDA0LAogICAgImRpbWVuc2lvbnMiOiB7CiAgICAgICJ2aWV3cG9ydCI6IDM5MCwKICAgICAgImNvbnRlbnQiOiAzOTAKICAgIH0sCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9Cl0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-b219666c22f93469dddf",
+          "file": "site-audit.spec.ts",
+          "line": 25,
+          "column": 7
+        },
+        {
+          "title": "all student destinations and pane buttons (1440px)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 59100,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:17:35.458Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "student-navigation-1440",
+                      "contentType": "application/json",
+                      "body": "WwogIHsKICAgICJzZWN0aW9uIjogImRhc2hib2FyZCIsCiAgICAicGFuZSI6IG51bGwKICB9LAogIHsKICAgICJzZWN0aW9uIjogInVuaXZlcnNpdGllcyIsCiAgICAicGFuZSI6ICJzZWFyY2giLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyMQogIH0sCiAgewogICAgInNlY3Rpb24iOiAidW5pdmVyc2l0aWVzIiwKICAgICJwYW5lIjogImNhcmVlcnMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAzCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ1bml2ZXJzaXRpZXMiLAogICAgInBhbmUiOiAibWF0Y2hlcyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDMyCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ1bml2ZXJzaXRpZXMiLAogICAgInBhbmUiOiAib3V0bG9vayIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9LAogIHsKICAgICJzZWN0aW9uIjogInVuaXZlcnNpdGllcyIsCiAgICAicGFuZSI6ICJjb3VudHJpZXMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxNwogIH0sCiAgewogICAgInNlY3Rpb24iOiAic2Nob2xhcnNoaXBzIiwKICAgICJwYW5lIjogImJyb3dzZSIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDE3CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzY2hvbGFyc2hpcHMiLAogICAgInBhbmUiOiAicmVjb21tZW5kZWQiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA5CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzY2hvbGFyc2hpcHMiLAogICAgInBhbmUiOiAib3Bwb3J0dW5pdGllcyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDI2CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzdHVkeS1wbGFuIiwKICAgICJwYW5lIjogInBsYW4iLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA3CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzdHVkeS1wbGFuIiwKICAgICJwYW5lIjogInRlc3RzIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMjMKICB9LAogIHsKICAgICJzZWN0aW9uIjogInN0dWR5LXBsYW4iLAogICAgInBhbmUiOiAidG9vbHMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA0CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ0YXNrcyIsCiAgICAicGFuZSI6ICJ0YXNrcyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDI0CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ0YXNrcyIsCiAgICAicGFuZSI6ICJkZWFkbGluZXMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA2CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJwcm9maWxlIiwKICAgICJwYW5lIjogInJlYWRpbmVzcyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9LAogIHsKICAgICJzZWN0aW9uIjogInByb2ZpbGUiLAogICAgInBhbmUiOiAiZ29hbHMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyNAogIH0sCiAgewogICAgInNlY3Rpb24iOiAicHJvZmlsZSIsCiAgICAicGFuZSI6ICJhY3Rpdml0aWVzIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTIKICB9LAogIHsKICAgICJzZWN0aW9uIjogInByb2ZpbGUiLAogICAgInBhbmUiOiAic3RvcmllcyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDcKICB9LAogIHsKICAgICJzZWN0aW9uIjogInByb2ZpbGUiLAogICAgInBhbmUiOiAic2ltaWxhciIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDMKICB9LAogIHsKICAgICJzZWN0aW9uIjogImZ1bmRpbmciLAogICAgInBhbmUiOiBudWxsCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJhcHBsaWNhdGlvbnMiLAogICAgInBhbmUiOiAidHJhY2tlciIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDEzCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJhcHBsaWNhdGlvbnMiLAogICAgInBhbmUiOiAid29ya3NwYWNlIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMQogIH0sCiAgewogICAgInNlY3Rpb24iOiAibWF0ZXJpYWxzIiwKICAgICJwYW5lIjogInJlcXVpcmVtZW50cyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDQKICB9LAogIHsKICAgICJzZWN0aW9uIjogIm1hdGVyaWFscyIsCiAgICAicGFuZSI6ICJkb2N1bWVudHMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyOAogIH0sCiAgewogICAgInNlY3Rpb24iOiAibWF0ZXJpYWxzIiwKICAgICJwYW5lIjogImVzc2F5cyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDQKICB9LAogIHsKICAgICJzZWN0aW9uIjogIm1hdGVyaWFscyIsCiAgICAicGFuZSI6ICJpbnRlcnZpZXdzIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTIKICB9LAogIHsKICAgICJzZWN0aW9uIjogIm9mZmVycyIsCiAgICAicGFuZSI6IG51bGwKICB9LAogIHsKICAgICJzZWN0aW9uIjogInBvc3QtYWRtaXNzaW9uLWZ1bmRpbmciLAogICAgInBhbmUiOiBudWxsCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ2aXNhIiwKICAgICJwYW5lIjogInNwZWFraW5nIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTgKICB9LAogIHsKICAgICJzZWN0aW9uIjogInZpc2EiLAogICAgInBhbmUiOiAidmlzYSIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDYKICB9LAogIHsKICAgICJzZWN0aW9uIjogInZpc2EiLAogICAgInBhbmUiOiAiYXBvc3RpbGxlIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogNQogIH0sCiAgewogICAgInNlY3Rpb24iOiAidmlzYSIsCiAgICAicGFuZSI6ICJkZXBhcnR1cmUiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJndWlkYW5jZSIsCiAgICAicGFuZSI6ICJtZW50b3IiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA4CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJndWlkYW5jZSIsCiAgICAicGFuZSI6ICJjb25zdWx0aW5nIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMgogIH0sCiAgewogICAgInNlY3Rpb24iOiAiZ3VpZGFuY2UiLAogICAgInBhbmUiOiAiZmFxIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMAogIH0sCiAgewogICAgInNlY3Rpb24iOiAiY29tbXVuaXR5IiwKICAgICJwYW5lIjogImZvcnVtIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogNQogIH0sCiAgewogICAgInNlY3Rpb24iOiAiY29tbXVuaXR5IiwKICAgICJwYW5lIjogImNvdXJzZXMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyCiAgfQpd"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-4a926676bfbeb854eac1",
+          "file": "site-audit.spec.ts",
+          "line": 52,
+          "column": 7
+        },
+        {
+          "title": "all student destinations and pane buttons (390px)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 240000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 40295,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:18:34.576Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "student-navigation-390",
+                      "contentType": "application/json",
+                      "body": "WwogIHsKICAgICJzZWN0aW9uIjogImRhc2hib2FyZCIsCiAgICAicGFuZSI6IG51bGwKICB9LAogIHsKICAgICJzZWN0aW9uIjogInVuaXZlcnNpdGllcyIsCiAgICAicGFuZSI6ICJzZWFyY2giLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyMQogIH0sCiAgewogICAgInNlY3Rpb24iOiAidW5pdmVyc2l0aWVzIiwKICAgICJwYW5lIjogImNhcmVlcnMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAzCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ1bml2ZXJzaXRpZXMiLAogICAgInBhbmUiOiAibWF0Y2hlcyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDMyCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ1bml2ZXJzaXRpZXMiLAogICAgInBhbmUiOiAib3V0bG9vayIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDAKICB9LAogIHsKICAgICJzZWN0aW9uIjogInVuaXZlcnNpdGllcyIsCiAgICAicGFuZSI6ICJjb3VudHJpZXMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxNwogIH0sCiAgewogICAgInNlY3Rpb24iOiAic2Nob2xhcnNoaXBzIiwKICAgICJwYW5lIjogImJyb3dzZSIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDE3CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzY2hvbGFyc2hpcHMiLAogICAgInBhbmUiOiAicmVjb21tZW5kZWQiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA5CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzY2hvbGFyc2hpcHMiLAogICAgInBhbmUiOiAib3Bwb3J0dW5pdGllcyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDI2CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzdHVkeS1wbGFuIiwKICAgICJwYW5lIjogInBsYW4iLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA3CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzdHVkeS1wbGFuIiwKICAgICJwYW5lIjogInRlc3RzIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMjMKICB9LAogIHsKICAgICJzZWN0aW9uIjogInN0dWR5LXBsYW4iLAogICAgInBhbmUiOiAidG9vbHMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxNAogIH0sCiAgewogICAgInNlY3Rpb24iOiAidGFza3MiLAogICAgInBhbmUiOiAidGFza3MiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyNAogIH0sCiAgewogICAgInNlY3Rpb24iOiAidGFza3MiLAogICAgInBhbmUiOiAiZGVhZGxpbmVzIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogNgogIH0sCiAgewogICAgInNlY3Rpb24iOiAicHJvZmlsZSIsCiAgICAicGFuZSI6ICJyZWFkaW5lc3MiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAwCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJwcm9maWxlIiwKICAgICJwYW5lIjogImdvYWxzIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMjQKICB9LAogIHsKICAgICJzZWN0aW9uIjogInByb2ZpbGUiLAogICAgInBhbmUiOiAiYWN0aXZpdGllcyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDEyCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJwcm9maWxlIiwKICAgICJwYW5lIjogInN0b3JpZXMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA3CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJwcm9maWxlIiwKICAgICJwYW5lIjogInNpbWlsYXIiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAzCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJmdW5kaW5nIiwKICAgICJwYW5lIjogbnVsbAogIH0sCiAgewogICAgInNlY3Rpb24iOiAiYXBwbGljYXRpb25zIiwKICAgICJwYW5lIjogInRyYWNrZXIiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAxCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJhcHBsaWNhdGlvbnMiLAogICAgInBhbmUiOiAid29ya3NwYWNlIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMQogIH0sCiAgewogICAgInNlY3Rpb24iOiAibWF0ZXJpYWxzIiwKICAgICJwYW5lIjogInJlcXVpcmVtZW50cyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDQKICB9LAogIHsKICAgICJzZWN0aW9uIjogIm1hdGVyaWFscyIsCiAgICAicGFuZSI6ICJkb2N1bWVudHMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyNgogIH0sCiAgewogICAgInNlY3Rpb24iOiAibWF0ZXJpYWxzIiwKICAgICJwYW5lIjogImVzc2F5cyIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDQKICB9LAogIHsKICAgICJzZWN0aW9uIjogIm1hdGVyaWFscyIsCiAgICAicGFuZSI6ICJpbnRlcnZpZXdzIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTIKICB9LAogIHsKICAgICJzZWN0aW9uIjogIm9mZmVycyIsCiAgICAicGFuZSI6IG51bGwKICB9LAogIHsKICAgICJzZWN0aW9uIjogInBvc3QtYWRtaXNzaW9uLWZ1bmRpbmciLAogICAgInBhbmUiOiBudWxsCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ2aXNhIiwKICAgICJwYW5lIjogInNwZWFraW5nIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMTgKICB9LAogIHsKICAgICJzZWN0aW9uIjogInZpc2EiLAogICAgInBhbmUiOiAidmlzYSIsCiAgICAiY29udHJvbHNSZW5kZXJlZCI6IDYKICB9LAogIHsKICAgICJzZWN0aW9uIjogInZpc2EiLAogICAgInBhbmUiOiAiYXBvc3RpbGxlIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogNQogIH0sCiAgewogICAgInNlY3Rpb24iOiAidmlzYSIsCiAgICAicGFuZSI6ICJkZXBhcnR1cmUiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJndWlkYW5jZSIsCiAgICAicGFuZSI6ICJtZW50b3IiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiA4CiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJndWlkYW5jZSIsCiAgICAicGFuZSI6ICJjb25zdWx0aW5nIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMgogIH0sCiAgewogICAgInNlY3Rpb24iOiAiZ3VpZGFuY2UiLAogICAgInBhbmUiOiAiZmFxIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogMAogIH0sCiAgewogICAgInNlY3Rpb24iOiAiY29tbXVuaXR5IiwKICAgICJwYW5lIjogImZvcnVtIiwKICAgICJjb250cm9sc1JlbmRlcmVkIjogNQogIH0sCiAgewogICAgInNlY3Rpb24iOiAiY29tbXVuaXR5IiwKICAgICJwYW5lIjogImNvdXJzZXMiLAogICAgImNvbnRyb2xzUmVuZGVyZWQiOiAyCiAgfQpd"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-4b889a01589db0ac331a",
+          "file": "site-audit.spec.ts",
+          "line": 52,
+          "column": 7
+        },
+        {
+          "title": "public language/theme controls and missing reset link are usable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6007,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:19:14.884Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-122127f2125d6d521e83",
+          "file": "site-audit.spec.ts",
+          "line": 99,
+          "column": 5
+        },
+        {
+          "title": "all admin sections render and account support is readable",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 180000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 40174,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:19:20.909Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "admin-read-only-navigation",
+                      "contentType": "application/json",
+                      "body": "WwogIHsKICAgICJzZWN0aW9uIjogIm92ZXJ2aWV3IiwKICAgICJsYWJlbCI6ICJPdmVydmlldyIKICB9LAogIHsKICAgICJzZWN0aW9uIjogImFuYWx5dGljcyIsCiAgICAibGFiZWwiOiAiQW5hbHl0aWNzIgogIH0sCiAgewogICAgInNlY3Rpb24iOiAidW5pdmVyc2l0aWVzIiwKICAgICJsYWJlbCI6ICJVbml2ZXJzaXRpZXMiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzY2hvbGFyc2hpcHMiLAogICAgImxhYmVsIjogIlNjaG9sYXJzaGlwcyIKICB9LAogIHsKICAgICJzZWN0aW9uIjogIm9wcG9ydHVuaXRpZXMiLAogICAgImxhYmVsIjogIk9wcG9ydHVuaXRpZXMiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJjb3Vyc2VzIiwKICAgICJsYWJlbCI6ICJDb3Vyc2VzICYgdmlkZW9zIgogIH0sCiAgewogICAgInNlY3Rpb24iOiAidmVyaWZ5IiwKICAgICJsYWJlbCI6ICJWZXJpZmljYXRpb24iCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJyZXNlYXJjaCIsCiAgICAibGFiZWwiOiAiUmVzZWFyY2ggYWdlbnQiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJyZWZyZXNoIiwKICAgICJsYWJlbCI6ICJEYXRhIHJlZnJlc2giCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJzdG9yaWVzIiwKICAgICJsYWJlbCI6ICJBZG1pc3Npb24gc3RvcmllcyIKICB9LAogIHsKICAgICJzZWN0aW9uIjogInJlcG9ydHMiLAogICAgImxhYmVsIjogIkZvcnVtIHJlcG9ydHMiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJjb25zdWx0aW5nIiwKICAgICJsYWJlbCI6ICJDb25zdWx0aW5nIHJlcXVlc3RzIgogIH0sCiAgewogICAgInNlY3Rpb24iOiAiZ3VpZGUiLAogICAgImxhYmVsIjogIkd1aWRlICYgaGVscCIKICB9LAogIHsKICAgICJzZWN0aW9uIjogImdvYWxMaWJyYXJ5IiwKICAgICJsYWJlbCI6ICJHb2FsIGxpYnJhcnkiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJ2YXVsdFByb21wdHMiLAogICAgImxhYmVsIjogIkFuc3dlciBWYXVsdCBxdWVzdGlvbnMiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJjaGVja2xpc3QiLAogICAgImxhYmVsIjogIkRlcGFydHVyZSBjaGVja2xpc3QiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJuYXZpZ2F0aW9uIiwKICAgICJsYWJlbCI6ICJTaWRlYmFyIHNlY3Rpb25zIgogIH0sCiAgewogICAgInNlY3Rpb24iOiAicHJlbWl1bSIsCiAgICAibGFiZWwiOiAiUHJlbWl1bSBnaWZ0cyIKICB9LAogIHsKICAgICJzZWN0aW9uIjogImNvbmZpZyIsCiAgICAibGFiZWwiOiAiU2V0dGluZ3MiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJhaSIsCiAgICAibGFiZWwiOiAiQUkgc2V0dGluZ3MiCiAgfSwKICB7CiAgICAic2VjdGlvbiI6ICJhdWRpdCIsCiAgICAibGFiZWwiOiAiQXVkaXQgbG9nIgogIH0sCiAgewogICAgInNlY3Rpb24iOiAidGVsZWdyYW0iLAogICAgImxhYmVsIjogIlRlbGVncmFtIGJvdCIKICB9LAogIHsKICAgICJzZWN0aW9uIjogIm93bmVyc2hpcCIsCiAgICAibGFiZWwiOiAiT3duZXJzaGlwIgogIH0sCiAgewogICAgInNlY3Rpb24iOiAiY2hhbm5lbCIsCiAgICAibGFiZWwiOiAiVGVsZWdyYW0gY2hhbm5lbCIKICB9LAogIHsKICAgICJzZWN0aW9uIjogImFjY291bnRzIiwKICAgICJsYWJlbCI6ICJBY2NvdW50cyIKICB9LAogIHsKICAgICJzZWN0aW9uIjogInJldmlld1F1ZXVlIiwKICAgICJsYWJlbCI6ICJSZXZpZXcgcXVldWUiCiAgfQpd"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-9ae86d72e07ceb65064d",
+          "file": "site-audit.spec.ts",
+          "line": 114,
+          "column": 5
+        },
+        {
+          "title": "mobile account utility buttons and logout work",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 43901,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:20:01.096Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "account-utility-buttons",
+                      "contentType": "application/json",
+                      "body": "WyJwYXltZW50cyIsIm5vdGlmaWNhdGlvbnMiLCJyZXdhcmRzIiwicGFyZW50Il0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-5949b60a58a2bac2f124",
+          "file": "site-audit.spec.ts",
+          "line": 138,
+          "column": 5
+        },
+        {
+          "title": "rapid destination changes cannot be undone by an exiting hub's pane callback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 27598,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:20:45.035Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a2337849154905c12691-0235a4ecafa05bd179ec",
+          "file": "site-audit.spec.ts",
+          "line": 164,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "university-detail-contracts.spec.ts",
+      "file": "university-detail-contracts.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "detail shares exact scope, native units, conflict/unknown and real-programme opt-in contracts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 39065,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:21:12.685Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "detail-contract-summary",
+                      "contentType": "application/json",
+                      "body": "eyJleGFjdFNjb3BlIjp0cnVlLCJuYXRpdmVUb2VmbDYiOnRydWUsIm5hdGl2ZUdwYTEwMCI6dHJ1ZSwibm9TeW50aGV0aWNQcm9ncmFtbWUiOnRydWUsIm1vZGVsT3B0SW4iOnRydWUsImxvY2FsaXplZE1vYmlsZSI6WyJlbiIsInV6IiwicnUiXSwiY29uZmxpY3RVbmtub3duIjp0cnVlLCJpbmFjdGl2ZVVua25vd24iOnRydWUsInJldmlld1dpdGhkcmF3YWwiOnRydWV9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "9012a978c4f57051dc66-5656d70434ce17d7298b",
+          "file": "university-detail-contracts.spec.ts",
+          "line": 12,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "university-request-epochs.spec.ts",
+      "file": "university-request-epochs.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "a superseded real catalogue body cannot replace newer cards or loading state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3981,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:21:51.784Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0051932a3b2a4bda6d5b-6278be6c8ee2af7587cd",
+          "file": "university-request-epochs.spec.ts",
+          "line": 6,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "vault-continuation.spec.ts",
+      "file": "vault-continuation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "C11 vault Free/Pro, review CAS, every metadata edit, ownership, downgrade locks and rollback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1558,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:21:55.782Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18eaedcf5d096e87875f-f97796baf4b7ed4918cc",
+          "file": "vault-continuation.spec.ts",
+          "line": 10,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "vault-link-reviews.spec.ts",
+      "file": "vault-link-reviews.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "document review binds normalized application links, rejects stale review CAS, and rolls back link revisions",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 751,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-09T11:21:57.357Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "04510b18c161556eb26f-8ac9bc5956998211eeae",
+          "file": "vault-link-reviews.spec.ts",
+          "line": 7,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-09T11:09:40.691Z",
+    "duration": 835557.74,
+    "expected": 58,
+    "skipped": 2,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

@@ -1,3 +1,4 @@
+import {parseExamInput} from "@/lib/examRecords";
 import {resolveAcademicRequirements,academicDecisionEnvelope} from "@/lib/universityDetailRequirements";
 import {parseApplicantContext,recordedToefl} from "@/lib/applicantContext";
 import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
@@ -194,6 +195,9 @@ export async function POST(req: Request) {
     );
   }
 
+  let examOverrides;
+  try{examOverrides={ielts:parseExamInput("ielts",body.ielts),sat:parseExamInput("sat",body.sat),act:parseExamInput("act",body.act),duolingo:parseExamInput("duolingo",body.duolingo),toefl:parseExamInput("toefl",body.toefl,typeof body.toeflScale==="string"?body.toeflScale:null)};}
+  catch{return NextResponse.json({error:"Invalid exam range, step or numeric format",code:"academic_input_invalid"},{status:400});}
   const limitRaw = clampNumber(body.limit, 1, 48);
   const limit = limitRaw ?? 24;
 
@@ -208,16 +212,16 @@ export async function POST(req: Request) {
   const degreeLevel = resolveStringInput(body.degreeLevel === undefined ? undefined : (body.degreeLevel ?? null), profile.degreeLevel);
   const gpa = resolveNumberInput(clampNumber(body.gpa, 0, 100), profile.applicantContext?.gpa?profile.applicantContext.gpa.value:profile.gpa);
   const gpaScale = resolveNumberInput(clampNumber(body.gpaScale, 0.1, 100), profile.applicantContext?.gpa?profile.applicantContext.gpa.maximum:profile.gpaScale);
-  const ielts = resolveNumberInput(clampNumber(body.ielts, 0, 9), profile.ieltsScore);
-  const toefl = resolveNumberInput(clampNumber(body.toefl, 0, 120), recordedToefl(profile.applicantContext,profile.toeflScore).score);
+  const ielts = resolveNumberInput(examOverrides.ielts, profile.ieltsScore);
+  const toefl = resolveNumberInput(examOverrides.toefl, recordedToefl(profile.applicantContext,profile.toeflScore).score);
   const toeflOverridden=["toefl","toeflScale","toeflExamDate","toeflValidUntil","toeflSections"].some(key=>body[key]!==undefined);
   let toeflRecord;
   try{
     toeflRecord=toeflOverridden?parseApplicantContext({toefl:{score:toefl.value,scale:body.toeflScale??null,examDate:body.toeflExamDate??null,validUntil:body.toeflValidUntil??null,sections:body.toeflSections}})?.toefl:profile.applicantContext?.toefl;
   }catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Invalid TOEFL record",code:"applicant_context_invalid"},{status:400});}
-  const duolingo = resolveNumberInput(clampNumber(body.duolingo, 0, 160), profile.duolingoScore);
-  const sat = resolveNumberInput(clampNumber(body.sat, 0, 1600), profile.satScore);
-  const act = resolveNumberInput(clampNumber(body.act, 0, 36), profile.actScore);
+  const duolingo = resolveNumberInput(examOverrides.duolingo, profile.duolingoScore);
+  const sat = resolveNumberInput(examOverrides.sat, profile.satScore);
+  const act = resolveNumberInput(examOverrides.act, profile.actScore);
   const budgetUsd = resolveNumberInput(clampNumber(body.budgetUsd, 0, 1_000_000), profile.budgetAnnualUsd);
   const startYearRaw = clampNumber(body.startYear, 2024, 2032);
   const startYear = { value: startYearRaw ?? null, source: (startYearRaw === undefined ? "unknown" : "request") as InputSource };

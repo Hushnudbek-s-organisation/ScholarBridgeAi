@@ -1,0 +1,2 @@
+src/lib/savedUniCoverage.ts(68,167): error TS18047: 'fact' is possibly 'null'.
+src/lib/savedUniCoverage.ts(68,180): error TS18047: 'fact' is possibly 'null'.
