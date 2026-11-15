@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { writingReferenceNotes } from "@/lib/ai/writingReferenceNotes";
 import { db } from "@/db";
 import { savedScholarships, savedUniversities, scholarships, studentActivities, studentProfiles, universities } from "@/db/schema";
 import { callAI } from "@/lib/ai";
@@ -78,6 +79,9 @@ CRAFT RULES (graduate-level writing quality, never at the cost of the rules abov
 - No cliché openings ("Since I was a child...", "I have always been passionate about...", "From a young age..."). Paragraph 1 opens directly on the intellectual problem, research question, or formative project the student actually recorded.
 - Prefer active, evidence-driven academic verbs (designed, analyzed, implemented, investigated, negotiated) grounded strictly in the recorded facts and notes below; never inflate a recorded task into a claim it cannot carry.
 - Vary sentence rhythm; delete empty intensifiers ("very", "truly", "extremely") and hedging filler. Concise and specific beats long and impressive-sounding.
+
+REFERENCE WRITING CRITERIA (use only with the student’s supplied facts):
+${writingReferenceNotes("sop")}
 
 STUDENT-RECORDED PROFILE FACTS (include only if relevant; these are not independently verified):
 ${context.profileFacts.length ? context.profileFacts.map((fact) => `- ${fact}`).join("\n") : "- No academic scores, experience, or activity details are recorded in the profile."}
