@@ -370,7 +370,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const scopedPayload=async(base:Record<string,unknown>)=>{
       const rows=(base.programs??[]) as {id:number}[];
       const [institution,programmes]=await Promise.all([loadCatalogueFacts("university",[uniId]),loadCatalogueFacts("program",rows.map(row=>row.id))]);
-      return withScopedDetailRequirements(base,institution.get(uniId)??[],programmes,requirementContext);
+      const allCycles = (base.applicationCycles ?? []) as {
+        programId: number | null;
+        cycleYear: number | null;
+        academicYear: string | null;
+        deadline: string | null;
+        intake: string | null;
+        applicationType: string | null;
+        isVerified: boolean;
+      }[];
+      const seen = new Set<string>();
+      const applicationCycles = allCycles.filter((cycle) => {
+        if (programId != null && cycle.programId !== programId) return false;
+        const year = requirementContext.admissionCycle;
+        if (year && cycle.academicYear !== year && String(cycle.cycleYear) !== year) return false;
+        const key = [cycle.deadline, cycle.intake, cycle.applicationType, cycle.isVerified].join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return withScopedDetailRequirements({ ...base, applicationCycles },institution.get(uniId)??[],programmes,requirementContext);
     };
     const experimental=parseUniversitySort(searchParams.get("sort")).sort==="chance_desc";
     let programmeDiscovery:ReturnType<typeof universityProgrammeDiscovery>["programmeDiscovery"]|null=null;
@@ -801,7 +820,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
      * differ in any displayed field — deadline, intake, plan, verification —
      * stay separate; only exact duplicates collapse.
      */
-    const seenCycleKeys = new Set<string>();
     const cycles = cycleRows
       .map((c) => {
         // The row carries its own cycle_year. Deriving the year by parsing
@@ -816,6 +834,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         }
         return {
           id: c.id,
+          programId: c.programId,
           cycleYear: year,
           academicYear: c.academicYear,
           intake: c.intake,
@@ -834,12 +853,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           sourceUrl: c.sourceUrl ?? null,
           lastVerifiedAt: c.lastVerifiedAt ? new Date(c.lastVerifiedAt).toISOString() : null,
         };
-      })
-      .filter((c) => {
-        const key = [c.deadline, c.intake, c.applicationType, c.isVerified].join("|");
-        if (seenCycleKeys.has(key)) return false;
-        seenCycleKeys.add(key);
-        return true;
       });
 
     // ---------- Sources (resilient: unknown table shape must not crash the page) ----------
