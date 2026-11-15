@@ -10,13 +10,14 @@ Checked on 2026-11-15. Use a consenting presenter’s own profile. Leave unavail
 | Princeton Electrical and Computer Engineering | 231 | Undergraduate major. University-wide first-year admission. |
 | Princeton Mechanical and Aerospace Engineering | 232 | Undergraduate major. University-wide first-year admission. |
 | Princeton Economics | 240 | Undergraduate major. University-wide first-year admission. |
+| Tsinghua Zijing Global Talents in Science and Engineering | 421 | English-taught, four academic years. 2027 fees and both intake rounds verified in the programme guide. |
 | Tsinghua Zijing Urban Regeneration and Design | 422 | English-taught. Use the programme-specific 2027 guide for scope, selection and fee. |
 | Tsinghua Zhishan Politics, Economics and Sociology | 4619 | English-taught. Use the programme-specific 2027 guide for scope, selection and fee. |
 | Tsinghua–CUHK dual undergraduate Economics | 4620 | Round 2 only for the 2027 Tsinghua intake. Confirm campus-specific tuition before displaying a full-degree cost. |
 
 Princeton publishes USD 68,140 tuition for **2026–27**. This is a year-labelled reference figure. The current demo application is for entry in 2027, so display that year explicitly if using this figure. Sources [majors](https://admission.princeton.edu/academics/degrees-departments), [university-wide admissions scope](https://admission.princeton.edu/academics), [2026–27 cost](https://finaid.princeton.edu/how-aid-works/student-budget).
 
-Tsinghua primary sources [English programmes](https://international.join-tsinghua.edu.cn/English_Taught_Programs.htm), [Zijing Urban Regeneration](https://international.join-tsinghua.edu.cn/info/1082/1184.htm), [Zhishan](https://international.join-tsinghua.edu.cn/info/1082/1183.htm), [2027 schedule](https://international.join-tsinghua.edu.cn/Admission1/Schedule.htm).
+Tsinghua primary sources [English programmes](https://international.join-tsinghua.edu.cn/English_Taught_Programs.htm), [Zijing Global Talents](https://international.join-tsinghua.edu.cn/info/1082/1185.htm), [Zijing Urban Regeneration](https://international.join-tsinghua.edu.cn/info/1082/1184.htm), [Zhishan](https://international.join-tsinghua.edu.cn/info/1082/1183.htm), [2027 schedule](https://international.join-tsinghua.edu.cn/Admission1/Schedule.htm).
 
 ## Deadline and checklist cases
 
