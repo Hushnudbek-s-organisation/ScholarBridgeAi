@@ -18,10 +18,16 @@ isbotlamaydi.
 > sinang, backup oling va alohida operator tasdig'ini oling. `db:verify` bu
 > ruxsatlarni tekshirmaydi.
 
-> **Audit holati — 2026-10-14:** Drizzle manbasida 95 jadval va 1,050 ustun bor.
+> **Audit holati — 2026-11-15:** Drizzle manbasida 116 jadval va 1,274 ustun bor.
 > `npm run test:schema` repodagi DDL bilan offline tekshiruv; live Supabase yoki
-> production bazaga ulanilmadi va hech narsa o'zgartirilmadi. Shuning uchun
-> production schema **UNVERIFIED**. `supabase/remove_profile_match_tiers.sql`
+> production bazaga ulanilmadi va hech narsa o'zgartirilmadi. Scholly uchun
+> `scholly_profile`, `scholly_events` va `daily_missions` qo'shildi; migration
+> `supabase/scholly_profile_events_2026-11-15.sql` hali production bazaga
+> qo'llanmagan. Mission API'da egasi tekshiriladigan kunlik tanlov, skip/another
+> va ma'lumot bilan tasdiqlanadigan ball berish bor; mission kartasi dashboard'da
+> uchala tilda ishlaydi. Freeze/restore va bildirishnoma yuborish ulanmagan.
+> Production schema **UNVERIFIED**.
+> `supabase/remove_profile_match_tiers.sql`
 > `saved_universities.match_category`/`match_score` ustunlarini o'chiradi; u
 > tayyorlangan, lekin qo'llanmagan va alohida tasdiqsiz ishlatilmasin.
 
@@ -54,6 +60,7 @@ isbotlamaydi; UI/API yo'nalishi bo'yicha aniq xarita audit natijasida beriladi.
 | Ilova joyi (bo'lim) | Jadvalar | Qanday ma'lumot chiqadi / saqlanadi |
 |---|---|---|
 | **Profil / Autentifikatsiya** (kirish, onboarding) | `student_profiles` | Ism, email, **parol hashing** (hech qachon ochiq matn), GPA, Ielts/Toefl/SAT/GRE, byudjet, mamlakatlar, barqaror ID'li qiziqish yo'nalishlari (`study_interests`) va eski `target_major`, hujjatlar haqidagi to'liq profil (akademik, moliyaviy, sport, olimpiadalar), onboarding qadami, premium holati, parent-link |
+| **Scholly sozlamalari, onboarding va kundalik missiya** | `scholly_profile`, `scholly_events`, `daily_missions` | Profilga tegishli til/timezone/onboarding, bitta kunlik missiyaning deterministik holati, progress mezonlari va ballari; missiya API-si egalikni tekshiradi va ballni bir marta beradi. Freeze/restore va bildirishnoma yuborish hali ulanmagan. |
 | **Universitetlar sahifasi** (`/universities`) | `universities`, `university_rankings`, `university_sources` | Katalog nomi/mamlakati, mavjud reyting yozuvlari (provayder + yil), narx va talablar uchun maydonlar, manba/tekshiruv metama'lumoti; schema katalog qiymatlarining hozirgi to'g'riligini tasdiqlamaydi |
 | **Universitet ichida dasturlar** (programmasi) | `programs`, `program_requirements`, `application_cycles`, `program_sources` | Dastur, talab va application-cycle maydonlari; imtihon, GPA, portfolio, til va muddat talablari dasturga xos, rasmiy joriy manba bilan tekshiriladi (waiver/alternativlar ham bo'lishi mumkin) |
 | **Stipendiya markazi** (`/scholarships`) | `scholarships`, `scholarship_sources`, `scholarship_decisions` | Katalogda mavjud stipendiya maydonlari (beruvchi, qamrov, summa/muddat, eligibility, manba va status); mavjud yozuvning to'liqligi yoki yangiligi schema bilan kafolatlanmaydi |
@@ -1914,6 +1921,65 @@ must collapse colliding names before re-pointing the rest.
 | `sort_order` | integer |  | yes |  |
 | `created_at` | timestamp |  | yes |  |
 | `updated_at` | timestamp |  | yes |  |
+
+### `scholly_events`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `user_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
+| `type` | text |  | — | |
+| `payload` | jsonb |  | yes | Structured event payload; object only |
+| `created_at` | timestamp with time zone |  | yes | UTC |
+
+### `scholly_profile`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `user_id` | integer |  | — | PK and FK → student_profiles(id) on delete cascade |
+| `name_pref` | text | yes | — | Optional preferred name |
+| `name_confirmed` | boolean |  | yes | |
+| `lang` | text |  | yes | en / uz / ru |
+| `tone` | text |  | yes | friendly / short / serious |
+| `tz` | text |  | yes | Defaults to Asia/Tashkent |
+| `streak` | integer |  | yes | |
+| `longest_streak` | integer |  | yes | |
+| `freezes` | integer |  | yes | Bounded 0–2 |
+| `points` | integer |  | yes | |
+| `level` | integer |  | yes | |
+| `skin` | text |  | yes | |
+| `outfit` | jsonb |  | yes | Object |
+| `last_active_day` | date | yes | — | |
+| `notif_prefs` | jsonb |  | yes | Object; no sender is enabled by this migration |
+| `quiet_start` | text |  | yes | Defaults to 22:00 |
+| `quiet_end` | text |  | yes | Defaults to 07:00 |
+| `reminder_window` | text | yes | — | |
+| `telegram_chat_id` | text | yes | — | |
+| `onboarding_state` | text |  | yes | not_started / in_progress / skipped / completed |
+| `onboarding_step` | text |  | yes | |
+| `onboarding_answers` | jsonb |  | yes | Object |
+| `onboarded_at` | timestamp with time zone | yes | — | UTC |
+| `created_at` | timestamp with time zone |  | yes | UTC |
+| `updated_at` | timestamp with time zone |  | yes | UTC |
+
+### `daily_missions`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `user_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
+| `day` | date |  | — | One mission per profile and Scholly day (04:00 in saved timezone) |
+| `type` | text |  | — | fill_profile_fields / save_universities / upload_document / sop_paragraph |
+| `size_min` | integer |  | yes | Mission size; 1–5 |
+| `points` | integer |  | yes | 10 or 20; awarded only once on verified completion |
+| `target_count` | integer |  | yes | Deterministic completion threshold |
+| `criteria` | jsonb |  | yes | Baseline snapshot used to verify real profile/save/upload/SOP progress |
+| `theme` | text |  | yes | Deterministic day theme |
+| `is_star` | boolean |  | yes | Higher-point mission flag |
+| `status` | text |  | yes | pending / done / skipped |
+| `another_used` | boolean |  | yes | One replacement per day |
+| `created_at` | timestamp with time zone |  | yes | UTC |
+| `done_at` | timestamp with time zone | yes | — | UTC completion time |
 
 ## 5. Qanday bazaga qo'yiladi — tartib va ta'mirlash (fresh vs existing)
 

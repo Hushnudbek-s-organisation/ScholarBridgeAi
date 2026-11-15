@@ -1,29 +1,9 @@
 "use client";
 
-/**
- * AiOrbFaceAvatar — the circular AI Face Orb that fronts the visa interview
- * studio.
- *
- * It replaces the previous anthropomorphic officer portrait. That one drew a
- * human head with hair, a blazer, a tie and a nose, which made two claims the
- * product cannot honestly make: that the interviewer is a specific person, and
- * that the role has a gender. An orb is the honest shape — it presents a voice
- * and a state, and nothing about a body.
- *
- * The face is intentionally minimal, matching the supplied reference: one
- * solid-white circular face, two black oval eyes, and a small black mouth. No
- * colored rim, gradients, eye highlights, or tongue. It is one 220×220 SVG so
- * the silhouette stays circular at every size.
- *
- * The eyes blink and shift gaze with the interview state. The mouth lip-syncs:
- * `level` drives it when the browser exposes amplitude; otherwise
- * `useSpeechOscillator` supplies a syllable-rate cadence. State color belongs to
- * the surrounding waveform/status UI, not the face itself. Fixed SVG fills keep
- * the face white and features black in both light and dark themes.
- */
+import type { SpeakerStyle } from "@/lib/daily-speaking";
+import { SpeakingEffects } from "./SpeakingEffects";
 
-import React, { useEffect, useState, useSyncExternalStore } from "react";
-import { SVG_COLORS } from "@/components/ui/tokens";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 export type AiOrbFaceState = "LISTENING" | "THINKING" | "SPEAKING" | "IDLE";
 
@@ -66,7 +46,7 @@ function usePrefersReducedMotion(): boolean {
  * and a phrase-length gate, which reads as speech rather than as a metronome.
  * A `requestAnimationFrame` loop, so it lands at the display's 60fps.
  */
-function useSpeechOscillator(active: boolean, enabled: boolean): number {
+function useSpeechOscillator(active: boolean, enabled: boolean, rate: number): number {
   const [value, setValue] = useState(0);
   const running = active && enabled;
   useEffect(() => {
@@ -75,7 +55,7 @@ function useSpeechOscillator(active: boolean, enabled: boolean): number {
     const start = performance.now();
     const tick = (now: number) => {
       const t = (now - start) / 1000;
-      const syllable = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI * 6.5);
+      const syllable = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI * rate);
       const envelope = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI * 2.3 + 0.9);
       const gate = 0.55 + 0.45 * Math.sin(t * 2 * Math.PI * 1.15 + 2.1);
       setValue(Math.max(0, Math.min(1, syllable * (0.35 + 0.65 * envelope) * gate)));
@@ -83,7 +63,7 @@ function useSpeechOscillator(active: boolean, enabled: boolean): number {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [running]);
+  }, [running, rate]);
   // The idle value is derived, not written: resetting it from the effect would
   // cascade a render every time the orb stopped talking.
   return running ? value : 0;
@@ -187,6 +167,8 @@ export interface AiOrbFaceAvatarProps {
   state: AiOrbFaceState;
   /** 0–1 amplitude from the audio analyser (or mic) for the current turn. */
   level: number;
+  measuredAudio?: boolean;
+  temperament?: SpeakerStyle;
   /** Localized status pill copy, so this component stays translation-free. */
   statusLabel: string;
   roleLabel: string;
@@ -199,84 +181,37 @@ export function AiOrbFaceAvatar({
   state,
   level,
   statusLabel,
+  measuredAudio = false,
+  temperament = "calm",
   roleLabel,
   countryFlag,
   countryName,
 }: AiOrbFaceAvatarProps) {
   const reduced = usePrefersReducedMotion();
-  const blink = useBlink(state, reduced);
   const speaking = state === "SPEAKING";
-  const listening = state === "LISTENING";
-  const thinking = state === "THINKING";
-
-  // Real amplitude when the browser gives us one; a syllable-rate oscillator
-  // when the voice is `speechSynthesis`, which exposes none.
-  const oscillator = useSpeechOscillator(speaking, level < 0.02);
+  const rate = temperament === "fast" ? 9 : temperament === "irritated" ? 7 : 5.5;
+  const oscillator = useSpeechOscillator(speaking, !measuredAudio && !reduced, rate);
+  const blink = useBlink(state, reduced) && !reduced;
   const measured = speaking ? Math.min(1, Math.max(0, level) * 1.4) : 0;
-  const driven = speaking ? Math.max(0.12, measured || oscillator) : 0;
-  // Without motion the mouth still moves — a frozen open mouth reads as broken —
-  // it just does so calmly.
-  const mouthOpen = reduced && speaking ? 0.45 : driven;
-
-  const mouthH = 7 + mouthOpen * 17; // 7 → 24
-  const mouthW = 36 + mouthOpen * 6; // 36 → 42
-
-  // Where the gaze sits. Thinking looks up and to the side; listening drops a
-  // touch, which reads as attention rather than as a stare.
-  const gaze = thinking ? { x: 3, y: -2.5 } : listening ? { x: 0, y: 1 } : { x: 0, y: 0 };
-
-  /**
-   * scaleY(0.08) about each eye's own centre, composed AFTER the gaze shift so
-   * the lid closes on the eye wherever it happens to be looking.
-   */
-  const eyeTransform = (cx: number) =>
-    `translate(${gaze.x} ${gaze.y}) translate(${cx} 101) scale(1 ${blink ? 0.08 : 1}) translate(${-cx} -101)`;
+  const mouthOpen = speaking ? (reduced ? 0.45 : measuredAudio ? measured : oscillator) : 0;
 
   return (
     <div className="flex w-full flex-col items-center gap-4">
-      <div className="relative flex h-[248px] w-[248px] items-center justify-center">
-        {/* Minimal white face, matching the requested reference: no colored
-            rim, gradients, highlights, or skin tones. Only the features are black. */}
-        <svg
-          viewBox="0 0 220 220"
-          className="relative h-[208px] w-[208px] rounded-full drop-shadow-[0_8px_18px_rgba(0,0,0,0.12)]"
-          role="img"
-          aria-label={countryName ? `${roleLabel} — ${countryName}` : roleLabel}
-        >
-          <circle cx="110" cy="110" r="108" fill={SVG_COLORS.white} />
-          <g transform={eyeTransform(64)}>
-            <ellipse cx="64" cy="110" rx="17" ry="22" fill={SVG_COLORS.black} />
-          </g>
-          <g transform={eyeTransform(156)}>
-            <ellipse cx="156" cy="110" rx="17" ry="22" fill={SVG_COLORS.black} />
-          </g>
-
-          {/* Keep lip-sync, but use the same solid black as the resting mouth. */}
-          {speaking ? (
-            <rect
-              x={110 - mouthW / 2}
-              y={132 - mouthH / 2}
-              width={mouthW}
-              height={mouthH}
-              rx={mouthW / 2}
-              ry={mouthW / 2}
-              fill={SVG_COLORS.black}
-            />
-          ) : (
-            <path d="M 90 128 C 90 120, 130 120, 130 128 C 130 139, 90 139, 90 128 Z" fill={SVG_COLORS.black} />
-          )}
-        </svg>
-
-        {/* Country context on the rim. */}
-        {countryFlag && (
-          <span
-            className="absolute right-3 bottom-3 flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg shadow-md ring-2 ring-white/80 dark:bg-slate-800 dark:ring-slate-700"
-            title={countryName}
-            aria-hidden="true"
-          >
-            {countryFlag}
-          </span>
+      <div className={"sb-speaking-face-stage"} data-speaking-avatar data-state={state}
+        data-temperament={temperament}
+        role="img" aria-label={countryName ? `${roleLabel} — ${countryName}` : roleLabel}>
+        <div className={"sb-speaking-face-halo"} aria-hidden="true" />
+        {speaking && temperament !== "calm" && (
+          <SpeakingEffects effect={temperament} reduced={reduced}
+            className={temperament === "fast" ? "sb-speaking-face-electric" : "sb-speaking-face-fire"} />
         )}
+        <div className={"sb-speaking-face-shell"} aria-hidden="true">
+          <div className={"sb-speaking-face-visor"}>
+            <span className={"sb-speaking-face-eyes"} data-blink={blink || undefined}><i data-eye="left" /><i data-eye="right" /></span>
+            <span className={"sb-speaking-face-mouth"} style={{ transform: `scaleY(${1 + mouthOpen * 3.2})` }} />
+          </div>
+        </div>
+        {countryFlag && <span className={"sb-speaking-face-flag"} title={countryName} aria-hidden="true">{countryFlag}</span>}
       </div>
 
       <HudWave level={speaking ? mouthOpen : level} state={state} />

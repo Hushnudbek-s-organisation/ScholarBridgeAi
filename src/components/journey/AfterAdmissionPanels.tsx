@@ -1098,7 +1098,7 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
           );
         })()}
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
-      <AppNote kind="money" className="mt-2" />
+      <AppNote kind="money" variant="inline" compact className="mt-6" />
     </div>
   );
 }

@@ -400,7 +400,7 @@ check(
   "fallback speech volume responds to speech events and auto-submits after 2.2 seconds at three words",
   /rec\.onspeechstart = \(\) =>[\s\S]*?setVolume\(0\.82\)/.test(listeningStart) && /split\(\/\\s\+\/\)\.filter\(Boolean\)\.length < 3/.test(visaUi) && /}, 2_200\)/.test(visaUi),
 );
-const startInterviewSource = visaUi.slice(visaUi.indexOf("async function startInterview()"), visaUi.indexOf("async function runAnalysis()"));
+const startInterviewSource = visaUi.slice(visaUi.indexOf("async function startInterview(gender: VisaOfficerGender)"), visaUi.indexOf("async function runAnalysis()"));
 check(
   "interview start immediately renders and speaks the deterministic opening without awaiting Live or chat",
   /setMode\("fallback"\)/.test(startInterviewSource) && /buildInstantOpeningLine\(c, gender, activeProfile\?\.name\)/.test(startInterviewSource) && /pushMessage\(\{ role: "officer", text: openingLine \}\)/.test(startInterviewSource) && /fallbackSpeak\(openingLine\)/.test(startInterviewSource) && !/await (?:startLiveInterview|fetchOfficerReply)/.test(startInterviewSource),

@@ -134,6 +134,14 @@ const CURATED_CHECKS: Record<string, { name: string; expr: string }[]> = {
     { name: "ownership_transfers_status_check", expr: "status IN ('pending', 'accepted', 'completed', 'rejected', 'expired', 'cancelled')" },
     { name: "ownership_transfers_check", expr: "from_profile_id <> to_profile_id" },
   ],
+  daily_missions: [
+    { name: "daily_missions_status_check", expr: "status IN ('pending', 'done', 'skipped')" },
+    { name: "daily_missions_type_check", expr: "type IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph')" },
+    { name: "daily_missions_size_check", expr: "size_min BETWEEN 1 AND 5" },
+    { name: "daily_missions_target_count_check", expr: "target_count BETWEEN 1 AND 5000" },
+    { name: "daily_missions_points_check", expr: "points IN (10, 20)" },
+    { name: "daily_missions_criteria_object_check", expr: "jsonb_typeof(criteria) = 'object'" },
+  ],
 };
 
 // ---------------------------------------------------------------------------

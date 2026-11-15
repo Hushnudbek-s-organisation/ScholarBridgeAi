@@ -154,7 +154,8 @@ export function PaymentsSection({ activeProfile }: PaymentsSectionProps) {
             </h2>
             <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-white sb-ink-on-warm">{t("proBadge")}</span>
           </div>
-          <p className="mt-1 text-sm text-slate-600 break-words">{t("proSubtitle")}</p>
+          <p className="mt-3 text-xl font-extrabold leading-tight text-slate-900">{t("proHeadline")}</p>
+          <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-700 break-words">{t("proSubtitle")}</p>
           <ul className="mt-4 space-y-2.5">
             {PRO_FEATURES.map((f) => (
               <li key={f.key} className="flex items-start gap-2 text-sm text-slate-800">

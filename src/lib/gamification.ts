@@ -164,13 +164,14 @@ export async function awardPoints(
   profileId: number,
   points: number,
   reason: string,
-  relatedEntityId?: number | null
+  relatedEntityId?: number | null,
+  executor?: Executor
 ): Promise<AwardResult> {
   if (!Number.isSafeInteger(points) || points <= 0 || points > 2_147_483_647) {
     throw new Error("points must be a positive integer");
   }
 
-  return withProfileLock(profileId, async (tx) => {
+  const run = async (tx: Executor): Promise<AwardResult> => {
     // A repeat action still means the student studied today: record the day
     // BEFORE the duplicate check below, which would otherwise return early and
     // leave a re-watched lesson uncounted.
@@ -234,7 +235,13 @@ export async function awardPoints(
       level: currentLevel,
       newlyAwardedBadges,
     };
-  });
+  };
+
+  if (executor) {
+    await executor.execute(sql`SELECT id FROM student_profiles WHERE id = ${profileId} FOR NO KEY UPDATE`);
+    return run(executor);
+  }
+  return withProfileLock(profileId, run);
 }
 
 /** Evaluate a single badge's criteria for a profile. */
@@ -314,7 +321,7 @@ const STREAK_HISTORY_DAYS = 400;
 const STREAK_HISTORY_MAX_ROWS = 20_000;
 
 /** Return the full gamification snapshot for a profile. */
-export async function getGamification(profileId: number, timeZone = "UTC") {
+export async function getGamification(profileId: number, timeZone = "Asia/Tashkent", dayStartHour = 4) {
   const row = await ensureUserPoints(profileId);
   const levelRows = await getLevels();
   const level = computeLevel(row.totalPoints, levelRows);
@@ -349,7 +356,8 @@ export async function getGamification(profileId: number, timeZone = "UTC") {
   const streak = computeDailyStreak(
     streakActivity.map((entry) => entry.createdAt),
     new Date(),
-    timeZone
+    timeZone,
+    dayStartHour
   );
   // The `ledger` payload is the points history the UI may show — the 0-point
   // activity markers are internal bookkeeping and stay out of it.

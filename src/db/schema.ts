@@ -117,6 +117,72 @@ export const studentProfiles = pgTable("student_profiles", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Scholly's additive companion profile. The user_id is the authenticated
+// student_profiles.id; no duplicate account identity is created.
+export const schollyProfiles = pgTable("scholly_profile", {
+  userId: integer("user_id").primaryKey().references(() => studentProfiles.id, { onDelete: "cascade" }),
+  namePref: text("name_pref"),
+  nameConfirmed: boolean("name_confirmed").notNull().default(false),
+  lang: text("lang").notNull().default("uz"),
+  tone: text("tone").notNull().default("friendly"),
+  tz: text("tz").notNull().default("Asia/Tashkent"),
+  streak: integer("streak").notNull().default(0),
+  longestStreak: integer("longest_streak").notNull().default(0),
+  freezes: integer("freezes").notNull().default(0),
+  points: integer("points").notNull().default(0),
+  level: integer("level").notNull().default(1),
+  skin: text("skin").notNull().default("default"),
+  outfit: jsonb("outfit").notNull().default({}),
+  lastActiveDay: date("last_active_day"),
+  notifPrefs: jsonb("notif_prefs").notNull().default({}),
+  quietStart: text("quiet_start").notNull().default("22:00"),
+  quietEnd: text("quiet_end").notNull().default("07:00"),
+  reminderWindow: text("reminder_window"),
+  telegramChatId: text("telegram_chat_id"),
+  onboardingState: text("onboarding_state").notNull().default("not_started"),
+  onboardingStep: text("onboarding_step").notNull().default("name"),
+  onboardingAnswers: jsonb("onboarding_answers").notNull().default({}),
+  onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const schollyEvents = pgTable("scholly_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+  type: text("type").notNull(),
+  payload: jsonb("payload").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("idx_scholly_events_user_type_created").on(table.userId, table.type, table.createdAt),
+]);
+
+export const dailyMissions = pgTable("daily_missions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+  day: date("day").notNull(),
+  type: text("type").notNull(),
+  sizeMin: integer("size_min").notNull().default(3),
+  points: integer("points").notNull().default(10),
+  targetCount: integer("target_count").notNull().default(1),
+  criteria: jsonb("criteria").notNull().default({}),
+  theme: text("theme").notNull().default("plan"),
+  isStar: boolean("is_star").notNull().default(false),
+  status: text("status").notNull().default("pending"),
+  anotherUsed: boolean("another_used").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  doneAt: timestamp("done_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("uq_daily_missions_user_day").on(table.userId, table.day),
+  index("idx_daily_missions_user_status_day").on(table.userId, table.status, table.day),
+  check("daily_missions_status_check", sql`${table.status} IN ('pending', 'done', 'skipped')`),
+  check("daily_missions_type_check", sql`${table.type} IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph')`),
+  check("daily_missions_size_check", sql`${table.sizeMin} BETWEEN 1 AND 5`),
+  check("daily_missions_target_count_check", sql`${table.targetCount} BETWEEN 1 AND 5000`),
+  check("daily_missions_points_check", sql`${table.points} IN (10, 20)`),
+  check("daily_missions_criteria_object_check", sql`jsonb_typeof(${table.criteria}) = 'object'`),
+]);
+
 export const universities = pgTable("universities", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),

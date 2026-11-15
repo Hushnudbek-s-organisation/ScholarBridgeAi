@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
 import { getGamification } from "@/lib/gamification";
+import { db } from "@/db";
+import { schollyProfiles } from "@/db/schema";
+import { eq } from "drizzle-orm";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -16,10 +19,11 @@ export async function GET(req: Request) {
         { status: access.status }
       );
     }
-    // Use the caller's calendar zone for streak day boundaries. The pure
-    // streak helper safely falls back to UTC for invalid timezone identifiers.
-    const timeZone = (searchParams.get("timeZone") ?? "UTC").slice(0, 100);
-    const snapshot = await getGamification(profileId, timeZone);
+    // Streak boundaries use the timezone saved to the authenticated Scholly
+    // profile. Ignore legacy client query parameters: the server owns the day.
+    const [preferences] = await db.select({ timeZone: schollyProfiles.tz })
+      .from(schollyProfiles).where(eq(schollyProfiles.userId, profileId)).limit(1);
+    const snapshot = await getGamification(profileId, preferences?.timeZone ?? "Asia/Tashkent", 4);
     return NextResponse.json(snapshot);
   } catch (error) {
     console.error("GET /api/gamification error:", error);

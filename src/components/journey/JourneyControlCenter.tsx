@@ -764,13 +764,22 @@ export function JourneyControlCenter({
 
   return (
     <div className="space-y-5" data-testid="journey-dashboard">
-      <DashboardOverview data={data} primaryTitle={primaryStep ? nextStepTitle(primaryStep) : t("ccNothingOutstanding")}
+      <DashboardOverview
+        data={data}
+        primaryTitle={primaryStep ? nextStepTitle(primaryStep) : t("ccNothingOutstanding")}
         primaryDetail={primaryStep ? nextStepDetail(primaryStep) : t("ccNothingOutstandingHint")}
-        primaryLabel={primaryStep ? actionLabelForStep(t,primaryStep.id,primaryStep.tab) : t("ccContinue",{stage:currentStageLabel})}
-        primaryTab={primaryStep?.tab ?? journey.continueTab} currentStage={currentStageLabel}
-        onNavigate={onNavigateTab}/>
+        primaryLabel={primaryStep ? actionLabelForStep(t, primaryStep.id, primaryStep.tab) : t("ccContinue", { stage: currentStageLabel })}
+        primaryTab={primaryStep?.tab ?? journey.continueTab}
+        currentStage={currentStageLabel}
+        onNavigate={onNavigateTab}
+        getStepTitle={nextStepTitle}
+        getStepDetail={nextStepDetail}
+      />
 
-      <details className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-surface"><summary className="cursor-pointer text-sm font-semibold">{t("overviewJourneyDetails")}</summary>
+      <details className="sb-dashboard-disclosure">
+        <summary className="cursor-pointer font-semibold">{t("overviewJourneyDetails")}</summary>
+        <div className="mt-4 space-y-5">
+
       <JourneyCard tone="hero">
         <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-5">
           <div className="min-w-0">
@@ -907,7 +916,6 @@ export function JourneyControlCenter({
 
       </JourneyCard>
 
-      </details>
 
       {/* ---- 2. Next steps ----------------------------------------------- */}
       {remainingSteps.length > 0 && <JourneyCard title={t("ccNextStepsTitle")} subtitle={t("ccNextStepsSubtitle")}>
@@ -1319,6 +1327,8 @@ export function JourneyControlCenter({
       </JourneyCard>
       {starterActivity.applications === 0 && !starterComplete && <DashboardStarterHelp key={data.profile.id} profileId={data.profile.id} activity={starterActivity} onNavigateTab={onNavigateTab}/>}
       {afterOverview && <details className="sb-dashboard-disclosure"><summary>{t("overviewRewards")}</summary>{afterOverview}</details>}
+        </div>
+      </details>
     </div>
   );
 }

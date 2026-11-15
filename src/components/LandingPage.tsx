@@ -12,14 +12,8 @@ import { SVG_COLORS } from "@/components/ui/tokens";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-// main (PR #132) moved the testimonials/FAQ and the QS marquee into
-// idle-deferred chunks. The two direct imports below are intentionally NOT
-// restored: DeferredBelowFold renders both of them dynamically, so keeping
-// the eager imports would defeat the first-load budget and leave unused
-// imports (lint error). Our next/image fix is kept for the two photos that
-// still render inline in this file.
-const DeferredBelowFold = dynamic(
-  () => import("./landing/DeferredBelowFold").then((m) => m.DeferredBelowFold),
+const PremiumFAQ = dynamic(
+  () => import("./landing/PremiumFAQ").then((m) => m.PremiumFAQ),
   { ssr: false, loading: () => null },
 );
 const DeferredMarquee = dynamic(
@@ -54,36 +48,14 @@ import {
   Award,
   Bot,
   CheckCircle2,
-  CheckSquare,
   Compass,
-  Crown,
   ExternalLink,
-  FileText,
-  FolderOpen,
-  Gift,
   GraduationCap,
-  HandCoins,
-  LayoutDashboard,
-  ListChecks,
-  MessagesSquare,
-  PiggyBank,
-  Plane,
-  Route,
-  Search,
   Send,
   ShieldCheck,
   Sparkles,
-  Target,
-  Trophy,
   Wallet,
 } from "lucide-react";
-import {
-  NAV_GROUPS,
-  NAV_GROUP_I18N,
-  NAV_SECTIONS,
-  NAV_SECTION_LABEL_KEYS,
-  NAV_UTILITY_SECTIONS,
-} from "@/lib/navSections";
 import { AppNote } from "./AppNote";
 import { toWikimediaThumb, onWikimediaThumbError, viaImageProxy, campusPhotoSrc } from "@/lib/wikimediaThumb";
 import { Button } from "@/components/ui/Button";
@@ -202,11 +174,8 @@ const scrollEngine = (() => {
       velocity = Math.abs(moved) * 0.8 + velocity * 0.2;
       subs.forEach((fn) => fn());
       raf = requestAnimationFrame(step);
-    } else if (smooth !== target) {
+    } else {
       smooth = target;
-      velocity = 0;
-      subs.forEach((fn) => fn());
-    } else if (velocity !== 0) {
       velocity = 0;
       subs.forEach((fn) => fn());
     }
@@ -224,6 +193,7 @@ const scrollEngine = (() => {
     if (typeof ResizeObserver !== "undefined") {
       resizeObserver = new ResizeObserver(onResize);
       resizeObserver.observe(document.documentElement);
+      resizeObserver.observe(document.body);
     }
   };
   const subscribe = (fn: ScrollSubscriber) => {
@@ -687,12 +657,7 @@ export function LandingPage({
   onSignIn,
 }: LandingPageProps) {
   const t = useTranslations("landing");
-  const nav = useTranslations("nav");
   const tm = useTranslations("meta");
-  // The preview mirrors the real dashboard, so it reads the dashboard's own
-  // strings instead of keeping a second, drifting copy of them.
-  const td = useTranslations("dashboard");
-
   /**
    * Phone/tablet menu. The four section links used to live in an
    * `overflow-x-auto` strip, so on a 320-390px screen the last one ("Planning"
@@ -703,6 +668,7 @@ export function LandingPage({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const heroMockRef = useRef<HTMLDivElement | null>(null);
+  const flightDestination = useRef<HTMLSpanElement | null>(null);
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -786,91 +752,10 @@ export function LandingPage({
     { num: "3", title: t("r3Title"), text: t("r3Text"), tag: t("roadTag3") },
   ];
 
-  /**
-   * The dashboard preview is built from the SAME navigation source of truth
-   * the app itself uses (`NAV_SECTIONS` groups + the `nav` translations) and
-   * from the dashboard's own copy (`dashboard` namespace). The preview used to
-   * be a hand-written list of flat, pre-reorganization links, which is exactly
-   * how it ended up advertising an old dashboard for months. Deriving it here
-   * means it cannot drift again.
-   */
-  const mockIcon: Record<
-    string,
-    React.ComponentType<{ className?: string }>
-  > = {
-    dashboard: LayoutDashboard,
-    universities: Search,
-    scholarships: Award,
-    "study-plan": Route,
-    tasks: ListChecks,
-    profile: Target,
-    funding: PiggyBank,
-    applications: CheckSquare,
-    materials: FolderOpen,
-    offers: Trophy,
-    "post-admission-funding": HandCoins,
-    visa: Plane,
-    guidance: Bot,
-    community: MessagesSquare,
-  };
-  const mockSidebarGroups = NAV_GROUPS.map((group) => ({
-    id: group,
-    label: nav(NAV_GROUP_I18N[group] as never),
-    items: NAV_SECTIONS.filter((section) => section.group === group)
-      .map((section) => ({
-        id: section.id,
-        label: nav(NAV_SECTION_LABEL_KEYS[section.id] as never),
-        icon: mockIcon[section.id] ?? Sparkles,
-        pro: Boolean(section.premium),
-      })),
-  })).filter((group) => group.items.length > 0);
-  const mockAccountItems = NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).map(
-    (u) => ({
-      id: u.id,
-      label: nav(NAV_SECTION_LABEL_KEYS[u.id] as never),
-      icon:
-        u.id === "payments" ? Crown : u.id === "notifications" ? Send : Gift,
-      pro: Boolean(u.premium),
-    }),
-  );
-
-  // Sample numbers on purpose — the title bar labels the whole panel as
-  // "Demo · sample data". Every label is the string the real dashboard uses.
-  const mockStats = [
-    {
-      label: td("statShortlisted"),
-      value: "12",
-      sub: td("statShortlistedSub"),
-      icon: GraduationCap,
-      tone: "bg-indigo-50 text-indigo-600",
-    },
-    {
-      label: td("statScholarships"),
-      value: "5",
-      sub: td("statScholarshipsSub"),
-      icon: Award,
-      tone: "bg-emerald-50 text-emerald-600",
-    },
-    {
-      label: td("statMilestones"),
-      value: "7",
-      sub: td("statMilestonesSub"),
-      icon: CheckCircle2,
-      tone: "bg-amber-50 text-amber-600",
-    },
-    {
-      label: td("statSop"),
-      value: td("statSopReady"),
-      sub: td("statSopSub"),
-      icon: FileText,
-      tone: "bg-violet-50 text-violet-600",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-canvas font-sans text-slate-900 antialiased selection:bg-indigo-600 selection:text-white dark:bg-canvas dark:text-white dark:selection:bg-indigo-300 dark:selection:text-slate-950">
       {/* Flight path lives underneath content so it never covers text/CTAs. */}
-      <ScrollFlightPath />
+      <ScrollFlightPath destination={flightDestination} />
       <PhotoCraftKineticHud />
 
       {/* All foreground must sit above the jet. Gutters keep ruler/words clear. */}
@@ -1054,12 +939,6 @@ export function LandingPage({
               >
                 {t("heroBody")}
               </Motion.p>
-              <Motion.p
-                variants={heroStaticItem}
-                className="mt-3 max-w-[620px] text-sm font-medium leading-relaxed text-slate-500 dark:text-slate-400"
-              >
-                {t("heroAudienceNote")}
-              </Motion.p>
               <Motion.div
                 variants={heroStaticItem}
                 className="mt-6 flex flex-wrap items-center gap-3"
@@ -1076,20 +955,6 @@ export function LandingPage({
                 >
                   {t("ctaHow")}
                 </Button>
-              </Motion.div>
-              <Motion.div
-                variants={heroStaticItem}
-                className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-slate-600 dark:text-slate-300"
-              >
-                {[t("trust1"), t("trust2"), t("trust3")].map((item) => (
-                  <span key={item} className="inline-flex items-center gap-1.5">
-                    <CheckCircle2
-                      className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-300"
-                      aria-hidden
-                    />
-                    {item}
-                  </span>
-                ))}
               </Motion.div>
               <Motion.div
                 variants={heroStaticItem}
@@ -1125,6 +990,7 @@ export function LandingPage({
                 branch. Both sides are kept: no visual regression, no full
                 framer-motion bundle pulled back into the first load. */}
             <Motion.div
+              ref={heroMockRef}
               className="relative mx-auto w-full max-w-[760px] md:max-w-[720px] lg:max-w-[820px]"
               initial={false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1145,185 +1011,17 @@ export function LandingPage({
                       {t("demoBadge")}
                     </span>
                   </div>
-                  <div className="grid min-h-[300px] grid-cols-1 sm:grid-cols-[188px_1fr]">
-                    <aside className="hidden border-r border-slate-200 bg-canvas p-2 py-1.5 dark:border-slate-800 dark:bg-canvas sm:block">
-                      <div className="mb-2 flex items-center gap-1.5 px-1">
-                        <span className="sb-logo-well grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-control border border-slate-200 dark:border-slate-800">
-                          <BrandingImage
-                            alt={t("logoAlt")}
-                            className="h-full w-full object-cover"
-                          />
-                        </span>
-                        <span className="text-xs font-black text-slate-900 dark:text-white">
-                          ScholarBridge
-                        </span>
-                        <span className="rounded-control bg-indigo-50 px-1 text-xs font-black text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
-                          AI
-                        </span>
-                      </div>
-                      {mockSidebarGroups.map((group) => (
-                        <div key={group.id} className="mb-0.5">
-                          <div className="px-2 pb-0 pt-0.5 text-xs font-black uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
-                            {group.label}
-                          </div>
-                          {group.items.map(({ id, label, icon: Icon, pro }) => (
-                            <div
-                              key={id}
-                              className={`mb-px flex items-center gap-1 rounded-control px-2 py-0.5 text-xs font-semibold leading-tight ${
-                                id === "dashboard"
-                                  ? "bg-indigo-600 text-white dark:bg-indigo-500 dark:text-white"
-                                  : pro
-                                    ? "border border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-300"
-                                    : "text-slate-600 dark:text-slate-300"
-                              }`}
-                            >
-                              <Icon
-                                className="h-2.5 w-2.5 shrink-0"
-                                aria-hidden
-                              />
-                              <span className="min-w-0 flex-1 break-words">{label}</span>
-                              {pro && (
-                                <span className="ml-auto shrink-0 rounded-control bg-amber-100 px-1 text-xs font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
-                                  PRO
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                      <div className="mt-0.5 border-t border-slate-200 pt-0.5 dark:border-slate-800">
-                        <div className="px-2 pb-0 text-xs font-black uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
-                          {nav("accountCluster")}
-                        </div>
-                        {mockAccountItems.map(
-                          ({ id, label, icon: Icon, pro }) => (
-                            <div
-                              key={id}
-                              className={`mb-px flex items-center gap-1 rounded-control px-2 py-0.5 text-xs font-semibold leading-tight ${pro ? "border border-amber-200 text-amber-700 dark:border-amber-500/30 dark:text-amber-300" : "text-slate-600 dark:text-slate-300"}`}
-                            >
-                              <Icon
-                                className="h-2.5 w-2.5 shrink-0"
-                                aria-hidden
-                              />
-                              <span className="min-w-0 flex-1 break-words">{label}</span>
-                              {pro && (
-                                <span className="ml-auto shrink-0 rounded-control bg-amber-100 px-1 text-xs font-black text-amber-800 dark:bg-amber-500/20 dark:text-amber-200">
-                                  PRO
-                                </span>
-                              )}
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </aside>
-
-                    <div className="bg-slate-50 p-2.5 dark:bg-canvas sm:p-3">
-                      <div className="flex gap-3 rounded-overlay bg-gradient-to-br from-hero-from via-hero-via to-hero-to p-3 text-white dark:border dark:border-indigo-500/20 dark:from-hero-from dark:via-hero-via dark:to-hero-to">
-                        <div className="min-w-0 flex-1">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-xs font-semibold">
-                            <Sparkles
-                              className="h-2.5 w-2.5 text-amber-300"
-                              aria-hidden
-                            />{" "}
-                            {t("mockActiveApplicant")}
-                          </span>
-                          <div className="mt-2 text-sm font-black leading-tight sm:text-sm">
-                            {td("heroTitle")}
-                          </div>
-                          <p className="mt-1.5 text-sm leading-snug text-slate-300">
-                            {t("mockHubSub")}
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-1 text-xs font-semibold">
-                            <span className="inline-flex items-center gap-0.5 rounded-control bg-white/10 px-1.5 py-0.5">
-                              <GraduationCap
-                                className="h-2.5 w-2.5"
-                                aria-hidden
-                              />{" "}
-                              {t("mockChipBachelor")}
-                            </span>
-                            <span className="inline-flex items-center gap-0.5 rounded-control bg-white/10 px-1.5 py-0.5">
-                              <Wallet
-                                className="h-2.5 w-2.5 text-emerald-300"
-                                aria-hidden
-                              />{" "}
-                              $25 000/yr
-                            </span>
-                            <span className="inline-flex items-center gap-0.5 rounded-control bg-white/10 px-1.5 py-0.5">
-                              <Trophy
-                                className="h-2.5 w-2.5 text-amber-300"
-                                aria-hidden
-                              />{" "}
-                              {t("mockChipPubs")}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="hidden w-[108px] shrink-0 flex-col items-center rounded-surface border border-white/20 p-2 sm:flex">
-                          <div className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                            {td("readinessLabel")}
-                          </div>
-                          <div className="my-1.5 grid h-12 w-12 place-items-center rounded-full border-[3px] border-indigo-400/70">
-                            <span className="text-base font-black text-amber-300">
-                              47<small className="text-xs">%</small>
-                            </span>
-                          </div>
-                          <div className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-control bg-gradient-to-r from-amber-400 to-orange-500 py-1 text-xs font-black text-slate-950 sb-ink-on-warm">
-                            <Bot className="h-2.5 w-2.5" aria-hidden />{" "}
-                            {td("runAudit")}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        {mockStats.map(
-                          ({ label, value, sub, icon: Icon, tone }) => (
-                            <div
-                              key={label}
-                              className="rounded-surface border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-surface"
-                            >
-                              <div className="flex items-start justify-between gap-1">
-                                <small className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                  {label}
-                                </small>
-                                <span
-                                  className={`grid h-4 w-4 place-items-center rounded-control ${tone}`}
-                                >
-                                  <Icon className="h-2.5 w-2.5" aria-hidden />
-                                </span>
-                              </div>
-                              <strong className="mt-1 block text-base font-black text-slate-950 dark:text-white">
-                                {value}
-                              </strong>
-                              <span className="text-xs text-slate-600 dark:text-slate-300">
-                                {sub}
-                              </span>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                      <div className="mt-3 rounded-surface border border-indigo-200 bg-white p-3 dark:border-indigo-500/30 dark:bg-surface">
-                        <div className="flex items-center gap-1 text-xs font-black text-indigo-700 dark:text-indigo-300">
-                          <Compass className="h-3 w-3" aria-hidden />{" "}
-                          {td("portfolioTitle")}
-                        </div>
-                        <p className="mt-1.5 text-sm leading-snug text-slate-500 dark:text-slate-400">
-                          {t("mockPortfolioNote")}
-                        </p>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="inline-flex max-w-[200px] flex-col rounded-surface border border-slate-200 bg-white px-2.5 py-1.5 text-left shadow-sm dark:border-slate-700 dark:bg-surface">
-                          <span className="text-xs font-bold leading-none text-slate-500 dark:text-slate-400">{t("mockFloatGrantLabel")}</span>
-                          <span className="mt-0.5 line-clamp-2 text-xs font-black leading-tight text-slate-900 dark:text-white">{t("mockFloatGrantTitle")}</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-surface border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
-                          {t("mockFloatFitLabel")} · {t("mockFloatFitValue")}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <Image
+                    src="/landing/dashboard-current.webp"
+                    alt={t("demoBadge")}
+                    width={1280}
+                    height={885}
+                    sizes="(max-width: 1023px) 94vw, 48vw"
+                    loading="eager"
+                    className="block h-auto w-full"
+                  />
                 </div>
               </div>
-              {/* Floating badges removed — content now inline inside mock (no overflow) */}
-              <div className="sr-only" aria-hidden="true" hidden />
             </Motion.div>
           </div>
         </section>
@@ -1362,7 +1060,7 @@ export function LandingPage({
                     sizes="(max-width: 640px) 94vw, (max-width: 1024px) 47vw, 25vw"
                     loading="lazy"
                     unoptimized
-                    className="aspect-[16/10] w-full object-cover"
+                    className="aspect-[16/10] w-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.035]"
                   />
                   <div className="p-2">{step.mini}</div>
                   <div className="flex flex-1 flex-col px-3 pb-3 pt-3">
@@ -1435,16 +1133,20 @@ export function LandingPage({
                     </div>
                   </div>
                   {/* Pipeline */}
-                  <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
+                  <Motion.div
+                    className="mt-5 flex items-center gap-2 overflow-x-auto pb-1"
+                    viewport={{ once: true, amount: 0.5 }}
+                    onViewportEnter={(entry) => entry?.target.setAttribute("data-pipeline-entered", "")}
+                  >
                     {[t("featPipeline1"), t("featPipeline2"), t("featPipeline3"), t("featPipeline4")].map((label, i) => (
                       <React.Fragment key={label}>
-                        <span className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${i === 0 ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-500 dark:bg-indigo-500" : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"}`}>
+                        <span data-sequence-step style={{ "--sequence-delay": `${i * 290}ms` } as React.CSSProperties} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${i === 0 ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-500 dark:bg-indigo-500" : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"}`}>
                           {label}
                         </span>
-                        {i < 3 && <span className="h-px w-6 shrink-0 bg-slate-200 dark:bg-slate-700" aria-hidden />}
+                        {i < 3 && <span data-sequence-link style={{ "--sequence-delay": `${i * 290 + 220}ms` } as React.CSSProperties} className="h-px w-6 shrink-0 bg-slate-200 dark:bg-slate-700" aria-hidden />}
                       </React.Fragment>
                     ))}
-                  </div>
+                  </Motion.div>
                 </div>
                 {/* Advisor mock */}
                 <div className="border-t border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-canvas sm:p-6 lg:border-l lg:border-t-0">
@@ -1523,10 +1225,6 @@ export function LandingPage({
                   ))}
                 </div>
               </div>
-              <div className="mt-4 rounded-surface border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/30 dark:bg-amber-500/10">
-                <div className="text-sm font-black text-amber-800 dark:text-amber-200">{t("chanceWhyTitle")}</div>
-                <p className="mt-1 text-sm leading-relaxed text-amber-900 dark:text-amber-200">{t("chanceWhyText")}</p>
-              </div>
               <ul className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-200">
                 {[t("chanceLi1"), t("chanceLi2"), t("chanceLi3")].map(
                   (item) => (
@@ -1598,7 +1296,7 @@ export function LandingPage({
         {/* ===== Roadmap — connected spine ===== */}
         <section
           id="roadmap"
-          className="sb-cv-section scroll-mt-16 border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10"
+          className="sb-cv-section sb-roadmap scroll-mt-16 border-b border-slate-200 bg-canvas py-8 dark:border-slate-800 sm:py-10"
         >
           <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <div className="mx-auto mb-6 max-w-[720px] text-center">
@@ -1620,7 +1318,10 @@ export function LandingPage({
                 {roadItems.map((item, idx) => (
                   <RevealItem
                     key={item.num}
-                    className={`relative rounded-overlay border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-surface sm:w-[calc(50%-20px)] ${idx % 2 === 0 ? "sm:mr-auto" : "sm:ml-auto"}`}
+                    viewport={{ once: true, amount: 0.22, margin: "0px 0px 36px 0px" }}
+                    onViewportEnter={(entry) => entry?.target.setAttribute("data-roadmap-entered", "")}
+                    style={{ "--sequence-delay": `${idx * 330}ms` } as React.CSSProperties}
+                    className={`relative rounded-overlay border border-slate-200 bg-white p-5 motion-safe:transition-[box-shadow,border-color] motion-safe:hover:border-indigo-400 motion-safe:hover:shadow-lg motion-safe:hover:shadow-indigo-500/15 dark:border-slate-800 dark:bg-surface sm:w-[calc(50%-20px)] ${idx % 2 === 0 ? "sm:mr-auto" : "sm:ml-auto"}`}
                   >
                     {/* Dot on spine */}
                     <span aria-hidden className="absolute top-6 hidden h-3 w-3 rounded-full border-2 border-indigo-600 bg-white dark:border-indigo-400 dark:bg-surface sm:block" style={idx % 2 === 0 ? { right: "-26px" } : { left: "-26px" }} />
@@ -1643,48 +1344,10 @@ export function LandingPage({
           </div>
         </section>
 
-        {/* ===== Telegram strip ===== */}
-        <section className="border-b border-slate-200 bg-canvas py-7 dark:border-slate-800 sm:py-8">
-          <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
-            <div className="overflow-hidden rounded-overlay border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 shadow-sm dark:border-indigo-500/20 dark:from-indigo-500/10 dark:via-surface dark:to-violet-500/10 dark:bg-surface sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
-                    {t("secTelegram")} · <span className="font-mono text-xs font-bold normal-case tracking-normal text-slate-500 dark:text-slate-400">{PUBLIC_TELEGRAM_HANDLE}</span>
-                  </div>
-                  <div className="mt-1 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">{t("tgEyebrow")}</div>
-                  <h3 className="mt-1 text-lg font-black leading-tight text-slate-950 dark:text-white sm:text-xl">
-                    {t("tgTitle")}
-                  </h3>
-                  <p className="mt-1.5 max-w-[640px] text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                    {t("tgBody")}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {[t("tgPill1"), t("tgPill2"), t("tgPill3")].map((pill) => (
-                      <span key={pill} className="rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-500/30 dark:bg-slate-900 dark:text-indigo-300">
-                        {pill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <a
-                  href={PUBLIC_TELEGRAM_CHANNEL_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-surface bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-md shadow-indigo-600/20 transition hover:-translate-y-px hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-indigo-400 dark:focus-visible:ring-offset-surface"
-                >
-                  <Send className="h-4 w-4" aria-hidden /> {t("tgCta")}
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ===== Premium Testimonials + FAQ — deferred after idle to keep first-load JS <1300KB (shared shell <1200KB) ===== */}
-        <DeferredBelowFold />
+        <PremiumFAQ />
 
         {/* ===== CTA ===== */}
-        <section id="cta" className="sb-cv-section scroll-mt-20 bg-canvas py-8 sm:py-10">
+        <section id="cta" className="scroll-mt-20 bg-canvas py-8 sm:py-10">
           <div className="mx-auto w-[min(1180px,94%)] md:pr-14 xl:pr-40 2xl:pr-28">
             <Reveal>
               <div className="sb-cta-banner relative overflow-hidden rounded-overlay border border-indigo-900/20 px-6 py-10 text-center shadow-xl shadow-indigo-900/15 dark:border-indigo-500/20 sm:px-14 sm:py-12">
@@ -1709,9 +1372,12 @@ export function LandingPage({
                     />{" "}
                     {t("ctaBadge")}
                   </div>
-                  <h2 className="mt-4 text-3xl font-black tracking-[-0.035em] text-white sm:text-[43px]">
-                    {t("ctaTitle")}
-                  </h2>
+                  <div className="relative mx-auto w-fit max-w-full">
+                    <h2 className="mt-4 text-3xl font-black tracking-[-0.035em] text-white sm:text-[43px]">
+                      {t("ctaTitle")}
+                    </h2>
+                    <span ref={flightDestination} data-flight-destination aria-hidden className="pointer-events-none absolute right-3 -top-4 h-px w-px lg:-right-10 lg:top-1/2" />
+                  </div>
                   <p className="mx-auto mt-2 max-w-[620px] text-sm leading-relaxed text-indigo-100 sm:text-base">
                     {t("ctaText")}
                   </p>
@@ -1748,9 +1414,6 @@ export function LandingPage({
               </span>
               {tm("appName")} · ScholarBridge AI
             </div>
-            <p className="mt-2 max-w-[420px] text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-              {t("heroBody")}
-            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href="/universities" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200">{t("browsePublicCatalog")}</Link>
               <span className="text-slate-300 dark:text-slate-600">·</span>
@@ -1804,7 +1467,7 @@ export function LandingPage({
 }
 /**
  * The jet's route for the whole scroll story. Unlike a flat "slide along a
- * polyline" mascot, this 3320-unit path is an aerobatic sequence: a long
+ * polyline" mascot, this path is an aerobatic sequence: a long
  * descending S-cruise, a VICTORY LOOP (34–48 % of scroll — the tangent turns
  * through a full ~360°), a BARREL ROLL segment (63–75 %) and a final low pass
  * / approach (82–100 %). It is only ever consumed through a pre-sampled
@@ -1818,8 +1481,7 @@ const FLIGHT_PATH_D =
   "C 960 1040, 660 1040, 680 1240 " +
   "C 700 1440, 980 1560, 860 1820 " +
   "C 740 2080, 160 2040, 220 2340 " +
-  "C 280 2640, 1020 2580, 920 2880 " +
-  "C 820 3140, 420 3160, 600 3320";
+  "C 280 2640, 1020 2580, 920 2880";
 
 /**
  * The airframe stays greyscale like the rest of the overlay; only the
@@ -2004,14 +1666,13 @@ function ExecutiveMonochromeJet({
   );
 }
 
-function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
-  const liteDetected = useLiteMotionTier();
-  const lite = liteProp ?? liteDetected;
+function ScrollFlightPath({ destination }: { destination: React.RefObject<HTMLSpanElement | null> }) {
+  const lite = useLiteMotionTier();
   /**
    * Scroll-locked aerobatic flight on the SHARED damped scroll engine
    * (`paintOnceUnderReducedMotion` → `scrollEngine.subscribe`): zero React
    * state per frame, one passive listener for the whole page.
-   *  • CAMERA: the 3320-unit route cannot fit in a viewport, so a decoupled
+   *  • CAMERA: the full route cannot fit in a viewport, so a decoupled
    *    camera translates the world instead: `cameraY = 470 − (0.78·(90 +
    *    p·3230) + 0.22·y)`. The 0.78 monotonic blend guarantees the NET screen
    *    motion stays forward even while the loop's geometry flies "backwards"
@@ -2033,6 +1694,7 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
    */
   const pathRef = React.useRef<SVGPathElement | null>(null);
   const cameraRef = React.useRef<SVGGElement | null>(null);
+  const approachRef = React.useRef<SVGPathElement | null>(null);
   const jetGroupRef = React.useRef<SVGGElement | null>(null);
   const shadowGroupRef = React.useRef<SVGGElement | null>(null);
   const plumeRef = React.useRef<SVGGElement | null>(null);
@@ -2049,7 +1711,7 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
     if (!path) return;
     const reducedMotion = window.matchMedia?.(
       "(prefers-reduced-motion: reduce)",
-    ).matches || lite;
+    ).matches;
 
     const STEPS = lite ? 120 : 360;
     // [x, y, unwrapped screen-heading°, bank-turn°] per sample.
@@ -2112,7 +1774,9 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
     const paint = () => {
       const p = scrollEngine.progress();
       const vel = scrollEngine.velocity();
-      const f = p * STEPS;
+      const approachStart = 0.86;
+      const f = Math.min(1, p / approachStart) * STEPS;
+      const lerpWith = (a: number, b: number, ratio: number) => a + (b - a) * ratio;
       const i0 = Math.min(STEPS, Math.floor(f));
       const i1 = Math.min(STEPS, i0 + 1);
       const w = f - i0;
@@ -2136,10 +1800,11 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
       const ap = clamp((p - 0.82) / 0.18, 0, 1);
       const approach = 1 + ap * ap * (3 - 2 * ap) * 0.28;
 
-      const cameraY = 470 - (0.78 * (90 + p * 3230) + 0.22 * y);
+      const finish = clamp((p - approachStart) / (1 - approachStart), 0, 1);
+      const cameraY = 470 - (0.78 * (90 + p * 3230) + 0.22 * (y + finish * 440));
 
       // Forward-only rendering: rounded attributes are only touched on change.
-      const dashOffset = (totalLen * (1 - p)).toFixed(2);
+      const dashOffset = (totalLen * (1 - f / STEPS)).toFixed(2);
       if (dashOffset !== lastDashOffset) {
         path.setAttribute("stroke-dashoffset", dashOffset);
         lastDashOffset = dashOffset;
@@ -2149,10 +1814,37 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
         cameraRef.current?.setAttribute("transform", cameraTransform);
         lastCameraTransform = cameraTransform;
       }
-      const { vw, vh } = scrollEngine.viewport();
-      const scaleX = Math.max(0.01, (vw || 1200) / 1200);
-      const scaleY = Math.max(0.01, (vh || 1000) / 1000);
-      const jetTransform = `translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(approach / scaleX).toFixed(4)} ${(approach / scaleY).toFixed(4)}) rotate(${angle.toFixed(2)}) scale(1 ${wingScaleY.toFixed(3)})`;
+      const bounds = cameraRef.current?.ownerSVGElement?.getBoundingClientRect();
+      const scaleX = Math.max(0.01, (bounds?.width || 1200) / 1200);
+      const scaleY = Math.max(0.01, (bounds?.height || 1000) / 1000);
+      const destinationBox = finish > 0 ? destination.current?.getBoundingClientRect() : null;
+      let jetX = x;
+      let jetY = y;
+      let heading = angle;
+      if (destinationBox && bounds) {
+        const targetX = (destinationBox.left - bounds.left) / scaleX;
+        const targetY = (destinationBox.top - bounds.top) / scaleY - cameraY;
+        const deltaX = targetX - x;
+        const point = { x, y };
+        const startControl = { x: x - 65, y: y + 195 };
+        const endControl = { x: targetX - Math.max(32, Math.abs(deltaX) * .36), y: targetY };
+        const mix = (a: typeof point, b: typeof point) => ({ x: lerpWith(a.x, b.x, finish), y: lerpWith(a.y, b.y, finish) });
+        const a = mix(point, startControl);
+        const b = mix(startControl, endControl);
+        const c = mix(endControl, { x: targetX, y: targetY });
+        const d = mix(a, b);
+        const e = mix(b, c);
+        const end = mix(d, e);
+        jetX = end.x;
+        jetY = end.y;
+        heading = Math.atan2((end.y - d.y) * scaleY, (end.x - d.x) * scaleX) * 180 / Math.PI;
+        approachRef.current?.setAttribute("d", `M ${x} ${y} C ${a.x} ${a.y}, ${d.x} ${d.y}, ${jetX} ${jetY}`);
+      } else if (approachRef.current?.hasAttribute("d")) {
+        approachRef.current.removeAttribute("d");
+      }
+      const size = lerpWith(approach, 0.76, finish);
+      const wing = lerpWith(wingScaleY, 1, finish);
+      const jetTransform = `translate(${jetX.toFixed(2)} ${jetY.toFixed(2)}) scale(${(size / scaleX).toFixed(4)} ${(size / scaleY).toFixed(4)}) rotate(${heading.toFixed(2)}) scale(1 ${wing.toFixed(3)})`;
       if (jetTransform !== lastJetTransform) {
         jetGroupRef.current?.setAttribute("transform", jetTransform);
         lastJetTransform = jetTransform;
@@ -2241,7 +1933,7 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
       window.removeEventListener("resize", handleResize);
       if (resizeTimer) clearTimeout(resizeTimer);
     };
-  }, [lite]);
+  }, [destination, lite]);
 
   return (
     <div
@@ -2302,8 +1994,10 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
             strokeDasharray="4200 4200"
             strokeDashoffset={4200}
           />
+          <path ref={approachRef} data-flight-approach fill="none" stroke="currentColor" opacity="0.62" strokeWidth="3" strokeLinecap="round" />
           <g
             ref={jetGroupRef}
+            data-flight-jet
             transform="translate(580 90) scale(1 1) rotate(7)"
             className="sb-will-transform"
           >
@@ -2324,5 +2018,3 @@ function ScrollFlightPath({ lite: liteProp }: { lite?: boolean } = {}) {
     </div>
   );
 }
-
-

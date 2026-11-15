@@ -313,15 +313,9 @@ check(
     /not affiliated with any university/i.test(landingHtml) &&
     /can be wrong or out of date/i.test(landingHtml)
 );
-// Regression guard for the dashboard preview: it used to advertise the
-// pre-reorganization sidebar (~30 flat links). It is now derived from
-// NAV_SECTIONS, so the six groups and the account cluster must be present.
 check(
-  "landing dashboard preview mirrors the current navigation",
-  /Study Plan &amp; Tests/.test(landingHtml) &&
-    /Tasks &amp; Timeline/.test(landingHtml) &&
-    /After Admission/.test(landingHtml) &&
-    /Account &amp; settings/.test(landingHtml)
+  "landing dashboard preview uses the current production screenshot and labels it as illustrative",
+  /dashboard-current\.webp/.test(landingHtml) && /Demo · sample data/.test(landingHtml)
 );
 check(
   "landing dashboard preview no longer shows the old flat sidebar links",
@@ -343,14 +337,8 @@ check(
     !/\d+\s*%/.test(admissionProbabilityRow)
 );
 
-// The dashboard preview used to show an "Admissions Index" percentage — a
-// second, differently-computed number that read like an admission chance. It
-// now shows the same profile-readiness score the Readiness pane uses.
-const strengthLabel: Record<string, string> = {
-  en: "Profile information coverage",
-  uz: "Profil ma’lumotlari qamrovi",
-  ru: "Заполненность профиля данными",
-};
+// The dashboard text lives in the screenshot; verify the localized badge and
+// screenshot source rather than searching the raster preview for text.
 const noRawKeys: Record<string, boolean> = {};
 for (const locale of ["en", "uz", "ru"]) {
   const { html } = renderLanding(locale);
@@ -360,9 +348,9 @@ for (const locale of ["en", "uz", "ru"]) {
   noRawKeys[locale] = !/\b(landing|dashboard|nav|meta|hubs|degrees)\.[a-z][A-Za-z0-9]*/.test(text);
   check(`landing leaks no unresolved message keys (${locale})`, noRawKeys[locale]);
   check(
-    `landing dashboard mock uses the localized readiness label (${locale})`,
-    html.includes(strengthLabel[locale]),
-    strengthLabel[locale]
+    `landing dashboard screenshot uses the localized demo label (${locale})`,
+    html.includes("dashboard-current.webp") && html.replace(/&#x27;/g, "'").includes(demoBadge[locale]),
+    demoBadge[locale]
   );
   check(`landing no longer advertises an "Admissions Index" (${locale})`, !/Admissions Index/.test(html));
 }
@@ -1083,54 +1071,41 @@ for (const locale of ["en", "uz", "ru"]) {
 }
 
 // ---------------------------------------------------------------------------
-section("12b. AI Face Orb — pure white face, black features, no vendor names");
-// The Orb intentionally follows the supplied minimal white-face reference.
-// Its face has no colored ring, gradient, specular accent, or tongue; state is
-// still communicated by the surrounding status pill/equalizer and lip-sync.
+section("12b. Speaking avatar — localized status, temperament and reduced-motion-friendly face");
 const ORB_STATES = ["IDLE", "LISTENING", "THINKING", "SPEAKING"] as const;
-const CLOSED_MOUTH = "M 90 128 C 90 120, 130 120, 130 128 C 130 139, 90 139, 90 128 Z";
+const orbProps = (state: typeof ORB_STATES[number]) => ({
+  state,
+  level: state === "SPEAKING" ? 0.7 : 0.2,
+  measuredAudio: state === "SPEAKING",
+  statusLabel: `status ${state}`,
+  roleLabel: "Consular officer",
+  countryFlag: "\u{1F1E9}\u{1F1EA}",
+  countryName: "Germany",
+});
 const orbRenders = ORB_STATES.map((state) =>
-  renderLocalized(
-    "en",
-    React.createElement(AiOrbFaceAvatar, {
-      state,
-      level: state === "SPEAKING" ? 0.7 : 0.2,
-      statusLabel: `status ${state}`,
-      roleLabel: "Consular officer",
-      countryFlag: "\u{1F1E9}\u{1F1EA}",
-      countryName: "Germany",
-    })
-  )
+  renderLocalized("en", React.createElement(AiOrbFaceAvatar, orbProps(state)))
 );
 for (const [i, state] of ORB_STATES.entries()) {
   const r = orbRenders[i];
-  check(`orb renders in ${state}`, r.error === null, r.error ?? "");
-  check(`orb ${state} is a true 220x220 circle`, r.html.includes('viewBox="0 0 220 220"') && r.html.includes("rounded-full"));
-  check(`orb ${state} has a solid white face`, /<circle[^>]*cx="110"[^>]*cy="110"[^>]*r="108"[^>]*fill="#ffffff"/.test(r.html));
-  check(`orb ${state} carries the status pill copy`, r.html.includes(`status ${state}`));
-  check(`orb ${state} names no AI vendor`, !/(Gemini|Groq|OpenAI|Anthropic|Claude|GPT|gemini|groq|openai)/.test(r.html));
-  check(`orb ${state} has no colored face treatment`, !/linearGradient|radialGradient|<stop |stroke=|#f43f5e/.test(r.html));
+  check(`speaking avatar renders in ${state}`, r.error === null, r.error ?? "");
+  check(`avatar marks its ${state} state and accessible role`, r.html.includes(`data-state="${state}"`) && r.html.includes('aria-label="Consular officer — Germany"'));
+  check(`avatar ${state} carries the localized status pill`, r.html.includes(`status ${state}`) && r.html.includes('role="status"'));
+  check(`avatar ${state} names no AI vendor`, !/(Gemini|Groq|OpenAI|Anthropic|Claude|GPT|gemini|groq|openai)/.test(r.html));
+  check(`avatar ${state} renders the face layers`, r.html.includes("sb-speaking-face-stage") && r.html.includes("sb-speaking-face-visor") && r.html.includes('data-eye="left"') && r.html.includes('data-eye="right"'));
 }
-check(
-  "orb has two solid black oval eyes and no eye highlights",
-  (orbRenders[0].html.match(/<ellipse[^>]*cx="(?:64|156)"[^>]*cy="110"[^>]*rx="17"[^>]*ry="22"[^>]*fill="#000000"/g) ?? []).length === 2 &&
-    !orbRenders[0].html.includes("opacity=\"0.85\"")
-);
-check("orb rests with a small black mouth", orbRenders[0].html.includes(CLOSED_MOUTH) && orbRenders[0].html.includes('fill="#000000"'));
-check(
-  "orb mouth lip-syncs in speaking state without a non-black tongue",
-  orbRenders[3].html.includes('fill="#000000"') && !orbRenders[3].html.includes("#f43f5e") && !orbRenders[3].html.includes(CLOSED_MOUTH)
-);
-check(
-  "two orb instances both render the same minimal face without SVG defs",
-  (orbRenders[0].html.match(/<circle[^>]*cx="110"[^>]*cy="110"[^>]*r="108"[^>]*fill="#ffffff"/g) ?? []).length === 1 &&
-    !orbRenders[0].html.includes("<defs>")
-);
+const speakingFaceCss = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
+check("speaking face is circular and uses responsive sizing", /\.sb-speaking-face-stage[\s\S]*?width: min\(100%, 244px\)[\s\S]*?aspect-ratio: 1/.test(speakingFaceCss) && /\.sb-speaking-face-shell[\s\S]*?border-radius: 50%/.test(speakingFaceCss));
+const mouthScale = (html: string) => Number(html.match(/class="sb-speaking-face-mouth" style="transform:scaleY\(([^)]+)\)"/)?.[1]);
+check("speaking mouth follows measured audio", mouthScale(orbRenders[3].html) > mouthScale(orbRenders[0].html) && mouthScale(orbRenders[0].html) === 1);
+const pairedOrbs = renderLocalized("en", React.createElement(React.Fragment, null,
+  React.createElement(AiOrbFaceAvatar, orbProps("IDLE")),
+  React.createElement(AiOrbFaceAvatar, orbProps("LISTENING")),
+));
+check("two speaking avatars render independently without svg id collisions", pairedOrbs.error === null && (pairedOrbs.html.match(/sb-speaking-face-stage/g) ?? []).length === 2 && !pairedOrbs.html.includes("<defs>"));
 for (const locale of ["uz", "ru"]) {
-  const r = renderLocalized(locale, React.createElement(AiOrbFaceAvatar, {
-    state: "SPEAKING", level: 0.5, statusLabel: "x", roleLabel: "y",
-  }));
-  check(`orb renders in ${locale}`, r.error === null, r.error ?? "");
+  const r = renderLocalized(locale, React.createElement(AiOrbFaceAvatar, { ...orbProps("SPEAKING"), statusLabel: locale }));
+  check(`avatar renders in ${locale}`, r.error === null, r.error ?? "");
+  check(`avatar status is localized by caller in ${locale}`, r.html.includes(`>${locale}</span>`));
 }
 
 // ---------------------------------------------------------------------------

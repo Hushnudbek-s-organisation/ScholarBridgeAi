@@ -139,6 +139,7 @@ export function ScholarshipFiltersPanel({
         <select
           id={`${idPrefix}-country}`}
           value={filters.country}
+          data-scholly-help="country"
           onChange={(event) => onChange({ ...filters, country: event.target.value })}
           aria-label={t("allCountries")}
           className={SELECT_CLASS}

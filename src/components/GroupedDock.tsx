@@ -188,6 +188,7 @@ export function GroupedDock({
       <nav
         ref={nav}
         data-testid="grouped-dock"
+        data-scholly-help="dock"
         aria-label={dashboardLabel}
         className="sb-grouped-dock print:hidden"
       >
@@ -200,6 +201,7 @@ export function GroupedDock({
           }}
           aria-label={dashboardLabel}
           aria-current={dashboardActive ? "page" : undefined}
+          data-scholly-help="dashboard"
           className="sb-dock-trigger"
         >
           <House aria-hidden className="h-5 w-5"/>
@@ -216,6 +218,7 @@ export function GroupedDock({
             aria-label={group.label}
             aria-expanded={open === group.id}
             aria-controls={`dock-panel-${group.id}`}
+            data-scholly-help="dock"
             data-active={group.active || undefined}
             onKeyDown={(event) => triggerKey(event, group.id)}
             onClick={() => setOpen(open === group.id ? null : group.id)}

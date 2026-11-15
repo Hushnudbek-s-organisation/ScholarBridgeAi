@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { AnimatePresence, m as Motion } from "framer-motion";
 import {
   Activity,
@@ -71,6 +71,8 @@ import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { loadBootConfig } from "@/lib/bootConfig";
 import { Button } from "@/components/ui/Button";
 import { GroupedDock } from "./GroupedDock";
+import { setGuidedJourneyHidden, useGuidedJourneyHidden } from "@/lib/guided-journey-visibility";
+import { SchollyCompanion } from "./SchollyCompanion";
 
 export interface StudentProfile {
   applicantContext?:import("@/lib/applicantContext").ApplicantContext|null;
@@ -139,6 +141,7 @@ export interface StudentProfile {
 
 interface NavbarProps {
   activeTab: string;
+  activePane?: string | null;
   setActiveTab: (tab: string) => void;
   activeProfile: StudentProfile | null;
   activeProfileId?: number | null;
@@ -356,6 +359,7 @@ const TABLET_RAIL_IDS = [
 
 export function Navbar({
   activeTab,
+  activePane,
   setActiveTab,
   activeProfile,
   activeProfileId,
@@ -366,8 +370,11 @@ export function Navbar({
   onLocaleChange,
   hiddenNav,
 }: NavbarProps) {
+  const locale = useLocale();
   const t = useTranslations("nav");
   const tm = useTranslations("meta");
+  const journey = useTranslations("guidedJourney");
+  const journeyHidden = useGuidedJourneyHidden();
   const th = useTranslations("navHints");
   const tp = useTranslations("navPanes");
 
@@ -785,19 +792,22 @@ export function Navbar({
   );
 
   const SettingsRow = (
-    <div className="flex items-center justify-between gap-2">
-      <LanguageSwitcher onLocaleChange={onLocaleChange} compact />
-      <ThemeToggle />
-      {onLogout && (
-        <Button variant="unstyled"
-          onClick={onLogout}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
-          title={t("logout")}
-          aria-label={t("logout")}
-        >
-          <LogOut className="h-3.5 w-3.5" />
-        </Button>
-      )}
+    <div className="space-y-2">
+      {journeyHidden && <Button variant="outline" className="w-full" onClick={() => setGuidedJourneyHidden(false)}>{journey("restore")}</Button>}
+      <div className="flex items-center justify-between gap-2">
+        <LanguageSwitcher onLocaleChange={onLocaleChange} compact />
+        <ThemeToggle />
+        {onLogout && (
+          <Button variant="unstyled"
+            onClick={onLogout}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300"
+            title={t("logout")}
+            aria-label={t("logout")}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 
@@ -813,10 +823,10 @@ export function Navbar({
 
       {/* ================= PHONE: TOP BAR ================= */}
       <header data-sb-shell-header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex h-14 items-center gap-2 px-3 sm:px-4">
+        <div className="sb-shell-bar flex h-14 items-center gap-2 px-3 sm:px-4">
           <Button variant="unstyled"
             onClick={() => setDrawerOpen(true)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="sb-shell-menu flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
             aria-label={t("openMenu")}
             aria-expanded={drawerOpen}
             aria-haspopup="dialog"
@@ -827,20 +837,29 @@ export function Navbar({
             <div className="sb-logo-well h-8 w-8 shrink-0 overflow-hidden rounded-control border border-slate-200 bg-white shadow-sm">
               <BrandingImage alt={t("logoAlt")} className="h-8 w-8 object-cover" />
             </div>
-            <span className="break-words text-base font-bold tracking-tight text-slate-900 dark:text-white">{tm("appName")}</span>
+            <span className="break-words text-base font-bold tracking-tight text-slate-900 dark:text-white">{activeTab === "dashboard" ? "ScholarBridgeAI" : tm("appName")}</span>
           </Button>
-          <div className="ml-auto flex shrink-0 items-center gap-1">
+          {activeTab === "dashboard" && (
+            <Button variant="unstyled" className="sb-home-search" onClick={openSearch} aria-label={t("searchButton")} data-scholly-help="searchSite">
+              <Search className="h-4 w-4 shrink-0" aria-hidden />
+              <span>{t("searchButton")}</span>
+            </Button>
+          )}
+          <div className="sb-shell-actions ml-auto flex shrink-0 items-center gap-1">
             <Button variant="unstyled"
               onClick={openSearch}
-              className="flex h-11 w-11 items-center justify-center rounded-control text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              data-scholly-help="searchSite"
+              className="sb-shell-search-icon flex h-11 w-11 items-center justify-center rounded-control text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               aria-label={t("searchButton")}
             >
               <Search className="h-[18px] w-[18px]" />
             </Button>
+            {activeTab === "dashboard" && <div className="sb-home-language"><LanguageSwitcher onLocaleChange={onLocaleChange} compact /></div>}
             <NotificationBell profileId={activeProfileId ?? null} />
-            <span className="hidden sm:inline-flex">
+            <span className="sb-shell-theme hidden sm:inline-flex">
               <ThemeSwitch />
             </span>
+            {activeTab === "dashboard" && <Button variant="unstyled" className="sb-home-avatar" onClick={() => setDrawerOpen(true)} aria-label={t("openMenu")} aria-expanded={drawerOpen} aria-haspopup="dialog">{initials}</Button>}
           </div>
         </div>
       </header>
@@ -852,6 +871,22 @@ export function Navbar({
         }).filter(g=>g.count>0),
         {id:"account",label:t("dockAccount"),shortLabel:t("dockShort.account"),icon:<Users aria-hidden className="h-5 w-5"/>,active:utilityItems.some(i=>isDestinationActive(i.id)),count:utilityItems.length,content:<div className="space-y-3">{utilityItems.map(i=>renderItem(i,"dock-account"))}{renderProfileCard()}{SettingsRow}</div>}
       ]}/>
+
+      <SchollyCompanion
+        activeTab={activeTab}
+        activePane={activePane}
+        locale={locale}
+        profileId={activeProfileId ?? activeProfile?.id ?? null}
+        profileName={activeProfile?.name ?? ""}
+        profileFacts={[activeProfile?.targetMajor ?? "", activeProfile?.degreeLevel ?? ""]}
+        navigate={go}
+        topics={paletteItems.filter(item => !item.premium).map(item => ({
+          id: item.id,
+          title: item.label,
+          hint: ("hint" in item ? item.hint : undefined) ?? ("searchTerms" in item ? item.searchTerms?.split("  ")[0] : undefined),
+          keywords: "searchTerms" in item ? item.searchTerms ?? "" : "",
+        }))}
+      />
 
       {/* ================= PHONE / TABLET: SLIDE-IN MENU ================= */}
       <AnimatePresence>

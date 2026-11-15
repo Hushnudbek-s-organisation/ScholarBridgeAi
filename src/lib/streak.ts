@@ -30,6 +30,7 @@ export const STREAK_ACTIVITY_REASONS = [
   "quiz_passed",
   "thread_created",
   "reply_created",
+  "scholly_daily_mission",
   "daily_active",
 ] as const;
 
@@ -43,7 +44,7 @@ export function isStreakActivity(reason: string | null | undefined): boolean {
 /** Reason written by `recordDailyActivity()` — the per-day "showed up" marker. */
 export const DAILY_ACTIVITY_REASON = "daily_active";
 
-function dayKey(value: Date | string, formatter: Intl.DateTimeFormat): string | null {
+function dayKey(value: Date | string, formatter: Intl.DateTimeFormat, dayStartHour: number): string | null {
   // A date-only value is already a calendar day, not a UTC timestamp. Keep
   // it stable in every timezone; timestamps are projected into the student's
   // local calendar day below.
@@ -52,7 +53,8 @@ function dayKey(value: Date | string, formatter: Intl.DateTimeFormat): string | 
   if (!Number.isFinite(date.getTime())) return null;
   const parts = formatter.formatToParts(date);
   const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
+  const localDay = `${part("year")}-${part("month")}-${part("day")}`;
+  return Number(part("hour")) < dayStartHour ? shiftDay(localDay, -1) : localDay;
 }
 
 function shiftDay(day: string, amount: number): string {
@@ -65,6 +67,7 @@ export function computeDailyStreak(
   activityDates: readonly (Date | string)[],
   now: Date = new Date(),
   timeZone = "UTC",
+  dayStartHour = 0,
 ): DailyStreak {
   let formatter: Intl.DateTimeFormat;
   try {
@@ -73,6 +76,8 @@ export function computeDailyStreak(
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
     });
   } catch {
     // An invalid/missing browser timezone must not break the rewards screen.
@@ -81,10 +86,13 @@ export function computeDailyStreak(
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
     });
   }
-  const today = dayKey(now, formatter)!;
-  const days = new Set(activityDates.map((value) => dayKey(value, formatter)).filter((day): day is string => !!day && day <= today));
+  const boundary = Number.isInteger(dayStartHour) && dayStartHour >= 0 && dayStartHour <= 23 ? dayStartHour : 0;
+  const today = dayKey(now, formatter, boundary)!;
+  const days = new Set(activityDates.map((value) => dayKey(value, formatter, boundary)).filter((day): day is string => !!day && day <= today));
   const ordered = [...days].sort();
 
   let longest = 0;
