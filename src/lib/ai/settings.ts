@@ -13,6 +13,7 @@
 
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from "node:crypto";
 import { OPENROUTER_MODEL_IDS } from "./openrouterModelIds";
+import { GEMINI_MODELS } from "./geminiModels";
 export { OPENROUTER_MODEL_IDS } from "./openrouterModelIds";
 
 // ---------------------------------------------------------------------------
@@ -124,7 +125,7 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   gemini: {
     id: "gemini",
     label: "Gemini (Live voice)",
-    defaultModel: "gemini-3.1-flash-live-preview",
+    defaultModel: GEMINI_MODELS.live,
     keyEnvVar: "GEMINI_API_KEY",
     modelEnvVar: "GEMINI_LIVE_MODEL",
     keyShape: "AIza…",
@@ -134,7 +135,7 @@ export const AI_PROVIDERS: Record<AIProviderId, AIProviderMeta> = {
   google: {
     id: "google",
     label: "Google Gemini (chat)",
-    defaultModel: "gemini-2.5-flash",
+    defaultModel: GEMINI_MODELS.flash,
     keyEnvVar: "GOOGLE_AI_API_KEY",
     modelEnvVar: "GOOGLE_AI_MODEL",
     keyShape: "AIza…",
@@ -231,7 +232,7 @@ export function isAIProviderId(value: string | null | undefined): value is AIPro
 // Task registry (spec §12 — one provider per task, configurable by admin)
 // ---------------------------------------------------------------------------
 
-export type AITaskId = "admissions" | "essay" | "general" | "search" | "document" | "visa";
+export type AITaskId = "admissions" | "essay" | "general" | "search" | "document" | "visa" | "faq" | "translation";
 
 export interface AITaskMeta {
   id: AITaskId;
@@ -246,16 +247,29 @@ export const AI_TASKS: AITaskMeta[] = [
   { id: "search", label: "Search & discovery", description: "Scholarship / university search assist" },
   { id: "document", label: "Document analysis", description: "Research agent & document review" },
   { id: "visa", label: "Visa interview", description: "Visa officer dialogue + interview analysis" },
+  { id: "faq", label: "Product FAQ", description: "Short navigation and product questions" },
+  { id: "translation", label: "Translation and classification", description: "Short multilingual text and labels" },
 ];
 
 /**
- * Visa uses OpenRouter by default. Explicit per-task choices still win;
- * when the default provider has no usable key, automatic routing can choose
- * the first configured provider.
+ * The native Live API is separate. These are the default chat providers
+ * when an administrator or environment setting has not selected another.
  */
 export const TASK_DEFAULT_PROVIDER: Partial<Record<AITaskId, AIProviderId>> = {
-  visa: "openrouter",
+  admissions: "google",
+  essay: "google",
+  general: "google",
+  document: "google",
+  visa: "google",
+  faq: "google",
+  translation: "google",
 };
+
+export function modelForTask(provider: AIProviderId, task: string, model: string): string {
+  if (provider === "google" && model === GEMINI_MODELS.flash &&
+    (task === "faq" || task === "translation")) return GEMINI_MODELS.lite;
+  return model;
+}
 
 export function isAITaskId(value: string | null | undefined): value is AITaskId {
   return AI_TASKS.some((t) => t.id === value);
@@ -277,6 +291,8 @@ export const TASK_PROVIDER_ENV: Record<string, string> = {
   search: "AI_PROVIDER_SEARCH",
   document: "AI_PROVIDER_DOCUMENT_ANALYSIS",
   visa: "AI_PROVIDER_VISA",
+  faq: "AI_PROVIDER_FAQ",
+  translation: "AI_PROVIDER_TRANSLATION",
 };
 
 /** app_config keys for the explicit fallback + disabled list. */
@@ -334,13 +350,9 @@ export function hasExplicitProviderChoice(
   dbProviders: DbTaskProviderMap,
   env: Record<string, string | undefined> = process.env
 ): boolean {
-  const taskDefault = TASK_DEFAULT_PROVIDER[taskType as AITaskId];
   const envVar = TASK_PROVIDER_ENV[taskType] || TASK_PROVIDER_ENV.general;
-  const selectedDefault = dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] || env.AI_PROVIDER_DEFAULT;
-  const candidates = taskDefault
-    ? [dbProviders[taskProviderConfigKey(taskType)], env[envVar], selectedDefault === "openrouter" ? selectedDefault : undefined]
-    : [dbProviders[taskProviderConfigKey(taskType)], dbProviders[DEFAULT_PROVIDER_CONFIG_KEY], env[envVar], env.AI_PROVIDER_DEFAULT];
-  return candidates.some((c) => isAIProviderId(String(c ?? "").trim().toLowerCase()));
+  return [dbProviders[taskProviderConfigKey(taskType)], env[envVar], dbProviders[DEFAULT_PROVIDER_CONFIG_KEY], env.AI_PROVIDER_DEFAULT]
+    .some((choice) => isAIProviderId(String(choice ?? "").trim().toLowerCase()));
 }
 
 // ---------------------------------------------------------------------------
@@ -503,18 +515,9 @@ export function resolveProviderForTask(
 ): AIProviderId {
   const dbTask = dbProviders[taskProviderConfigKey(taskType)];
   const envVar = TASK_PROVIDER_ENV[taskType] || TASK_PROVIDER_ENV.general;
-  const taskDefault = TASK_DEFAULT_PROVIDER[taskType as AITaskId];
-  if (taskDefault) {
-    // Visa's task-level default remains OpenRouter unless an explicit task
-    // mapping/environment choice overrides it.
-    const selectedDefault = dbProviders[DEFAULT_PROVIDER_CONFIG_KEY] || env.AI_PROVIDER_DEFAULT;
-    const raw = String(dbTask || env[envVar] || (selectedDefault === "openrouter" ? "openrouter" : taskDefault)).trim().toLowerCase();
-    return isAIProviderId(raw) ? (raw as AIProviderId) : taskDefault;
-  }
-  const dbDefault = dbProviders[DEFAULT_PROVIDER_CONFIG_KEY];
-  const envValue = env[envVar] || env.AI_PROVIDER_DEFAULT || defaultProvider;
-  const raw = String(dbTask || dbDefault || envValue || defaultProvider).trim().toLowerCase();
-  return isAIProviderId(raw) ? (raw as AIProviderId) : (defaultProvider as AIProviderId);
+  const fallback = TASK_DEFAULT_PROVIDER[taskType as AITaskId] ?? (isAIProviderId(defaultProvider) ? defaultProvider : "openrouter");
+  const choices = [dbTask, dbProviders[DEFAULT_PROVIDER_CONFIG_KEY], env[envVar], env.AI_PROVIDER_DEFAULT];
+  return choices.map((choice) => choice?.trim().toLowerCase()).find(isAIProviderId) ?? fallback;
 }
 
 /**
@@ -542,7 +545,8 @@ export function resolveCredential(
     }
   }
 
-  const envKey = env[meta.keyEnvVar];
+  const envKey = env[meta.keyEnvVar]?.trim() ||
+    (providerId === "google" ? env.GEMINI_API_KEY?.trim() : providerId === "gemini" ? env.GOOGLE_AI_API_KEY?.trim() : undefined);
   if (envKey) {
     return {
       apiKey: envKey,

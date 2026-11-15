@@ -182,10 +182,10 @@ check("isAIProviderId validates ids (case-sensitive)", () => {
 // ---------------------------------------------------------------------------
 // Task registry
 // ---------------------------------------------------------------------------
-check("task registry exposes exactly 6 tasks (visa added in Task 7)", () => {
+check("task registry includes FAQ and translation", () => {
   assert.deepEqual(
     AI_TASKS.map((t) => t.id),
-    ["admissions", "essay", "general", "search", "document", "visa"]
+    ["admissions", "essay", "general", "search", "document", "visa", "faq", "translation"]
   );
 });
 
@@ -214,6 +214,8 @@ check("TASK_PROVIDER_ENV maps every task to its env var", () => {
     search: "AI_PROVIDER_SEARCH",
     document: "AI_PROVIDER_DOCUMENT_ANALYSIS",
     visa: "AI_PROVIDER_VISA",
+    faq: "AI_PROVIDER_FAQ",
+    translation: "AI_PROVIDER_TRANSLATION",
   };
   for (const t of AI_TASKS) {
     assert.equal(TASK_PROVIDER_ENV[t.id], expected[t.id]);
@@ -228,7 +230,7 @@ check("CONFIG_DEFAULTS has an ai_provider_<task> key for every task", () => {
   for (const t of AI_TASKS) {
     assert.ok(CONFIG_DEFAULTS[taskProviderConfigKey(t.id)], `missing ${taskProviderConfigKey(t.id)}`);
   }
-  assert.equal(CONFIG_DEFAULTS.ai_provider_visa, "openrouter");
+  assert.equal(CONFIG_DEFAULTS.ai_provider_visa, "google");
 });
 
 // ---------------------------------------------------------------------------
@@ -330,8 +332,8 @@ check("hasExplicitEncryptionSecret requires >= 16 chars", () => {
 // ---------------------------------------------------------------------------
 // Resolution rules
 // ---------------------------------------------------------------------------
-check("resolveProviderForTask defaults to openrouter", () => {
-  assert.equal(resolveProviderForTask("essay", {}, {}), "openrouter");
+check("resolveProviderForTask defaults essay to Google", () => {
+  assert.equal(resolveProviderForTask("essay", {}, {}), "google");
 });
 
 check("resolveProviderForTask: DB (admin panel) wins over env", () => {
@@ -360,7 +362,7 @@ check("resolveProviderForTask: env wins over default", () => {
 });
 
 check("resolveProviderForTask: unknown provider id falls back to default", () => {
-  assert.equal(resolveProviderForTask("essay", { ai_provider_essay: "bogus" }, {}), "openrouter");
+  assert.equal(resolveProviderForTask("essay", { ai_provider_essay: "bogus" }, {}), "google");
 });
 
 check("resolveProviderForTask: unknown task falls back to general env", () => {
@@ -408,7 +410,7 @@ check("resolveCredential: model priority db → env → default", () => {
 
 check("isTaskConfigured reflects key presence", () => {
   assert.equal(
-    isTaskConfigured("essay", {}, null, { OPENROUTER_API_KEY: "sk-env-key-1234567890" }),
+    isTaskConfigured("essay", {}, null, { GEMINI_API_KEY: "sk-env-key-1234567890" }),
     true
   );
   assert.equal(isTaskConfigured("essay", {}, null, {}), false);
@@ -419,8 +421,8 @@ check("isTaskConfigured reflects key presence", () => {
 // ---------------------------------------------------------------------------
 check("providerForTask returns name + env key (env-only mode)", () => {
   const r = aiCore.providerForTask("essay");
-  assert.equal(r.name, "openrouter");
-  assert.equal(r.model, AI_PROVIDERS.openrouter.defaultModel);
+  assert.equal(r.name, "google");
+  assert.equal(r.model, AI_PROVIDERS.google.defaultModel);
 });
 
 check("PROVIDERS exposes a call() adapter for every CHAT provider (gemini is voice-only)", () => {
@@ -580,9 +582,9 @@ check("reasoning_effort is only sent to models that accept it", () => {
   assert.equal(settings.acceptsReasoningEffort("anthropic", "claude-x"), false);
 });
 
-check("visa task defaults to OpenRouter and ignores unrelated global defaults", () => {
-  assert.equal(resolveProviderForTask("visa", {}, {}), "openrouter");
-  assert.equal(resolveProviderForTask("visa", { [DEFAULT_PROVIDER_CONFIG_KEY]: "openai" }, {}), "openrouter");
+check("visa task defaults to Google and honors explicit overrides", () => {
+  assert.equal(resolveProviderForTask("visa", {}, {}), "google");
+  assert.equal(resolveProviderForTask("visa", { [DEFAULT_PROVIDER_CONFIG_KEY]: "openai" }, {}), "openai");
   assert.equal(resolveProviderForTask("visa", { ai_provider_visa: "anthropic" }, {}), "anthropic");
   assert.equal(resolveProviderForTask("visa", {}, { AI_PROVIDER_VISA: "openai" }), "openai");
   // Other tasks still follow the global default.
@@ -852,14 +854,14 @@ await checkAsync("aiChat: required capability is enforced before any request", a
   });
 });
 
-await checkAsync("resolveRuntimeProvider: auto-selects the first provider with a key; visa prefers OpenRouter", async () => {
+await checkAsync("resolveRuntimeProvider: auto-selects the first provider with a key; visa prefers Google", async () => {
   await withRouter({ ANTHROPIC_API_KEY: KEYS.anthropic }, () => okReply(""), async () => {
     const r = await aiCore.resolveRuntimeProvider("essay");
     assert.equal(r.name, "anthropic");
     assert.equal(r.selection, "auto");
     assert.equal(r.apiKeySource, "env");
     const visa = await aiCore.resolveRuntimeProvider("visa");
-    assert.equal(visa.name, "anthropic", "visa falls back to auto when OpenRouter has no key");
+    assert.equal(visa.name, "anthropic", "visa falls back to auto when Google has no key");
   });
   await withRouter({ ANTHROPIC_API_KEY: KEYS.anthropic, GROQ_API_KEY: KEYS.groq }, () => okReply(""), async () => {
     const visa = await aiCore.resolveRuntimeProvider("visa");
@@ -869,7 +871,18 @@ await checkAsync("resolveRuntimeProvider: auto-selects the first provider with a
   await withRouter({ OPENROUTER_API_KEY: "sk-or-v1-openrouterTESTKEY00000000004" }, () => okReply(""), async () => {
     const visa = await aiCore.resolveRuntimeProvider("visa");
     assert.equal(visa.name, "openrouter");
-    assert.equal(visa.selection, "default");
+    assert.equal(visa.selection, "auto");
+  });
+  await withRouter({ GEMINI_API_KEY: "AIzaExampleCredentialForRoutingTests0123", GROQ_API_KEY: KEYS.groq }, () => okReply(""), async () => {
+    for (const task of ["admissions", "essay", "general", "visa"]) {
+      const routed = await aiCore.resolveRuntimeProvider(task);
+      assert.equal(routed.name, "google");
+      assert.equal(routed.model, "gemini-3.8-flash");
+      assert.equal(routed.selection, "default");
+    }
+    for (const task of ["faq", "translation"]) {
+      assert.equal((await aiCore.resolveRuntimeProvider(task)).model, "gemini-3.1-flash-lite");
+    }
   });
   await withRouter({ GROQ_API_KEY: KEYS.groq, AI_PROVIDER_DEFAULT: "openai" }, () => okReply(""), async () => {
     const r = await aiCore.resolveRuntimeProvider("essay");
@@ -982,11 +995,14 @@ check("successful Test/Full check persists a typed key and shows saved-key prove
   assert.match(ui, /A key check does not verify these models/);
 });
 
-check("visa TTS uses a bounded OpenRouter model retry and safe browser fallback, never another provider", () => {
+check("visa TTS defaults to Google with a bounded cache and preserves the OpenRouter path", () => {
   const tts = readFileSync(join(ROOT, "src/app/api/visa/tts/route.ts"), "utf8");
   const registry = readFileSync(join(ROOT, "src/lib/ai/openrouterModelIds.ts"), "utf8");
   const candidateBlock = tts.slice(tts.indexOf("const candidates ="), tts.indexOf("const deadline ="));
-  assert.equal((tts.match(/fetch\(/g) ?? []).length, 1, "one bounded upstream call shape is used for sequential candidates");
+  assert.match(tts, /GEMINI_MODELS\.tts/);
+  assert.match(tts, /store: false/);
+  assert.match(tts, /"content-type": "audio\/wav"/);
+  assert.match(tts, /speechCache\.size >= 8/);
   assert.match(candidateBlock, /process\.env\.OPENROUTER_TTS_MODEL\?\.trim\(\)/);
   assert.match(candidateBlock, /OPENROUTER_MODEL_REGISTRY\.speech\.modelId/);
   assert.doesNotMatch(candidateBlock, /fishaudio\/fish-speech-2\.1-pro:free/, "reject the unverified/404 alias");

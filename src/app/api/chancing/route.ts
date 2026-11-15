@@ -25,6 +25,7 @@ import {
   requirementNodesFromRow,
 } from "@/lib/assessment/adapters";
 import type { ProgrammeAssessment } from "@/lib/assessment";
+import { annualUsdAmount } from "@/lib/usdCosts";
 import { compareDegreeLevels } from "@/lib/degreeLevels";
 
 export const dynamic = "force-dynamic";
@@ -265,8 +266,8 @@ export async function GET(req: Request) {
         requirementRow: reqByProgramId.get(program.id) ?? null,
         // A quarantined price is not published as a cost: it stays null, so the
         // finance total is unknown rather than silently free.
-        tuitionUsd: verified && program.tuitionCurrency === "USD" && program.tuitionAmount != null
-          ? Number(program.tuitionAmount)
+        tuitionUsd: verified
+          ? annualUsdAmount({ value: program.tuitionAmount, currency: program.tuitionCurrency, period: program.tuitionPeriod })
           : null,
         applicationFeeUsd: null,
         cycle: program.degree ? null : null,

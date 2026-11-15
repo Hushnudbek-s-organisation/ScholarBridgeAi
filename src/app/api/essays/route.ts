@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { writingReferenceNotes } from "@/lib/ai/writingReferenceNotes";
 import { db } from "@/db";
 import { applications, essayVersions } from "@/db/schema";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
@@ -134,7 +135,7 @@ export async function POST(req: Request) {
       profileId: access.session.profile.id,
       timeoutMs: 3_500,
       behaviors: [
-        { key: "specificityAndEvidence", description: "Uses concrete, verifiable personal evidence rather than generic claims." },
+        { key: "specificityAndEvidence", description: ["Uses concrete, verifiable personal evidence rather than generic claims.", writingReferenceNotes(essayType)].filter(Boolean).join(" ") },
         { key: "promptRelevance", description: "Directly answers the application prompt and stays focused." },
         { key: "personalOwnership", description: "Communicates the student's own perspective rather than generic template language." },
       ],
@@ -222,8 +223,9 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Essay text is required" }, { status: 400 });
     }
 
+    const essayType = parseType(body.essayType);
     const feedback = analyzeEssay(content, {
-      type: parseType(body.essayType),
+      type: essayType,
       wordLimit: parseWordLimit(body.wordLimit),
       targetName: clampString(body.targetName, 200) || null,
       prompt: clampString(body.prompt, 2000) || null,
@@ -233,7 +235,7 @@ export async function PUT(req: Request) {
       profileId: access.session.profile.id,
       timeoutMs: 3_500,
       behaviors: [
-        { key: "specificityAndEvidence", description: "Uses concrete, verifiable personal evidence rather than generic claims." },
+        { key: "specificityAndEvidence", description: ["Uses concrete, verifiable personal evidence rather than generic claims.", writingReferenceNotes(essayType)].filter(Boolean).join(" ") },
         { key: "promptRelevance", description: "Directly answers the application prompt and stays focused." },
         { key: "personalOwnership", description: "Communicates the student's own perspective rather than generic template language." },
       ],

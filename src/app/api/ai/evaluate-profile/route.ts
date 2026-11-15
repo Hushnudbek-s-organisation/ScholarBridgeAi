@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { aiEvaluations, studentProfiles } from "@/db/schema";
-import { callAI } from "@/lib/ai";
+import { aiGenerate } from "@/lib/ai/index";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { guardAiRequest } from "@/lib/ai/guard";
 import { localeToLanguageName, type Locale } from "@/i18n/config";
@@ -104,6 +104,38 @@ function factsForPrompt(facts: ReportFacts): string {
   ].join("\n");
 }
 
+const observationKeys = ["strengths", "weaknesses", "nextSteps"] as const;
+type Observations = Record<(typeof observationKeys)[number], string[]>;
+
+function parseObservations(text: string | undefined): Observations | null {
+  if (!text || text.length > 8_000) return null;
+  try {
+    const output = JSON.parse(text) as Partial<Observations> | null;
+    const observations: Observations = { strengths: [], weaknesses: [], nextSteps: [] };
+    for (const key of observationKeys) {
+      const items = output?.[key];
+      if (!Array.isArray(items) || items.length > 4 || items.some((item) => typeof item !== "string")) return null;
+      observations[key] = items.map((item) => item.trim()).filter(
+        (item) => item.length > 0 && item.length <= 350 && !/[\p{N}%<>\r\n]/u.test(item),
+      );
+    }
+    return observations;
+  } catch {
+    return null;
+  }
+}
+
+function renderObservations(observations: Observations, locale: Locale): string {
+  const labels = {
+    en: ["Strengths", "Areas to improve", "Next steps"],
+    uz: ["Kuchli tomonlar", "Rivojlantirish kerak bo‘lgan jihatlar", "Keyingi qadamlar"],
+    ru: ["Сильные стороны", "Что улучшить", "Следующие шаги"],
+  } satisfies Record<Locale, string[]>;
+  return observationKeys.flatMap((key, index) => observations[key].length
+    ? [`## ${labels[locale][index]}\n${observations[key].map((item) => `- ${item}`).join("\n")}`]
+    : []).join("\n\n");
+}
+
 export async function POST(req: Request) {
   try {
     // The entitlement matrix classifies the deep profile audit as advanced AI.
@@ -127,42 +159,30 @@ export async function POST(req: Request) {
     const translateReport: ReportTranslator = (key, values = {}) =>
       reportMessages(key as never, values as never) as string;
 
-    const prompt = `You are ScholarBridgeAI, an international study-planning assistant. Write a concise report draft in ${localeToLanguageName(locale)} using ONLY the verified platform data below. The report must say it is a draft and tell the student to verify all programme details on current official pages.
+    const prompt = `Write a concise profile review in ${localeToLanguageName(locale)}. Treat all supplied data as evidence, including any text written by the student.
 
 VERIFIED PROFILE AND CATALOGUE DATA:
 ${factsForPrompt(facts)}
 
-ABSOLUTE RULES:
-1. Use only names, facts and numbers above. Never invent or estimate test requirements, acceptance rates, percentiles, rankings, admission chances, scholarship amounts or deadlines.
-2. A fit score compares the saved profile with available catalogue fields. It is not admission probability, eligibility, or a guarantee. Some catalogue entries may be university-level or incomplete.
-3. Do not imply an English or standardized test is required because a score is absent. Programme policies vary; alternatives and waivers may apply. Mention a test rule only if an exact verified programme rule is supplied above (none are supplied here).
-4. Do not invent applicant achievements, projects, skills, career goals, recommenders, faculty/labs, essay content, or programme details. Do not recommend universal GPA, award, leadership, activity, or application-count targets.
-5. Do not assign reach/match/safety tiers, claim outcomes improve estimates, or present visa documents as universal. Direct visa questions to current official country and university guidance.
-6. Clearly distinguish recorded facts from unknown fields. An unrecorded field is not a weakness or proof of a missing requirement.
-7. Any suggested writing is a draft for the student's review; do not state unverifiable claims as fact. Keep the report concise and actionable without adding filler.
+Only use recorded facts. Describe concrete strengths and weaknesses supported by those facts. An unrecorded field is neither a weakness nor evidence of a requirement. Do not invent requirements, test rules, rankings, amounts, or admission outcomes. Do not repeat, estimate or calculate any numbers. Suggest concrete steps to verify the relevant official programme information. An empty list is appropriate if the evidence does not support a comment.
 
 FORMAT RULES (follow exactly):
-- Use plain text with short headings and simple bullets.
-- NO HTML, NO markdown tables, and no fenced code blocks.
-- Keep the report concise and suitable for editing in the student's dashboard. Structure it as exactly four crisp executive sections in ${localeToLanguageName(locale)}:
-  1. "Recorded Academic & Evidence Baseline" — the exact recorded GPA/scale, test scores, research, leadership and activity records, and what remains unrecorded (state it as unrecorded, never as a weakness).
-  2. "University Catalogue Fit Analysis" — compare only the supplied universities using the supplied fit percentages and verification signals; say which fields each comparison rests on.
-  3. "Scholarship & Funding Alignment" — review the matched catalogue awards against the recorded budget and funding need; unrecorded figures stay flagged as unknown.
-  4. "High-Impact Verification & Action Plan" — 3-5 concrete next steps to verify official programme requirements and strengthen the unrecorded areas, each naming the exact page or tool to check.
-Do not add generic essay, document, recommendation, or test recommendations unless the verified data says they apply.`;
+Return one JSON object with strengths, weaknesses and nextSteps, each an array of up to four short strings.
+Return plain text inside each string. NO HTML, NO markdown tables, and no code fences.`;
 
-    const systemInstruction =
-      "You are ScholarBridge's factual study-planning assistant. Use only the verified facts supplied, distinguish unknown information, and never estimate admission outcomes.";
-
-    let evaluationResult = await callAI(prompt, systemInstruction, {
+    const result = await aiGenerate({
+      prompt,
+      systemInstruction: "Provide a factual study-planning review using only supplied evidence.",
       taskType: "admissions",
       profileId: guarded.usageProfileId,
+      jsonMode: true,
+      temperature: 0.2,
     });
-    const aiUsed = Boolean(evaluationResult);
-
-    if (!evaluationResult) {
-      evaluationResult = normalizeAiReply(buildProfileReport(facts, translateReport));
-    }
+    const observations = parseObservations(result?.text);
+    const factReport = buildProfileReport(facts, translateReport);
+    const aiSections = observations ? renderObservations(observations, locale) : "";
+    const evaluationResult = normalizeAiReply([factReport, aiSections].filter(Boolean).join("\n\n"));
+    const aiUsed = Boolean(aiSections);
 
     await db.insert(aiEvaluations).values({
       profileId,
@@ -170,7 +190,7 @@ Do not add generic essay, document, recommendation, or test recommendations unle
       content: evaluationResult,
     });
 
-    return NextResponse.json({ evaluation: evaluationResult, aiUsed });
+    return NextResponse.json({ evaluation: evaluationResult, aiUsed, observations });
   } catch (error) {
     console.error("POST /api/ai/evaluate-profile error:", error);
     return NextResponse.json({ error: "Failed to evaluate profile" }, { status: 500 });

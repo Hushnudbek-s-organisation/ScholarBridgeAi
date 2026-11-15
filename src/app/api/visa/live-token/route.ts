@@ -9,6 +9,7 @@ import {
   type LiveConnectConfig,
 } from "@google/genai";
 import { resolveProviderCredential } from "@/lib/ai/credentials";
+import { GEMINI_MODELS } from "@/lib/ai/geminiModels";
 import {
   buildOfficerSystemPrompt,
   getVisaCountry,
@@ -27,7 +28,6 @@ import { readJsonBody } from "@/lib/request";
 
 export const runtime = "nodejs";
 
-const DEFAULT_LIVE_MODEL = "gemini-3.1-flash-live-preview";
 const DEFAULT_API_VERSION = "v1beta";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -36,11 +36,12 @@ const LIVE_QUOTA_CODE = "live_quota_exceeded";
 const LIVE_DISABLED_CODE = "live_voice_disabled";
 const LIVE_CAPACITY_CODE = "live_capacity_reached";
 
-function getLiveModelName(): string {
+function getLiveModelName(configuredModel?: string): string {
   return (
     process.env.GEMINI_LIVE_MODEL ||
     process.env.VISA_LIVE_MODEL ||
-    DEFAULT_LIVE_MODEL
+    configuredModel ||
+    GEMINI_MODELS.live
   ).trim();
 }
 
@@ -220,7 +221,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const model = getLiveModelName();
+    const model = getLiveModelName(credential.model);
     const apiVersion = getLiveApiVersion();
     const expireTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     const newSessionExpireTime = new Date(Date.now() + 60 * 1000).toISOString();

@@ -264,6 +264,10 @@ section("6. Affordability and funding");
 
   check("within budget when the full annual USD cost fits", withBudget.withinBudget === "yes" && withBudget.annualCostUsd === 10000);
   check("over budget when the full annual USD cost exceeds the budget", assessAffordability({ interests: ["Computer Science"], budgetUsd: 5000 }, p, u, sch, "Germany").withinBudget === "no");
+  const monthlyTuition = { ...p, annualTuition: 1000, tuitionPeriod: "month" };
+  const assessed = recommend({ interests: ["Computer Science"], budgetUsd: 10000 }, makeCatalog([monthlyTuition], new Map()))[0];
+  check("canonical finance annualizes monthly USD tuition before comparing it to the budget",
+    assessed.assessment.finance.annualTotalLowerBoundUsd === 12000);
   check("no budget → unknown, not 'no'", noBudget.withinBudget === "unknown");
   check("missing living cost keeps the full annual cost unknown rather than treating it as zero", (() => {
     const noLiving = uni({ id: 1, name: "No published living cost", annualLivingEst: null });

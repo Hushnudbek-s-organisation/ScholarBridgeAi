@@ -33,6 +33,7 @@ import {
 } from "../src/lib/assessment/eligibility";
 import { assessFinance } from "../src/lib/assessment/finance";
 import { compareAcademicMetric } from "../src/lib/assessment/academicComparison";
+import { assessCatalogueProgramme, catalogueAcademicComparisons } from "../src/lib/assessment/adapters";
 import {
   normalizeAssessmentPreferencesForWrite,
   parseAssessmentPreferences,
@@ -655,6 +656,32 @@ check("academic comparison reports below / within / above, never a percentile", 
   const missing = compareAcademicMetric({ metric: "sat", unit: "1600", studentValue: 1500 }, statistics);
   assert.equal(missing.position, "unknown");
   assert.equal(missing.reason, "no_published_statistic");
+});
+
+check("Princeton comparison uses the historical university-wide test-submitter cohort", () => {
+  const university = { id: 13, name: "Princeton University" };
+  const programme = { id: 230, universityId: 13, name: "Computer Science", degree: "Bachelor's" };
+  const result = assessCatalogueProgramme({
+    university,
+    programme,
+    profile: { satScore: 1530, actScore: 33 },
+    assessedAt: "2026-11-15T00:00:00Z",
+    asOfDate: "2026-11-15",
+  });
+  assert.equal(result.academicComparisons.length, 2);
+  const [sat, act] = result.academicComparisons;
+  assert.deepEqual([sat.p25, sat.p50, sat.p75, sat.position], [1490, 1530, 1560, "within"]);
+  assert.deepEqual([act.p25, act.p50, act.p75, act.position], [34, 35, 35, "below"]);
+  assert.equal(sat.statisticScope.kind, "university");
+  assert.equal(sat.population, "test_submitters");
+  assert.equal(sat.statisticYear, "2025–26");
+  assert.equal(result.admissionProbability.value, null);
+
+  const scores = { sat: { value: 1530, unit: "1600" }, act: null };
+  assert.deepEqual(catalogueAcademicComparisons(university, { ...programme, degree: "Master" }, scores), []);
+  assert.deepEqual(catalogueAcademicComparisons(university, programme, scores, "international transfer"), []);
+  assert.deepEqual(catalogueAcademicComparisons({ id: 20, name: "Tsinghua University" }, programme, scores), []);
+  assert.deepEqual(catalogueAcademicComparisons(university, programme, { ...scores, sat: { value: 1530, unit: "36" } }), []);
 });
 
 // ---------------------------------------------------------------------------

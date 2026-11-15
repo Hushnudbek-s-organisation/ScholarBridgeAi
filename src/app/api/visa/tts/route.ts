@@ -1,21 +1,21 @@
+import { createHash } from "node:crypto";
 import { BodyLimitError, cancelBody, readBoundedBytes } from "@/lib/boundedBody";
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { OPENROUTER_MODEL_REGISTRY } from "@/lib/ai/openrouterModelIds";
+import { evaluateAiBudget } from "@/lib/ai/budget-gate";
+import { resolveProviderCredential } from "@/lib/ai/credentials";
+import { GEMINI_MODELS } from "@/lib/ai/geminiModels";
+import { DISABLED_PROVIDERS_CONFIG_KEY, parseDisabledProviders } from "@/lib/ai/settings";
+import { logAIUsage } from "@/lib/ai/usage";
+import { getStoredConfig } from "@/lib/config";
 import { openRouterKey } from "@/lib/ai/openrouterModels";
 import { LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
 import type { VisaOfficerGender } from "@/lib/visa-interview";
 
-/**
- * POST /api/visa/tts — optional neural voice upgrade for the consular officer.
- *
- * Returns audio/mpeg bytes, or 204 when unavailable. The client falls back to
- * browser speech synthesis. Try the configured OpenRouter model and then the
- * verified free Fish Audio model, within one 6-second deadline; never switch
- * providers. The same-provider model retry stays bounded and status-only.
- */
+/** Optional neural voice. The client uses browser speech when the API returns 204. */
 export const dynamic = "force-dynamic";
 
 const MAX_TEXT_LENGTH = 4096;
@@ -25,6 +25,77 @@ const UPSTREAM_TIMEOUT_MS = OPENROUTER_MODEL_REGISTRY.speech.timeoutMs;
 async function readBoundedAudio(body: ReadableStream<Uint8Array>, maxBytes: number, signal: AbortSignal): Promise<Uint8Array | null> {
   try { const audio = await readBoundedBytes(body, maxBytes, signal); return audio.byteLength ? audio : null; }
   catch (error) { if (error instanceof BodyLimitError) return null; throw error; }
+}
+
+const speechCache = new Map<string, { audio: Uint8Array; expiresAt: number }>();
+
+async function googleSpeech(req: Request, apiKey: string, model: string, profileId: number, gender: VisaOfficerGender, text: string) {
+  const voice = gender === "female" ? "Kore" : "Charon";
+  const cacheKey = createHash("sha256").update(JSON.stringify([profileId, model, voice, text])).digest("hex");
+  const cached = speechCache.get(cacheKey);
+  if (cached && cached.expiresAt <= Date.now()) speechCache.delete(cacheKey);
+  let audio = cached && cached.expiresAt > Date.now() ? cached.audio : null;
+  if (!audio) {
+    if (!(await evaluateAiBudget("google", model)).allowed) return new NextResponse(null, { status: 204 });
+    const signal = AbortSignal.any([req.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+      method: "POST",
+      signal,
+      headers: { "x-goog-api-key": apiKey, "content-type": "application/json" },
+      body: JSON.stringify({
+        model,
+        input: [{ type: "user_input", content: [{ type: "text", text }] }],
+        response_format: { type: "audio", mime_type: "audio/wav" },
+        generation_config: { speech_config: [{ voice }] },
+        store: false,
+      }),
+    });
+    if (!response.ok || !response.body) {
+      cancelBody(response.body);
+      console.warn(JSON.stringify({ evt: "ai_request", task: "visa_tts", provider: "google", model, status: "error", category: `http_${response.status}` }));
+      return new NextResponse(null, { status: 204 });
+    }
+    const bytes = await readBoundedBytes(response.body, Math.ceil(MAX_AUDIO_BYTES * 4 / 3) + 64 * 1024, signal);
+    const result = JSON.parse(new TextDecoder().decode(bytes)) as {
+      steps?: { type: string; content?: { type: string; data?: string }[] }[];
+    };
+    const base64 = result.steps?.filter((step) => step.type === "model_output")
+      .flatMap((step) => step.content ?? []).find((part) => part.type === "audio")?.data;
+    const wav = typeof base64 === "string" ? Buffer.from(base64, "base64") : null;
+    if (!wav || wav.length < 44 || wav.length > MAX_AUDIO_BYTES ||
+        wav.toString("ascii", 0, 4) !== "RIFF" || wav.toString("ascii", 8, 12) !== "WAVE") {
+      return new NextResponse(null, { status: 204 });
+    }
+    audio = wav;
+    await logAIUsage({
+      profileId,
+      taskType: "visa_tts",
+      provider: "google",
+      model,
+      promptTokens: 0,
+      completionTokens: 0,
+      costEstimate: 0,
+      costStatus: "usage_unreported",
+      status: "success",
+    }).catch(() => console.warn("Visa TTS usage could not be recorded"));
+    if (audio.byteLength <= 512 * 1024) {
+      if (speechCache.size >= 8) {
+        const oldest = speechCache.keys().next();
+        if (!oldest.done) speechCache.delete(oldest.value);
+      }
+      speechCache.set(cacheKey, { audio, expiresAt: Date.now() + 3 * 60_000 });
+    }
+  }
+  const audioBody = audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength) as ArrayBuffer;
+  return new NextResponse(audioBody, {
+    headers: {
+      "content-type": "audio/wav",
+      "content-length": String(audio.byteLength),
+      "cache-control": "no-store",
+      "x-tts-provider": "google",
+      "x-tts-model": model,
+    },
+  });
 }
 
 export async function POST(req: Request) {
@@ -43,6 +114,15 @@ export async function POST(req: Request) {
     if (!rawText) return NextResponse.json({ error: "text is required." }, { status: 400 });
     const text = rawText.slice(0, MAX_TEXT_LENGTH);
     const gender: VisaOfficerGender = parsed.body?.gender === "female" ? "female" : "male";
+    if (!process.env.OPENROUTER_TTS_MODEL?.trim()) {
+      const disabled = parseDisabledProviders(await getStoredConfig(DISABLED_PROVIDERS_CONFIG_KEY).catch(() => null) ?? process.env.AI_PROVIDERS_DISABLED);
+      const { apiKey } = disabled.includes("google") ? {} : await resolveProviderCredential("google");
+      if (apiKey) {
+        const model = process.env.GEMINI_TTS_MODEL?.trim() || GEMINI_MODELS.tts;
+        if (!/^[A-Za-z0-9._-]{1,120}$/.test(model)) return new NextResponse(null, { status: 204 });
+        return await googleSpeech(req, apiKey, model, profileId, gender, text);
+      }
+    }
     const fishVoice = gender === "female"
       ? process.env.OPENROUTER_TTS_VOICE_FEMALE?.trim()
       : process.env.OPENROUTER_TTS_VOICE_MALE?.trim();
