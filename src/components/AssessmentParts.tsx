@@ -585,7 +585,9 @@ export function AcademicComparisonList({ comparisons }: { comparisons: AcademicC
             compact
             label={academicMetricLabel(comparison.metric, t)}
             fact={presentRaw({
-              value: comparison.studentValue,
+              value: comparison.p25 != null && comparison.p75 != null
+                ? `${comparison.p25}–${comparison.p75}`
+                : null,
               fieldLabel: academicMetricLabel(comparison.metric, t),
               trust: "observed",
               valueType: "observed_statistic",

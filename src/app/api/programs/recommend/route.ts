@@ -267,6 +267,7 @@ export async function POST(req: Request) {
     fundingNeed: fundingNeed.value,
     languagePref: languagePref.value as string | null,
     startYear: startYear.value as number | null,
+    applicantScope,
     citizenships:body.citizenship===undefined?(profile.applicantContext?.citizenships??[]):undefined,
     toeflRecord,
     citizenship: body.citizenship===undefined?(profile.applicantContext?.citizenships?.[0]??null):typeof body.citizenship === "string" ? body.citizenship.slice(0,100) : null,

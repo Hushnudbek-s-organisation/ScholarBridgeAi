@@ -5,7 +5,7 @@ import {
   type ProgrammeAssessment,
 } from "./assessment";
 import type { EligibilityProfile, RequirementNode } from "./assessment/eligibility";
-import { financeInputFromCosts } from "./assessment/adapters";
+import { catalogueAcademicComparisons, financeInputFromCosts } from "./assessment/adapters";
 import { budgetVerdict, evaluateBudgetFit } from "./budgetFit";
 /**
  * Subject-to-program recommender engine (2026-10).
@@ -91,6 +91,7 @@ export interface RecommendationInput {
   /** Preferred teaching language, e.g. "English". Absent = no preference. */
   languagePref?: string | null;
   startYear?: number | null; // e.g. 2027
+  applicantScope?: string | null;
   /** Caller-supplied date keeps cycle selection pure and deterministic. */
   asOfDate?: string | null;
 }
@@ -645,9 +646,11 @@ function assessmentFor(
   };
 
   const finance = financeInputFromCosts({
-    tuitionUsd: affordability.annualTuition != null && (program.tuitionCurrency || "USD").toUpperCase() === "USD"
-      ? Number(affordability.annualTuition)
-      : null,
+    tuitionUsd: annualUsdAmount({
+      value: program.annualTuition,
+      currency: program.tuitionCurrency,
+      period: program.tuitionPeriod,
+    }),
     tuitionSourceUrl: program.sourceUrl ?? null,
     livingUsd: affordability.livingEstUsd,
     budgetUsd: input.budgetUsd ?? null,
@@ -678,6 +681,12 @@ function assessmentFor(
       legacyTeachingLanguage: input.languagePref ? [input.languagePref] : [],
       eligibilityProfile,
       finance,
+      comparisons: catalogueAcademicComparisons(
+        university,
+        { id: program.id, universityId: program.universityId, degree: program.degreeLevel },
+        { sat: eligibilityProfile.sat ?? null, act: eligibilityProfile.act ?? null },
+        input.applicantScope
+      ),
     },
     requirements: requirementNodes,
     assessedAt: new Date().toISOString(),

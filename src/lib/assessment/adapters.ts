@@ -20,7 +20,7 @@
 import { resolveScopedFact, type FactContext } from "@/lib/factResolver";
 import type { CatalogueFact } from "@/lib/evidencePolicy";
 import { isVerifiedOfficialRequirement, mayAutoReject, type TrustedValue } from "@/lib/typedEvidence";
-import { compareDegreeLevels, undergraduateTestApplies } from "@/lib/degreeLevels";
+import { compareDegreeLevels, normalizeDegreeLevel, undergraduateTestApplies } from "@/lib/degreeLevels";
 import { parseListColumn } from "@/lib/chancing";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import type { ApplicantContext } from "@/lib/applicantContext";
@@ -612,6 +612,43 @@ export function publishedStatisticsFor(input: {
   return out;
 }
 
+// Princeton Common Data Set 2025–26, C9. These bands describe enrolled
+// first-year score submitters across the university.
+const princetonFirstYearStatistics = publishedStatisticsFor({
+  metrics: {
+    sat: { p25: 1490, p50: 1530, p75: 1560 },
+    act: { p25: 34, p50: 35, p75: 35 },
+  },
+  unit: { sat: "1600", act: "36" },
+  scope: { kind: "university", label: "Princeton University (first-year enrolled score submitters)" },
+  year: "2025–26",
+  population: "test_submitters",
+  sourceUrl: "https://ir.princeton.edu/sites/g/files/toruqf2041/files/documents/CDS_2526_Princeton_v2.pdf",
+  verificationStatus: "verified",
+});
+
+export function catalogueAcademicComparisons(
+  university: Pick<AssessmentUniversityRow, "id" | "name">,
+  programme: Pick<AssessmentProgrammeRow, "id" | "universityId" | "degree">,
+  metrics: Pick<ReturnType<typeof applicantMetrics>, "sat" | "act">,
+  applicantCategory?: string | null
+): ReturnType<typeof comparisonsFromStatistics> {
+  if (
+    university.id !== 13 || university.name !== "Princeton University" ||
+    programme.id <= 0 || programme.universityId !== university.id ||
+    normalizeDegreeLevel(programme.degree) !== "Bachelor" ||
+    /transfer/i.test(applicantCategory ?? "")
+  ) return [];
+
+  return comparisonsFromStatistics(
+    princetonFirstYearStatistics.filter(({ metric, unit }) => {
+      const recorded = metric === "sat" ? metrics.sat : metrics.act;
+      return recorded != null && Number.isFinite(recorded.value) && recorded.unit === unit;
+    }),
+    { gpa: null, ielts: null, toefl: null, det: null, ...metrics }
+  );
+}
+
 /** Build the canonical input for one programme. */
 export function assessmentInputFor(input: {
   programme: AssessmentProgrammeRow;
@@ -742,10 +779,10 @@ export function assessCatalogueProgramme(input: {
     oneTimeFeeUsd: input.applicationFeeUsd ?? null,
     budgetUsd,
   });
-  const comparisons = comparisonsFromStatistics(
-    publishedStatisticsFor2(input.publishedStatistics ?? []),
-    applicantMetrics(input.profile)
-  );
+  const metrics = applicantMetrics(input.profile);
+  const comparisons = input.publishedStatistics
+    ? comparisonsFromStatistics(publishedStatisticsFor2(input.publishedStatistics), metrics)
+    : catalogueAcademicComparisons(input.university, input.programme, metrics, input.applicantCategory);
   return assessProgramme(
     assessmentInputFor({
       programme: input.programme,
