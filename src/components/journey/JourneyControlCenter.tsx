@@ -765,6 +765,7 @@ export function JourneyControlCenter({
   return (
     <div className="space-y-5" data-testid="journey-dashboard">
       <DashboardOverview
+        key={data.profile.id}
         data={data}
         primaryTitle={primaryStep ? nextStepTitle(primaryStep) : t("ccNothingOutstanding")}
         primaryDetail={primaryStep ? nextStepDetail(primaryStep) : t("ccNothingOutstandingHint")}

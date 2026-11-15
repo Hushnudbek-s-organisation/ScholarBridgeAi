@@ -207,3 +207,34 @@ test("dashboard data error keeps navigation and retry functional", async ({page}
   await retry.click();
   await expect(page.getByTestId("journey-dashboard")).toBeVisible();
 });
+
+test("Scholly mission only shows the end-of-day summary after completion", async ({ page }) => {
+  test.setTimeout(120_000);
+  await dashboard(page, "en", "dark", 390);
+  const mission = page.getByRole("region", { name: "Today’s mission" });
+  await expect(mission.getByText("Chosen by Scholly")).toBeVisible();
+  await expect(mission.getByText("Complete profile details", { exact: true })).toBeVisible();
+  await expect(mission.getByRole("heading", { name: "You’re done for today!" })).toHaveCount(0);
+  const before = await page.request.get("/api/scholly/mission");
+  expect(before.ok()).toBe(true);
+  const started = await before.json();
+  expect(started.mission.status).toBe("pending");
+
+  const profile = await page.request.put(`/api/profiles/${fixtures.studentId}`, { data: { ieltsScore: 6.5 } });
+  expect(profile.ok()).toBe(true);
+  await mission.getByRole("button", { name: "Check progress" }).click();
+  await expect(mission.getByRole("heading", { name: "You’re done for today!" })).toBeVisible();
+  await expect(mission.getByText(/\+10 points/)).toBeVisible();
+  const refreshed = await page.request.post("/api/scholly/mission", { data: { action: "refresh" } });
+  expect(refreshed.ok()).toBe(true);
+  expect(await refreshed.json()).toMatchObject({
+    mission: { id: started.mission.id, status: "done" },
+    points: started.points + 10,
+    justCompleted: false,
+  });
+  await mission.getByRole("button", { name: "Done for today" }).click();
+  await expect(mission.getByRole("heading", { name: "Today’s mission" })).toBeFocused();
+  await page.reload();
+  await expect(mission.getByText("Completed — points awarded")).toBeVisible();
+  await expect(mission.getByRole("heading", { name: "You’re done for today!" })).toHaveCount(0);
+});

@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   ArrowRight, Bookmark, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight,
-  Circle, Compass, FileCheck2, GraduationCap, ListChecks, Sparkles, Target,
+  Circle, Compass, FileCheck2, ListChecks, Sparkles, Target,
 } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
+import { ProgressRing } from "@/components/ui/journey";
+import type { SchollyMissionTheme, SchollyMissionType } from "@/lib/scholly-missions";
 import type { JourneyDashboard } from "./JourneyControlCenter";
 
 function dateKey(date: Date) {
@@ -15,7 +18,8 @@ function dateKey(date: Date) {
 
 type MissionView = {
   id: number;
-  type: "fill_profile_fields" | "save_universities" | "upload_document" | "sop_paragraph";
+  type: SchollyMissionType;
+  theme: SchollyMissionTheme;
   status: "pending" | "done" | "skipped";
   sizeMin: number;
   points: number;
@@ -25,24 +29,44 @@ type MissionView = {
   anotherUsed: boolean;
 };
 
+type MissionResponse = { mission?: MissionView; justCompleted?: boolean };
+
+function completionKey(profileId: number) {
+  return `scholly:mission-dismissed:${profileId}`;
+}
+
+function isCompletionDismissed(profileId: number, missionId: number) {
+  try {
+    return localStorage.getItem(completionKey(profileId)) === String(missionId);
+  } catch {
+    return false;
+  }
+}
+
 const missionCopy = {
   uz: {
-    title: "Bugungi kichik qadam", loading: "Missiya yuklanmoqda…", error: "Bugungi missiya hozir ochilmadi.",
+    title: "Bugungi missiya", readiness: "Ariza tayyorligi", chosen: "Scholly tanladi",
+    theme: { plan: "Reja", writing: "Yozuv", language: "Til", search: "Qidiruv", speaking: "Speaking va viza", light: "Yengil kun", review: "Hafta yakuni" },
+    finished: "Bugunga bo‘ldi!", dismiss: "Bugunni yakunlash", tomorrow: "Ertaga yangi missiya kutadi.", loading: "Missiya yuklanmoqda…", error: "Bugungi missiya hozir ochilmadi.",
     tasks: { fill_profile_fields: "Profil ma’lumotlarini to‘ldiring", save_universities: "Universitetlarni saqlang", upload_document: "Hujjat yuklang", sop_paragraph: "SOP uchun 50 ta so‘z yozing" },
     open: "Vazifani ochish", check: "Progressni tekshirish", another: "Boshqa missiya", skip: "Bugun o‘tkazib yuborish", retry: "Qayta urinish",
-    done: "Bajarildi — ball hisoblandi", skipped: "Bugungi missiya o‘tkazib yuborildi", points: "ball", progress: "Bajarilish",
+    done: "Bajarildi — ball hisoblandi", skipped: "Bugungi missiya o‘tkazib yuborildi", points: "ball", minutes: "daq", progress: "Bajarilish",
   },
   en: {
-    title: "Today's small step", loading: "Loading mission…", error: "Today's mission is unavailable right now.",
+    title: "Today’s mission", readiness: "Application readiness", chosen: "Chosen by Scholly",
+    theme: { plan: "Planning", writing: "Writing", language: "Language", search: "Discovery", speaking: "Speaking and visas", light: "Light day", review: "Weekly review" },
+    finished: "You’re done for today!", dismiss: "Done for today", tomorrow: "A new mission will be ready tomorrow.", loading: "Loading mission…", error: "Today's mission is unavailable right now.",
     tasks: { fill_profile_fields: "Complete profile details", save_universities: "Save universities", upload_document: "Upload a document", sop_paragraph: "Write 50 words for your SOP" },
     open: "Open task", check: "Check progress", another: "Another mission", skip: "Skip for today", retry: "Retry",
-    done: "Completed — points awarded", skipped: "Today's mission was skipped", points: "points", progress: "Progress",
+    done: "Completed — points awarded", skipped: "Today's mission was skipped", points: "points", minutes: "min", progress: "Progress",
   },
   ru: {
-    title: "Небольшой шаг на сегодня", loading: "Загрузка задания…", error: "Сегодняшнее задание сейчас недоступно.",
+    title: "Задание на сегодня", readiness: "Готовность заявки", chosen: "Выбор Scholly",
+    theme: { plan: "Планирование", writing: "Письмо", language: "Язык", search: "Поиск", speaking: "Разговорная практика и визы", light: "Лёгкий день", review: "Итоги недели" },
+    finished: "На сегодня всё!", dismiss: "Завершить день", tomorrow: "Завтра вас ждёт новое задание.", loading: "Загрузка задания…", error: "Сегодняшнее задание сейчас недоступно.",
     tasks: { fill_profile_fields: "Заполните профиль", save_universities: "Сохраните университеты", upload_document: "Загрузите документ", sop_paragraph: "Напишите 50 слов для SOP" },
     open: "Открыть задачу", check: "Проверить прогресс", another: "Другое задание", skip: "Пропустить сегодня", retry: "Повторить",
-    done: "Выполнено — баллы начислены", skipped: "Задание на сегодня пропущено", points: "баллов", progress: "Прогресс",
+    done: "Выполнено — баллы начислены", skipped: "Задание на сегодня пропущено", points: "баллов", minutes: "мин", progress: "Прогресс",
   },
 } as const;
 
@@ -66,20 +90,30 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
   const [mission, setMission] = useState<MissionView | null>(null);
   const [missionError, setMissionError] = useState(false);
   const [missionBusy, setMissionBusy] = useState(false);
+  const [dismissedMission, setDismissedMission] = useState<number | null>(null);
+  const missionHeading = useRef<HTMLHeadingElement>(null);
+  const profileId = data.profile.id;
   const copy = missionCopy[locale.startsWith("ru") ? "ru" : locale.startsWith("en") ? "en" : "uz"];
   const [greetingBefore, greetingAfter] = t("overviewGreeting", { name: "\uFFF0" }).split("\uFFF0");
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/scholly/mission?profileId=${data.profile.id}`, { cache: "no-store", signal: controller.signal })
+    fetch(`/api/scholly/mission?profileId=${profileId}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("mission_unavailable");
-        return response.json() as Promise<{ mission?: MissionView }>;
+        return response.json() as Promise<MissionResponse>;
       })
-      .then((result) => { if (result.mission) { setMission(result.mission); setMissionError(false); } else setMissionError(true); })
+      .then(({ mission: next, justCompleted }) => {
+        if (controller.signal.aborted) return;
+        if (!next) throw new Error("mission_unavailable");
+        if (justCompleted) window.dispatchEvent(new Event("scholly:mission-done"));
+        setDismissedMission(isCompletionDismissed(profileId, next.id) ? next.id : null);
+        setMission(next);
+        setMissionError(false);
+      })
       .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setMissionError(true); });
     return () => controller.abort();
-  }, [data.profile.id]);
+  }, [profileId]);
 
   async function updateMission(action: "skip" | "another" | "refresh") {
     setMissionBusy(true);
@@ -88,13 +122,12 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
       const response = await fetch("/api/scholly/mission", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId: data.profile.id, action }),
+        body: JSON.stringify({ profileId, action }),
       });
-      const result = await response.json() as { mission?: MissionView };
+      const result = await response.json() as MissionResponse;
       if (!response.ok || !result.mission) throw new Error("mission_update_failed");
-      if (mission?.status === "pending" && result.mission.status === "done") {
-        window.dispatchEvent(new Event("scholly:mission-done"));
-      }
+      if (result.justCompleted) window.dispatchEvent(new Event("scholly:mission-done"));
+      setDismissedMission(isCompletionDismissed(profileId, result.mission.id) ? result.mission.id : null);
       setMission(result.mission);
       setMissionError(false);
     } catch {
@@ -102,6 +135,16 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
     } finally {
       setMissionBusy(false);
     }
+  }
+
+  function dismissCompletion(missionId: number) {
+    try {
+      localStorage.setItem(completionKey(profileId), String(missionId));
+    } catch {
+      // The summary can still be dismissed when storage is disabled.
+    }
+    setDismissedMission(missionId);
+    missionHeading.current?.focus();
   }
 
   const monthDays = useMemo(() => {
@@ -126,6 +169,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
   const appCounts = data.applications;
   const statusTotal = Math.max(1, appCounts.preparing + appCounts.submitted + appCounts.decision);
   const moveMonth = (delta: number) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  const readiness = Math.max(0, Math.min(100, Math.round(data.readiness.overall)));
   const dayLabel = (remaining: number | null) => remaining == null ? t("overviewDateSet") : t("overviewDaysLeft", { count: remaining });
 
   return <>
@@ -145,7 +189,9 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
           </div>
           <p className="sb-overview-stage">{t("overviewCurrentStage", { stage: currentStage })}</p>
         </div>
-        <GraduationCap aria-hidden className="sb-overview-cap" strokeWidth={1.2} />
+        <div className="sbOverviewReadiness">
+          <ProgressRing pct={readiness} size={72} strokeWidth={6} label={copy.readiness} />
+        </div>
       </section>
       <section className="sb-overview-panel sbOverviewPlan">
         <h2><FileCheck2 aria-hidden />{t("overviewPlan")}</h2>
@@ -161,25 +207,38 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
 
     <section className="sb-overview-panel sbOverviewMission" aria-labelledby="sb-daily-mission-title">
       <div className="sbOverviewMissionHeading">
-        <h2 id="sb-daily-mission-title"><Target aria-hidden />{copy.title}</h2>
-        {mission && <span className="sbOverviewMissionPoints">{mission.points} {copy.points}</span>}
+        <h2 id="sb-daily-mission-title" ref={missionHeading} tabIndex={-1}><Target aria-hidden />{copy.title}</h2>
+        {mission && <span className="sbOverviewMissionPoints">{mission.sizeMin} {copy.minutes} · {mission.points} {copy.points}</span>}
       </div>
       {!mission && !missionError && <p className="sbOverviewMissionMessage" role="status">{copy.loading}</p>}
       {missionError && <div><p className="sbOverviewMissionMessage" role="status">{copy.error}</p><button className="sbOverviewMissionRetry" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.retry}</button></div>}
       {mission && <>
+        <div className="sbOverviewMissionSource">
+          <Image src="/scholly.webp" alt="" width={28} height={28} />
+          <span>{copy.chosen}</span>
+          <span className="sbOverviewMissionTheme">{copy.theme[mission.theme]}</span>
+        </div>
         <p className="sbOverviewMissionTask">{copy.tasks[mission.type]}</p>
         <p className="sbOverviewMissionStatus" role="status">
           {mission.status === "done" ? copy.done : mission.status === "skipped" ? copy.skipped : `${copy.progress}: ${mission.progress} / ${mission.target}`}
         </p>
         <progress className="sbOverviewMissionProgress" value={mission.status === "done" ? mission.target : mission.progress} max={Math.max(1, mission.target)} aria-label={copy.progress} />
-        <div className="sbOverviewMissionActions">
-          {mission.status === "pending" && <>
+        {mission.status === "done" && dismissedMission !== mission.id && (
+          <div className="sbOverviewMissionFinish">
+            <div role="status">
+              <h3>{copy.finished}</h3>
+              <p>+{mission.points} {copy.points} · {copy.readiness} {new Intl.NumberFormat(locale, { style: "percent" }).format(readiness / 100)}</p>
+              <p>{copy.tomorrow}</p>
+            </div>
+            <Button variant="outline" onClick={() => dismissCompletion(mission.id)}>{copy.dismiss}</Button>
+          </div>
+        )}
+        {mission.status === "pending" && <div className="sbOverviewMissionActions">
             <button type="button" className="sbOverviewMissionPrimary" onClick={() => onNavigate(({ fill_profile_fields: "profile", save_universities: "universities", upload_document: "documents", sop_paragraph: "essays" })[mission.type])}>{copy.open}<ArrowRight aria-hidden /></button>
             <button type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.check}</button>
             {!mission.anotherUsed && <button type="button" disabled={missionBusy} onClick={() => updateMission("another")}>{copy.another}</button>}
             <button type="button" disabled={missionBusy} onClick={() => updateMission("skip")}>{copy.skip}</button>
-          </>}
-        </div>
+        </div>}
       </>}
     </section>
 
@@ -213,7 +272,8 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
           </div>
           <div className="sbOverviewDeadlineDetail">
             {selectedDeadlines.length ? selectedDeadlines.map((deadline) => <button type="button" key={deadline.id} onClick={() => onNavigate(deadline.tab)}>
-              <strong>{deadline.title}</strong><span>{dayLabel(deadline.daysRemaining)}</span>
+              <strong>{deadline.title}</strong>
+              <span className="sbOverviewDeadlineChip" data-urgent={deadline.daysRemaining != null && deadline.daysRemaining >= 0 && deadline.daysRemaining <= 3 || undefined}>{dayLabel(deadline.daysRemaining)}</span>
             </button>) : <p>{t("overviewNoDeadlines")}</p>}
             <button className="sbOverviewOpenCalendar" type="button" onClick={() => onNavigate("tasks")}><CalendarDays aria-hidden />{t("overviewOpenCalendar")}</button>
           </div>

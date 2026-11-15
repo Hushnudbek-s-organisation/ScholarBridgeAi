@@ -77,7 +77,7 @@ async function evaluateMission(profileId: number, row: typeof dailyMissions.$inf
   return db.transaction(async (tx) => {
     const [locked] = await tx.select().from(dailyMissions)
       .where(eq(dailyMissions.id, row.id)).for("update").limit(1);
-    if (!locked) return { row, progress: { progress: 0, target: row.targetCount, complete: false } };
+    if (!locked) return { row, progress: { progress: 0, target: row.targetCount, complete: false }, justCompleted: false };
     const context = await loadSchollyMissionContext(profileId, day, timezone, tx);
     const progress = missionProgress(
       locked.type as SchollyMissionType,
@@ -85,14 +85,14 @@ async function evaluateMission(profileId: number, row: typeof dailyMissions.$inf
       criteriaFromStored(locked.criteria),
       missionCriteriaFromContext(context),
     );
-    if (locked.status !== "pending" || !progress.complete) return { row: locked, progress };
+    if (locked.status !== "pending" || !progress.complete) return { row: locked, progress, justCompleted: false };
 
     const [done] = await tx.update(dailyMissions).set({ status: "done", doneAt: new Date() })
       .where(and(eq(dailyMissions.id, locked.id), eq(dailyMissions.status, "pending"))).returning();
-    if (!done) return { row: locked, progress };
+    if (!done) return { row: locked, progress, justCompleted: false };
     await awardPoints(profileId, done.points, "scholly_daily_mission", done.id, tx);
     await logSchollyEvent(profileId, "mission_done", { missionId: done.id, type: done.type, points: done.points, day: done.day }, tx);
-    return { row: done, progress };
+    return { row: done, progress, justCompleted: true };
   });
 }
 
@@ -105,6 +105,7 @@ async function responseFor(profileId: number) {
   return privateNoStoreJson({
     mission: missionPayload(evaluated.row, evaluated.progress),
     points,
+    justCompleted: evaluated.justCompleted,
     timezone: timeZone,
   });
 }

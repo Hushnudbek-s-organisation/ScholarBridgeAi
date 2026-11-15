@@ -1513,6 +1513,22 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
 .sbOverviewMissionHeading h2 { display: flex; align-items: center; gap: 8px; }
 .sbOverviewMissionHeading h2 svg { width: 20px; height: 20px; color: #a78bfa; }
 .sbOverviewMissionPoints { color: var(--sb-ink-muted); font-size: .875rem; font-weight: 650; }
+.sbOverviewMissionSource { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; color: var(--sb-ink-muted); font-size: .875rem; }
+.sbOverviewMissionSource img { object-fit: contain; }
+.sbOverviewMissionTheme { border: 1px solid var(--sb-border); border-radius: 999px; padding: 2px 8px; }
+.sbOverviewMissionFinish { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 16px; padding: 14px; border-radius: 12px; background: var(--sb-well); }
+.sbOverviewMissionFinish h3 { color: var(--sb-ink-heading); font-weight: 650; }
+.sbOverviewMissionFinish p { color: var(--sb-ink-muted); font-size: .875rem; }
+.sbOverviewReadiness { flex: none; }
+.sbOverviewReadiness [role="progressbar"] { flex-direction: column; gap: 6px; text-align: center; }
+.sbOverviewDeadlineChip { display: inline-flex; width: fit-content; border: 1px solid var(--sb-border); border-radius: 999px; padding: 2px 8px; font-size: .8125rem; }
+.sbOverviewDeadlineChip[data-urgent] { border-color: #c2410c; background: #fff7ed; color: #9a3412; }
+.dark .sbOverviewDeadlineChip[data-urgent] { border-color: #9a3412; background: #431407; color: #fed7aa; }
+@media (max-width: 480px) {
+  .sb-overview-hero:has(.sbOverviewReadiness) { flex-wrap: wrap; gap: 12px; }
+  .sb-overview-hero:has(.sbOverviewReadiness) .sb-overview-hero-copy { flex-basis: 100%; }
+  .sbOverviewReadiness [role="progressbar"] { flex-direction: row; text-align: start; }
+}
 .sbOverviewMissionTask { margin-top: 12px; color: var(--sb-ink-heading); font-size: 1rem; font-weight: 600; }
 .sbOverviewMissionStatus, .sbOverviewMissionMessage { margin-top: 6px; color: var(--sb-ink-muted); font-size: .875rem; }
 .sbOverviewMissionRetry { min-height: 44px; margin-top: 10px; padding: 8px 12px; border: 1px solid var(--sb-border); border-radius: 10px; color: var(--sb-ink-body); font-size: .875rem; }
