@@ -1,6 +1,4 @@
-import "server-only";
-
-// These are independently written teaching notes. Original applications, identities,
+// Used by API routes. These are independently written teaching notes. Original applications, identities,
 // admissions decisions and numerical scores are never sent to the model.
 const writingReferences = [
   {
