@@ -71,6 +71,10 @@
     "test:essays": "tsx scripts/check-essays.ts",
     "test:visa": "tsx scripts/check-visa-similar.ts && tsx scripts/check-visa-scoring.ts",
     "test:visa-render": "tsx scripts/check-visa-render.tsx",
+    "test:scholly-motion": "tsx scripts/check-scholly-motion.ts",
+    "test:scholly-onboarding": "tsx scripts/check-scholly-onboarding.ts",
+    "test:scholly-profile": "tsx scripts/check-scholly-profile.ts",
+    "test:scholly-missions": "tsx scripts/check-scholly-missions.ts",
     "test:samples": "tsx scripts/check-samples.ts",
     "test:costs": "tsx scripts/check-costs.ts",
     "test:video": "tsx scripts/check-video-player.ts",
@@ -200,7 +204,8 @@
     "next-intl": "^4.13.5",
     "pg": "8.20.0",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
@@ -210,6 +215,7 @@
     "@types/pg": "8.18.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "^0.187.0",
     "drizzle-kit": "0.31.11",
     "embedded-postgres": "^18.4.0-beta.17",
     "eslint": "9.39.4",

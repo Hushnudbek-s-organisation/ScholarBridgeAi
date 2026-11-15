@@ -102,6 +102,7 @@ import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
 // lazy chunk (a static value import of it is forbidden by check-samples.ts).
 import { modelAnswerForTurn } from "@/lib/samples/modelAnswers";
 import { visaSampleCountryFor } from "@/lib/samples/visa";
+import { SpeakingRoom } from "@/components/visa/SpeakingRoom";
 import { AiOrbFaceAvatar } from "@/components/visa/AiOrbFaceAvatar";
 import {
   classifySpeechError,
@@ -117,6 +118,8 @@ import { UI_COLORS } from "@/components/ui/tokens";
 import { ProgressFill } from "@/components/ui/ProgressBar";
 
 const MAX_SILENCE_RECOVERY_ATTEMPTS = 5;
+const OFFICER_NAMES = { male: "John", female: "Rica" } as const;
+const OFFICERS = ["male", "female"] as const;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -653,7 +656,7 @@ interface LiveSessionLike {
 }
 
 interface VisaEngine {
-  startInterview: () => void;
+  startInterview: (officer: VisaOfficerGender) => void;
   submitAnswer: (text: string) => void;
   onMicClick: () => void;
   toggleMute: () => void;
@@ -691,6 +694,8 @@ export function VisaSpeakingAssistant({
    */
   const [countrySearch, setCountrySearch] = useState("");
   const [showAllCountries, setShowAllCountries] = useState(false);
+  const officerPickerRef = useRef<HTMLDialogElement>(null);
+  const startButtonRef = useRef<HTMLButtonElement>(null);
   const [gender, setGender] = useState<VisaOfficerGender | null>(null);
   const [voice, setVoice] = useState<VisaLiveVoice>("Kore");
   const [liveVoiceSelected, setLiveVoiceSelected] = useState(false);
@@ -899,6 +904,7 @@ export function VisaSpeakingAssistant({
   };
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [volume, setVolume] = useState(0);
+  const [measuredSpeech, setMeasuredSpeech] = useState(false);
   const [outputLevel, setOutputLevel] = useState(0);
 
   const sessionRef = useRef(0);
@@ -965,6 +971,7 @@ export function VisaSpeakingAssistant({
     cancelAnimationFrame(ttsRafRef.current);
     ttsRafRef.current = 0;
     setOutputLevel(0);
+    setMeasuredSpeech(false);
   }
 
   const liveSessionRef = useRef<LiveSessionLike | null>(null);
@@ -1073,7 +1080,7 @@ export function VisaSpeakingAssistant({
   }
   const showTextFallback = engineMode === "fallback" && (!sttSupported || micBlocked);
   const reactorStatus: "LISTENING" | "THINKING" | "SPEAKING" | "IDLE" =
-    officerState === "speaking"
+    officerState === "speaking" && !muted
       ? "SPEAKING"
       : officerState === "thinking"
         ? "THINKING"
@@ -1378,8 +1385,9 @@ export function VisaSpeakingAssistant({
           stopNeuralSpeech();
           onDone();
         };
-        setOfficer("speaking");
         source.start();
+        setMeasuredSpeech(true);
+        setOfficer("speaking");
         ttsRafRef.current = requestAnimationFrame(tick);
         clearSpeakWatchdog();
         speakWatchdogRef.current = window.setTimeout(() => {
@@ -1444,7 +1452,6 @@ export function VisaSpeakingAssistant({
           cleanup();
           settle(false);
         };
-        setOfficer("speaking");
         clearSpeakWatchdog();
         speakWatchdogRef.current = window.setTimeout(() => {
           if (ttsPlaybackIdRef.current !== playbackId) return;
@@ -1452,6 +1459,8 @@ export function VisaSpeakingAssistant({
           onDone();
         }, speakWatchdogMs(text));
         void audio.play().then(() => {
+          if (ttsAudioElRef.current !== audio || ttsPlaybackIdRef.current !== playbackId) return;
+          setOfficer("speaking");
           setAudioGestureRequired(false);
           settle(true);
         }).catch((error: unknown) => {
@@ -1500,7 +1509,7 @@ export function VisaSpeakingAssistant({
           if (selectedVoice) utter.voice = selectedVoice;
           utter.rate = 0.95;
           utter.pitch = configRef.current?.gender === "female" ? 1.15 : 0.85;
-          setOfficer("speaking");
+          utter.onstart = () => { if (isCurrent() && !finished) setOfficer("speaking"); };
           utter.onend = finishSpeaking;
           utter.onerror = (event) => {
             if ((event as SpeechSynthesisErrorEvent).error === "not-allowed") setAudioGestureRequired(true);
@@ -1514,9 +1523,8 @@ export function VisaSpeakingAssistant({
         }
       };
 
-      // Keep the text and speaking state immediate; request natural neural
-      // audio in parallel with the already-rendered officer line.
-      setOfficer("speaking");
+      // Keep the transcript visible while the audio is being prepared.
+      setOfficer("thinking");
       void (async () => {
         const controller = new AbortController();
         ttsAbortRef.current = controller;
@@ -1617,7 +1625,7 @@ export function VisaSpeakingAssistant({
     async function submitAnswer(text: string): Promise<void> {
       const clean = text.trim();
       if (!clean || submittingRef.current) return;
-      if (officerStateRef.current === "speaking") {
+      if (officerStateRef.current === "speaking" || ttsAbortRef.current) {
         if (engineModeRef.current === "gemini-live") interruptAssistant();
         else {
           safeCancelSpeech();
@@ -2295,10 +2303,11 @@ export function VisaSpeakingAssistant({
       if (fetchFirst) await fetchOfficerReply(messagesRef.current);
     }
 
-    async function startInterview(): Promise<void> {
+    async function startInterview(gender: VisaOfficerGender): Promise<void> {
       const c = getVisaCountry(countryCode);
-      if (!c || !gender) return;
-      const selectedVoice = normalizeVisaLiveVoice(voice, gender);
+      if (!c) return;
+      setGender(gender);
+      const selectedVoice = normalizeVisaLiveVoice(liveVoiceSelected ? voice : undefined, gender);
       configRef.current = { countryCode: c.code, gender, voice: selectedVoice };
       sessionRef.current += 1;
       liveIntentionalCloseRef.current = true;
@@ -2364,6 +2373,17 @@ export function VisaSpeakingAssistant({
             profileId: activeProfile?.id ?? undefined,
           }),
         });
+        if (res.status === 501) {
+          const { scoreVisaInterview } = await import("@/lib/visaScoring");
+          if (sessionRef.current !== token || !mountedRef.current) return;
+          const rubric = scoreVisaInterview(messagesRef.current, { homeCountry: activeProfile?.country, destination: c.name, profile: activeProfile });
+          setAnalysis(normalizeVisaAnalysis({
+            rubric, preparation_signal: rubric.scores.total, confidence: rubric.scores.specificity,
+            language_level: rubric.scores.languageClarity, aiAvailable: false,
+          }));
+          setScreen("result");
+          return;
+        }
         const data = await res.json().catch(() => ({}));
         if (sessionRef.current !== token || !mountedRef.current) return;
         // A rubric-only response (no AI provider configured) is still a real
@@ -2437,7 +2457,8 @@ export function VisaSpeakingAssistant({
     }
 
     function restartInterview(): void {
-      void startInterview();
+      const officer = configRef.current?.gender;
+      if (officer) void startInterview(officer);
     }
 
     function backToSetup(): void {
@@ -2464,7 +2485,7 @@ export function VisaSpeakingAssistant({
         stopNeuralSpeech();
         clearSpeakWatchdog();
         clearLivePlayback();
-        if (engineModeRef.current !== "gemini-live" && officerStateRef.current === "speaking") {
+        if (engineModeRef.current !== "gemini-live" && officerStateRef.current !== "idle") {
           setOfficer("idle");
           autoListen(sessionRef.current);
         }
@@ -2542,7 +2563,7 @@ export function VisaSpeakingAssistant({
           finish();
         };
         setAudioGestureRequired(false);
-        setOfficer("speaking");
+        utter.onstart = () => { if (sessionRef.current === token && !mutedRef.current) setOfficer("speaking"); };
         synth.speak(utter);
         speakWatchdogRef.current = window.setTimeout(finish, speakWatchdogMs(text));
       } catch {
@@ -2677,115 +2698,97 @@ export function VisaSpeakingAssistant({
             )}
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
-              <h2 className="text-base font-bold text-slate-900">
-                {t("genderTitle")}
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-500">{t("genderHint")}</p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {(
-                  [
-                    { id: "male", emoji: "👨‍💼", label: t("male"), desc: t("maleDesc") },
-                    { id: "female", emoji: "👩‍💼", label: t("female"), desc: t("femaleDesc") },
-                  ] as const
-                ).map((g) => {
-                  const selected = gender === g.id;
-                  return (
-                    <Button variant="unstyled"
-                      key={g.id}
-                      type="button"
-                      onClick={() => {
-                        setGender(g.id);
-                        setVoice(normalizeVisaLiveVoice(voice, g.id));
-                      }}
-                      aria-pressed={selected}
-                      className={`relative flex items-center gap-3 rounded-surface border-2 p-4 text-left transition-all ${
-                        selected
-                          ? "border-blue-600 bg-blue-50 shadow-md"
-                          : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm"
-                      }`}
-                    >
-                      {selected && (
-                        <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-blue-600" />
-                      )}
-                      <span className="text-4xl leading-none sm:text-5xl">
-                        {g.emoji}
-                      </span>
-                      <span>
-                        <span
-                          className={`block text-sm font-bold ${
-                            selected ? "text-blue-900" : "text-slate-800"
-                          }`}
-                        >
-                          {g.label}
-                        </span>
-                        <span className="block text-xs text-slate-500">
-                          {g.desc}
-                        </span>
-                      </span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
-              <h2 className="text-base font-bold text-slate-900">
-                {t("liveVoiceTitle")}
-              </h2>
-              <p className="mt-0.5 text-sm text-slate-500">{t("liveVoiceHint")}</p>
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {VISA_LIVE_VOICES.map((v) => {
-                  const selected = voice === v;
-                  return (
-                    <Button variant="unstyled"
-                      key={v}
-                      type="button"
-                      onClick={() => {
-                        setVoice(v);
-                        setLiveVoiceSelected(true);
-                      }}
-                      className={`rounded-surface border px-3 py-2.5 text-left transition-all ${
-                        selected
-                          ? "border-cyan-400 bg-slate-950 text-white shadow-md"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2 text-xs font-black">
-                        <Waves className="h-3.5 w-3.5" />
-                        {v}
-                      </span>
-                    </Button>
-                  );
-                })}
-              </div>
+          <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
+            <h2 className="text-base font-bold text-slate-900">
+              {t("liveVoiceTitle")}
+            </h2>
+            <p className="mt-0.5 text-sm text-slate-500">{t("liveVoiceHint")}</p>
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              {VISA_LIVE_VOICES.map((v) => {
+                const selected = liveVoiceSelected && voice === v;
+                return (
+                  <Button variant="unstyled"
+                    key={v}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setVoice(v);
+                      setLiveVoiceSelected(true);
+                    }}
+                    className={`rounded-surface border px-3 py-2.5 text-left transition-all ${
+                      selected
+                        ? "border-cyan-400 bg-slate-950 text-white shadow-md"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-bold">
+                      <Waves className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      {t(`voiceTones.${v}`)}
+                    </span>
+                  </Button>
+                );
+              })}
             </div>
           </div>
-
           <div className="mb-3 rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
             {t("openRouterInterviewDisclosure")}
           </div>
           <div className="flex flex-col items-center gap-2">
             <Button variant="unstyled"
               type="button"
-              onClick={() => engineRef.current?.startInterview()}
-              disabled={!countryCode || !gender}
+              ref={startButtonRef}
+              onClick={() => officerPickerRef.current?.showModal()}
+              data-scholly-help="interview"
+              aria-haspopup="dialog"
+              disabled={!countryCode}
               className={`w-full rounded-surface px-6 py-3.5 text-sm font-bold shadow-md transition-all sm:w-auto sm:min-w-72 ${
-                countryCode && gender
+                countryCode
                   ? "bg-blue-600 text-white hover:bg-blue-700"
                   : "cursor-not-allowed bg-slate-200 text-slate-500"
               }`}
             >
               🎙️ {t("start")}
             </Button>
-            {(!countryCode || !gender) && (
+            {!countryCode && (
               <p className="text-sm text-slate-500">{t("pickCountryFirst")}</p>
             )}
           </div>
+          <dialog
+            ref={officerPickerRef}
+            aria-labelledby="visa-officer-picker-title"
+            className="m-auto w-[calc(100%_-_2rem)] max-w-[19rem] rounded-overlay border border-slate-200 bg-white p-4 text-slate-900 shadow-xl backdrop:bg-[rgb(2_6_23_/_0.65)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          >
+            <h2 id="visa-officer-picker-title" className="mb-3 text-center text-base font-bold">
+              {t("chooseInterviewer")}
+            </h2>
+            <div className="grid aspect-square grid-rows-2 divide-y divide-slate-200 overflow-hidden rounded-surface border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+              {OFFICERS.map((officer) => (
+                <Button
+                  key={officer}
+                  variant="unstyled"
+                  type="button"
+                  onClick={() => {
+                    officerPickerRef.current?.close();
+                    engineRef.current?.startInterview(officer);
+                  }}
+                  className="grid place-items-center text-xl font-bold transition-colors hover:bg-indigo-50 focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-indigo-500 dark:hover:bg-indigo-500/15"
+                >
+                  {OFFICER_NAMES[officer]}
+                </Button>
+              ))}
+            </div>
+            <form method="dialog" className="mt-3 flex justify-center">
+              <Button type="submit" variant="ghost">{t("cancelInterviewerPicker")}</Button>
+            </form>
+          </dialog>
         </div>
       )}
 
+      <SpeakingRoom open={screen !== "setup"} title={t("title")} exitLabel={t("changeSetup")}
+        onExit={() => {
+          engineRef.current?.backToSetup();
+          requestAnimationFrame(() => startButtonRef.current?.focus({ preventScroll: true }));
+        }}>
       {screen === "interview" && country && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3 rounded-overlay border border-slate-200 bg-white p-3 shadow-xs sm:p-4">
@@ -2830,10 +2833,11 @@ export function VisaSpeakingAssistant({
               which was black in both themes. */}
           <div className="overflow-hidden rounded-overlay border border-slate-200/90 bg-gradient-to-br from-slate-50 via-indigo-50/35 to-sky-50/25 text-slate-900 shadow-lg dark:border-slate-700/80 dark:from-canvas dark:via-surface dark:to-well dark:text-slate-100">
             <div className="grid gap-4 p-4 lg:grid-cols-[1fr_420px] lg:p-6">
-              <div className="relative flex min-h-[430px] flex-col items-center justify-center rounded-overlay border border-slate-200/80 bg-white/85 p-6 shadow-xs backdrop-blur-md dark:border-slate-700/70 dark:bg-surface/85">
+              <div className="relative flex min-h-[320px] flex-col items-center justify-center rounded-overlay border border-slate-200/80 bg-white/85 p-4 shadow-xs sm:p-6 backdrop-blur-md dark:border-slate-700/70 dark:bg-surface/85">
                 <AiOrbFaceAvatar
                   state={reactorStatus}
                   level={reactorLevel}
+                  measuredAudio={measuredSpeech || engineMode === "gemini-live"}
                   countryFlag={country.flag}
                   countryName={localizedCountryName(country.name)}
                   statusLabel={
@@ -2845,7 +2849,7 @@ export function VisaSpeakingAssistant({
                           ? `✨ ${t("avThinking")}`
                           : `✅ ${t("avReady")}`
                   }
-                  roleLabel={t("avOfficerRole")}
+                  roleLabel={gender ? OFFICER_NAMES[gender] : t("avOfficerRole")}
                 />
                 <div className="mt-4 grid w-full max-w-xl grid-cols-3 gap-2 text-center text-xs font-black tracking-wide text-slate-500 uppercase sm:text-xs dark:text-slate-300">
                   <div className="rounded-overlay border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700/60 dark:bg-white/5">
@@ -2863,12 +2867,9 @@ export function VisaSpeakingAssistant({
               <div className="flex flex-col gap-4">
                 <div className="rounded-overlay border border-slate-200/90 bg-white p-5 shadow-xs dark:border-slate-700/70 dark:bg-surface">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-overlay bg-slate-100 text-3xl ring-1 ring-slate-200 dark:bg-indigo-950/60 dark:ring-indigo-800/50">
-                      {gender === "female" ? "👩‍💼" : "👨‍💼"}
-                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-black text-slate-900 dark:text-slate-100">
-                        {t("officer")} · {localizedCountryName(country.name)}
+                        {gender ? OFFICER_NAMES[gender] : t("officer")} · {localizedCountryName(country.name)}
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">
                         {reactorStatus === "SPEAKING"
@@ -3475,8 +3476,9 @@ export function VisaSpeakingAssistant({
           </div>
         </div>
       )}
+      </SpeakingRoom>
       {/* Standing small print: this panel can be wrong — say so where it is read. */}
-      <AppNote kind="visa" className="mt-2" />
+      <AppNote kind="visa" variant="inline" compact className="mt-8 max-w-3xl px-1 pb-2" />
     </div>
   );
 }

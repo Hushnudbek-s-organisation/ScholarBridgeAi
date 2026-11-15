@@ -1,10 +1,9 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { campusPhotoSrc, onWikimediaThumbError } from "@/lib/wikimediaThumb";
-import { MARQUEE_ROW_1, MARQUEE_ROW_2, MARQUEE_ROW_3, type MarqueeUniversityItem } from "./marqueeRows";
-import { isLiteMotionSync } from "@/lib/liteMotion";
+import { MARQUEE_ROW_1, MARQUEE_ROW_2, type MarqueeUniversityItem } from "./marqueeRows";
 
 function SectionIndex({ n, label }: { n: string; label: string }) {
   return (
@@ -17,12 +16,6 @@ function SectionIndex({ n, label }: { n: string; label: string }) {
 
 export function DeferredMarquee({ onStart }: { onStart: () => void }) {
   const tIndex = useTranslations("landing");
-  const [lite, setLite] = useState(() => isLiteMotionSync());
-  useEffect(() => {
-    // liteMotion subscription for marquee speed
-    const { subscribeLiteMotion } = require("@/lib/liteMotion") as { subscribeLiteMotion: (cb: (v: boolean) => void) => () => void };
-    return subscribeLiteMotion(setLite);
-  }, []);
   const sectionRef = useRef<HTMLElement>(null);
 
   // PR #132 moved the marquee into an idle-deferred (ssr:false) chunk but left
@@ -122,7 +115,6 @@ export function DeferredMarquee({ onStart }: { onStart: () => void }) {
       <div className="space-y-3 overflow-hidden">
         {renderRow(MARQUEE_ROW_1, "sb-marquee-right")}
         {renderRow(MARQUEE_ROW_2, "sb-marquee-left")}
-        {!lite && renderRow(MARQUEE_ROW_3, "sb-marquee-right-slow")}
       </div>
     </section>
   );

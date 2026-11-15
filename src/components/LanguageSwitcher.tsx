@@ -30,8 +30,8 @@ export function LanguageSwitcher({ onLocaleChange, compact = false }: LanguageSw
         <select
           value={locale}
           onChange={(e) => handleChange(e.target.value)}
-          className="min-h-11 cursor-pointer bg-transparent py-2 pl-1 pr-1 text-sm font-semibold uppercase text-slate-800 focus:outline-none dark:text-slate-100"
-          aria-label={t("label")}
+          className={`sb-language-select min-h-11 cursor-pointer bg-transparent py-2 pl-1 pr-1 text-sm font-semibold uppercase text-slate-800 focus:outline-none dark:text-slate-100`}
+          aria-label={t("label")} data-scholly-help="language"
         >
           {locales.map((l) => (
             <option key={l} value={l}>
@@ -49,8 +49,8 @@ export function LanguageSwitcher({ onLocaleChange, compact = false }: LanguageSw
       <select
         value={locale}
         onChange={(e) => handleChange(e.target.value)}
-        className="min-h-11 cursor-pointer bg-transparent py-1 pl-1 pr-6 text-sm font-semibold text-slate-800 focus:outline-none dark:text-slate-100"
-        aria-label={t("label")}
+        className={`sb-language-select min-h-11 cursor-pointer bg-transparent py-1 pl-1 pr-6 text-sm font-semibold text-slate-800 focus:outline-none dark:text-slate-100`}
+        aria-label={t("label")} data-scholly-help="language"
       >
         {locales.map((l) => (
           <option key={l} value={l}>

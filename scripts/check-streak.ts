@@ -51,6 +51,20 @@ const dateOnlyInLosAngeles = computeDailyStreak(
 check("date-only activity keeps its calendar date across timezones", dateOnlyInLosAngeles.current === 1 && !dateOnlyInLosAngeles.activeToday);
 const invalidTimezone = computeDailyStreak(["2026-10-12T10:00:00Z"], now, "Not/A_Timezone");
 check("invalid timezone safely falls back to UTC", invalidTimezone.current === 1);
+const beforeBoundary = computeDailyStreak(
+  ["2026-10-11T12:00:00Z", "2026-10-12T03:59:00Z"],
+  new Date("2026-10-12T03:59:30Z"),
+  "UTC",
+  4,
+);
+check("activity before 04:00 belongs to the preceding streak day", beforeBoundary.current === 1 && beforeBoundary.activeToday);
+const atBoundary = computeDailyStreak(
+  ["2026-10-11T12:00:00Z", "2026-10-12T03:59:00Z", "2026-10-12T04:00:00Z"],
+  new Date("2026-10-12T04:00:30Z"),
+  "UTC",
+  4,
+);
+check("04:00 starts the next streak day", atBoundary.current === 2 && atBoundary.activeToday);
 check("milestones are ordered and meaningful", STREAK_MILESTONES.join(",") === "3,7,14,30,60,100,365");
 
 console.log("\nStreak activity definition");
@@ -58,7 +72,7 @@ console.log("\nStreak activity definition");
 // A day may only be counted for something the student DID. Points received for
 // someone else's action must never extend the streak: a like on an old post, or
 // a referred friend's progress, used to count as a study day for the author.
-for (const selfPerformed of ["lesson_complete", "quiz_passed", "thread_created", "reply_created", DAILY_ACTIVITY_REASON]) {
+for (const selfPerformed of ["lesson_complete", "quiz_passed", "thread_created", "reply_created", "scholly_daily_mission", DAILY_ACTIVITY_REASON]) {
   check(`"${selfPerformed}" counts as the student's own activity`, isStreakActivity(selfPerformed));
 }
 for (const received of ["content_liked", "referral_referrer", "referral_referred", "admin_award", "profile_created"]) {

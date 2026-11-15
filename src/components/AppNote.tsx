@@ -81,10 +81,12 @@ export function AppNote({
   className = "",
   /** `inline` drops the icon for very tight rows (table footers, chips). */
   variant = "block",
+  compact = false,
 }: {
   kind: AppNoteKind;
   className?: string;
   variant?: "block" | "inline";
+  compact?: boolean;
 }) {
   const { locale } = useLocaleContext();
   const messages = dictionaries[locale] ?? dictionaries[defaultLocale];
@@ -93,7 +95,7 @@ export function AppNote({
     <p
       role="note"
       data-app-note={kind}
-      className={`${variant === "inline" ? "" : "flex items-start gap-1.5 "}text-sm leading-normal ${TONE[kind]} ${className}`}
+      className={`${variant === "inline" ? "" : "flex items-start gap-1.5 "}${compact ? "text-[0.6875rem]" : "text-sm"} leading-normal ${TONE[kind]} ${className}`}
     >
       {variant === "block" && <Info className="mt-[2px] h-3 w-3 shrink-0 opacity-60" aria-hidden />}
       <span>{text}</span>

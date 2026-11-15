@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
 import { 
@@ -125,7 +126,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
       <div className="sb-brand-hero text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-500/20 rounded-surface border border-indigo-400/30">
-            <Bot className="h-6 w-6 text-amber-300" />
+            <Image src="/scholly.webp" alt="" width={30} height={34} className="h-8 w-auto object-contain" />
           </div>
           <div>
             {/* h2 — the hosting hub already renders the screen's <h1>. */}
@@ -161,7 +162,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
                   : "bg-slate-900 text-amber-300"
               }`}
             >
-              {m.sender === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+              {m.sender === "user" ? <User className="h-4 w-4" /> : <Image src="/scholly.webp" alt="" width={25} height={28} className="h-7 w-auto object-contain" />}
             </div>
 
             <div
@@ -249,7 +250,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
         AI disclosure — still before any reply is trusted, but as a quiet line
         under the composer instead of an amber strip above the conversation.
       */}
-      <AppNote kind="ai" variant="inline" className="px-3 pb-2.5 text-center" />
+      <AppNote kind="ai" variant="inline" compact className="px-3 pb-2.5 text-center" />
     </div>
   );
 }

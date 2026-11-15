@@ -30,6 +30,7 @@ import {
   visiblePanes,
 } from "@/lib/navSections";
 import { AppNote } from "@/components/AppNote";
+import styles from "./HomeClient.module.css";
 import { SectionIntro } from "@/components/SectionIntro";
 import { TelegramNudge } from "@/components/telegram/TelegramNudge";
 import { DailyStreakCard } from "@/components/DailyStreakCard";
@@ -1076,6 +1077,7 @@ export function Home({
       <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Navbar
         activeTab={activeTab}
+        activePane={activePane}
         setActiveTab={setActiveTab}
         activeProfile={activeProfile}
         activeProfileId={activeProfile?.id ?? null}
@@ -1107,7 +1109,7 @@ export function Home({
             a newcomer always knows where they are and what comes next. The
             dashboard keeps its own richer journey control center instead. */}
         {view === "app" && activeProfile && activeProfile.onboardingCompleted !== false && activeTab !== "dashboard" && (
-          <div className="mb-3">
+          <div className="mb-3 empty:hidden">
             <GuidedJourneyBar
               activeProfile={activeProfile}
               savedUniversityCount={savedUniversities.length}
@@ -1370,12 +1372,6 @@ export function Home({
 
       {/* Footer */}
       <footer className="sb-dock-clearance border-t border-slate-200 bg-white pt-6  mt-12 text-center text-xs text-slate-500">
-        {/* Small print above Terms / Privacy: the app shows AI-written text
-            and compiled catalogue data, both of which can be wrong or out of
-            date. One honest line wherever the user ends up. */}
-        <div className="mx-auto mb-4 max-w-screen-2xl border-b border-slate-100 px-4 pb-4">
-          <AppNote kind="general" className="mx-auto max-w-[900px] text-left" />
-        </div>
         <div className="max-w-screen-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <p>© {new Date().getFullYear()} ScholarBridgeAI • Democratizing Global Higher Education Access</p>
@@ -1403,6 +1399,7 @@ export function Home({
             </Button>
           </div>
         </div>
+        <AppNote kind="general" variant="inline" className={styles.footerNote} />
       </footer>
       </div>
 

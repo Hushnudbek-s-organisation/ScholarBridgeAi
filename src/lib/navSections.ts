@@ -261,6 +261,7 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
       // it opens at the top of the viewport instead of sitting 1,500 px under
       // the requirements panel it used to share the tab with.
       { id: "speaking", label: "AI speaking simulator", description: "Live voice and text consular visa interview simulator with instant feedback." },
+      { id: "daily-speaking", label: "Daily Speaking", description: "Practise everyday conversations for your destination, by voice or text." },
       { id: "visa", label: "Visa requirements", description: "Visa requirements for your destination, model answers and past session history." },
       { id: "apostille", label: "e-Apostille & funds", description: "Uzbekistan e-Apostille matrix, translation rules and bank-statement window calculator." },
       { id: "departure", label: "Departure & arrival", isNew: true, description: "After the visa: flight, housing, insurance, packing and 7/30/90-day arrival steps." },

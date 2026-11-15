@@ -87,6 +87,7 @@ const PlanningStudio = dynamic(() => import("@/components/PlanningStudio").then(
 const AiSopStudio = dynamic(() => import("@/components/AiSopStudio").then((m) => m.AiSopStudio), { loading: panelLoading });
 const EssayRubricStudio = dynamic(() => import("@/components/EssayRubricStudio").then((m) => m.EssayRubricStudio), { loading: panelLoading });
 const ProfessorOutreachStudio = dynamic(() => import("@/components/ProfessorOutreachStudio").then((m) => m.ProfessorOutreachStudio), { loading: panelLoading });
+const DailySpeaking = dynamic(() => import("@/components/DailySpeaking").then((m) => m.DailySpeaking), { loading: panelLoading });
 const VisaSpeakingAssistant = dynamic(() => import("@/components/VisaSpeakingAssistant").then((m) => m.VisaSpeakingAssistant), { loading: panelLoading });
 const AiChatMentor = dynamic(() => import("@/components/AiChatMentor").then((m) => m.AiChatMentor), { loading: panelLoading });
 const AdmissionsAdvisor = dynamic(() => import("@/components/AdmissionsAdvisor").then((m) => m.AdmissionsAdvisor), { loading: panelLoading });
@@ -453,7 +454,7 @@ export function FundingHub({ profile, navigate }: HubProps) {
       intro={t("introFunding")}
       primaryLabel={t("primaryScholarships")}
       onPrimary={() => navigate("scholarships")}
-      note={{ tone: "warn", text: td("money") }}
+      note={{ tone: "warn", text: td("money"), compact: true }}
     >
       <SubPills
         ariaLabel={label}
@@ -869,12 +870,13 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "warn", text: td("visa") }}
+      note={["daily-speaking", "speaking"].includes(active) ? undefined : { tone: "warn", text: td("visa"), compact: true }}
     >
       {/* The simulator used to render 1,500 px BELOW the requirements wall in
           one shared "visa" tab. Now every tool owns its pane and the
           simulator IS the default landing pane of this hub. */}
       {active === "speaking" && <VisaSpeakingAssistant activeProfile={profile} />}
+      {active === "daily-speaking" && <DailySpeaking />}
       {active === "visa" && (
         <VisaCenterPanel profileId={profile.id} onNavigateTab={navigate} hideApostille />
       )}
@@ -926,7 +928,7 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "warn", text: t("aiDisclaimer") }}
+      note={{ tone: "warn", text: t("aiDisclaimer"), compact: true }}
     >
       {active === "mentor" &&
         (hidden.includes("advisor") ? (

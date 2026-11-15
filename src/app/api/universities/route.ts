@@ -165,10 +165,13 @@ export async function GET(req: Request) {
 
     // Tuition filter: only universities with VERIFIED tuition (NULL excluded, spec §16).
     if (maxTuition != null && maxTuition !== "") {
-      const maxT = Number(maxTuition);
-      if (Number.isFinite(maxT) && maxT >= 0 && maxT <= 100_000_000) {
-        allUnis = allUnis.filter(u => u.annualTuitionUsd != null && u.annualTuitionUsd <= maxT);
-      }
+      const requestedMax = Number(maxTuition);
+      // Treat the UI's $150k ceiling as a server-side bound too. Out-of-range
+      // or malformed client values must not silently disable the tuition filter.
+      const maxT = Number.isFinite(requestedMax)
+        ? Math.max(0, Math.min(requestedMax, 150_000))
+        : 150_000;
+      allUnis = allUnis.filter(u => u.annualTuitionUsd != null && u.annualTuitionUsd <= maxT);
     }
 
     if (ieltsFilter != null && ieltsFilter !== "") {

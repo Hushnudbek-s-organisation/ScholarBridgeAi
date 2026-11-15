@@ -42,6 +42,12 @@ function check(name: string, fn: () => void) {
   }
 }
 
+check("server-side tuition filters clamp requests to the UI's $150,000 ceiling", () => {
+  const route = readFileSync(join(ROOT, "src/app/api/universities/route.ts"), "utf8");
+  assert.match(route, /Math\.min\(requestedMax,\s*150_000\)/);
+  assert.match(route, /annualTuitionUsd\s*<=\s*maxT/);
+});
+
 /* ------------------------------------------------------- live rows */
 
 /** University of Latvia (id 200): prose #200, verified QS position 801. */

@@ -10,10 +10,12 @@ import {
   FileText,
   GraduationCap,
   User,
+  X,
 } from "lucide-react";
 import type { StudentProfile } from "./Navbar";
 import { profileCompletenessRatio } from "@/lib/chancing";
 import { Button } from "@/components/ui/Button";
+import { setGuidedJourneyHidden, useGuidedJourneyHidden } from "@/lib/guided-journey-visibility";
 import { ProgressFill } from "@/components/ui/ProgressBar";
 
 /**
@@ -64,6 +66,7 @@ export function GuidedJourneyBar({
   onOpenProfileModal,
 }: GuidedJourneyBarProps) {
   const t = useTranslations("guidedJourney");
+  const hidden = useGuidedJourneyHidden();
   // Deferred to an effect (not a lazy useState initializer): reading storage
   // during render would flash the expanded bar on mobile (spec render rules).
   const [collapsed, setCollapsed] = useState(false);
@@ -97,7 +100,7 @@ export function GuidedJourneyBar({
   useEffect(() => {
     let cancelled = false;
     let taskRequest = 0;
-    if (!profileId) {
+    if (!profileId || hidden) {
       void Promise.resolve().then(() => {
         if (cancelled) return;
         setApplicationCount(null);
@@ -148,9 +151,9 @@ export function GuidedJourneyBar({
       cancelled = true;
       window.removeEventListener("scholarbridge:tasks-updated", onTasksUpdated);
     };
-  }, [profileId]);
+  }, [profileId, hidden]);
 
-  if (!activeProfile) return null;
+  if (!activeProfile || hidden) return null;
 
   const coveragePct = Math.round(profileCompletenessRatio(activeProfile) * 100);
   const profileIncomplete = !activeProfile.gpa || !activeProfile.targetMajor;
@@ -237,6 +240,9 @@ export function GuidedJourneyBar({
         >
           {collapsed ? <ChevronDown className="h-3.5 w-3.5" aria-hidden /> : <ChevronUp className="h-3.5 w-3.5" aria-hidden />}
           <span className="hidden sm:inline">{collapsed ? t("showLabel") : t("hideLabel")}</span>
+        </Button>
+        <Button variant="ghost" type="button" onClick={() => setGuidedJourneyHidden(true)} aria-label={t("dismiss")} title={t("dismiss")} className="min-h-11 min-w-11 shrink-0 px-0">
+          <X className="h-4 w-4" aria-hidden />
         </Button>
       </div>
 

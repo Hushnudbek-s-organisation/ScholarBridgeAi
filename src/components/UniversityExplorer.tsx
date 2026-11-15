@@ -115,6 +115,8 @@ export interface University {
   universityType?: string | null;
 }
 
+const MAX_ANNUAL_TUITION_USD = 150_000;
+
 const UNIVERSITY_FILTER_COUNTRIES = withQsTop200Countries([
   "United States",
   "United Kingdom",
@@ -197,8 +199,8 @@ export function UniversityExplorer({
   const [selectedLevel, setSelectedLevel] = useState("All");
   // `maxTuition` drives the live label; `committedMaxTuition` is what the
   // request uses, so dragging the slider doesn't fire a request per pixel.
-  const [maxTuition, setMaxTuition] = useState<number>(70000);
-  const [committedMaxTuition, setCommittedMaxTuition] = useState<number>(70000);
+  const [maxTuition, setMaxTuition] = useState<number>(MAX_ANNUAL_TUITION_USD);
+  const [committedMaxTuition, setCommittedMaxTuition] = useState<number>(MAX_ANNUAL_TUITION_USD);
   // Quick-filter chips that map onto existing API filters.
   const [maxRank, setMaxRank] = useState<number | null>(null);
   const [ieltsMax, setIeltsMax] = useState<number | null>(null);
@@ -317,7 +319,7 @@ export function UniversityExplorer({
     // selected in their profile. Guests may still use the level filter.
     const effectiveLevel = activeProfile?.degreeLevel || selectedLevel;
     if (effectiveLevel !== "All") params.set("degreeLevel", effectiveLevel);
-    if (committedMaxTuition < 70000) params.set("maxTuition", committedMaxTuition.toString());
+    if (committedMaxTuition < MAX_ANNUAL_TUITION_USD) params.set("maxTuition", committedMaxTuition.toString());
     if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     // ALWAYS send the selected order. Omitting the default let the API apply
     // "personal match" whenever a profile existed, which silently overrode QS.
@@ -536,7 +538,7 @@ export function UniversityExplorer({
   const quickFiltersActive =
     maxRank != null ||
     ieltsMax != null ||
-    committedMaxTuition !== 70000 ||
+    committedMaxTuition !== MAX_ANNUAL_TUITION_USD ||
     selectedCountry !== "All" ||
     selectedType !== "All" ||
     selectedLevel !== "All" ||
@@ -554,7 +556,7 @@ export function UniversityExplorer({
     (selectedCountry !== "All" ? 1 : 0) +
     (selectedType !== "All" ? 1 : 0) +
     (selectedLevel !== "All" ? 1 : 0) +
-    (committedMaxTuition !== 70000 ? 1 : 0) +
+    (committedMaxTuition !== MAX_ANNUAL_TUITION_USD ? 1 : 0) +
     (maxRank != null ? 1 : 0) +
     (ieltsMax != null ? 1 : 0);
 
@@ -563,7 +565,7 @@ export function UniversityExplorer({
       window.clearTimeout(searchDebounceRef.current);
       searchDebounceRef.current = null;
     }
-    commitTuition(70000);
+    commitTuition(MAX_ANNUAL_TUITION_USD);
     setSearch("");
     setDebouncedSearch("");
     setSelectedCountry("All");
@@ -628,6 +630,7 @@ export function UniversityExplorer({
               value={selectedCountry}
               onChange={(e) => setSelectedCountry(e.target.value)}
               aria-label={t("exCountryAll")}
+              data-scholly-help="country"
               className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="All">{t("exCountryAll")}</option>
@@ -649,6 +652,7 @@ export function UniversityExplorer({
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
               aria-label={t("uniType")}
+              data-scholly-help="universityType"
               className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="All">{t("exTypeAll")}</option>
@@ -664,6 +668,7 @@ export function UniversityExplorer({
               onChange={(e) => setSelectedLevel(e.target.value)}
               disabled={Boolean(lockedLevel)}
               aria-label={t("exLevelAria")}
+              data-scholly-help="degree"
               className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600 sm:text-sm"
             >
               {(!lockedLevel || lockedLevel === "All") && <option value="All">{t("exLevelAll")}</option>}
@@ -683,6 +688,7 @@ export function UniversityExplorer({
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               aria-label={t("exSortRank")}
+              data-scholly-help="sort"
               className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             >
               <option value="rank_asc">{t("exSortRank")}</option>
@@ -699,7 +705,7 @@ export function UniversityExplorer({
           </div>
 
           {/* Max Tuition Slider */}
-          <div className="bg-slate-50 px-3 py-1.5 rounded-surface border border-slate-200 flex flex-col justify-center">
+          <div data-scholly-help="tuition" className="bg-slate-50 px-3 py-1.5 rounded-surface border border-slate-200 flex flex-col justify-center">
             <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
               <label htmlFor={`${idPrefix}-max-tuition`}>{t("exMaxTuition")}</label>
               <span className="text-indigo-600 font-bold">${formatNumber(maxTuition, { placeholder: "0", suffix: "/yr" })}</span>
@@ -707,8 +713,9 @@ export function UniversityExplorer({
             <input
               id={`${idPrefix}-max-tuition`}
               type="range"
+              data-scholly-help="tuition"
               min="5000"
-              max="70000"
+              max={MAX_ANNUAL_TUITION_USD}
               step="5000"
               value={maxTuition}
               onChange={(e) => onTuitionInput(Number(e.target.value))}
@@ -786,6 +793,7 @@ export function UniversityExplorer({
               type="text"
               placeholder={t("exSearchPlaceholder")}
               aria-label={t("exSearchPlaceholder")}
+              data-scholly-help="searchUniversity"
               value={search}
               onChange={(e) => onSearchInput(e.target.value)}
               className="min-h-11 w-full rounded-surface border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
@@ -798,6 +806,7 @@ export function UniversityExplorer({
             onClick={() => setMobileFiltersOpen(true)}
             aria-expanded={mobileFiltersOpen}
             aria-controls="university-filter-sheet"
+            data-scholly-help="filters"
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-surface border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-700 sm:hidden"
           >
             <Filter className="h-4 w-4" />
@@ -1053,6 +1062,7 @@ export function UniversityExplorer({
               <div
                 key={uni.id}
                 data-university-id={uni.id}
+                data-scholly-help="university"
                 className="group flex h-full flex-col justify-between overflow-hidden rounded-overlay border border-slate-200 bg-white shadow-xs transition-all hover:border-indigo-300 hover:shadow-lg dark:border-slate-700 dark:bg-surface dark:hover:border-indigo-500/50"
               >
                 {/* Top Image Banner — a taller banner on a phone, where the
@@ -1084,7 +1094,7 @@ export function UniversityExplorer({
 
                   {/* Match Score Badge */}
                   <div className="absolute left-3 right-24 top-3 flex flex-wrap items-center gap-1.5">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
+                    <span data-scholly-help="fit" className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
                       {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")}
                     </span>
                     {/* The retired composite index is NOT rendered. A card shows

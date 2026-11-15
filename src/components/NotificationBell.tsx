@@ -123,7 +123,7 @@ export function NotificationBell({ profileId, placement = "down" }: Notification
         onClick={toggle}
         className="relative grid min-h-11 min-w-11 place-items-center text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-control transition-colors"
         title={t("title")}
-        aria-label={t("title")}
+        aria-label={t("title")} data-scholly-help="notifications"
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (

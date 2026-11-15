@@ -208,7 +208,7 @@ export function HubPage({
   onPaneChange?: (id: string) => void;
   hiddenPanes?: string[];
   tabListLabel?: string;
-  note?: { tone: "info" | "warn"; text: string };
+  note?: { tone: "info" | "warn"; text: string; compact?: boolean };
   children: React.ReactNode;
 }) {
   const t = useTranslations("hubs");
@@ -290,7 +290,10 @@ export function HubPage({
       {/* The standing disclaimer stays honest but gets quiet: a compact
           11px footnote BELOW the section content (it used to be a banner
           stacked above the explorer — three of these on one screen). */}
-      {note && (
+      {note?.compact && (
+        <p role="note" className="mt-8 max-w-3xl px-1 pb-2 text-[0.6875rem] leading-relaxed text-slate-600 dark:text-slate-400">{note.text}</p>
+      )}
+      {note && !note.compact && (
         <div
           className={`mt-6 flex items-start gap-1.5 rounded-surface border px-3 py-2 text-xs leading-relaxed ${
             note.tone === "warn"
