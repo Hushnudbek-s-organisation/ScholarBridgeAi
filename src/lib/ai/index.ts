@@ -37,6 +37,7 @@ import {
   resolveCredential,
   resolveFallbackProvider,
   resolveProviderForTask,
+  modelForTask,
   supportsCapability,
   taskProviderConfigKey,
   type AICapability,
@@ -454,7 +455,7 @@ async function usableCredential(id: AIProviderId, disabled: AIProviderId[]) {
 export function providerForTask(taskType: string): { name: AIProviderId; apiKey?: string; model?: string } {
   const name = resolveProviderForTask(taskType, {}, process.env);
   const cfg = resolveCredential(name, null, process.env);
-  return { name, apiKey: cfg.apiKey, model: cfg.model };
+  return { name, apiKey: cfg.apiKey, model: modelForTask(name, taskType, cfg.model) };
 }
 
 export interface RuntimeProvider {
@@ -479,8 +480,7 @@ export async function resolveRuntimeProvider(taskType: string, runtime?: Runtime
     selection = fromDb ? "admin" : "env";
   } else {
     const taskDefault = resolveProviderForTask(taskType, {}, {});
-    // Visa prefers OpenRouter when usable; otherwise, like every task, use
-    // the first usable provider.
+    // Prefer the task default when it can serve the request.
     // One query for every stored credential (not one per provider).
     const all = await resolveAllProviderCredentials();
     const usable = new Set<AIProviderId>(AI_PROVIDER_IDS.filter((id) => isUsable(id, all[id], cfg.disabled)));
@@ -497,7 +497,7 @@ export async function resolveRuntimeProvider(taskType: string, runtime?: Runtime
     name,
     apiKey: cred.apiKey,
     apiKeySource: cred.apiKeySource,
-    model: cred.model,
+    model: modelForTask(name, taskType, cred.model),
     selection,
     disabled: cfg.disabled.includes(name),
   };
@@ -545,7 +545,7 @@ async function callOnce(
   }
   const cred = await resolveProviderCredential(provider);
   const adapter = PROVIDERS[provider as AIProviderName];
-  const adapted = await adapter.call(req, { apiKey: cred.apiKey, model: cred.model });
+  const adapted = await adapter.call(req, { apiKey: cred.apiKey, model: modelForTask(provider, req.taskType ?? "general", cred.model) });
   if (!adapted) {
     throw new AIProviderError(provider, "not_configured", `${AI_PROVIDERS[provider].label} is not configured`);
   }
@@ -605,7 +605,7 @@ async function callWithRetry(
       if (remainingBudgetMs(req) <= 0) throw new AIProviderError(provider, "timeout", "AI request deadline exceeded");
       // Budget is re-checked before EVERY paid attempt: a retry chain must not
       // keep spending after the platform has crossed its limit mid-request.
-      const budgetModel = (await resolveProviderCredential(provider)).model;
+      const budgetModel = modelForTask(provider, task, (await resolveProviderCredential(provider)).model);
       const verdict = await evaluateAiBudget(provider, budgetModel);
       if (!verdict.allowed) throw budgetError(provider, "scope" in verdict ? verdict.scope : verdict.reason);
       const response = await callOnce(provider, req, cfg, require);

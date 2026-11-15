@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { GEMINI_MODELS } from "@/lib/ai/geminiModels";
 
 /** Whether this page is running inside somebody else's frame (a preview pane,
  *  an LMS embed...). Parent frames must grant `allow="microphone"` — the page's
@@ -1392,12 +1393,12 @@ export function VisaSpeakingAssistant({
       }
     }
 
-    async function playNeuralAudioElement(bytes: ArrayBuffer, token: number, playbackId: number, onDone: () => void, text: string): Promise<boolean> {
+    async function playNeuralAudioElement(bytes: ArrayBuffer, contentType: string, token: number, playbackId: number, onDone: () => void, text: string): Promise<boolean> {
       if (typeof Audio === "undefined" || ttsPlaybackIdRef.current !== playbackId) return false;
       let objectUrl: string;
       let audio: HTMLAudioElement;
       try {
-        objectUrl = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+        objectUrl = URL.createObjectURL(new Blob([bytes], { type: contentType }));
         audio = new Audio(objectUrl);
       } catch {
         return false;
@@ -1552,7 +1553,7 @@ export function VisaSpeakingAssistant({
           // Invalidate a decode/resume that outlived its budget before starting
           // the element/browser fallback, preventing late duplicate audio.
           ttsAudioAttemptRef.current += 1;
-          if (await playNeuralAudioElement(bytes, token, playbackId, finishSpeaking, text)) return;
+          if (await playNeuralAudioElement(bytes, contentType, token, playbackId, finishSpeaking, text)) return;
           if (isCurrent() && !finished) browserSpeak();
         } catch {
           // An explicit stop (mute/interrupt/new utterance) nulls the ref and
@@ -1912,7 +1913,7 @@ export function VisaSpeakingAssistant({
         model:
           typeof data.model === "string"
             ? data.model
-            : "gemini-3.1-flash-live-preview",
+            : GEMINI_MODELS.live,
         apiVersion: typeof data.apiVersion === "string" ? data.apiVersion : "v1beta",
         voice: typeof data.voice === "string" ? data.voice : undefined,
         expiresAt: typeof data.expiresAt === "string" ? data.expiresAt : undefined,

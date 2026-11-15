@@ -88,6 +88,9 @@ export const VERIFIED_DEFAULT_PRICING: PricingTable = {
   },
   // https://ai.google.dev/gemini-api/docs/pricing (Gemini Developer API, standard text)
   google: {
+    // Standard list pricing for budget estimates, excluding temporary discounts.
+    "gemini-3.8-flash": { inputPerMTok: 1.5, outputPerMTok: 7.5 },
+    "gemini-3.1-flash-lite": { inputPerMTok: 0.25, outputPerMTok: 1.5 },
     "gemini-2.5-flash": { inputPerMTok: 0.3, outputPerMTok: 2.5 },
     "gemini-2.5-pro": {
       inputPerMTok: 1.25,
