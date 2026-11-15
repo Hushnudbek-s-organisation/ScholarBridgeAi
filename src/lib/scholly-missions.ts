@@ -73,6 +73,7 @@ export function schollyThemeForDay(day: string): SchollyMissionTheme {
 }
 
 export function buildSchollyMissionHistory(day: string, rows: readonly { day: string; status: string }[]): SchollyMissionHistory {
+  if (!rows.length) return { recentStatuses: [], completedStreak: 0 };
   const statusByDay = new Map(rows.map((row) => [row.day, row.status]));
   const recentStatuses = [1, 2, 3].map((offset) => statusByDay.get(shiftMissionDay(day, -offset)) ?? "missed");
   let completedStreak = 0;
@@ -123,16 +124,15 @@ export function pickSchollyMission(
   const missedInRecentThree = history.recentStatuses.slice(0, 3).filter((status) => status !== "done").length;
   const reduceSize = missedInRecentThree >= 2;
   const isStar = history.completedStreak >= 5;
-  const baseSize: Record<SchollyMissionType, number> = {
-    fill_profile_fields: 2,
-    save_universities: 3,
-    upload_document: 3,
-    sop_paragraph: 5,
-  };
   let targetCount = selected.targetCount;
-  if (reduceSize) targetCount = 1;
-  if (isStar && !reduceSize && (selected.type === "fill_profile_fields" || selected.type === "save_universities")) targetCount++;
-  const sizeMin = reduceSize ? 1 : Math.min(5, baseSize[selected.type] + (isStar ? 1 : 0));
+  if (reduceSize) {
+    targetCount = selected.type === "sop_paragraph" ? 25 : 1;
+  } else if (isStar) {
+    if (selected.type === "fill_profile_fields") targetCount = Math.min(context.missingProfileFields.length, targetCount + 1);
+    if (selected.type === "save_universities") targetCount++;
+    if (selected.type === "sop_paragraph") targetCount += 25;
+  }
+  const sizeMin = reduceSize ? 1 : isStar || selected.type === "sop_paragraph" ? 5 : 3;
   return { type: selected.type, targetCount, sizeMin, isStar, points: isStar ? 20 : 10, theme };
 }
 
@@ -155,7 +155,10 @@ export function missionProgress(
   } else {
     progress = Math.max(0, current.sopWordCount - baseline.sopWordCount);
   }
-  const target = type === "sop_paragraph" ? Math.max(50, targetCount) : Math.max(1, targetCount);
+  // Older short SOP rows stored 1 while displaying and requiring 50 words.
+  let target = Math.max(1, targetCount);
+  if (type === "sop_paragraph" && target === 1) target = 50;
+  if (type === "fill_profile_fields") target = Math.max(1, Math.min(target, baseline.missingFields.length));
   const boundedProgress = Math.min(progress, target);
   return { progress: boundedProgress, target, complete: boundedProgress >= target };
 }

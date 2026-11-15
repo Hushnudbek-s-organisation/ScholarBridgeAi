@@ -39,6 +39,26 @@ assert.equal(pickSchollyMission(context, { recentStatuses: ["skipped", "skipped"
 assert.equal(pickSchollyMission(context, { recentStatuses: [], completedStreak: 5 }).isStar, true);
 assert.equal(pickSchollyMission(context, { recentStatuses: [], completedStreak: 5 }).points, 20);
 assert.notEqual(pickSchollyMission(context, undefined, "upload_document").type, "upload_document");
+const singleMissingField: SchollyMissionContext = {
+  ...context, missingProfileFields: ["country"], hasDeadlineWithinSevenDays: false,
+};
+const starProfile = pickSchollyMission(
+  singleMissingField,
+  { recentStatuses: ["done", "done", "done"], completedStreak: 5 },
+);
+assert.equal(starProfile.type, "fill_profile_fields");
+assert.equal(starProfile.targetCount, 1);
+assert.equal(starProfile.sizeMin, 5);
+assert.equal(pickSchollyMission({ ...context, hasDeadlineWithinSevenDays: false }).sizeMin, 3);
+
+const shortSop = pickSchollyMission(
+  { ...context, missingProfileFields: [], savedUniversityIds: [1, 2, 3], hasDeadlineWithinSevenDays: false },
+  { recentStatuses: ["missed", "skipped"], completedStreak: 0 },
+);
+assert.equal(shortSop.type, "sop_paragraph");
+assert.equal(shortSop.targetCount, 25);
+assert.equal(shortSop.sizeMin, 1);
+assert.deepEqual(buildSchollyMissionHistory("2026-11-16", []), { recentStatuses: [], completedStreak: 0 });
 assert.deepEqual(buildSchollyMissionHistory("2026-11-16", [
   { day: "2026-11-15", status: "done" },
   { day: "2026-11-14", status: "done" },
@@ -55,6 +75,15 @@ assert.deepEqual(missionProgress("fill_profile_fields", 2, baseline, {
 assert.equal(missionProgress("fill_profile_fields", 2, baseline, {
   ...baseline, missingFields: [],
 }).complete, true);
+assert.deepEqual(missionProgress("fill_profile_fields", 3, { ...baseline, missingFields: ["country"] }, {
+  ...baseline, missingFields: [],
+}), { progress: 1, target: 1, complete: true });
+assert.equal(missionProgress("sop_paragraph", 25, baseline, {
+  ...baseline, sopWordCount: 145,
+}).complete, true);
+assert.equal(missionProgress("sop_paragraph", 1, baseline, {
+  ...baseline, sopWordCount: 145,
+}).target, 50);
 assert.equal(missionProgress("save_universities", 2, baseline, {
   ...baseline, savedUniversityIds: [4, 8, 9],
 }).progress, 2);

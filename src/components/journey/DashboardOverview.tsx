@@ -48,7 +48,8 @@ const missionCopy = {
     title: "Bugungi missiya", readiness: "Ariza tayyorligi", chosen: "Scholly tanladi",
     theme: { plan: "Reja", writing: "Yozuv", language: "Til", search: "Qidiruv", speaking: "Speaking va viza", light: "Yengil kun", review: "Hafta yakuni" },
     finished: "Bugunga bo‘ldi!", dismiss: "Bugunni yakunlash", tomorrow: "Ertaga yangi missiya kutadi.", loading: "Missiya yuklanmoqda…", error: "Bugungi missiya hozir ochilmadi.",
-    tasks: { fill_profile_fields: "Profil ma’lumotlarini to‘ldiring", save_universities: "Universitetlarni saqlang", upload_document: "Hujjat yuklang", sop_paragraph: "SOP uchun 50 ta so‘z yozing" },
+    tasks: { fill_profile_fields: "Profil ma’lumotlarini to‘ldiring", save_universities: "Universitetlarni saqlang", upload_document: "Hujjat yuklang" },
+    sopTask: (words: number) => `SOP uchun ${words} ta so‘z yozing`,
     open: "Vazifani ochish", check: "Progressni tekshirish", another: "Boshqa missiya", skip: "Bugun o‘tkazib yuborish", retry: "Qayta urinish",
     done: "Bajarildi — ball hisoblandi", skipped: "Bugungi missiya o‘tkazib yuborildi", points: "ball", minutes: "daq", progress: "Bajarilish",
   },
@@ -56,7 +57,8 @@ const missionCopy = {
     title: "Today’s mission", readiness: "Application readiness", chosen: "Chosen by Scholly",
     theme: { plan: "Planning", writing: "Writing", language: "Language", search: "Discovery", speaking: "Speaking and visas", light: "Light day", review: "Weekly review" },
     finished: "You’re done for today!", dismiss: "Done for today", tomorrow: "A new mission will be ready tomorrow.", loading: "Loading mission…", error: "Today's mission is unavailable right now.",
-    tasks: { fill_profile_fields: "Complete profile details", save_universities: "Save universities", upload_document: "Upload a document", sop_paragraph: "Write 50 words for your SOP" },
+    tasks: { fill_profile_fields: "Complete profile details", save_universities: "Save universities", upload_document: "Upload a document" },
+    sopTask: (words: number) => `Write ${words} words for your SOP`,
     open: "Open task", check: "Check progress", another: "Another mission", skip: "Skip for today", retry: "Retry",
     done: "Completed — points awarded", skipped: "Today's mission was skipped", points: "points", minutes: "min", progress: "Progress",
   },
@@ -64,7 +66,8 @@ const missionCopy = {
     title: "Задание на сегодня", readiness: "Готовность заявки", chosen: "Выбор Scholly",
     theme: { plan: "Планирование", writing: "Письмо", language: "Язык", search: "Поиск", speaking: "Разговорная практика и визы", light: "Лёгкий день", review: "Итоги недели" },
     finished: "На сегодня всё!", dismiss: "Завершить день", tomorrow: "Завтра вас ждёт новое задание.", loading: "Загрузка задания…", error: "Сегодняшнее задание сейчас недоступно.",
-    tasks: { fill_profile_fields: "Заполните профиль", save_universities: "Сохраните университеты", upload_document: "Загрузите документ", sop_paragraph: "Напишите 50 слов для SOP" },
+    tasks: { fill_profile_fields: "Заполните профиль", save_universities: "Сохраните университеты", upload_document: "Загрузите документ" },
+    sopTask: (words: number) => `Добавьте слова в SOP (${words})`,
     open: "Открыть задачу", check: "Проверить прогресс", another: "Другое задание", skip: "Пропустить сегодня", retry: "Повторить",
     done: "Выполнено — баллы начислены", skipped: "Задание на сегодня пропущено", points: "баллов", minutes: "мин", progress: "Прогресс",
   },
@@ -218,7 +221,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
           <span>{copy.chosen}</span>
           <span className="sbOverviewMissionTheme">{copy.theme[mission.theme]}</span>
         </div>
-        <p className="sbOverviewMissionTask">{copy.tasks[mission.type]}</p>
+        <p className="sbOverviewMissionTask">{mission.type === "sop_paragraph" ? copy.sopTask(mission.target) : copy.tasks[mission.type]}</p>
         <p className="sbOverviewMissionStatus" role="status">
           {mission.status === "done" ? copy.done : mission.status === "skipped" ? copy.skipped : `${copy.progress}: ${mission.progress} / ${mission.target}`}
         </p>
