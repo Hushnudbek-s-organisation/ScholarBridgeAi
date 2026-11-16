@@ -147,6 +147,20 @@ export const schollyProfiles = pgTable("scholly_profile", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const schollyWardrobeItems = pgTable("scholly_wardrobe_items", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => studentProfiles.id, { onDelete: "cascade" }),
+  itemKey: text("item_key").notNull(),
+  acquiredAt: timestamp("acquired_at", { withTimezone: true }).defaultNow().notNull(),
+  source: text("source").notNull(),
+  spentPoints: integer("spent_points").notNull().default(0),
+}, (table) => [
+  uniqueIndex("uq_scholly_wardrobe_owned_item").on(table.userId, table.itemKey),
+  uniqueIndex("uq_scholly_wardrobe_starter").on(table.userId).where(sql`${table.source} = 'starter'`),
+  check("scholly_wardrobe_items_source_check", sql`${table.source} IN ('purchase', 'starter', 'achievement')`),
+  check("scholly_wardrobe_purchase_cost", sql`(${table.source} = 'purchase' AND ${table.spentPoints} > 0) OR (${table.source} <> 'purchase' AND ${table.spentPoints} = 0)`),
+]);
+
 export const schollyEvents = pgTable("scholly_events", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
@@ -176,7 +190,7 @@ export const dailyMissions = pgTable("daily_missions", {
   uniqueIndex("uq_daily_missions_user_day").on(table.userId, table.day),
   index("idx_daily_missions_user_status_day").on(table.userId, table.status, table.day),
   check("daily_missions_status_check", sql`${table.status} IN ('pending', 'done', 'skipped')`),
-  check("daily_missions_type_check", sql`${table.type} IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph')`),
+  check("daily_missions_type_check", sql`${table.type} IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph', 'ielts_vocabulary', 'visa_practice')`),
   check("daily_missions_size_check", sql`${table.sizeMin} BETWEEN 1 AND 5`),
   check("daily_missions_target_count_check", sql`${table.targetCount} BETWEEN 1 AND 5000`),
   check("daily_missions_points_check", sql`${table.points} IN (10, 20)`),
@@ -2187,7 +2201,7 @@ export const journeyDeadlines = pgTable(
   {
     id: serial("id").primaryKey(),
     profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
-    kind: text("kind").notNull(), // university | scholarship | test | document | visa | other
+    kind: text("kind").notNull(), // university | scholarship | test | document | visa | departure | other
     title: text("title").notNull(),
     dueDate: date("due_date").notNull(),
     entityType: text("entity_type"),

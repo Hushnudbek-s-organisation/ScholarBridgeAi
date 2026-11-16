@@ -85,7 +85,10 @@ Hosting assumptions (all portable):
   instances, set `CRON_SECRET` and call `GET /api/cron/notifications` (and
   optionally `/api/cron/refresh`) from an external scheduler with
   `Authorization: Bearer <CRON_SECRET>`. A database marker prevents double
-  sweeps.
+  sweeps. To send opted-in Scholly daily missions through the existing Telegram
+  bot, also call `POST /api/cron/scholly-reminders` every 15 minutes with the
+  same authorization header. Set the bot’s public HTTPS site URL so reminders
+  can include the link to turn them off.
 - **Rate limits are per process** (in memory). With several instances each
   enforces its own window — acceptable, but not a global limit.
 - Behind a proxy/CDN set `TRUSTED_PROXY_HOPS` / `CLIENT_IP_HEADER` so per-IP
@@ -120,6 +123,10 @@ Hosting assumptions (all portable):
 5. The daily AI limits index (`ai_usage(profile_id, created_at)`) is part of
    the canonical schema; standalone it is
    [`supabase/add_ai_usage_quota_index.sql`](./supabase/add_ai_usage_quota_index.sql).
+6. On an existing database, apply the Scholly patches before deploying this
+   version. Apply [the base Scholly schema](./supabase/scholly_profile_events_2026-11-15.sql)
+   first, then [the mission practice patch](./supabase/scholly_mission_practice_2026-11-16.sql)
+   and [the wardrobe patch](./supabase/scholly_wardrobe_2026-11-16.sql).
 
 ## 3. Domain and canonical URL
 

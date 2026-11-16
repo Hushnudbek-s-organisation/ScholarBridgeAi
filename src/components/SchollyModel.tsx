@@ -1,16 +1,28 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties } from "react";
+import { DEFAULT_SCHOLLY_OUTFIT, schollyPalette, SCHOLLY_RAINBOW, type SchollyOutfit } from "@/lib/scholly-wardrobe";
+import { SchollyAura, SchollyRecoloredPortrait } from "./SchollyLook";
 import type * as Three from "three";
 import type { SchollyMotion } from "./useSchollyMotion";
 
-export function SchollyModel({ trackPointer = false, held = false, paused = false, motion = "idle" }: {
+export function SchollyModel({ trackPointer = false, held = false, paused = false, motion = "idle", outfit = DEFAULT_SCHOLLY_OUTFIT, staticPreview = false }: {
   trackPointer?: boolean;
   held?: boolean;
   paused?: boolean;
   motion?: SchollyMotion;
+  outfit?: SchollyOutfit;
+  staticPreview?: boolean;
 }) {
   const host = useRef<HTMLSpanElement>(null);
+  const palette = useMemo(() => schollyPalette(outfit), [outfit]);
+  const customizedBody = Boolean(outfit.body && outfit.body !== "blue");
+  const customizedEyes = Boolean(outfit.eyes && outfit.eyes !== "cyan");
+  const rainbow = outfit.eyes === "rainbow";
+  const look = useRef({ palette, body: outfit.body, rainbow, customizedEyes });
+  useEffect(() => {
+    look.current = { palette, body: outfit.body, rainbow, customizedEyes };
+  }, [palette, outfit.body, rainbow, customizedEyes]);
   const animation = useRef({ held, motion, paused, since: 0 });
   useEffect(() => {
     const since = animation.current.motion === motion ? animation.current.since : performance.now();
@@ -44,7 +56,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
 
   useEffect(() => {
     const element = host.current;
-    if (!element) return;
+    if (!element || staticPreview) return;
     let disposed = false;
     let cleanup: (() => void) | undefined;
     void import("three").then((T) => {
@@ -139,7 +151,9 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
       resize.observe(element);
 
       const pressedScale = new T.Vector3();
-      const neutralEyes = new T.Color(0x68efff);
+      const neutralEyes = new T.Color();
+      const rainbowColors = SCHOLLY_RAINBOW.map(color => new T.Color(color));
+      let renderedLook: typeof look.current | undefined;
       const concernEyes = new T.Color(0xffb869);
       let nextBlink = 0;
       renderer.setAnimationLoop((ms) => {
@@ -173,7 +187,22 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         if (nextBlink === 0 || time > nextBlink + .12) nextBlink = time + 4 + Math.random() * 3;
         const blink = dragging || dizzy || sleeping || (!reduced && idle && time >= nextBlink) ? .09 : 1;
         cyan.opacity = pose === "talk" || thinking ? .85 + .15 * Math.sin(elapsed * 7) : 1;
-        cyan.color.copy(concerned ? concernEyes : neutralEyes);
+        const appearance = look.current;
+        if (renderedLook !== appearance) {
+          const body = appearance.body;
+          shell.color.set(!body || body === "blue" ? "#1846C0" : appearance.palette.main);
+          shell.metalness = body === "silver" || body === "gold" ? .38 : .16;
+          rim.color.set(body === "night" ? "#7CC4FF" : "#1CBDFF");
+          rim.intensity = body === "night" ? 4 : 3;
+          neutralEyes.set(appearance.palette.eye);
+          renderedLook = appearance;
+        }
+        const rainbowPhase = reduced ? 0 : (time % 6) / 6 * rainbowColors.length;
+        const rainbowIndex = Math.floor(rainbowPhase);
+        if (appearance.rainbow) cyan.color.lerpColors(rainbowColors[rainbowIndex],
+          rainbowColors[(rainbowIndex + 1) % rainbowColors.length], rainbowPhase - rainbowIndex);
+        else cyan.color.copy(concerned && !appearance.customizedEyes ? concernEyes : neutralEyes);
+        mouthColor.color.copy(cyan.color);
         eyes.forEach((eye, index) => {
           const angle = elapsed * 5 + index * Math.PI;
           eye.position.x = (index ? .30 : -.30) + (!reduced && thinking ? .055 * Math.cos(angle) : 0);
@@ -219,7 +248,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
       };
     }).catch(() => {});
     return () => { disposed = true; cleanup?.(); };
-  }, [trackPointer]);
+  }, [staticPreview, trackPointer]);
 
   const dragging = motion === "drag";
   const dizzy = motion === "shake";
@@ -229,19 +258,44 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
   const pointing = motion === "point";
   const concerned = motion === "concern";
   const showArms = dragging || waving || happy || pointing || concerned;
+  const useFallbackEyes = customizedBody || customizedEyes;
+  const eyeColor = concerned && !customizedEyes ? "#FFB869" : palette.eye;
+  const closed = sleeping || dizzy || dragging;
+  const eyePositions = customizedBody ? { left: 90, right: 135, y: 104, offset: 0 } : { left: 91, right: 166, y: 103, offset: -4 };
 
   return (
-    <span ref={host} className="sb-scholly-model" aria-hidden="true">
-      <span className="sb-scholly-portrait" data-dragging={dragging || undefined} data-dizzy={dizzy || undefined} data-arms={showArms || undefined}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/scholly.webp" alt="" draggable={false} />
-        {showArms && <>
+    <span ref={host} className="sb-scholly-model" aria-hidden="true" data-eye-style={rainbow ? "rainbow" : undefined}
+      data-body-style={outfit.body} data-look-paused={paused || undefined} style={{ "--scholly-eye": eyeColor } as CSSProperties}>
+      <SchollyAura aura={outfit.aura} eye={palette.eye} paused={paused} />
+      <span className="sb-scholly-portrait" data-dragging={dragging || undefined} data-dizzy={dizzy || undefined} data-arms={showArms && !customizedBody || undefined}>
+        {customizedBody ? <SchollyRecoloredPortrait palette={palette} body={outfit.body} motion={motion} /> :
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/scholly.webp" alt="" draggable={false} />}
+        {showArms && !customizedBody && <>
           <span className="sb-scholly-portrait-arm sb-scholly-portrait-arm-left" />
           <span className="sb-scholly-portrait-arm sb-scholly-portrait-arm-right" />
         </>}
-        {dizzy && <span className="sb-scholly-dizzy-head" />}
+        {dizzy && !customizedBody && <span className="sb-scholly-dizzy-head" />}
         <svg className="sb-scholly-lids sb-scholly-expression" viewBox="0 0 221 250">
-          {(dragging || dizzy || sleeping || happy || concerned || motion === "idle" || motion === "think" || motion === "talk") &&
+          {useFallbackEyes && <>
+            {!customizedBody && <>
+              <ellipse cx="91" cy="103" rx="14" ry="19" fill="#131f3f" />
+              <ellipse cx="166" cy="99" rx="14" ry="19" fill="#122044" />
+            </>}
+            {[eyePositions.left, eyePositions.right].map((x, index) => {
+              const y = eyePositions.y + index * eyePositions.offset;
+              return closed || happy
+                ? <path key={x} className="sb-scholly-look-eye-stroke" d={happy
+                  ? `M${x - 6} ${y + 2}l6-6 6 6` : `M${x - 6} ${y}q6 4 12 0`}
+                  strokeWidth="3" strokeLinecap="round" fill="none" />
+                : <ellipse key={x} className="sb-scholly-look-eye-fill" cx={x} cy={y} rx="6" ry="10" />;
+            })}
+            {customizedBody && (motion === "talk" || sleeping
+              ? <ellipse className="sb-scholly-look-eye-fill" cx="112" cy="127" rx={sleeping ? 4 : 7} ry={sleeping ? 3 : 5} />
+              : <path className="sb-scholly-look-eye-stroke" d="M101 120q11 12 22 0"
+                strokeWidth="4" strokeLinecap="round" fill="none" />)}
+          </>}
+          {!useFallbackEyes && (dragging || dizzy || sleeping || happy || concerned || motion === "idle" || motion === "think" || motion === "talk") &&
             <g data-eyes={sleeping || dizzy || dragging ? "closed" : happy ? "happy" : motion}>
               <ellipse cx="91" cy="103" rx="14" ry="19" fill="#131f3f" />
               <ellipse cx="166" cy="99" rx="14" ry="19" fill="#122044" />
@@ -251,10 +305,10 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
                   ? <g fill={concerned ? "#ffb869" : "#68efff"}><circle cx="91" cy="103" r="5" /><circle cx="166" cy="99" r="5" /></g>
                   : <path d="M85 103q6 4 12 0m63-4q6 4 12 0" stroke="#68efff" strokeWidth="3" strokeLinecap="round" fill="none" />}
             </g>}
-          {(motion === "talk" || happy || sleeping) && <>
+          {!customizedBody && (motion === "talk" || happy || sleeping) && <>
             <ellipse cx="132" cy="115" rx="20" ry="11" fill="#101b36" />
-            {happy ? <path d="M119 112q13 17 26 0" stroke="#68efff" strokeWidth="3" fill="none" /> :
-              <ellipse data-scholly-mouth cx="132" cy="115" rx={sleeping ? 4 : 8} ry={sleeping ? 3 : 5} fill="#68efff" />}
+            {happy ? <path d="M119 112q13 17 26 0" stroke={eyeColor} strokeWidth="3" fill="none" /> :
+              <ellipse data-scholly-mouth cx="132" cy="115" rx={sleeping ? 4 : 8} ry={sleeping ? 3 : 5} fill={eyeColor} />}
           </>}
         </svg>
       </span>

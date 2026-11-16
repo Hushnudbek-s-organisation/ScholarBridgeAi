@@ -724,6 +724,48 @@ async function main() {
     const a = await startLink(aziza.id);
     await service.handleUpdate(msg(1001, `/start link_${a.token}`));
     await service.handleUpdate(cb(1001, buttonsOf(lastTo(1001)).find((b) => String(b.callback_data).startsWith("lk:y:")).callback_data));
+    const { runSchollyTelegramReminders } = await import("../src/lib/scholly-telegram-reminders.server");
+    const reminderTime = new Date("2026-11-17T10:35:00Z"); // 15:35 Asia/Tashkent
+    const nextDay = new Date("2026-11-18T10:35:00Z");
+    const settingsRoute = await import("../src/app/api/scholly/settings/route");
+    const settingsHeaders = {
+      "Content-Type": "application/json",
+      Cookie: `sb_session=${auth.signSessionToken({ id: aziza.id, passwordHash: "$2b$10$x" })}`,
+    };
+    const saveSchollySettings = (patch: Record<string, unknown>) => settingsRoute.PUT(new Request("http://x/api/scholly/settings", {
+      method: "PUT", headers: settingsHeaders, body: JSON.stringify({
+        mode: "full", tone: "serious", reminderWindow: "after_school",
+        quietStart: "22:00", quietEnd: "07:00", missionTelegram: true, ...patch,
+      }),
+    }));
+    let reminderMark = mark();
+    await runSchollyTelegramReminders(reminderTime);
+    check("Scholly daily mission is opt-in", since(reminderMark).length === 0);
+    check("Scholly settings reject invalid local hours", (await saveSchollySettings({ quietStart: "25:00" })).status === 400);
+    check("Scholly reminder consent and a custom quiet window are saved", (await saveSchollySettings({ quietStart: "14:00", quietEnd: "16:00" })).ok);
+    await runSchollyTelegramReminders(reminderTime);
+    check("Scholly creates no reminder during custom quiet hours", since(reminderMark).length === 0);
+    await saveSchollySettings({});
+    await Promise.all([runSchollyTelegramReminders(reminderTime), runSchollyTelegramReminders(reminderTime)]);
+    const schollyReminder = since(reminderMark).filter((call) => call.method === "sendMessage");
+    check("Parallel Scholly schedules send once per local day with an opt-out link",
+      schollyReminder.length === 1 && buttonsOf(schollyReminder[0]).some((button) => button.url === `${SITE}/#notifications`));
+    reminderMark = mark();
+    failQueue.push({ error_code: 502, description: "Uncertain delivery" });
+    await runSchollyTelegramReminders(nextDay);
+    await runSchollyTelegramReminders(nextDay);
+    check("Uncertain Scholly delivery receives no immediate or duplicate attempt", since(reminderMark).length === 1);
+    const [schollyLog] = await db.select().from(schema.telegramMessages)
+      .where(and(eq(schema.telegramMessages.type, "scholly_daily_mission"), eq(schema.telegramMessages.status, "failed")));
+    check("Scholly delivery does not enter Telegram's delayed retry queue", schollyLog?.retryPayload === null);
+    await db.insert(schema.dailyMissions).values({ userId: aziza.id, day: "2026-11-19", type: "fill_profile_fields", status: "done" });
+    reminderMark = mark();
+    await runSchollyTelegramReminders(new Date("2026-11-19T10:35:00Z"));
+    check("Completed missions receive no Scholly reminder", since(reminderMark).length === 0);
+    await saveSchollySettings({ mode: "muted" });
+    await runSchollyTelegramReminders(new Date("2026-11-20T10:35:00Z"));
+    check("Muted Scholly sends no reminder", since(reminderMark).length === 0);
+
     let m = mark();
     const created = await sweep.runNotificationSweep(aziza.id);
     const reminderMsgs = since(m).filter((c) => c.method === "sendMessage" && /DAAD/.test(c.body.text));
@@ -763,7 +805,10 @@ async function main() {
     failQueue.push({ error_code: 502, description: "Bad Gateway" }, { error_code: 502, description: "Bad Gateway" }, { error_code: 502, description: "Bad Gateway" });
     await sweep.runNotificationSweep(aziza.id);
     failQueue.length = 0;
-    const failedRow = (await db.select().from(schema.telegramMessages).where(and(eq(schema.telegramMessages.kind, "notification"), eq(schema.telegramMessages.status, "failed"))))[0];
+    const [failedRow] = await db.select().from(schema.telegramMessages).where(and(
+      eq(schema.telegramMessages.type, "deadline_approaching"),
+      eq(schema.telegramMessages.status, "failed"),
+    ));
     check("failed delivery keeps a retry payload", Boolean(failedRow?.retryPayload));
     const r1 = await service.retryFailedDeliveries();
     const retried = (await db.select().from(schema.telegramMessages).where(eq(schema.telegramMessages.id, failedRow.id)))[0];

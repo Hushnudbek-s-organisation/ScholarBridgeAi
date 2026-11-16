@@ -1950,7 +1950,7 @@ must collapse colliding names before re-pointing the rest.
 | `skin` | text |  | yes | |
 | `outfit` | jsonb |  | yes | Object |
 | `last_active_day` | date | yes | — | |
-| `notif_prefs` | jsonb |  | yes | Object; no sender is enabled by this migration |
+| `notif_prefs` | jsonb |  | yes | Object; Telegram mission reminders require an explicit opt-in |
 | `quiet_start` | text |  | yes | Defaults to 22:00 |
 | `quiet_end` | text |  | yes | Defaults to 07:00 |
 | `reminder_window` | text | yes | — | |
@@ -1962,6 +1962,17 @@ must collapse colliding names before re-pointing the rest.
 | `created_at` | timestamp with time zone |  | yes | UTC |
 | `updated_at` | timestamp with time zone |  | yes | UTC |
 
+### `scholly_wardrobe_items`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |  | yes | PK |
+| `user_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
+| `item_key` | text |  | — | Unique per user; catalog key in `slot:key` format |
+| `acquired_at` | timestamp with time zone |  | yes | UTC |
+| `source` | text |  | — | purchase / starter / achievement; one starter per user |
+| `spent_points` | integer |  | yes | Acquisition price for purchases; zero for unlocks |
+
 ### `daily_missions`
 
 | column | type | null | default | notes |
@@ -1969,11 +1980,11 @@ must collapse colliding names before re-pointing the rest.
 | `id` | serial |  | yes | PK |
 | `user_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
 | `day` | date |  | — | One mission per profile and Scholly day (04:00 in saved timezone) |
-| `type` | text |  | — | fill_profile_fields / save_universities / upload_document / sop_paragraph |
+| `type` | text |  | — | fill_profile_fields / save_universities / upload_document / sop_paragraph / ielts_vocabulary / visa_practice |
 | `size_min` | integer |  | yes | Mission size; 1–5 |
 | `points` | integer |  | yes | 10 or 20; awarded only once on verified completion |
 | `target_count` | integer |  | yes | Deterministic completion threshold |
-| `criteria` | jsonb |  | yes | Baseline snapshot used to verify real profile/save/upload/SOP progress |
+| `criteria` | jsonb |  | yes | Baseline snapshot used to verify activity, including saved visa practices |
 | `theme` | text |  | yes | Deterministic day theme |
 | `is_star` | boolean |  | yes | Higher-point mission flag |
 | `status` | text |  | yes | pending / done / skipped |

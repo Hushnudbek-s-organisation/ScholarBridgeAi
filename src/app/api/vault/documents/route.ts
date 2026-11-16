@@ -13,7 +13,7 @@ import {
 } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { premiumGate } from "@/lib/premium";
-import { recordDailyActivity } from "@/lib/gamification";
+import { awardSchollyMicroRewards, recordDailyActivity } from "@/lib/gamification";
 
 export const dynamic = "force-dynamic";
 
@@ -151,7 +151,7 @@ export async function POST(req: Request) {
     if(!applicationIds)return jsonError(400,"applicationIds must contain positive integer IDs","bad_request");
 
     const response = await db.transaction(async(tx)=>{
-    if(hasFile){await tx.execute(sql`SELECT id FROM public.student_profiles WHERE id=${profileId} FOR SHARE`);await tx.execute(sql`SELECT id FROM public.subscriptions WHERE profile_id=${profileId} FOR SHARE`);const locked=await premiumGate(profileId,"documents_upload",tx);if(locked)return locked;}
+    if(hasFile){await tx.execute(sql`SELECT id FROM public.student_profiles WHERE id=${profileId} FOR NO KEY UPDATE`);await tx.execute(sql`SELECT id FROM public.subscriptions WHERE profile_id=${profileId} FOR SHARE`);const locked=await premiumGate(profileId,"documents_upload",tx);if(locked)return locked;}
     const owned = applicationIds.length ? await tx.select({id:applications.id}).from(applications).where(and(eq(applications.profileId,profileId),inArray(applications.id,applicationIds))).for("share") : [];
     if (owned.length !== new Set(applicationIds).size) return jsonError(403,"Application link not permitted","forbidden");
     const [doc] = await tx
@@ -178,6 +178,9 @@ export async function POST(req: Request) {
           .values(owned.map((a) => ({ applicationId: a.id, documentId: doc.id, usage: "required" })))
           .onConflictDoNothing();
       }
+    }
+    if (doc.fileUrl && g.value.session.profile.id === profileId) {
+      await awardSchollyMicroRewards(profileId, "scholly_document_uploaded", [doc.id], tx);
     }
     return NextResponse.json({ ok: true, document: doc });
     });
@@ -209,7 +212,7 @@ export async function PATCH(req: Request) {
   try {
     let uploadedFileChanged = false;
     const response = await db.transaction(async(tx)=>{
-    if(hasFile){await tx.execute(sql`SELECT id FROM public.student_profiles WHERE id=${profileId} FOR SHARE`);await tx.execute(sql`SELECT id FROM public.subscriptions WHERE profile_id=${profileId} FOR SHARE`);const locked=await premiumGate(profileId,"documents_upload",tx);if(locked)return locked;}
+    if(hasFile){await tx.execute(sql`SELECT id FROM public.student_profiles WHERE id=${profileId} FOR NO KEY UPDATE`);await tx.execute(sql`SELECT id FROM public.subscriptions WHERE profile_id=${profileId} FOR SHARE`);const locked=await premiumGate(profileId,"documents_upload",tx);if(locked)return locked;}
     const [doc] = await tx
       .select()
       .from(userDocuments)
@@ -255,6 +258,9 @@ export async function PATCH(req: Request) {
       if(removed.length)await tx.delete(applicationDocumentLinks).where(and(eq(applicationDocumentLinks.documentId,id),inArray(applicationDocumentLinks.applicationId,removed)));
       const added=owned.filter(application=>!currentIds.includes(application.id));
       if(added.length)await tx.insert(applicationDocumentLinks).values(added.map(application=>({applicationId:application.id,documentId:id,usage:"required"}))).onConflictDoNothing();
+    }
+    if (!doc.fileUrl && patch.fileUrl && g.value.session.profile.id === profileId) {
+      await awardSchollyMicroRewards(profileId, "scholly_document_uploaded", [doc.id], tx);
     }
     return NextResponse.json({ ok: true, id });
     });

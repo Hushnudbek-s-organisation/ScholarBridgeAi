@@ -96,16 +96,22 @@ export async function tgSendMessage(
   token: string,
   chatId: string,
   html: string,
-  buttons: Keyboard = []
+  buttons: Keyboard = [],
+  singleAttempt = false,
 ): Promise<TgResult<{ message_id: number }>> {
   const keyboard = toInlineKeyboard(buttons);
-  return tgCall(token, "sendMessage", {
+  const body = {
     chat_id: chatId,
     text: html,
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true },
     ...(keyboard.length ? { reply_markup: { inline_keyboard: keyboard } } : {}),
-  });
+  };
+  // Send-once callers cannot retry an uncertain response for a message that
+  // Telegram might have accepted before the connection broke.
+  return singleAttempt
+    ? tgCallOnce(token, "sendMessage", body, 8000)
+    : tgCall(token, "sendMessage", body);
 }
 
 export async function tgEditMessage(

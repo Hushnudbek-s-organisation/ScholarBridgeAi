@@ -1,13 +1,23 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { Pool } from "pg";
-import { gradeQuiz, questionsForDay, type DailyQuiz } from "../src/lib/scholly-quiz.server";
+import { gradeQuiz, publicQuiz, questionsForDay, type DailyQuiz } from "../src/lib/scholly-quiz.server";
 
 const fixtures = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8")) as {
   adminEmail: string;
   adminPassword: string;
   studentId: number;
 };
+
+test("Scholly rotates 21 questions and preserves the questions attached to a saved result", () => {
+  const sets = Array.from({ length: 7 }, (_, index) => questionsForDay(`2026-11-${10 + index}`));
+  expect(new Set(sets.flat().map(({ id }) => id)).size).toBe(21);
+  const saved = gradeQuiz("2026-11-10", sets[0].map(({ id, correctIndex }) => ({
+    questionId: id, selectedIndex: correctIndex,
+  })));
+  expect(publicQuiz("2026-11-11", "en", saved).questions.map(({ id }) => id))
+    .toEqual(sets[0].map(({ id }) => id));
+});
 
 test("Scholly grades and awards a daily quiz once across concurrent requests", async ({ request }) => {
   expect((await request.get("/api/scholly/quiz")).status()).toBe(401);

@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { writingReferenceNotes } from "@/lib/ai/writingReferenceNotes";
 import { db } from "@/db";
-import { applications, essayVersions } from "@/db/schema";
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { applications, essayVersions, studentProfiles } from "@/db/schema";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
 import { readJsonBody, clampString, optionalNumber, positiveInt } from "@/lib/request";
 import { analyzeEssay, compareVersions, countWords, type EssayType } from "@/lib/essay";
 import { scoreConversationBehaviors } from "@/lib/ai/behaviorScore";
-import { recordDailyActivity } from "@/lib/gamification";
+import { awardSchollyMicroRewards, recordDailyActivity } from "@/lib/gamification";
 
 /**
  * Essay versions + rubric (#8).
@@ -21,6 +21,7 @@ import { recordDailyActivity } from "@/lib/gamification";
 
 const ESSAY_TYPES = ["sop", "personal_statement", "why_us", "supplemental", "scholarship"];
 const MAX_CHARS = 60_000; // ~9k words, far above any real limit
+const SOP_PARAGRAPH_WORDS = 50;
 
 function parseType(value: unknown): EssayType {
   return ESSAY_TYPES.includes(String(value)) ? (String(value) as EssayType) : "sop";
@@ -142,22 +143,23 @@ export async function POST(req: Request) {
       ],
     });
 
-    const [last] = await db
-      .select()
-      .from(essayVersions)
-      .where(and(
+    const { row, last } = await db.transaction(async (tx) => {
+      await tx.select({ id: studentProfiles.id }).from(studentProfiles)
+        .where(eq(studentProfiles.id, profileId)).for("no key update");
+      const draft = and(
         eq(essayVersions.profileId, profileId),
         eq(essayVersions.essayType, essayType),
         universityId != null ? eq(essayVersions.universityId, universityId) : isNull(essayVersions.universityId),
-      ))
-      .orderBy(desc(essayVersions.versionNumber))
-      .limit(1);
-
-    const versionNumber = (last?.versionNumber ?? 0) + 1;
-
-    const [row] = await db
-      .insert(essayVersions)
-      .values({
+      );
+      const [last] = await tx.select().from(essayVersions).where(draft)
+        .orderBy(desc(essayVersions.versionNumber)).limit(1);
+      const ownSop = essayType === "sop" && access.session.profile.id === profileId;
+      const [{ longestDraft }] = ownSop
+        ? await tx.select({ longestDraft: sql<number>`coalesce(max(${essayVersions.wordCount}), 0)::int` })
+          .from(essayVersions).where(draft)
+        : [{ longestDraft: 0 }];
+      const versionNumber = (last?.versionNumber ?? 0) + 1;
+      const [row] = await tx.insert(essayVersions).values({
         profileId,
         universityId,
         essayType,
@@ -176,12 +178,13 @@ export async function POST(req: Request) {
         rubricFit: feedback.scores.fit,
         rubricTotal: feedback.scores.total,
         aiFeedback: clampString(body.aiFeedback, 20_000) || null,
-      })
-      .returning();
-
-    if (essayType === "sop" && last?.content !== content && access.session.profile.id === profileId) {
-      await recordDailyActivity(profileId);
-    }
+      }).returning();
+      if (ownSop && Math.floor(row.wordCount / SOP_PARAGRAPH_WORDS) > Math.floor(longestDraft / SOP_PARAGRAPH_WORDS)) {
+        await awardSchollyMicroRewards(profileId, "scholly_sop_paragraph", [row.id], tx);
+      }
+      if (ownSop && last?.content !== content) await recordDailyActivity(profileId, tx);
+      return { row, last };
+    });
     const behaviorSignals = await behaviorSignalsPromise;
     return NextResponse.json({
       version: row,

@@ -2264,6 +2264,11 @@
     }
   },
   "departure": {
+    "dateLabel": "Planned departure date",
+    "saveDate": "Save date",
+    "dateSaved": "Departure date saved.",
+    "dateError": "Could not save the departure date.",
+    "dateHint": "Scholly uses this optional date to suggest visa practice. Clear the field to remove the date.",
     "title": "Departure Checklist",
     "subtitle": "From accepting your offer to your first week abroad — nothing forgotten.",
     "signInTitle": "Sign in to use the checklist",

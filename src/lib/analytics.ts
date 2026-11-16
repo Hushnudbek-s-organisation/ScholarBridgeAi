@@ -79,6 +79,7 @@ import {
   userBadges,
 } from "@/db/schema";
 import { ensureAnalyticsTables } from "@/lib/visits";
+import { getSchollyAnalytics, type SchollyAnalytics } from "@/lib/scholly-analytics.server";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -362,6 +363,7 @@ export interface AnalyticsOverview {
   revenue: RevenueStats;
   content: ContentStats;
   engagement: EngagementStats;
+  scholly: SchollyAnalytics | null;
   series: SeriesPoint[];
   topPages: { path: string; views: number; visitors: number }[];
   topScreens: { screen: string; views: number; visitors: number }[];
@@ -1196,7 +1198,7 @@ export async function getAnalyticsOverview(options: AnalyticsOptions = {}): Prom
   // Traffic needs `site_visits`; make sure it exists (additive + idempotent).
   const trackingAvailable = await ensureAnalyticsTables();
 
-  const [traffic, breakdowns, series, visits, signups, users, revenue, content, engagement] = await Promise.all([
+  const [traffic, breakdowns, series, visits, signups, users, revenue, content, engagement, scholly] = await Promise.all([
     trackingAvailable
       ? trafficStats(bounds, warnings)
       : Promise.resolve(emptyTraffic()),
@@ -1208,6 +1210,7 @@ export async function getAnalyticsOverview(options: AnalyticsOptions = {}): Prom
     revenueStats(bounds, warnings),
     contentStats(bounds, warnings),
     engagementStats(bounds, warnings),
+    safe("Scholly", warnings, null, () => getSchollyAnalytics(days, now)),
   ]);
 
   if (!trackingAvailable) {
@@ -1230,6 +1233,7 @@ export async function getAnalyticsOverview(options: AnalyticsOptions = {}): Prom
     revenue,
     content,
     engagement,
+    scholly,
     series,
     topPages: breakdowns.topPages,
     topScreens: breakdowns.topScreens,

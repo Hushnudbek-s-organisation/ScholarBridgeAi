@@ -6,14 +6,19 @@ import { privateNoStoreJson } from "@/lib/apiResponse";
 import { readJsonBody } from "@/lib/request";
 import { logSchollyEvent } from "@/lib/scholly-events";
 import { transitionSchollyOnboarding, type SchollyOnboardingSnapshot } from "@/lib/scholly-onboarding";
+import { sanitizeSchollyOutfit } from "@/lib/scholly-wardrobe";
 import { isSchollyLocale, isSupportedTimeZone } from "@/lib/scholly-profile";
+import { parseSchollyReminderPreferences } from "@/lib/scholly-reminders";
 
 function publicProfile(row: typeof schollyProfiles.$inferSelect, stageKnown: boolean) {
   return {
+    userId: row.userId,
+    outfit: sanitizeSchollyOutfit(row.outfit),
     namePref: row.namePref,
     nameConfirmed: row.nameConfirmed,
     lang: row.lang,
     tone: row.tone,
+    mode: parseSchollyReminderPreferences(row).mode,
     tz: row.tz,
     reminderWindow: row.reminderWindow,
     onboardingState: row.onboardingState,

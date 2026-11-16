@@ -22,6 +22,7 @@ import {
   recommendationRequests,
   savedScholarships,
   savedUniversities,
+  schollyProfiles,
   scholarships,
   studentChecklist,
   studentProfiles,
@@ -60,6 +61,7 @@ import { gpaTo40Scale } from "@/lib/gpa";
 import { profilePlan } from "@/lib/entitlements";
 import { computeNextActions } from "@/lib/journey/nextSteps";
 import { summarizeApplications } from "@/lib/journey/applicationSummary";
+import { loadRecentSchollyAchievements, loadSchollyAudience, recordSchollyDashboardVisit } from "@/lib/scholly-audience.server";
 
 export const dynamic = "force-dynamic";
 
@@ -270,10 +272,27 @@ export async function GET(req: Request) {
     const closedApplications = new Set(appRows
       .filter((app) => ["submitted", "interview", "decision", "withdrawn"].includes(app.status))
       .map((app) => `app-${app.id}`));
-    const schollyDeadline = allDeadlines.find((item) =>
-      item.daysRemaining != null && item.daysRemaining >= 0 && item.daysRemaining <= 3
+    const nearestSchollyDeadline = allDeadlines.find((item) =>
+      item.daysRemaining != null && item.daysRemaining >= 0
       && !closedApplications.has(item.id)
-    ) ?? null;
+    );
+    const schollyDeadline = nearestSchollyDeadline?.daysRemaining != null && nearestSchollyDeadline.daysRemaining <= 3
+      ? nearestSchollyDeadline : null;
+    const schollySignalsPromise = (async () => {
+      const [preferences] = await db.select({ tz: schollyProfiles.tz }).from(schollyProfiles)
+        .where(eq(schollyProfiles.userId, profileId)).limit(1);
+      const [audience, achievements] = await Promise.all([
+        loadSchollyAudience(profileId, preferences?.tz ?? "Asia/Tashkent", {
+          now: today, nearestDeadlineDays: nearestSchollyDeadline?.daysRemaining,
+        }),
+        loadRecentSchollyAchievements(profileId, today),
+        recordSchollyDashboardVisit(profileId, today),
+      ]);
+      return { audience, achievements };
+    })().catch((error: unknown) => {
+      console.error("Could not load Scholly dashboard signals:", error);
+      return null;
+    });
 
     // ---- Profile readiness (spec §3, §13) --------------------------------
     // ONE mapped profile row feeds every scoring engine on this page: the
@@ -394,7 +413,7 @@ export async function GET(req: Request) {
     });
 
     // ---- Recommendations for you (spec §3) --------------------------------
-    const recommended = await recommendedPromise;
+    const [recommended, schollySignals] = await Promise.all([recommendedPromise, schollySignalsPromise]);
 
     return privateNoStoreJson({
       profile: {
@@ -406,6 +425,7 @@ export async function GET(req: Request) {
       nextSteps,
       deadlines,
       schollyDeadline,
+      schollySignals,
       applications: appProgress,
       // Full-profile activity counts power the three starter tasks. The
       // recommendation arrays are intentionally short and cannot answer this.
@@ -482,6 +502,8 @@ function tabForKind(kind: string): string {
       return "documents";
     case "visa":
       return "visa";
+    case "departure":
+      return "departure";
     default:
       return "tasks";
   }

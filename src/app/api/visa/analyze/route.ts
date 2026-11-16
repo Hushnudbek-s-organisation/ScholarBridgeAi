@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const history = sanitizeHistory(body?.messages, 40, 2000);
+    const history = sanitizeHistory(body?.messages, 40, 2000).filter(({ text }) => text.trim().length > 0);
     // Profile context is read only from the authenticated session; a body
     // profileId can never select another student's academic or funding data.
     const ownerId = session?.profile.id ?? null;

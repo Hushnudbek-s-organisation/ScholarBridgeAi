@@ -1,5 +1,5 @@
-import { db } from "@/db";
-import { schollyEvents } from "@/db/schema";
+import { db } from "../db";
+import { schollyEvents } from "../db/schema";
 
 export const SCHOLLY_ONBOARDING_EVENT_TYPES = [
   "onboarding_started",
@@ -16,6 +16,11 @@ export const SCHOLLY_EVENT_TYPES = [
   "mission_skipped",
   "mission_another",
   "quiz_done",
+  "points_awarded",
+  "item_unlocked",
+  "item_bought",
+  "item_equipped",
+  "level_up",
 ] as const;
 export type SchollyEventType = (typeof SCHOLLY_EVENT_TYPES)[number];
 

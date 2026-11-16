@@ -17,6 +17,20 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { parseStudyInterestSelections } from "@/lib/studyInterests";
 import { invalidateProfileMatchCache } from "@/lib/catalogCache";
 import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
+import { awardSchollyMicroRewards } from "@/lib/gamification";
+import { missingSchollyProfileFields } from "@/lib/scholly-mission-store.server";
+import type { SchollyProfileField } from "@/lib/scholly-missions";
+
+// Stored as ledger entity IDs. Keep the numbers stable if mission fields are reordered.
+const SCHOLLY_PROFILE_FIELD_REWARD_IDS: Record<SchollyProfileField, number> = {
+  country: 1,
+  targetMajor: 2,
+  degreeLevel: 3,
+  gpa: 4,
+  ieltsScore: 5,
+  budgetAnnualUsd: 6,
+  preferredCountries: 7,
+};
 
 /**
  * Authorization: identity comes from the signed session cookie — never from an
@@ -259,7 +273,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // owner changing their OWN password.
     const actorIsTarget = access.targetId === profileId && access.session.profile.id === profileId;
 
-    const [updatedProfile] = await db.update(studentProfiles)
+    const updateProfile = (connection: Pick<typeof db, "update">) => connection.update(studentProfiles)
       .set({
         name: body.name !== undefined ? clampString(body.name, 120) : undefined,
         // An empty email would break sign-in — leave the stored one untouched.
@@ -339,6 +353,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       })
       .where(eq(studentProfiles.id, profileId))
       .returning();
+
+    const [updatedProfile] = actorIsTarget ? await db.transaction(async (tx) => {
+      const [previous] = await tx.select().from(studentProfiles)
+        .where(eq(studentProfiles.id, profileId)).for("no key update");
+      const updated = await updateProfile(tx);
+      if (previous && updated[0]) {
+        const stillMissing = new Set(missingSchollyProfileFields(updated[0]));
+        const filled = missingSchollyProfileFields(previous)
+          .filter((field) => !stillMissing.has(field))
+          .map((field) => SCHOLLY_PROFILE_FIELD_REWARD_IDS[field]);
+        await awardSchollyMicroRewards(profileId, "scholly_profile_field_filled", filled, tx);
+      }
+      return updated;
+    }) : await updateProfile(db);
 
     // When the profile reaches completion, complete any pending referral.
     if (updatedProfile) {

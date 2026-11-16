@@ -5,6 +5,7 @@ import { DAILY_ACTIVITY_REASON, isStreakActivity } from "@/lib/streak";
 import { loadSchollyStreak } from "@/lib/scholly-streak.server";
 import { schollyTimeZone } from "@/lib/scholly-mission-store.server";
 import { isSupportedTimeZone } from "@/lib/scholly-profile";
+import { logSchollyEvent } from "@/lib/scholly-events";
 import { profileCompletenessRatio, type ChancingProfile } from "@/lib/chancing";
 import {
   userPoints,
@@ -114,6 +115,16 @@ interface AwardResult {
   newlyAwardedBadges: (typeof badges.$inferSelect)[];
 }
 
+async function schollyLedgerDay(profileId: number, executor: Executor) {
+  const zone = await schollyTimeZone(profileId, executor);
+  const timeZone = isSupportedTimeZone(zone) && !/^[+-]/.test(zone) ? zone : "Asia/Tashkent";
+  const localBoundary = sql`date_trunc('day', timezone(${timeZone}, now()) - interval '4 hours') + interval '4 hours'`;
+  return {
+    start: sql`timezone('UTC', timezone(${timeZone}, ${localBoundary}))`,
+    end: sql`timezone('UTC', timezone(${timeZone}, ${localBoundary} + interval '1 day'))`,
+  };
+}
+
 /**
  * Mark "the student showed up today" in the ledger.
  *
@@ -132,9 +143,7 @@ export async function recordDailyActivity(profileId: number, executor?: Executor
   if (!Number.isFinite(profileId) || profileId <= 0) return false;
   try {
     if (!executor) return await withProfileLock(profileId, (tx) => recordDailyActivity(profileId, tx));
-    const savedTimeZone = await schollyTimeZone(profileId, executor);
-    const timeZone = isSupportedTimeZone(savedTimeZone) ? savedTimeZone : "Asia/Tashkent";
-    const localBoundary = sql`date_trunc('day', timezone(${timeZone}, now()) - interval '4 hours') + interval '4 hours'`;
+    const { start, end } = await schollyLedgerDay(profileId, executor);
     const result = await executor.execute(sql`
       INSERT INTO points_ledger (profile_id, points, reason)
       SELECT ${profileId}, 0, ${DAILY_ACTIVITY_REASON}
@@ -142,8 +151,8 @@ export async function recordDailyActivity(profileId: number, executor?: Executor
         SELECT 1 FROM points_ledger
         WHERE profile_id = ${profileId}
           AND reason = ${DAILY_ACTIVITY_REASON}
-          AND created_at >= timezone('UTC', timezone(${timeZone}, ${localBoundary}))
-          AND created_at < timezone('UTC', timezone(${timeZone}, ${localBoundary} + interval '1 day'))
+          AND created_at >= ${start}
+          AND created_at < ${end}
       )
       RETURNING id
     `);
@@ -228,6 +237,10 @@ export async function awardPoints(
       .where(eq(userPoints.profileId, profileId));
 
     const newlyAwardedBadges = await grantBadges(profileId, tx);
+    const previousLevel = computeLevel(newTotal - points, levelRows);
+    if (currentLevel.id !== previousLevel.id) {
+      await logSchollyEvent(profileId, "level_up", { id: currentLevel.id, name: currentLevel.name }, tx);
+    }
 
     return {
       points,
@@ -242,6 +255,56 @@ export async function awardPoints(
     return run(executor);
   }
   return withProfileLock(profileId, run);
+}
+
+const SCHOLLY_MICRO_POINTS = {
+  scholly_profile_field_filled: 3,
+  scholly_university_saved: 3,
+  scholly_sop_paragraph: 10,
+  scholly_document_uploaded: 15,
+  reply_created: 5,
+} as const;
+const SCHOLLY_MICRO_DAILY_CAP = 60;
+type SchollyMicroReason = keyof typeof SCHOLLY_MICRO_POINTS;
+
+/** Claim a server-verified action once and share a daily cap across action types. */
+export async function awardSchollyMicroRewards(
+  profileId: number,
+  reason: SchollyMicroReason,
+  relatedEntityIds: readonly number[],
+  executor: Executor,
+): Promise<void> {
+  if (!relatedEntityIds.length) return;
+  await executor.execute(sql`SELECT id FROM student_profiles WHERE id = ${profileId} FOR NO KEY UPDATE`);
+  const { start, end } = await schollyLedgerDay(profileId, executor);
+  const [{ pointsToday }] = await executor.select({ pointsToday: sql<number>`coalesce(sum(${pointsLedger.points}), 0)::int` })
+    .from(pointsLedger).where(and(
+      eq(pointsLedger.profileId, profileId),
+      inArray(pointsLedger.reason, Object.keys(SCHOLLY_MICRO_POINTS)),
+      sql`${pointsLedger.createdAt} >= ${start}`,
+      sql`${pointsLedger.createdAt} < ${end}`,
+    ));
+  const alreadyClaimed = await executor.select({ id: pointsLedger.relatedEntityId }).from(pointsLedger).where(and(
+    eq(pointsLedger.profileId, profileId),
+    eq(pointsLedger.reason, reason),
+    inArray(pointsLedger.relatedEntityId, [...relatedEntityIds]),
+  ));
+  const claimed = new Set(alreadyClaimed.map(({ id }) => id));
+  let remaining = Math.max(0, SCHOLLY_MICRO_DAILY_CAP - pointsToday);
+
+  for (const relatedEntityId of relatedEntityIds) {
+    if (claimed.has(relatedEntityId)) continue;
+    claimed.add(relatedEntityId);
+    const points = Math.min(remaining, SCHOLLY_MICRO_POINTS[reason]);
+    if (points === 0) {
+      // A capped action still consumes its claim so repeating it tomorrow cannot earn a reward.
+      await executor.insert(pointsLedger).values({ profileId, points, reason, relatedEntityId });
+      continue;
+    }
+    await awardPoints(profileId, points, reason, relatedEntityId, executor);
+    await logSchollyEvent(profileId, "points_awarded", { reason, relatedEntityId, points }, executor);
+    remaining -= points;
+  }
 }
 
 /** Evaluate a single badge's criteria for a profile. */

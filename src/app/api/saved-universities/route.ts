@@ -10,7 +10,7 @@ import { enforceFreeCap } from "@/lib/planLimits";
 import { localeFromRequest } from "@/lib/engineText";
 import { localizeUniversityRow } from "@/lib/catalogLocalizer";
 import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
-import { recordDailyActivity } from "@/lib/gamification";
+import { awardSchollyMicroRewards, recordDailyActivity } from "@/lib/gamification";
 
 const SAVED_UNIVERSITY_STATUSES = new Set([
   "Shortlisted",
@@ -144,16 +144,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "University not found", code: "not_found" }, { status: 404 });
     }
 
-    const [newSaved] = await db.insert(savedUniversities).values({
-      profileId,
-      universityId,
-      status,
-      notes,
-    }).returning();
-    if (access.session.profile.id === profileId) await recordDailyActivity(profileId);
+    const saved = await db.transaction(async (tx) => {
+      const ownSave = access.session.profile.id === profileId;
+      await tx.select({ id: studentProfiles.id }).from(studentProfiles)
+        .where(eq(studentProfiles.id, profileId)).for("no key update");
+      const savedKey = and(eq(savedUniversities.profileId, profileId), eq(savedUniversities.universityId, universityId));
+      const [savedBeforeInsert] = await tx.select().from(savedUniversities).where(savedKey).limit(1);
+      if (savedBeforeInsert) return { saved: savedBeforeInsert, message: "Already saved" };
+      const [newSaved] = await tx.insert(savedUniversities).values({ profileId, universityId, status, notes })
+        .onConflictDoNothing().returning();
+      if (!newSaved) {
+        const [alreadySaved] = await tx.select().from(savedUniversities).where(savedKey).limit(1);
+        return { saved: alreadySaved, message: "Already saved" };
+      }
+      if (ownSave) {
+        await awardSchollyMicroRewards(profileId, "scholly_university_saved", [universityId], tx);
+        await recordDailyActivity(profileId, tx);
+      }
+      return { saved: newSaved };
+    });
     await invalidateDashboardRecommendationsForProfile(profileId);
 
-    return NextResponse.json({ saved: newSaved });
+    return NextResponse.json(saved);
   } catch (error) {
     console.error("POST /api/saved-universities error:", error);
     return NextResponse.json({ error: "Failed to save university" }, { status: 500 });

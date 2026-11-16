@@ -119,6 +119,7 @@ type ActivitiesRow = {
   role: string | null;
   achievements: string | null;
 };
+type ActivityReader = Pick<typeof db, "select">;
 
 const ACTIVITIES_MEMO_KEY = "__sbSavedActivitiesMemoV2";
 function activitiesMemo(): AsyncTtlCache<number, ActivitiesRow[]> {
@@ -133,13 +134,14 @@ export function invalidateSavedActivities(profileId?: number): void {
   else memo.invalidate(profileId);
 }
 
-export async function loadSavedActivities(profileId: number) {
+export async function loadSavedActivities(profileId: number, reader: ActivityReader = db) {
+  if (reader !== db) return readSavedActivities(profileId, reader);
   if (ACTIVITIES_MEMO_TTL_MS === 0) return readSavedActivities(profileId);
   return activitiesMemo().getOrCreate(profileId, () => readSavedActivities(profileId));
 }
 
-async function readSavedActivities(profileId: number): Promise<ActivitiesRow[]> {
-  const rows = (await db
+async function readSavedActivities(profileId: number, reader: ActivityReader = db): Promise<ActivitiesRow[]> {
+  const rows = (await reader
     .select({
       category: studentActivities.category,
       role: studentActivities.role,

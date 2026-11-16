@@ -10,8 +10,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ProgressRing, SourceTag } from "@/components/ui/journey";
-import { SCHOLLY_DEADLINE_NEAR, type SchollyDeadlineCue } from "@/lib/scholly-client-events";
+import { SCHOLLY_DASHBOARD_MESSAGES, SCHOLLY_DEADLINE_NEAR, type SchollyDashboardMessages, type SchollyDeadlineCue } from "@/lib/scholly-client-events";
+import type { SchollyQueuedMessage } from "@/lib/scholly-messages";
 import { selectSchollyDailyGrant } from "@/lib/scholly-daily-grant";
+import type { SchollyIeltsExercise } from "@/lib/scholly-ielts.server";
+import { SchollyIeltsMission } from "./SchollyIeltsMission";
 import type { SchollyMissionTheme, SchollyMissionType } from "@/lib/scholly-missions";
 import type { JourneyDashboard } from "./JourneyControlCenter";
 import SchollyDailyQuiz from "./SchollyDailyQuiz";
@@ -33,9 +36,10 @@ type MissionView = {
   target: number;
   complete: boolean;
   anotherUsed: boolean;
+  exercise?: SchollyIeltsExercise;
 };
 
-type MissionResponse = { mission?: MissionView; justCompleted?: boolean };
+type MissionResponse = { mission?: MissionView; justCompleted?: boolean; ieltsCorrect?: number };
 
 function completionKey(profileId: number) {
   return `scholly:mission-dismissed:${profileId}`;
@@ -54,7 +58,8 @@ const missionCopy = {
     title: "Bugungi missiya", dailyGrant: "Bugungi grant", readiness: "Ariza tayyorligi", chosen: "Scholly tanladi",
     theme: { plan: "Reja", writing: "Yozuv", language: "Til", search: "Qidiruv", speaking: "Speaking va viza", light: "Yengil kun", review: "Hafta yakuni" },
     finished: "Bugunga bo‘ldi!", dismiss: "Bugunni yakunlash", tomorrow: "Ertaga yangi missiya kutadi.", loading: "Missiya yuklanmoqda…", error: "Bugungi missiya hozir ochilmadi.",
-    tasks: { fill_profile_fields: "Profil ma’lumotlarini to‘ldiring", save_universities: "Universitetlarni saqlang", upload_document: "Hujjat yuklang" },
+    tasks: { fill_profile_fields: "Profil ma’lumotlarini to‘ldiring", save_universities: "Universitetlarni saqlang", upload_document: "Hujjat yuklang", visa_practice: "Viza suhbatini mashq qiling" },
+    ieltsTask: (words: number) => `${words} ta IELTS so‘zini o‘rganing va mini-testni bajaring`,
     sopTask: (words: number) => `SOP uchun ${words} ta so‘z yozing`,
     open: "Vazifani ochish", check: "Progressni tekshirish", another: "Boshqa missiya", skip: "Bugun o‘tkazib yuborish", retry: "Qayta urinish",
     done: "Bajarildi — ball hisoblandi", skipped: "Bugungi missiya o‘tkazib yuborildi", points: "ball", minutes: "daq", progress: "Bajarilish",
@@ -63,7 +68,8 @@ const missionCopy = {
     title: "Today’s mission", dailyGrant: "Today’s scholarship", readiness: "Application readiness", chosen: "Chosen by Scholly",
     theme: { plan: "Planning", writing: "Writing", language: "Language", search: "Discovery", speaking: "Speaking and visas", light: "Light day", review: "Weekly review" },
     finished: "You’re done for today!", dismiss: "Done for today", tomorrow: "A new mission will be ready tomorrow.", loading: "Loading mission…", error: "Today's mission is unavailable right now.",
-    tasks: { fill_profile_fields: "Complete profile details", save_universities: "Save universities", upload_document: "Upload a document" },
+    tasks: { fill_profile_fields: "Complete profile details", save_universities: "Save universities", upload_document: "Upload a document", visa_practice: "Practise a visa interview" },
+    ieltsTask: (words: number) => `Learn ${words} IELTS vocabulary words and take a short quiz`,
     sopTask: (words: number) => `Write ${words} words for your SOP`,
     open: "Open task", check: "Check progress", another: "Another mission", skip: "Skip for today", retry: "Retry",
     done: "Completed — points awarded", skipped: "Today's mission was skipped", points: "points", minutes: "min", progress: "Progress",
@@ -72,7 +78,8 @@ const missionCopy = {
     title: "Задание на сегодня", dailyGrant: "Стипендия дня", readiness: "Готовность заявки", chosen: "Выбор Scholly",
     theme: { plan: "Планирование", writing: "Письмо", language: "Язык", search: "Поиск", speaking: "Разговорная практика и визы", light: "Лёгкий день", review: "Итоги недели" },
     finished: "На сегодня всё!", dismiss: "Завершить день", tomorrow: "Завтра вас ждёт новое задание.", loading: "Загрузка задания…", error: "Сегодняшнее задание сейчас недоступно.",
-    tasks: { fill_profile_fields: "Заполните профиль", save_universities: "Сохраните университеты", upload_document: "Загрузите документ" },
+    tasks: { fill_profile_fields: "Заполните профиль", save_universities: "Сохраните университеты", upload_document: "Загрузите документ", visa_practice: "Потренируйтесь проходить собеседование на визу" },
+    ieltsTask: (words: number) => `Изучите слова для IELTS (${words}) и пройдите мини-тест`,
     sopTask: (words: number) => `Добавьте слова в SOP (${words})`,
     open: "Открыть задачу", check: "Проверить прогресс", another: "Другое задание", skip: "Пропустить сегодня", retry: "Повторить",
     done: "Выполнено — баллы начислены", skipped: "Задание на сегодня пропущено", points: "баллов", minutes: "мин", progress: "Прогресс",
@@ -92,6 +99,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
   getStepDetail: (step: JourneyDashboard["nextSteps"][number]) => string;
 }) {
   const t = useTranslations("journey");
+  const tDeparture = useTranslations("departure");
   const locale = useLocale();
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
@@ -99,10 +107,12 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
   const [mission, setMission] = useState<MissionView | null>(null);
   const [missionError, setMissionError] = useState(false);
   const [missionBusy, setMissionBusy] = useState(false);
+  const [ieltsScore, setIeltsScore] = useState<number | null>(null);
   const [dismissedMission, setDismissedMission] = useState<number | null>(null);
   const missionHeading = useRef<HTMLHeadingElement>(null);
   const profileId = data.profile.id;
-  const copy = missionCopy[locale.startsWith("ru") ? "ru" : locale.startsWith("en") ? "en" : "uz"];
+  const missionLocale = locale.startsWith("ru") ? "ru" : locale.startsWith("en") ? "en" : "uz";
+  const copy = missionCopy[missionLocale];
   const [greetingBefore, greetingAfter] = t("overviewGreeting", { name: "\uFFF0" }).split("\uFFF0");
 
   useEffect(() => {
@@ -124,20 +134,21 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
     return () => controller.abort();
   }, [profileId]);
 
-  async function updateMission(action: "skip" | "another" | "refresh") {
+  async function updateMission(action: "skip" | "another" | "refresh" | "submit_ielts", answers?: number[]) {
     setMissionBusy(true);
     setMissionError(false);
     try {
       const response = await fetch("/api/scholly/mission", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId, action }),
+        body: JSON.stringify({ profileId, action, missionId: mission?.id, answers }),
       });
       const result = await response.json() as MissionResponse;
       if (!response.ok || !result.mission) throw new Error("mission_update_failed");
       if (result.justCompleted) window.dispatchEvent(new Event("scholly:mission-done"));
       setDismissedMission(isCompletionDismissed(profileId, result.mission.id) ? result.mission.id : null);
       setMission(result.mission);
+      setIeltsScore(result.ieltsCorrect ?? null);
       setMissionError(false);
     } catch {
       setMissionError(true);
@@ -184,7 +195,40 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
     }));
   }, [deadlineDate, deadlineDays, deadlineId, profileId]);
 
+  const missionTab = {
+    fill_profile_fields: "profile", save_universities: "universities", upload_document: "documents",
+    sop_paragraph: "essays", visa_practice: "speaking", ielts_vocabulary: null,
+  };
+  const missionTitle = mission && (mission.type === "sop_paragraph" ? copy.sopTask(mission.target)
+    : mission.type === "ielts_vocabulary" ? copy.ieltsTask(mission.target) : copy.tasks[mission.type]);
   const dailyGrant = mission && selectSchollyDailyGrant(data.recommended.scholarships, mission.day);
+  useEffect(() => {
+    const signals = data.schollySignals;
+    if ((!mission && !missionError) || !signals) return;
+    const messages: SchollyQueuedMessage[] = signals.achievements.badges.map((badge) => ({
+      kind: "badge", key: `badge:${badge.id}`, name: badge.name,
+    }));
+    const { level } = signals.achievements;
+    if (level) messages.push({ kind: "level", key: `level:${level.id}`, name: level.name });
+    if (mission?.status === "pending") {
+      messages.push({ kind: "mission", key: `mission:${mission.id}`, sizeMin: mission.sizeMin });
+    }
+    if (mission?.status === "done") {
+      messages.push({ kind: "mission-done", key: `mission-done:${mission.id}`, points: mission.points });
+    }
+    const matchingGrants = data.recommended.personalised
+      ? data.recommended.scholarships.filter((grant) => grant.matchScore >= 75)
+      : [];
+    const grantDay = mission?.day ?? dateKey(new Date());
+    const match = selectSchollyDailyGrant(matchingGrants, grantDay);
+    if (match) messages.push({ kind: "grant", key: `grant:${match.id}`, match: Math.round(match.matchScore) });
+    const tip = signals.audience.includes("returned") ? "welcome-back"
+      : signals.audience.includes("incomplete-profile") ? "profile-tip" : "tip";
+    messages.push({ kind: tip, key: tip });
+    window.dispatchEvent(new CustomEvent<SchollyDashboardMessages>(SCHOLLY_DASHBOARD_MESSAGES, {
+      detail: { profileId, audience: signals.audience, messages },
+    }));
+  }, [data.recommended, data.schollySignals, mission, missionError, profileId]);
   const recommendations = recommendationTab === "universities"
     ? data.recommended.universities.slice(0, 3).map((item) => ({ title: item.name, detail: [item.city, item.country].filter(Boolean).join(", "), tab: "universities" }))
     : recommendationTab === "scholarships"
@@ -243,7 +287,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
           <span>{copy.chosen}</span>
           <span className="sbOverviewMissionTheme">{copy.theme[mission.theme]}</span>
         </div>
-        <p className="sbOverviewMissionTask">{mission.type === "sop_paragraph" ? copy.sopTask(mission.target) : copy.tasks[mission.type]}</p>
+        <p className="sbOverviewMissionTask">{missionTitle}</p>
         <p className="sbOverviewMissionStatus" role="status">
           {mission.status === "done" ? copy.done : mission.status === "skipped" ? copy.skipped : `${copy.progress}: ${mission.progress} / ${mission.target}`}
         </p>
@@ -258,9 +302,15 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
             <Button variant="outline" onClick={() => dismissCompletion(mission.id)}>{copy.dismiss}</Button>
           </div>
         )}
+        {mission.status === "pending" && mission.exercise && (
+          <SchollyIeltsMission key={`${profileId}-${mission.id}`} locale={missionLocale} exercise={mission.exercise}
+            busy={missionBusy} score={ieltsScore} onSubmit={(answers) => void updateMission("submit_ielts", answers)} />
+        )}
         {mission.status === "pending" && <div className="sbOverviewMissionActions">
-            <button type="button" className="sbOverviewMissionPrimary" onClick={() => onNavigate(({ fill_profile_fields: "profile", save_universities: "universities", upload_document: "documents", sop_paragraph: "essays" })[mission.type])}>{copy.open}<ArrowRight aria-hidden /></button>
-            <button type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.check}</button>
+            {missionTab[mission.type] && <>
+              <button type="button" className="sbOverviewMissionPrimary" onClick={() => onNavigate(missionTab[mission.type]!)}>{copy.open}<ArrowRight aria-hidden /></button>
+              <button type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.check}</button>
+            </>}
             {!mission.anotherUsed && <button type="button" disabled={missionBusy} onClick={() => updateMission("another")}>{copy.another}</button>}
             <button type="button" disabled={missionBusy} onClick={() => updateMission("skip")}>{copy.skip}</button>
         </div>}
@@ -308,7 +358,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
           </div>
           <div className="sbOverviewDeadlineDetail">
             {selectedDeadlines.length ? selectedDeadlines.map((deadline) => <button type="button" key={deadline.id} onClick={() => onNavigate(deadline.tab)}>
-              <strong>{deadline.title}</strong>
+              <strong>{deadline.kind === "departure" ? tDeparture("dateLabel") : deadline.title}</strong>
               <span className="sbOverviewDeadlineChip" data-urgent={deadline.daysRemaining != null && deadline.daysRemaining >= 0 && deadline.daysRemaining <= 3 || undefined}>{dayLabel(deadline.daysRemaining)}</span>
             </button>) : <p>{t("overviewNoDeadlines")}</p>}
             <button className="sbOverviewOpenCalendar" type="button" onClick={() => onNavigate("tasks")}><CalendarDays aria-hidden />{t("overviewOpenCalendar")}</button>

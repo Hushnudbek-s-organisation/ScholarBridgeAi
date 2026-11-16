@@ -44,6 +44,9 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
   const t = useTranslations("departure");
   const tr = useSeedText();
   const [phases, setPhases] = useState<Phase[] | null>(null);
+  const [departureDate, setDepartureDate] = useState("");
+  const [savedDepartureDate, setSavedDepartureDate] = useState("");
+  const [savingDate, setSavingDate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, showToast] = useToast();
   const profileId = activeProfile?.id ?? null;
@@ -51,8 +54,13 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
   useEffect(() => {
     if (!profileId) return;
     let live = true;
-    api<{ phases: Phase[] }>(`/api/departure?profileId=${profileId}`)
-      .then((d) => live && setPhases(d.phases))
+    api<{ phases: Phase[]; departureDate: string | null }>(`/api/departure?profileId=${profileId}`)
+      .then((d) => {
+        if (!live) return;
+        setPhases(d.phases);
+        setDepartureDate(d.departureDate ?? "");
+        setSavedDepartureDate(d.departureDate ?? "");
+      })
       .catch((e: Error) => live && setError(e.message));
     return () => {
       live = false;
@@ -78,6 +86,23 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
     }
   };
 
+  async function saveDepartureDate() {
+    if (!profileId || savingDate) return;
+    setSavingDate(true);
+    try {
+      const result = await api<{ departureDate: string | null }>("/api/departure", {
+        method: "PUT", body: JSON.stringify({ profileId, departureDate: departureDate || null }),
+      });
+      setDepartureDate(result.departureDate ?? "");
+      setSavedDepartureDate(result.departureDate ?? "");
+      showToast(t("dateSaved"));
+    } catch {
+      showToast(t("dateError"));
+    } finally {
+      setSavingDate(false);
+    }
+  }
+
   if (!profileId) return <EmptyState icon={Plane} title={t("signInTitle")} body={t("signInBody")} />;
 
   const total = phases?.reduce((s, p) => s + p.total, 0) ?? 0;
@@ -89,6 +114,18 @@ export function DepartureChecklist({ activeProfile, onNavigate }: { activeProfil
     <div className="space-y-4">
       <PageHeader icon={Plane} title={t("title")} subtitle={t("subtitle")} accent="emerald" />
       {error && <ErrorNote message={error} />}
+      {phases && <form className="flex flex-wrap items-end gap-3 rounded-overlay border border-slate-200 p-4 dark:border-slate-700" onSubmit={(event) => {
+        event.preventDefault();
+        void saveDepartureDate();
+      }}>
+        <label className="grid gap-1 text-sm font-semibold">
+          {t("dateLabel")}
+          <input type="date" value={departureDate} onChange={(event) => setDepartureDate(event.target.value)}
+            disabled={savingDate} className="rounded-control border border-slate-300 bg-transparent px-2 py-2 dark:border-slate-600" />
+        </label>
+        <Button type="submit" variant="outline" disabled={savingDate || departureDate === savedDepartureDate}>{t("saveDate")}</Button>
+        <p className="w-full text-sm text-[var(--sb-ink-muted)]">{t("dateHint")}</p>
+      </form>}
       {!phases && !error && <LoadingBlock label={t("loading")} />}
       {phases && phases.length === 0 && <EmptyState icon={Plane} title={t("empty")} />}
 

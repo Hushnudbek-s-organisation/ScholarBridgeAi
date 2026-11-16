@@ -229,7 +229,7 @@ test("Scholly mission only shows the end-of-day summary after completion", async
   expect(refreshed.ok()).toBe(true);
   expect(await refreshed.json()).toMatchObject({
     mission: { id: started.mission.id, status: "done" },
-    points: started.points + 10,
+    points: started.points + 3 + 10,
     justCompleted: false,
   });
   await mission.getByRole("button", { name: "Done for today" }).click();

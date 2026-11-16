@@ -1,6 +1,7 @@
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  aiEvaluations,
   applicationDocuments,
   applications,
   dailyMissions,
@@ -8,11 +9,13 @@ import {
   journeyDeadlines,
   schollyProfiles,
   studentProfiles,
+  testPlans,
   userDocuments,
   savedUniversities,
 } from "@/db/schema";
 import {
   SCHOLLY_PROFILE_FIELDS,
+  SCHOLLY_DEPARTURE_KIND,
   buildSchollyMissionHistory,
   schollyDayKey,
   type SchollyMissionContext,
@@ -21,6 +24,22 @@ import {
 } from "@/lib/scholly-missions";
 
 type Reader = Pick<typeof db, "select">;
+
+type SchollyProfileFields = Pick<typeof studentProfiles.$inferSelect,
+  "country" | "targetMajor" | "degreeLevel" | "gpa" | "gpaScale" | "ieltsScore" | "budgetAnnualUsd" | "preferredCountries"
+>;
+
+export function missingSchollyProfileFields(profile: SchollyProfileFields | undefined): SchollyProfileField[] {
+  const missing: SchollyProfileField[] = [];
+  if (!profile?.country?.trim()) missing.push("country");
+  if (!profile?.targetMajor?.trim()) missing.push("targetMajor");
+  if (!profile?.degreeLevel?.trim()) missing.push("degreeLevel");
+  if (profile?.gpa == null || !Number.isFinite(profile.gpa) || profile.gpa < 0 || profile.gpaScale == null || !Number.isFinite(profile.gpaScale) || profile.gpaScale <= 0 || profile.gpa > profile.gpaScale) missing.push("gpa");
+  if (profile?.ieltsScore == null || !Number.isFinite(profile.ieltsScore) || profile.ieltsScore < 0 || profile.ieltsScore > 9) missing.push("ieltsScore");
+  if (profile?.budgetAnnualUsd == null || profile.budgetAnnualUsd < 0) missing.push("budgetAnnualUsd");
+  if (!hasPreferredCountries(profile?.preferredCountries ?? null)) missing.push("preferredCountries");
+  return SCHOLLY_PROFILE_FIELDS.filter((field) => missing.includes(field));
+}
 
 export async function ensureSchollyProfile(profileId: number): Promise<boolean> {
   const [student] = await db.select({ preferredLocale: studentProfiles.preferredLocale })
@@ -61,16 +80,7 @@ export async function loadSchollyMissionContext(
     preferredCountries: studentProfiles.preferredCountries,
   }).from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
 
-  const missingProfileFields: SchollyProfileField[] = [];
-  if (!profile?.country?.trim()) missingProfileFields.push("country");
-  if (!profile?.targetMajor?.trim()) missingProfileFields.push("targetMajor");
-  if (!profile?.degreeLevel?.trim()) missingProfileFields.push("degreeLevel");
-  if (profile?.gpa == null || !Number.isFinite(profile.gpa) || profile.gpa < 0 || profile.gpaScale == null || !Number.isFinite(profile.gpaScale) || profile.gpaScale <= 0 || profile.gpa > profile.gpaScale) missingProfileFields.push("gpa");
-  if (profile?.ieltsScore == null || !Number.isFinite(profile.ieltsScore) || profile.ieltsScore < 0 || profile.ieltsScore > 9) missingProfileFields.push("ieltsScore");
-  if (profile?.budgetAnnualUsd == null || profile.budgetAnnualUsd < 0) missingProfileFields.push("budgetAnnualUsd");
-  if (!hasPreferredCountries(profile?.preferredCountries ?? null)) missingProfileFields.push("preferredCountries");
-
-  const [savedRows, documentRows, essayRows, checklistRows, appDeadlines, journeyDueDates] = await Promise.all([
+  const [savedRows, documentRows, essayRows, checklistRows, appDeadlines, journeyDueDates, departureRows, visaRows, ieltsPlans] = await Promise.all([
     reader.select({ id: savedUniversities.universityId }).from(savedUniversities)
       .where(eq(savedUniversities.profileId, profileId)).limit(500),
     reader.select({ id: userDocuments.id }).from(userDocuments)
@@ -83,7 +93,18 @@ export async function loadSchollyMissionContext(
     reader.select({ deadline: applications.deadline }).from(applications)
       .where(eq(applications.profileId, profileId)).limit(200),
     reader.select({ dueDate: journeyDeadlines.dueDate }).from(journeyDeadlines)
-      .where(and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.isCompleted, false))).limit(200),
+      .where(and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.isCompleted, false),
+        ne(journeyDeadlines.kind, SCHOLLY_DEPARTURE_KIND))).limit(200),
+    reader.select({ dueDate: journeyDeadlines.dueDate }).from(journeyDeadlines)
+      .where(and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.kind, SCHOLLY_DEPARTURE_KIND),
+        eq(journeyDeadlines.isCompleted, false))).orderBy(desc(journeyDeadlines.id)).limit(1),
+    reader.select({ id: aiEvaluations.id }).from(aiEvaluations)
+      .where(and(eq(aiEvaluations.profileId, profileId), eq(aiEvaluations.evaluationType, "Visa Practice"),
+        sql`${aiEvaluations.content} ~ '"answerCount"[[:space:]]*:[[:space:]]*[1-9][0-9]*'`))
+      .orderBy(desc(aiEvaluations.id)).limit(1),
+    reader.select({ currentScore: testPlans.currentScore, targetScore: testPlans.targetScore }).from(testPlans)
+      .where(and(eq(testPlans.profileId, profileId), eq(testPlans.testType, "ielts"), eq(testPlans.isActive, true)))
+      .orderBy(desc(testPlans.updatedAt), desc(testPlans.id)).limit(1),
   ]);
 
   const hasIncompleteRequiredDocuments = checklistRows.some((row) => row.isRequired
@@ -97,15 +118,24 @@ export async function loadSchollyMissionContext(
   const hasDeadlineWithinSevenDays = dates.some((due) => due >= day && due <= deadlineLimit);
   const sopWordCount = essayRows[0]?.wordCount ?? 0;
 
+  const validIeltsScore = (value: number | null | undefined): value is number =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 9;
+  const target = ieltsPlans[0]?.targetScore;
+  const current = ieltsPlans[0]?.currentScore ?? profile?.ieltsScore;
+  const departureDate = departureRows[0]?.dueDate;
+
   return {
     day,
     timezone: timeZone,
-    missingProfileFields: SCHOLLY_PROFILE_FIELDS.filter((field) => missingProfileFields.includes(field)),
+    missingProfileFields: missingSchollyProfileFields(profile),
     savedUniversityIds: savedRows.map((row) => row.id),
     uploadedDocumentIds: documentRows.map((row) => row.id),
     sopWordCount,
     hasDeadlineWithinSevenDays,
     hasIncompleteRequiredDocuments,
+    hasIeltsScoreGap: validIeltsScore(target) && validIeltsScore(current) && current < target,
+    hasDepartureWithinSixtyDays: Boolean(departureDate && departureDate >= day && departureDate <= addDays(day, 60)),
+    latestVisaPracticeId: visaRows[0]?.id ?? 0,
   };
 }
 
@@ -123,6 +153,7 @@ export function missionCriteriaFromContext(context: SchollyMissionContext): Scho
     savedUniversityIds: [...context.savedUniversityIds],
     uploadedDocumentIds: [...context.uploadedDocumentIds],
     sopWordCount: context.sopWordCount,
+    latestVisaPracticeId: context.latestVisaPracticeId ?? 0,
   };
 }
 
@@ -135,6 +166,7 @@ export function criteriaFromStored(value: unknown): SchollyMissionCriteria {
     missingFields: Array.isArray(row.missingFields) ? row.missingFields.filter((field): field is SchollyProfileField => SCHOLLY_PROFILE_FIELDS.includes(field as SchollyProfileField)) : [],
     savedUniversityIds: Array.isArray(row.savedUniversityIds) ? row.savedUniversityIds.filter((id): id is number => Number.isInteger(id) && id > 0) : [],
     uploadedDocumentIds: Array.isArray(row.uploadedDocumentIds) ? row.uploadedDocumentIds.filter((id): id is number => Number.isInteger(id) && id > 0) : [],
+    latestVisaPracticeId: typeof row.latestVisaPracticeId === "number" && Number.isSafeInteger(row.latestVisaPracticeId) ? Math.max(0, row.latestVisaPracticeId) : 0,
     sopWordCount: typeof row.sopWordCount === "number" && Number.isFinite(row.sopWordCount) ? Math.max(0, row.sopWordCount) : 0,
   };
 }

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { checklistItems, studentChecklist } from "@/db/schema";
+import { checklistItems, journeyDeadlines, studentChecklist, studentProfiles } from "@/db/schema";
 import { CHECKLIST_PHASES } from "@/lib/growth/defaults";
 import { bool, guardStudent, jsonError, readBody, serverError } from "@/lib/growth/api";
+import { dateOnly, isoDate } from "@/lib/journey/api";
+import { SCHOLLY_DEPARTURE_KIND } from "@/lib/scholly-missions";
 import { completionSummary } from "@/lib/calculations";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +19,12 @@ export async function GET(req: Request) {
   const g = await guardStudent(req, new URL(req.url).searchParams.get("profileId"));
   if (!g.ok) return g.response;
   try {
-    const [items, done] = await Promise.all([
+    const [items, done, departure] = await Promise.all([
       db.select().from(checklistItems).where(eq(checklistItems.isActive, true)).orderBy(asc(checklistItems.sortOrder), asc(checklistItems.id)),
       db.select().from(studentChecklist).where(eq(studentChecklist.profileId, g.value.profileId)),
+      db.select({ date: journeyDeadlines.dueDate }).from(journeyDeadlines)
+        .where(and(eq(journeyDeadlines.profileId, g.value.profileId), eq(journeyDeadlines.kind, SCHOLLY_DEPARTURE_KIND)))
+        .orderBy(desc(journeyDeadlines.id)).limit(1),
     ]);
     const doneAt = new Map(done.map((d) => [d.itemId, d.doneAt]));
     const phases = CHECKLIST_PHASES.map((phase) => {
@@ -34,6 +39,7 @@ export async function GET(req: Request) {
     );
     return NextResponse.json({
       phases,
+      departureDate: departure[0]?.date ?? null,
       done: progress.done,
       total: progress.total,
       percent: progress.pct,
@@ -64,5 +70,42 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, itemId, done: bool(b.value.done, true) });
   } catch (err) {
     return serverError("departure POST", err);
+  }
+}
+
+/** Set or clear the student's explicit departure date. */
+export async function PUT(req: Request) {
+  const body = await readBody(req);
+  if (!body.ok) return body.response;
+  const access = await guardStudent(req, body.value.profileId, { write: true });
+  if (!access.ok) return access.response;
+  const { profileId } = access.value;
+  const departureDate = body.value.departureDate;
+  const normalized = isoDate(dateOnly(departureDate));
+  if (departureDate !== null && (typeof departureDate !== "string" || departureDate !== normalized || departureDate.startsWith("0000-"))) {
+    return jsonError(400, "Departure date must be a valid calendar date", "invalid_departure_date");
+  }
+
+  try {
+    const saved = await db.transaction(async (tx) => {
+      const [profile] = await tx.select({ id: studentProfiles.id }).from(studentProfiles)
+        .where(eq(studentProfiles.id, profileId)).for("update").limit(1);
+      if (!profile) return false;
+      const filters = and(eq(journeyDeadlines.profileId, profileId), eq(journeyDeadlines.kind, SCHOLLY_DEPARTURE_KIND));
+      if (normalized === null) {
+        await tx.delete(journeyDeadlines).where(filters);
+      } else {
+        const updated = await tx.update(journeyDeadlines).set({ dueDate: normalized, isCompleted: false })
+          .where(filters).returning({ id: journeyDeadlines.id });
+        if (!updated.length) await tx.insert(journeyDeadlines).values({
+          profileId, kind: SCHOLLY_DEPARTURE_KIND, title: "Planned departure", dueDate: normalized,
+        });
+      }
+      return true;
+    });
+    if (!saved) return jsonError(404, "Profile not found", "not_found");
+    return NextResponse.json({ departureDate: normalized });
+  } catch (error) {
+    return serverError("departure PUT", error);
   }
 }
