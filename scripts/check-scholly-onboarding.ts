@@ -36,6 +36,29 @@ assert.equal(tone.patch.tone, "short");
 assert.equal(tone.patch.onboardingStep, "challenge");
 
 const now = new Date("2026-11-15T12:00:00Z");
+const knownStage = transitionSchollyOnboarding(
+  { ...inProgress, onboardingStep: "tone", onboardingAnswers: { reminderWindow: "evening" } },
+  { action: "tone", value: "short" },
+  now,
+  true,
+);
+if ("error" in knownStage) throw new Error(String(knownStage.error));
+assert.equal(knownStage.patch.onboardingState, "completed");
+assert.equal(knownStage.patch.onboardingStep, "complete");
+assert.equal(knownStage.patch.onboardedAt, now);
+assert.deepEqual(knownStage.patch.onboardingAnswers, { reminderWindow: "evening", tone: "short" });
+assert.equal(knownStage.event, "onboarding_completed");
+assert.deepEqual(knownStage.payload, { answeredQuestions: 2, challengeSkipped: "stage_known" });
+
+for (const onboardingState of ["skipped", "in_progress"] as const) {
+  const outdatedStep = { ...inProgress, onboardingState, onboardingStep: "challenge" as const };
+  const skippedChallenge = transitionSchollyOnboarding(outdatedStep, { action: "resume" }, now, true);
+  if ("error" in skippedChallenge) throw new Error(String(skippedChallenge.error));
+  assert.equal(skippedChallenge.patch.onboardingState, "completed");
+  assert.equal(skippedChallenge.patch.onboardingStep, "complete");
+  assert.equal(skippedChallenge.event, "onboarding_completed");
+}
+
 const completed = transitionSchollyOnboarding({ ...inProgress, onboardingStep: "challenge" }, { action: "challenge", value: "ielts" }, now);
 assert.ok(!("error" in completed));
 if ("error" in completed) throw new Error(String(completed.error));

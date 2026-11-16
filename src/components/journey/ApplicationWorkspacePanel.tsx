@@ -15,6 +15,7 @@ import { SectionTransition } from "@/components/motion";
 import { Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, daysLabel, toneForDays } from "@/components/ui/journey";
 import { Button } from "@/components/ui/Button";
 import { MotionButton } from "@/components/ui/MotionButton";
+import { announceSchollySubmission } from "@/lib/scholly-client-events";
 
 interface WorkspaceData {
   tabs: { id: string; label: string; icon: string }[];
@@ -208,6 +209,9 @@ export function ApplicationWorkspacePanel({
         return;
       }
       setMessage(t("awMarkedSubmitted"));
+      if (!data.application.submittedAt && json.status === "submitted" && json.id === data.application.id) {
+        announceSchollySubmission(profileId, data.application.id);
+      }
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("awSubmitError"));

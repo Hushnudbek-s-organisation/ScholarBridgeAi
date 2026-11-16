@@ -1835,12 +1835,51 @@ html[data-scholly-inspecting] body :where(*:not(.sb-scholly-inspector-bar, .sb-s
 .sb-scholly-confetti i[data-index="7"] { --x: 24px; --y: 13px; }
 .sb-scholly-confetti i[data-index="8"] { --x: -9px; --y: -25px; background: #ffe99e; }
 .sb-scholly[data-paused] * { animation-play-state: paused !important; }
+.sb-scholly-submission {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: #081329b3;
+}
+.sb-scholly-submission-card {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  max-width: 360px;
+  padding: 24px;
+  border: 1px solid #789bcd;
+  border-radius: 24px;
+  color: #f4f7ff;
+  background: #14264b;
+  text-align: center;
+  animation: sb-scholly-submission-in .2s ease-out both;
+}
+.sb-scholly-submission-card strong { font-size: clamp(1.3rem, 5vw, 1.8rem); }
+.sb-scholly-submission-card > span { color: #cddcf9; font-size: .92rem; }
+.sb-scholly-submission-art { position: relative; width: 112px; height: 120px; }
+.sb-scholly-submission-art img { width: 100%; height: 100%; object-fit: contain; }
+.sb-scholly-submission-art svg {
+  position: absolute;
+  inset: -6px 0 auto auto;
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+  color: #ffe6a3;
+  border: 1px solid #98774c;
+  border-radius: 50%;
+  background: #262445;
+}
+@keyframes sb-scholly-submission-in { from { opacity: 0; scale: .96; } to { opacity: 1; scale: 1; } }
 
 @media (prefers-reduced-motion: no-preference) {
   .sb-scholly:not([data-quiet]) [data-motion="idle"] .sb-scholly-portrait { animation: sb-scholly-float 3.2s ease-in-out infinite; }
   .sb-scholly:not([data-quiet]) [data-motion="idle"] [data-eyes="idle"] { animation: sb-scholly-blink 5.6s linear infinite; }
   .sb-scholly [data-motion="wave"] .sb-scholly-portrait-arm-right { animation: sb-scholly-raise .45s ease-in-out 2; }
   .sb-scholly [data-motion="wave"] .sb-scholly-portrait-arm-left { animation: none; }
+  .sb-scholly [data-motion="concern"] .sb-scholly-portrait-arm-left { animation: none; }
+  .sb-scholly [data-motion="concern"] .sb-scholly-portrait-arm-right { animation: sb-scholly-concern .8s ease-in-out; }
   .sb-scholly [data-motion="happy"] .sb-scholly-portrait-arm,
   .sb-scholly [data-motion="celebrate"] .sb-scholly-portrait-arm,
   .sb-scholly [data-motion="proud"] .sb-scholly-portrait-arm,
@@ -1864,6 +1903,7 @@ html[data-scholly-inspecting] body :where(*:not(.sb-scholly-inspector-bar, .sb-s
 @keyframes sb-scholly-blink { 0%, 97.8%, 100% { opacity: 0; } 98%, 99.8% { opacity: 1; } }
 @keyframes sb-scholly-raise { 20%, 75% { translate: 0 -12%; rotate: -36deg; } 45% { translate: 0 -20%; rotate: -64deg; } }
 @keyframes sb-scholly-raise-left { 20%, 75% { translate: 0 -12%; rotate: 36deg; } 45% { translate: 0 -20%; rotate: 64deg; } }
+@keyframes sb-scholly-concern { 50% { translate: 0 -7%; rotate: -24deg; } }
 @keyframes sb-scholly-dock { 50% { scale: 1.07; } }
 @keyframes sb-scholly-eye-turn { from { transform: rotate(0) translateX(4px); } to { transform: rotate(360deg) translateX(4px); } }
 @keyframes sb-scholly-eye-glow { from { opacity: .7; } to { opacity: 1; } }

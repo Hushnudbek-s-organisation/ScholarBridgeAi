@@ -22,12 +22,18 @@ assert.equal(canEnterSchollyMotion("idle", SCHOLLY_MOTION_PRIORITY.idle, SCHOLLY
 
 const companion = readFileSync(join(root, "src/components/SchollyCompanion.tsx"), "utf8");
 const model = readFileSync(join(root, "src/components/SchollyModel.tsx"), "utf8");
+const activityCues = readFileSync(join(root, "src/components/useSchollyActivityCues.ts"), "utf8");
 const styles = readFileSync(join(root, "src/app/globals.css"), "utf8");
 assert.match(companion, /animation === "easter"/);
 assert.match(companion, /animation === "celebrate" \|\| animation === "proud" \|\| animation === "levelup"/);
 assert.match(companion, /hardwareConcurrency <= 4/);
 assert.match(companion, /quiet \|\| keyboardOpen \|\| hidden/);
-assert.match(model, /\(dragging \|\| waving \|\| happy \|\| pointing\) &&/);
+assert.match(model, /const showArms = dragging \|\| waving \|\| happy \|\| pointing \|\| concerned/);
+assert.match(model, /\{showArms && <>/);
+assert.match(model, /concerned \? "#ffb869" : "#68efff"/);
+assert.match(activityCues, /element\.matches\("input, textarea"\) \|\| element\.isContentEditable/);
+assert.match(activityCues, /pending\.kind === "deadline" && userIsEditing\(\)/);
+assert.match(activityCues, /detail\.daysRemaining < 0 \|\| detail\.daysRemaining > 3/);
 assert.match(styles, /\[data-motion="point"\] \.sb-scholly-portrait-arm-right/);
 assert.match(styles, /prefers-reduced-motion: reduce[\s\S]*?\.sb-scholly-confetti \{ display: none; \}/);
 

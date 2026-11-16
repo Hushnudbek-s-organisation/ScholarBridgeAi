@@ -7,10 +7,15 @@ import {
   Circle, Compass, FileCheck2, ListChecks, Sparkles, Target,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { ProgressRing } from "@/components/ui/journey";
+import { ProgressRing, SourceTag } from "@/components/ui/journey";
+import { SCHOLLY_DEADLINE_NEAR, type SchollyDeadlineCue } from "@/lib/scholly-client-events";
+import { selectSchollyDailyGrant } from "@/lib/scholly-daily-grant";
 import type { SchollyMissionTheme, SchollyMissionType } from "@/lib/scholly-missions";
 import type { JourneyDashboard } from "./JourneyControlCenter";
+import SchollyDailyQuiz from "./SchollyDailyQuiz";
+import { SchollyWeeklyReport } from "./SchollyWeeklyReport";
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -18,6 +23,7 @@ function dateKey(date: Date) {
 
 type MissionView = {
   id: number;
+  day: string;
   type: SchollyMissionType;
   theme: SchollyMissionTheme;
   status: "pending" | "done" | "skipped";
@@ -45,7 +51,7 @@ function isCompletionDismissed(profileId: number, missionId: number) {
 
 const missionCopy = {
   uz: {
-    title: "Bugungi missiya", readiness: "Ariza tayyorligi", chosen: "Scholly tanladi",
+    title: "Bugungi missiya", dailyGrant: "Bugungi grant", readiness: "Ariza tayyorligi", chosen: "Scholly tanladi",
     theme: { plan: "Reja", writing: "Yozuv", language: "Til", search: "Qidiruv", speaking: "Speaking va viza", light: "Yengil kun", review: "Hafta yakuni" },
     finished: "Bugunga bo‘ldi!", dismiss: "Bugunni yakunlash", tomorrow: "Ertaga yangi missiya kutadi.", loading: "Missiya yuklanmoqda…", error: "Bugungi missiya hozir ochilmadi.",
     tasks: { fill_profile_fields: "Profil ma’lumotlarini to‘ldiring", save_universities: "Universitetlarni saqlang", upload_document: "Hujjat yuklang" },
@@ -54,7 +60,7 @@ const missionCopy = {
     done: "Bajarildi — ball hisoblandi", skipped: "Bugungi missiya o‘tkazib yuborildi", points: "ball", minutes: "daq", progress: "Bajarilish",
   },
   en: {
-    title: "Today’s mission", readiness: "Application readiness", chosen: "Chosen by Scholly",
+    title: "Today’s mission", dailyGrant: "Today’s scholarship", readiness: "Application readiness", chosen: "Chosen by Scholly",
     theme: { plan: "Planning", writing: "Writing", language: "Language", search: "Discovery", speaking: "Speaking and visas", light: "Light day", review: "Weekly review" },
     finished: "You’re done for today!", dismiss: "Done for today", tomorrow: "A new mission will be ready tomorrow.", loading: "Loading mission…", error: "Today's mission is unavailable right now.",
     tasks: { fill_profile_fields: "Complete profile details", save_universities: "Save universities", upload_document: "Upload a document" },
@@ -63,7 +69,7 @@ const missionCopy = {
     done: "Completed — points awarded", skipped: "Today's mission was skipped", points: "points", minutes: "min", progress: "Progress",
   },
   ru: {
-    title: "Задание на сегодня", readiness: "Готовность заявки", chosen: "Выбор Scholly",
+    title: "Задание на сегодня", dailyGrant: "Стипендия дня", readiness: "Готовность заявки", chosen: "Выбор Scholly",
     theme: { plan: "Планирование", writing: "Письмо", language: "Язык", search: "Поиск", speaking: "Разговорная практика и визы", light: "Лёгкий день", review: "Итоги недели" },
     finished: "На сегодня всё!", dismiss: "Завершить день", tomorrow: "Завтра вас ждёт новое задание.", loading: "Загрузка задания…", error: "Сегодняшнее задание сейчас недоступно.",
     tasks: { fill_profile_fields: "Заполните профиль", save_universities: "Сохраните университеты", upload_document: "Загрузите документ" },
@@ -163,6 +169,22 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
     return grouped;
   }, [data.deadlines]);
   const selectedDeadlines = deadlinesByDate.get(selectedDate) ?? [];
+  const nextDeadline = data.schollyDeadline === undefined
+    ? data.deadlines.find((deadline) =>
+        deadline.daysRemaining != null && deadline.daysRemaining >= 0 && deadline.daysRemaining <= 3
+      )
+    : data.schollyDeadline;
+  const deadlineId = nextDeadline?.id;
+  const deadlineDate = nextDeadline?.dueDate;
+  const deadlineDays = nextDeadline?.daysRemaining;
+  useEffect(() => {
+    if (!deadlineId || !deadlineDate || deadlineDays == null) return;
+    window.dispatchEvent(new CustomEvent<SchollyDeadlineCue>(SCHOLLY_DEADLINE_NEAR, {
+      detail: { id: deadlineId, dueDate: deadlineDate, daysRemaining: deadlineDays, profileId },
+    }));
+  }, [deadlineDate, deadlineDays, deadlineId, profileId]);
+
+  const dailyGrant = mission && selectSchollyDailyGrant(data.recommended.scholarships, mission.day);
   const recommendations = recommendationTab === "universities"
     ? data.recommended.universities.slice(0, 3).map((item) => ({ title: item.name, detail: [item.city, item.country].filter(Boolean).join(", "), tab: "universities" }))
     : recommendationTab === "scholarships"
@@ -245,6 +267,17 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
       </>}
     </section>
 
+    {dailyGrant && <section className="sb-overview-panel" aria-labelledby="sb-daily-grant-title">
+      <h2 id="sb-daily-grant-title" className="flex items-center gap-2">
+        <Bookmark aria-hidden className="h-5 w-5 shrink-0 text-indigo-500" />{copy.dailyGrant}
+      </h2>
+      <Link href={`/scholarships/${dailyGrant.id}?from=app`} className="mt-2 inline-block font-semibold underline-offset-4 hover:underline">
+        {dailyGrant.title}
+      </Link>
+      <p className="text-sm text-[var(--sb-ink-muted)]">{dailyGrant.provider}</p>
+      <SourceTag url={dailyGrant.sourceUrl} lastVerified={dailyGrant.lastVerifiedAt} verificationStatus={dailyGrant.verificationStatus} />
+    </section>}
+
     <div className="sbOverviewMiddleGrid">
       <section className="sb-overview-panel sbOverviewTasks">
         <h2><ListChecks aria-hidden />{t("overviewTasks")}</h2>
@@ -310,5 +343,8 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
         <strong>{item.title}</strong><small>{item.detail}</small>
       </button>)}</div> : <p className="sbOverviewEmpty">{t("overviewNoRecommendations")}</p>}
     </section>
+
+    <SchollyDailyQuiz profileId={profileId} />
+    <SchollyWeeklyReport profileId={profileId} onNavigate={onNavigate} />
   </>;
 }

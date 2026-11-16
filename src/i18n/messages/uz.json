@@ -92,8 +92,24 @@
     "minIelts": "Minimal IELTS",
     "officialSite": "Rasmiy sayt"
   },
+  "schollyQuiz": {
+    "title": "Kunlik mini test",
+    "instructions": "Har savolga bittadan javob tanlang. 5 ball oling, barcha javoblar to‘g‘ri bo‘lsa yana 3 ball qo‘shiladi.",
+    "loading": "Savollar yuklanmoqda…",
+    "loadError": "Testni yuklab bo‘lmadi.",
+    "retry": "Qayta urinish",
+    "submit": "Javoblarimni tekshirish",
+    "submitting": "Tekshirilmoqda…",
+    "submitError": "Javoblaringizni saqlab bo‘lmadi. Qaytadan urinib ko‘ring.",
+    "result": "{total} tadan {correct} ta to‘g‘ri · +{points} ball",
+    "yourAnswer": "Sizning javobingiz: {answer}",
+    "correctAnswer": "To‘g‘ri javob: {answer}"
+  },
   "scholly": {
     "onboardingTitle": "Bir nechta tezkor sozlama",
+    "deadlineNear": "{days, plural, =0 {Muddat bugun tugaydi} one {Muddatgacha 1 kun} other {Muddatgacha # kun}}",
+    "submissionMarked": "Ariza topshirildi",
+    "submissionHint": "Arizangiz kuzatuvda topshirilgan deb belgilandi.",
     "welcomeGeneric": "Salom! Senga foydali keyingi qadamni tanlashga yordam beraman.",
     "start": "Scholly'ni sozlash",
     "saveFailed": "Saqlab bo‘lmadi. Iltimos, qayta urinib ko‘r.",
@@ -119,7 +135,11 @@
     "documents": "Ariza hujjatlari",
     "later": "Keyinroq",
     "resume": "Sozlashni davom ettirish",
-    "questionCount": "{number}-savol / 3"
+    "questionCount": "{number}-savol / {total}",
+    "reminderPermissionAllow": "Brauzer bildirishnomalariga ruxsat berish",
+    "reminderPermissionHint": "Yetkazish yoqilgach, muhim muddat eslatmalarini olish uchun brauzer bildirishnomalariga ruxsat bering.",
+    "reminderPermissionFailed": "Brauzer bildirishnoma ruxsatini so‘rash oynasini ocha olmadi.",
+    "finishSetup": "Sozlashni yakunlash"
   },
   "theme": {
     "label": "Rang rejimi",

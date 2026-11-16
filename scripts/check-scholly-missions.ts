@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { selectSchollyDailyGrant } from "../src/lib/scholly-daily-grant";
 import {
   buildSchollyMissionHistory,
   missionProgress,
@@ -96,6 +97,27 @@ assert.deepEqual(missionProgress("sop_paragraph", 50, baseline, {
 assert.equal(missionProgress("sop_paragraph", 50, baseline, {
   ...baseline, sopWordCount: 170,
 }).complete, true);
+
+const verifiedGrant = {
+  id: 1, verificationStatus: "verified", sourceUrl: "https://university.test/scholarships/example",
+  lastVerifiedAt: "2026-11-15T00:00:00Z", deadlineDate: "2026-11-30",
+};
+const grants = [
+  { ...verifiedGrant, id: 5, verificationStatus: "unverified" },
+  { ...verifiedGrant, id: 2, sourceUrl: "https://university.test" },
+  { ...verifiedGrant, id: 4, deadlineDate: "2026-11-14" },
+  { ...verifiedGrant, id: 6, saved: true },
+  { ...verifiedGrant, id: 8, lastVerifiedAt: null },
+  { ...verifiedGrant, id: 9, sourceUrl: "javascript:void(0)" },
+  verifiedGrant,
+];
+assert.deepEqual(selectSchollyDailyGrant(grants, "2026-11-16"), verifiedGrant);
+assert.equal(selectSchollyDailyGrant(grants.slice(0, -1), "2026-11-16"), null);
+assert.equal(selectSchollyDailyGrant(grants, "2026-02-30"), null);
+const secondGrant = { ...verifiedGrant, id: 3 };
+const mondayGrant = selectSchollyDailyGrant([verifiedGrant, secondGrant], "2026-11-16");
+assert.deepEqual(selectSchollyDailyGrant([secondGrant, verifiedGrant], "2026-11-16"), mondayGrant);
+assert.notEqual(selectSchollyDailyGrant([verifiedGrant, secondGrant], "2026-11-17")?.id, mondayGrant?.id);
 
 const route = readFileSync(resolve(__dirname, "../src/app/api/scholly/mission/route.ts"), "utf8");
 assert.match(route, /requireProfileAccess/);

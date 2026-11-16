@@ -53,6 +53,7 @@ import {
 import { BrandingImage } from "./BrandingImage";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { NotificationBell } from "./NotificationBell";
+import { SchollyStreakChip } from "./SchollyStreakChip";
 import { ThemeSwitch, ThemeToggle } from "./ThemeToggle";
 import { CommandPalette, type PaletteItem } from "./CommandPalette";
 import {
@@ -840,7 +841,7 @@ export function Navbar({
             <span className="break-words text-base font-bold tracking-tight text-slate-900 dark:text-white">{activeTab === "dashboard" ? "ScholarBridgeAI" : tm("appName")}</span>
           </Button>
           {activeTab === "dashboard" && (
-            <Button variant="unstyled" className="sb-home-search" onClick={openSearch} aria-label={t("searchButton")} data-scholly-help="searchSite">
+            <Button variant="unstyled" className="sb-home-search hidden md:inline-flex" onClick={openSearch} aria-label={t("searchButton")} data-scholly-help="searchSite">
               <Search className="h-4 w-4 shrink-0" aria-hidden />
               <span>{t("searchButton")}</span>
             </Button>
@@ -855,6 +856,7 @@ export function Navbar({
               <Search className="h-[18px] w-[18px]" />
             </Button>
             {activeTab === "dashboard" && <div className="sb-home-language"><LanguageSwitcher onLocaleChange={onLocaleChange} compact /></div>}
+            {activeProfileId && <SchollyStreakChip key={activeProfileId} profileId={activeProfileId} />}
             <NotificationBell profileId={activeProfileId ?? null} />
             <span className="sb-shell-theme hidden sm:inline-flex">
               <ThemeSwitch />

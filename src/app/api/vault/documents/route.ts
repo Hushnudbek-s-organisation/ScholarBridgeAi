@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { premiumGate } from "@/lib/premium";
+import { recordDailyActivity } from "@/lib/gamification";
 
 export const dynamic = "force-dynamic";
 
@@ -180,7 +181,11 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ ok: true, document: doc });
     });
-    if(response.ok) await bumpCacheRevision(`documents:${profileId}`, "document created");
+    if (response.ok) {
+      const addedFile = text(b.value.fileUrl, 600) || text(b.value.fileName, 240) || Number(b.value.fileSizeBytes) > 0;
+      if (addedFile && g.value.session.profile.id === profileId) await recordDailyActivity(profileId);
+      await bumpCacheRevision(`documents:${profileId}`, "document created");
+    }
     return response;
   } catch (err) {
     return serverError("vault/documents POST", err);
@@ -202,6 +207,7 @@ export async function PATCH(req: Request) {
   const hasFile = Boolean(text(b.value.fileUrl,600) || text(b.value.fileName,240) || b.value.fileSizeBytes || b.value.mimeType);
   if(hasFile){const locked=await premiumGate(profileId,"documents_upload");if(locked)return locked;}
   try {
+    let uploadedFileChanged = false;
     const response = await db.transaction(async(tx)=>{
     if(hasFile){await tx.execute(sql`SELECT id FROM public.student_profiles WHERE id=${profileId} FOR SHARE`);await tx.execute(sql`SELECT id FROM public.subscriptions WHERE profile_id=${profileId} FOR SHARE`);const locked=await premiumGate(profileId,"documents_upload",tx);if(locked)return locked;}
     const [doc] = await tx
@@ -235,6 +241,9 @@ export async function PATCH(req: Request) {
     if(b.value.fileName!==undefined)patch.fileName=text(b.value.fileName,240);
     if(b.value.fileSizeBytes!==undefined)patch.fileSizeBytes=Number(b.value.fileSizeBytes)||null;
     if(b.value.mimeType!==undefined)patch.mimeType=text(b.value.mimeType,120);
+    uploadedFileChanged = Boolean(patch.fileName && patch.fileName !== doc.fileName)
+      || Boolean(patch.fileUrl && patch.fileUrl !== doc.fileUrl)
+      || (typeof patch.fileSizeBytes === "number" && patch.fileSizeBytes > 0 && patch.fileSizeBytes !== doc.fileSizeBytes);
     const contentChanged=["docType","title","verificationNote","fileUrl","fileName","fileSizeBytes","mimeType","expiresAt","issuedAt"].some(k=>k in patch && String(patch[k])!==String(doc[k as keyof typeof doc]));
     if(contentChanged||linksChanged){patch.verifiedAt=null;if(patch.status==null||patch.status==="verified")patch.status="needs_update";}
     const reviewed = patch.status === "verified" && g.value.session.profile.isAdmin;
@@ -249,7 +258,10 @@ export async function PATCH(req: Request) {
     }
     return NextResponse.json({ ok: true, id });
     });
-    if(response.ok) await bumpCacheRevision(`documents:${profileId}`, "document updated");
+    if (response.ok) {
+      if (uploadedFileChanged && g.value.session.profile.id === profileId) await recordDailyActivity(profileId);
+      await bumpCacheRevision(`documents:${profileId}`, "document updated");
+    }
     return response;
   } catch (err) {
     const code=(err as {cause?:{code?:string};code?:string}).cause?.code??(err as {code?:string}).code;

@@ -14,6 +14,7 @@ import { StudentProfile } from "./Navbar";
 import { RecLetterPanel } from "./RecLetterPanel";
 import { Button } from "@/components/ui/Button";
 import { notifyApplicationsChanged } from "@/lib/applicationEvents";
+import { announceSchollySubmission } from "@/lib/scholly-client-events";
 
 /**
  * Universal application tracker (#12) and private outcome history.
@@ -68,6 +69,7 @@ interface ApplicationRow {
   intakeTerm: string | null;
   deadline: string | null;
   status: string;
+  submittedAt: string | null;
   outcome: Outcome | null;
 }
 
@@ -224,6 +226,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
   };
 
   const setStatus = async (id: number, status: string) => {
+    const prior = rows.find(row => row.id === id);
     try {
       const res = await fetch("/api/applications", {
         method: "PATCH",
@@ -231,6 +234,12 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
         body: JSON.stringify({ id, status }),
       });
       if (!res.ok) throw new Error(t("statusError"));
+      if (activeProfileId && prior && !prior.submittedAt && prior.status !== "submitted" && status === "submitted") {
+        const saved = await res.json().catch(() => null);
+        if (saved?.application?.status === "submitted" && saved.application.submittedAt) {
+          announceSchollySubmission(activeProfileId, id);
+        }
+      }
       await load();
       notifyApplicationsChanged(activeProfile?.id ?? null);
     } catch (err) {

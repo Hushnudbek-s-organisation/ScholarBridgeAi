@@ -1,5 +1,6 @@
 import {
   computeDailyStreak,
+  computeSchollyStreak,
   isStreakActivity,
   DAILY_ACTIVITY_REASON,
   STREAK_MILESTONES,
@@ -94,5 +95,35 @@ const repeated = computeDailyStreak(
   now,
 );
 check("twelve actions in one day are one streak day", repeated.current === 1 && repeated.longest === 1);
+
+console.log("\nScholly freezes and restore");
+const january = (day: number) => `2026-01-${String(day).padStart(2, "0")}`;
+const activeDays = (length: number) => Array.from({ length }, (_, index) => january(index + 1));
+const snapshot = (day: number, length: number) => computeSchollyStreak(
+  activeDays(length), [], january(day), new Date(`${january(day)}T11:00:00Z`),
+);
+check("the seventh active day earns a freeze", snapshot(7, 7).freezes === 1);
+check("a 21-day run respects the two-freeze cap", snapshot(21, 21).freezes === 2);
+check("today's unused hours do not spend a freeze", snapshot(8, 7).current === 7 && snapshot(8, 7).freezes === 1);
+const frozen = snapshot(9, 7);
+check("a missed day spends a freeze and preserves the active-day count", frozen.current === 7 && frozen.freezes === 0);
+check("a frozen day is marked without claiming activity", frozen.recentDays.at(-2)?.frozen === true && !frozen.recentDays.at(-2)?.active);
+check("a repeated read does not spend another freeze", JSON.stringify(snapshot(9, 7)) === JSON.stringify(frozen));
+check("two misses with one freeze reset current but retain the record", snapshot(10, 7).current === 0 && snapshot(10, 7).longest === 7);
+check("two owned freezes bridge two missed days", snapshot(17, 14).current === 14 && snapshot(17, 14).freezes === 0);
+
+const repairMissions = [
+  { day: january(5), doneAt: new Date("2026-01-05T20:00:00Z") },
+  { day: january(6), doneAt: new Date("2026-01-06T19:30:00Z") },
+];
+const repair = computeSchollyStreak(activeDays(3), repairMissions, january(6), new Date("2026-01-06T20:00:00Z"));
+check("two completed missions within 24 hours restore a single missed day", repair.current === 5 && repair.longest === 5);
+check("the repaired day is marked without claiming real activity", repair.recentDays.at(-3)?.restored === true && !repair.recentDays.at(-3)?.active);
+const pendingRepair = computeSchollyStreak(activeDays(3), repairMissions, january(6), new Date("2026-01-06T19:00:00Z"));
+check("the second mission cannot restore a run before it completes", pendingRepair.current === 1 && pendingRepair.longest === 3);
+const lateRepair = computeSchollyStreak(activeDays(3), [
+  repairMissions[0], { ...repairMissions[1], doneAt: new Date("2026-01-06T20:00:01Z") },
+], january(6), new Date("2026-01-06T21:00:00Z"));
+check("two missions more than 24 hours apart do not restore a run", lateRepair.current === 2 && lateRepair.longest === 3);
 
 console.log(`\nstreak test passed (${passed} assertions)`);

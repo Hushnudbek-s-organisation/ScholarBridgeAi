@@ -76,6 +76,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
       const shell = new T.MeshPhysicalMaterial({ color: 0x1846c0, roughness: 0.34, metalness: 0.16, clearcoat: 0.5 });
       const visor = new T.MeshPhysicalMaterial({ color: 0x080f2e, roughness: 0.28, clearcoat: 0.8 });
       const cyan = new T.MeshBasicMaterial({ color: 0x68efff, transparent: true });
+      const mouthColor = cyan.clone();
       const purple = new T.MeshBasicMaterial({ color: 0xb779ff });
       function orb(parent: Three.Group, material: Three.Material, position: [number, number, number], scale: [number, number, number]) {
         const mesh = new T.Mesh(sphere, material);
@@ -90,13 +91,13 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
       const eyes = [-1, 1].map((side) => orb(head, cyan, [side * 0.30, -0.12, 0.673], [0.064, 0.111, 0.035]));
       const smileCurve = new T.QuadraticBezierCurve3(new T.Vector3(-0.126, -0.26, 0.687), new T.Vector3(0, -0.365, 0.687), new T.Vector3(0.126, -0.26, 0.687));
       const smileGeometry = new T.TubeGeometry(smileCurve, 24, 0.014, 8);
-      const smile = new T.Mesh(smileGeometry, cyan);
+      const smile = new T.Mesh(smileGeometry, mouthColor);
       const expression = new T.Group();
       expression.position.set(0, -0.29, 0.687);
       smile.position.set(0, 0.29, -0.687);
       expression.add(smile);
       head.add(expression);
-      const mouth = orb(head, cyan, [0, -0.29, 0.686], [0.105, 0.045, 0.025]);
+      const mouth = orb(head, mouthColor, [0, -0.29, 0.686], [0.105, 0.045, 0.025]);
       orb(robot, shell, [0, -0.67, 0], [0.59, 0.42, 0.39]);
       orb(robot, purple, [0, -0.655, 0.385], [0.17, 0.018, 0.014]);
       const fins = [-1, 1].map((side) => {
@@ -152,6 +153,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         const celebrating = pose === "celebrate" || pose === "proud" || pose === "levelup";
         const smiling = pose === "happy" || celebrating;
         const waving = pose === "wave";
+        const concerned = pose === "concern";
         const pointing = pose === "point";
         const dragging = pose === "drag";
         const dizzy = pose === "shake";
@@ -171,7 +173,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         if (nextBlink === 0 || time > nextBlink + .12) nextBlink = time + 4 + Math.random() * 3;
         const blink = dragging || dizzy || sleeping || (!reduced && idle && time >= nextBlink) ? .09 : 1;
         cyan.opacity = pose === "talk" || thinking ? .85 + .15 * Math.sin(elapsed * 7) : 1;
-        cyan.color.copy(pose === "concern" ? concernEyes : neutralEyes);
+        cyan.color.copy(concerned ? concernEyes : neutralEyes);
         eyes.forEach((eye, index) => {
           const angle = elapsed * 5 + index * Math.PI;
           eye.position.x = (index ? .30 : -.30) + (!reduced && thinking ? .055 * Math.cos(angle) : 0);
@@ -184,13 +186,15 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
           const flap = !reduced && dragging ? Math.sin(time * 10 * Math.PI) : 0;
           const raises = !reduced && (smiling || (waving && index === 1) || (pointing && index === 1));
           const wave = raises && waving ? Math.sin(elapsed * 2 * Math.PI * (2 / .9)) : 0;
-          fin.position.y = raises ? (pointing && index === 1 ? -.48 : -.25) : -.62 + flap * .11;
-          fin.rotation.z = side * (pointing && index === 1 ? -.16 : raises ? -1.08 + wave * .44 : .67 + flap * .56);
+          const gentleWave = !reduced && concerned && index === 1 ? Math.sin(Math.PI * Math.min(1, elapsed / .8)) : 0;
+          fin.position.y = raises ? (pointing && index === 1 ? -.48 : -.25) : -.62 + flap * .11 + gentleWave * .12;
+          fin.rotation.z = side * (pointing && index === 1 ? -.16 : raises ? -1.08 + wave * .44 : .67 + flap * .56 - gentleWave * .5);
         });
         const speaking = pose === "talk";
         smile.visible = !speaking;
         expression.scale.y = sleeping ? .2 : smiling ? 1.35 : 1;
         mouth.visible = speaking;
+        mouthColor.opacity = cyan.opacity;
         mouth.scale.y = reduced ? .045 : .032 + .022 * Math.sin(elapsed * 13);
         renderer.render(scene, camera);
       });
@@ -208,7 +212,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         renderer.setAnimationLoop(null);
         sphere.dispose();
         smileGeometry.dispose();
-        [shell, visor, cyan, purple].forEach((material) => material.dispose());
+        [shell, visor, cyan, purple, mouthColor].forEach((material) => material.dispose());
         renderer.dispose();
         renderer.forceContextLoss();
         renderer.domElement.remove();
@@ -223,26 +227,28 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
   const waving = motion === "wave";
   const happy = motion === "happy" || motion === "celebrate" || motion === "proud" || motion === "levelup";
   const pointing = motion === "point";
+  const concerned = motion === "concern";
+  const showArms = dragging || waving || happy || pointing || concerned;
 
   return (
     <span ref={host} className="sb-scholly-model" aria-hidden="true">
-      <span className="sb-scholly-portrait" data-dragging={dragging || undefined} data-dizzy={dizzy || undefined} data-arms={dragging || waving || happy || pointing || undefined}>
+      <span className="sb-scholly-portrait" data-dragging={dragging || undefined} data-dizzy={dizzy || undefined} data-arms={showArms || undefined}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/scholly.webp" alt="" draggable={false} />
-        {(dragging || waving || happy || pointing) && <>
+        {showArms && <>
           <span className="sb-scholly-portrait-arm sb-scholly-portrait-arm-left" />
           <span className="sb-scholly-portrait-arm sb-scholly-portrait-arm-right" />
         </>}
         {dizzy && <span className="sb-scholly-dizzy-head" />}
         <svg className="sb-scholly-lids sb-scholly-expression" viewBox="0 0 221 250">
-          {(dragging || dizzy || sleeping || happy || motion === "idle" || motion === "think" || motion === "talk") &&
+          {(dragging || dizzy || sleeping || happy || concerned || motion === "idle" || motion === "think" || motion === "talk") &&
             <g data-eyes={sleeping || dizzy || dragging ? "closed" : happy ? "happy" : motion}>
               <ellipse cx="91" cy="103" rx="14" ry="19" fill="#131f3f" />
               <ellipse cx="166" cy="99" rx="14" ry="19" fill="#122044" />
               {happy
                 ? <path d="M84 104l7-7 7 7m61-4l7-7 7 7" stroke="#68efff" strokeWidth="3" fill="none" />
-                : motion === "think" || motion === "talk"
-                  ? <g fill="#68efff"><circle cx="91" cy="103" r="5" /><circle cx="166" cy="99" r="5" /></g>
+                : motion === "think" || motion === "talk" || concerned
+                  ? <g fill={concerned ? "#ffb869" : "#68efff"}><circle cx="91" cy="103" r="5" /><circle cx="166" cy="99" r="5" /></g>
                   : <path d="M85 103q6 4 12 0m63-4q6 4 12 0" stroke="#68efff" strokeWidth="3" strokeLinecap="round" fill="none" />}
             </g>}
           {(motion === "talk" || happy || sleeping) && <>

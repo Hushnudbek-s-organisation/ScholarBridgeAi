@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, exists } from "drizzle-orm";
 import { db } from "@/db";
-import { schollyProfiles, studentProfiles } from "@/db/schema";
+import { applications, savedUniversities, schollyProfiles, studentProfiles } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { readJsonBody } from "@/lib/request";
@@ -8,7 +8,7 @@ import { logSchollyEvent } from "@/lib/scholly-events";
 import { transitionSchollyOnboarding, type SchollyOnboardingSnapshot } from "@/lib/scholly-onboarding";
 import { isSchollyLocale, isSupportedTimeZone } from "@/lib/scholly-profile";
 
-function publicProfile(row: typeof schollyProfiles.$inferSelect) {
+function publicProfile(row: typeof schollyProfiles.$inferSelect, stageKnown: boolean) {
   return {
     namePref: row.namePref,
     nameConfirmed: row.nameConfirmed,
@@ -20,11 +20,24 @@ function publicProfile(row: typeof schollyProfiles.$inferSelect) {
     onboardingStep: row.onboardingStep,
     onboardingAnswers: row.onboardingAnswers,
     onboardedAt: row.onboardedAt,
+    stageKnown,
   };
 }
 
 async function ensureProfile(profileId: number) {
-  const [student] = await db.select({ preferredLocale: studentProfiles.preferredLocale })
+  const [student] = await db.select({
+    preferredLocale: studentProfiles.preferredLocale,
+    degreeLevel: studentProfiles.degreeLevel,
+    targetMajor: studentProfiles.targetMajor,
+    country: studentProfiles.country,
+    preferredCountries: studentProfiles.preferredCountries,
+    studyInterests: studentProfiles.studyInterests,
+    gpa: studentProfiles.gpa,
+    hasSavedUniversity: exists(db.select({ id: savedUniversities.id })
+      .from(savedUniversities).where(eq(savedUniversities.profileId, profileId))),
+    hasApplication: exists(db.select({ id: applications.id })
+      .from(applications).where(eq(applications.profileId, profileId))),
+  })
     .from(studentProfiles).where(eq(studentProfiles.id, profileId)).limit(1);
   if (!student) return null;
   await db.insert(schollyProfiles).values({
@@ -32,7 +45,16 @@ async function ensureProfile(profileId: number) {
     lang: student.preferredLocale === "ru" || student.preferredLocale === "en" ? student.preferredLocale : "uz",
   }).onConflictDoNothing({ target: schollyProfiles.userId });
   const [row] = await db.select().from(schollyProfiles).where(eq(schollyProfiles.userId, profileId)).limit(1);
-  return row ?? null;
+  if (!row) return null;
+  // The same profile signals used by the dashboard identify the move from
+  // Discover to Match. A saved university or tracked application is direct
+  // evidence of progress even when an older profile still has missing fields.
+  const stageKnown = Boolean(
+    student.degreeLevel?.trim() || student.targetMajor?.trim() || student.country?.trim() ||
+    student.preferredCountries?.trim() || student.studyInterests?.trim() || Number(student.gpa) > 0 ||
+    student.hasSavedUniversity || student.hasApplication,
+  );
+  return { row, stageKnown };
 }
 
 export async function GET(req: Request) {
@@ -41,9 +63,9 @@ export async function GET(req: Request) {
     const access = await requireProfileAccess(req, searchParams.get("profileId"));
     if (!access.ok) return privateNoStoreJson({ error: access.error, code: access.code }, { status: access.status });
     if (access.targetId == null) return privateNoStoreJson({ error: "Profile not found" }, { status: 404 });
-    const row = await ensureProfile(access.targetId);
-    if (!row) return privateNoStoreJson({ error: "Profile not found" }, { status: 404 });
-    return privateNoStoreJson({ profile: publicProfile(row) });
+    const profile = await ensureProfile(access.targetId);
+    if (!profile) return privateNoStoreJson({ error: "Profile not found" }, { status: 404 });
+    return privateNoStoreJson({ profile: publicProfile(profile.row, profile.stageKnown) });
   } catch (error) {
     console.error("GET /api/scholly/profile error:", error);
     return privateNoStoreJson({ error: "Scholly profile is unavailable" }, { status: 500 });
@@ -77,7 +99,7 @@ export async function POST(req: Request) {
         tone: row.tone,
         onboardingAnswers: row.onboardingAnswers as Record<string, unknown>,
       };
-      const transition = transitionSchollyOnboarding(current, body, new Date());
+      const transition = transitionSchollyOnboarding(current, body, new Date(), initial.stageKnown);
       if ("error" in transition) return { error: transition.error, status: 409 as const };
 
       const [updated] = await tx.update(schollyProfiles)
@@ -89,8 +111,11 @@ export async function POST(req: Request) {
         ))
         .returning();
       if (!updated) return { error: "Onboarding changed; reload and continue", status: 409 as const };
+      if (body.action === "tone" && transition.event === "onboarding_completed") {
+        await logSchollyEvent(access.targetId!, "onboarding_step", { step: "tone", value: updated.tone }, tx);
+      }
       await logSchollyEvent(access.targetId!, transition.event, transition.payload, tx);
-      return { profile: publicProfile(updated) };
+      return { profile: publicProfile(updated, initial.stageKnown) };
     });
 
     if ("error" in outcome) return privateNoStoreJson({ error: outcome.error, code: "invalid_onboarding_transition" }, { status: outcome.status });
@@ -125,7 +150,7 @@ export async function PUT(req: Request) {
       updatedAt: new Date(),
     }).where(eq(schollyProfiles.userId, access.targetId)).returning();
     if (!updated) return privateNoStoreJson({ error: "Scholly preferences could not be saved" }, { status: 500 });
-    return privateNoStoreJson({ profile: publicProfile(updated) });
+    return privateNoStoreJson({ profile: publicProfile(updated, existing.stageKnown) });
   } catch (error) {
     console.error("PUT /api/scholly/profile error:", error);
     return privateNoStoreJson({ error: "Scholly preferences could not be saved" }, { status: 500 });

@@ -254,7 +254,7 @@ export async function GET(req: Request) {
         tab: "workspace",
       }));
 
-    const deadlines = [
+    const allDeadlines = [
       ...applicationDeadlines,
       ...deadlineRows.map((d) => ({
         id: `jd-${d.id}`,
@@ -265,8 +265,15 @@ export async function GET(req: Request) {
         tab: tabForKind(d.kind),
       })),
     ]
-      .sort((a, b) => (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999))
-      .slice(0, 8);
+      .sort((a, b) => (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999));
+    const deadlines = allDeadlines.slice(0, 8);
+    const closedApplications = new Set(appRows
+      .filter((app) => ["submitted", "interview", "decision", "withdrawn"].includes(app.status))
+      .map((app) => `app-${app.id}`));
+    const schollyDeadline = allDeadlines.find((item) =>
+      item.daysRemaining != null && item.daysRemaining >= 0 && item.daysRemaining <= 3
+      && !closedApplications.has(item.id)
+    ) ?? null;
 
     // ---- Profile readiness (spec §3, §13) --------------------------------
     // ONE mapped profile row feeds every scoring engine on this page: the
@@ -398,6 +405,7 @@ export async function GET(req: Request) {
       journey,
       nextSteps,
       deadlines,
+      schollyDeadline,
       applications: appProgress,
       // Full-profile activity counts power the three starter tasks. The
       // recommendation arrays are intentionally short and cannot answer this.
