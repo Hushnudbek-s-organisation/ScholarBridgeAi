@@ -15,6 +15,7 @@ export const SCHOLLY_EVENT_TYPES = [
   "mission_done",
   "mission_skipped",
   "mission_another",
+  "quiz_done",
 ] as const;
 export type SchollyEventType = (typeof SCHOLLY_EVENT_TYPES)[number];
 

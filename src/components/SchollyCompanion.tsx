@@ -2,9 +2,11 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowUp, PanelBottom, RotateCcw, Scan, X } from "lucide-react";
+import { ArrowUp, GraduationCap, PanelBottom, RotateCcw, Scan, X } from "lucide-react";
+import { useSchollyActivityCues } from "./useSchollyActivityCues";
 import { SchollyModel } from "./SchollyModel";
 import { SchollyInspector } from "./SchollyInspector";
+import { SchollyReminderPermission } from "./SchollyReminderPermission";
 import { explainPageElement } from "@/lib/scholly-page-guide";
 import { useSchollyMotion, type SchollyMotion } from "./useSchollyMotion";
 import { createSchollyShakeDetector } from "@/lib/scholly-shake";
@@ -24,6 +26,7 @@ type SchollyOnboardingProfile = {
   onboardingStep: "name" | "reminder" | "tone" | "challenge" | "complete";
   onboardingAnswers: Record<string, unknown>;
   onboardedAt: string | null;
+  stageKnown: boolean;
 };
 
 type BrowserModel = {
@@ -137,6 +140,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
     || (activeTab === "materials" && activePane === "documents");
   const live: SchollyMotion = drag ? "drag" : dizzy ? "shake" : selecting ? "point" : pending ? "think" : "idle";
   const { state: motion, setState: playMotion, hidden } = useSchollyMotion(live, quiet, hasDock && placement === "dock");
+  const activityCue = useSchollyActivityCues(profileId, quiet || hidden || keyboardOpen || open, motion, playMotion);
   useEffect(() => {
     const celebrateMission = () => { playMotion("happy"); };
     window.addEventListener("scholly:mission-done", celebrateMission);
@@ -429,6 +433,9 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
       : undefined;
 
   const animation = keyboardOpen ? "idle" : motion;
+  const deadlineCue = animation === "concern" && activityCue?.kind === "deadline" && !open
+    ? st("deadlineNear", { days: activityCue.daysRemaining }) : null;
+  const submissionCue = animation === "proud" && activityCue?.kind === "submission";
   const lowPower = typeof navigator === "undefined" || !navigator.hardwareConcurrency || navigator.hardwareConcurrency <= 4;
   const celebrating = animation === "celebrate" || animation === "proud" || animation === "levelup";
   const confettiCount = lowPower ? 12 : 24;
@@ -454,6 +461,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         {animation === "shake" && <span className="sb-scholly-dizzy-text" aria-hidden="true">{t.dizzy}</span>}
         {animation === "sleep" && <span className="sb-scholly-sleep" aria-hidden="true">Zz</span>}
         {animation === "wave" && !open && <span className="sb-scholly-dizzy-text sb-scholly-mood-text" aria-hidden="true">{t.hello}</span>}
+        {deadlineCue && <span className="sb-scholly-dizzy-text sb-scholly-mood-text" aria-hidden="true">{deadlineCue}</span>}
         {animation === "happy" && <span className="sb-scholly-confetti" aria-hidden="true">
           {Array.from({ length: lowPower ? 4 : 8 }, (_, index) => <i key={index} data-index={index + 1} />)}
         </span>}
@@ -466,7 +474,18 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         </span>}
         {animation === "easter" && <span className="sb-scholly-dizzy-text sb-scholly-mood-text" aria-hidden="true">{t.easter}</span>}
       </button>
-      <span className="sr-only" role="status">{animation === "shake" ? t.dizzy : animation === "easter" ? t.easter : animation === "wave" && !open ? t.hello : ""}</span>
+      {submissionCue && <div className="sb-scholly-submission" aria-hidden="true">
+        <div className="sb-scholly-submission-card">
+          <div className="sb-scholly-submission-art">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/scholly.webp" alt="" draggable={false} />
+            <GraduationCap aria-hidden="true" />
+          </div>
+          <strong>{st("submissionMarked")}</strong>
+          <span>{st("submissionHint")}</span>
+        </div>
+      </div>}
+      <span className="sr-only" role="status">{submissionCue ? `${st("submissionMarked")} ${st("submissionHint")}` : deadlineCue ?? (animation === "shake" ? t.dizzy : animation === "easter" ? t.easter : animation === "wave" && !open ? t.hello : "")}</span>
       <SchollyInspector selecting={selecting} selected={chatOpen ? selection?.element ?? null : null}
         instruction={t.pick} cancel={t.cancel} onCancel={() => {
           returningFromPicker.current = true;
@@ -508,19 +527,25 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
                 </form>}
               </>}
               {schollyProfile.onboardingStep === "reminder" && <>
-                <p><small>{st("questionCount", { number: onboardingQuestion })}</small><br />{st("reminderQuestion")}</p>
+                <p><small>{st("questionCount", { number: onboardingQuestion, total: schollyProfile.stageKnown ? 2 : 3 })}</small><br />{st("reminderQuestion")}</p>
                 <div className="sb-scholly-onboarding-options">
                   {([["before_school", "beforeSchool"], ["after_school", "afterSchool"], ["evening", "evening"], ["not_needed", "notNeeded"]] as const).map(([value, label]) => <button key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "reminder", value })}>{st(label)}</button>)}
                 </div>
               </>}
               {schollyProfile.onboardingStep === "tone" && <>
-                <p><small>{st("questionCount", { number: onboardingQuestion })}</small><br />{st("toneQuestion")}</p>
+                {schollyProfile.reminderWindow && schollyProfile.reminderWindow !== "not_needed" && (
+                  <SchollyReminderPermission disabled={onboardingBusy} />
+                )}
+                <p><small>{st("questionCount", { number: onboardingQuestion, total: schollyProfile.stageKnown ? 2 : 3 })}</small><br />{st("toneQuestion")}</p>
                 <div className="sb-scholly-onboarding-options">
                   {([["friendly", "friendly"], ["short", "short"]] as const).map(([value, label]) => <button key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "tone", value })}>{st(label)}</button>)}
                 </div>
               </>}
-              {schollyProfile.onboardingStep === "challenge" && <>
-                <p><small>{st("questionCount", { number: onboardingQuestion })}</small><br />{st("challengeQuestion")}</p>
+              {schollyProfile.onboardingStep === "challenge" && schollyProfile.stageKnown && (
+                <button type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "resume" })}>{st("finishSetup")}</button>
+              )}
+              {schollyProfile.onboardingStep === "challenge" && !schollyProfile.stageKnown && <>
+                <p><small>{st("questionCount", { number: onboardingQuestion, total: 3 })}</small><br />{st("challengeQuestion")}</p>
                 <div className="sb-scholly-onboarding-options">
                   {([["university", "university"], ["grant", "grant"], ["ielts", "ielts"], ["documents", "documents"]] as const).map(([value, label]) => <button key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "challenge", value })}>{st(label)}</button>)}
                 </div>

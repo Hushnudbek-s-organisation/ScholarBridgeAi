@@ -66,6 +66,7 @@ export interface JourneyDashboard {
     tab: string;
   }[];
   deadlines: { id: string; kind: string; title: string; dueDate: string; daysRemaining: number | null; tab: string }[];
+  schollyDeadline?: JourneyDashboard["deadlines"][number] | null;
   applications: { total: number; preparing: number; submitted: number; decision: number };
   /** Optional for older cached/test payloads; live API returns full counts. */
   activity?: { savedUniversities: number; savedScholarships: number; applications: number };
@@ -765,6 +766,7 @@ export function JourneyControlCenter({
   return (
     <div className="space-y-5" data-testid="journey-dashboard">
       <DashboardOverview
+        key={data.profile.id}
         data={data}
         primaryTitle={primaryStep ? nextStepTitle(primaryStep) : t("ccNothingOutstanding")}
         primaryDetail={primaryStep ? nextStepDetail(primaryStep) : t("ccNothingOutstandingHint")}

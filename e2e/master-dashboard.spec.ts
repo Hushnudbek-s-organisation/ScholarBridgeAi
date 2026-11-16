@@ -207,3 +207,115 @@ test("dashboard data error keeps navigation and retry functional", async ({page}
   await retry.click();
   await expect(page.getByTestId("journey-dashboard")).toBeVisible();
 });
+
+test("Scholly mission only shows the end-of-day summary after completion", async ({ page }) => {
+  test.setTimeout(120_000);
+  await dashboard(page, "en", "dark", 390);
+  const mission = page.getByRole("region", { name: "Today’s mission" });
+  await expect(mission.getByText("Chosen by Scholly")).toBeVisible();
+  await expect(mission.getByText("Complete profile details", { exact: true })).toBeVisible();
+  await expect(mission.getByRole("heading", { name: "You’re done for today!" })).toHaveCount(0);
+  const before = await page.request.get("/api/scholly/mission");
+  expect(before.ok()).toBe(true);
+  const started = await before.json();
+  expect(started.mission.status).toBe("pending");
+
+  const profile = await page.request.put(`/api/profiles/${fixtures.studentId}`, { data: { ieltsScore: 6.5 } });
+  expect(profile.ok()).toBe(true);
+  await mission.getByRole("button", { name: "Check progress" }).click();
+  await expect(mission.getByRole("heading", { name: "You’re done for today!" })).toBeVisible();
+  await expect(mission.getByText(/\+10 points/)).toBeVisible();
+  const refreshed = await page.request.post("/api/scholly/mission", { data: { action: "refresh" } });
+  expect(refreshed.ok()).toBe(true);
+  expect(await refreshed.json()).toMatchObject({
+    mission: { id: started.mission.id, status: "done" },
+    points: started.points + 10,
+    justCompleted: false,
+  });
+  await mission.getByRole("button", { name: "Done for today" }).click();
+  await expect(mission.getByRole("heading", { name: "Today’s mission" })).toBeFocused();
+  await page.reload();
+  await expect(mission.getByText("Completed — points awarded")).toBeVisible();
+  await expect(mission.getByRole("heading", { name: "You’re done for today!" })).toHaveCount(0);
+});
+
+test("Scholly streak opens an accessible calendar next to the notification bell", async ({ page }) => {
+  test.setTimeout(120_000);
+  const snapshot = page.waitForResponse(response => new URL(response.url()).pathname === "/api/scholly/streak");
+  await dashboard(page, "en", "dark", 390);
+  const response = await snapshot;
+  expect(response.ok()).toBe(true);
+  const { streak } = await response.json();
+  const header = page.getByRole("banner");
+  const chip = header.getByRole("button", { name: new RegExp(`^Daily streak · ${streak.current} day`) });
+  await expect(chip).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await chip.click();
+  const sheet = page.getByRole("dialog", { name: "Daily streak" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText("Longest", { exact: true })).toBeVisible();
+  await expect(sheet.getByText("Freezes left", { exact: true })).toBeVisible();
+  await expect(sheet.getByRole("list", { name: "Activity during the last seven days" }).getByRole("listitem")).toHaveCount(7);
+  await expect(sheet.locator("li[aria-current='date']")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(sheet).not.toBeVisible();
+  await expect(chip).toBeFocused();
+});
+
+test("Scholly quiz awards points once and the weekly report loads on demand", async ({ page }) => {
+  test.setTimeout(120_000);
+  await dashboard(page, "en", "dark", 390);
+  const rewardsUrl = `/api/gamification?profileId=${fixtures.studentId}`;
+  const before = await page.request.get(rewardsUrl);
+  expect(before.ok()).toBe(true);
+  const { totalPoints } = await before.json();
+
+  const quizRequest = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/scholly/quiz" && response.request().method() === "GET"
+  );
+  const quizSummary = page.getByText("Daily mini quiz", { exact: true });
+  await quizSummary.click();
+  const quiz = quizSummary.locator("..");
+  const quizResponse = await quizRequest;
+  expect(quizResponse.ok()).toBe(true);
+  const { day, questions, result: initialResult } = await quizResponse.json();
+  expect(initialResult).toBeNull();
+  expect(questions).toHaveLength(3);
+  const answers = questions.map((question: { id: string }) => {
+    expect(question).not.toHaveProperty("correctIndex");
+    return { questionId: question.id, selectedIndex: 0 };
+  });
+  for (const group of await quiz.locator("fieldset").all()) {
+    await group.getByRole("radio").first().check();
+  }
+  const submitResponse = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/scholly/quiz" && response.request().method() === "POST"
+  );
+  await quiz.getByRole("button", { name: "Check my answers" }).click();
+  const submitted = await submitResponse;
+  expect(submitted.ok()).toBe(true);
+  const { result } = await submitted.json();
+  expect([5, 8]).toContain(result.points);
+  await expect(quiz.getByRole("status")).toContainText(`+${result.points} points`);
+  const repeat = await page.request.post("/api/scholly/quiz", {
+    data: { profileId: fixtures.studentId, locale: "en", day, answers },
+  });
+  expect(repeat.ok()).toBe(true);
+  expect((await repeat.json()).result).toEqual(result);
+  const after = await page.request.get(rewardsUrl);
+  expect(after.ok()).toBe(true);
+  expect((await after.json()).totalPoints).toBe(totalPoints + result.points);
+
+  const reportRequest = page.waitForResponse(response => new URL(response.url()).pathname === "/api/scholly/weekly-report");
+  const reportSummary = page.getByText("Your week with Scholly", { exact: true });
+  await reportSummary.click();
+  const reportResponse = await reportRequest;
+  expect(reportResponse.ok()).toBe(true);
+  const { report, nextReportAt } = await reportResponse.json();
+  expect(Number.isFinite(Date.parse(nextReportAt))).toBe(true);
+  if (report) {
+    await expect(reportSummary.locator("..").getByText("Missions completed", { exact: true })).toBeVisible();
+  } else {
+    await expect(reportSummary.locator("..").getByText("Your first report will be ready", { exact: false })).toBeVisible();
+  }
+});

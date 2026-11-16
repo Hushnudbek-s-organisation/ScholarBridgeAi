@@ -92,8 +92,24 @@
     "minIelts": "Minimum IELTS",
     "officialSite": "Official site"
   },
+  "schollyQuiz": {
+    "title": "Daily mini quiz",
+    "instructions": "Choose one answer per question. Earn 5 points, plus 3 for a perfect score.",
+    "loading": "Loading questions…",
+    "loadError": "The quiz could not load.",
+    "retry": "Try again",
+    "submit": "Check my answers",
+    "submitting": "Checking…",
+    "submitError": "Your answers could not be saved. Try again.",
+    "result": "{correct} of {total} correct · +{points} points",
+    "yourAnswer": "Your answer: {answer}",
+    "correctAnswer": "Correct answer: {answer}"
+  },
   "scholly": {
     "onboardingTitle": "A few quick preferences",
+    "deadlineNear": "{days, plural, =0 {Due today} one {Due in 1 day} other {Due in # days}}",
+    "submissionMarked": "Application marked as submitted",
+    "submissionHint": "Your application tracker has been updated.",
     "welcomeGeneric": "Hi there! I’ll help you choose a useful next step.",
     "start": "Set up Scholly",
     "saveFailed": "That could not be saved. Please try again.",
@@ -119,7 +135,11 @@
     "documents": "Application documents",
     "later": "Later",
     "resume": "Continue setup",
-    "questionCount": "Question {number} of 3"
+    "questionCount": "Question {number} of {total}",
+    "reminderPermissionAllow": "Allow browser notifications",
+    "reminderPermissionHint": "Allow browser notifications for deadline reminders once delivery is available.",
+    "reminderPermissionFailed": "Your browser couldn’t open the notification permission prompt.",
+    "finishSetup": "Finish setup"
   },
   "theme": {
     "label": "Colour theme",

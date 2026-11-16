@@ -8,6 +8,7 @@ import { premiumGate } from "@/lib/premium";
 import { readJsonBody, clampString, optionalNumber, positiveInt } from "@/lib/request";
 import { analyzeEssay, compareVersions, countWords, type EssayType } from "@/lib/essay";
 import { scoreConversationBehaviors } from "@/lib/ai/behaviorScore";
+import { recordDailyActivity } from "@/lib/gamification";
 
 /**
  * Essay versions + rubric (#8).
@@ -178,6 +179,9 @@ export async function POST(req: Request) {
       })
       .returning();
 
+    if (essayType === "sop" && last?.content !== content && access.session.profile.id === profileId) {
+      await recordDailyActivity(profileId);
+    }
     const behaviorSignals = await behaviorSignalsPromise;
     return NextResponse.json({
       version: row,

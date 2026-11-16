@@ -10,6 +10,7 @@ import { enforceFreeCap } from "@/lib/planLimits";
 import { localeFromRequest } from "@/lib/engineText";
 import { localizeUniversityRow } from "@/lib/catalogLocalizer";
 import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
+import { recordDailyActivity } from "@/lib/gamification";
 
 const SAVED_UNIVERSITY_STATUSES = new Set([
   "Shortlisted",
@@ -149,6 +150,7 @@ export async function POST(req: Request) {
       status,
       notes,
     }).returning();
+    if (access.session.profile.id === profileId) await recordDailyActivity(profileId);
     await invalidateDashboardRecommendationsForProfile(profileId);
 
     return NextResponse.json({ saved: newSaved });

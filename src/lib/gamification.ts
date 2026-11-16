@@ -1,7 +1,10 @@
 import { randomInt } from "crypto";
 import { eq, and, desc, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { DAILY_ACTIVITY_REASON, computeDailyStreak, isStreakActivity } from "@/lib/streak";
+import { DAILY_ACTIVITY_REASON, isStreakActivity } from "@/lib/streak";
+import { loadSchollyStreak } from "@/lib/scholly-streak.server";
+import { schollyTimeZone } from "@/lib/scholly-mission-store.server";
+import { isSupportedTimeZone } from "@/lib/scholly-profile";
 import { profileCompletenessRatio, type ChancingProfile } from "@/lib/chancing";
 import {
   userPoints,
@@ -117,16 +120,11 @@ interface AwardResult {
  * WHY: the daily streak is derived from `points_ledger`, but points are granted
  * once per entity (one award per lesson id, one per quiz id). A student who
  * re-watches a lesson or retakes a quiz — the normal way to study — earned no
- * new points, so the day was invisible to the streak and the counter froze at
- * the number of distinct days on which they did something NEW. That is why the
- * feature looked broken: 14 of the 15 profiles with any activity had exactly one
- * counted day, the day they signed up.
+ * new points, so the day was invisible to the streak unless the student did
+ * something new.
  *
  * The marker is a 0-point ledger row (it must never inflate totals or the
- * leaderboard) written at most once per profile per UTC day, so a long video
- * session or a page that retries cannot flood the table. The streak itself is
- * still projected into the caller's calendar day at read time, so the marker's
- * timestamp — not the dedupe window — decides which day it lands on.
+ * leaderboard) written at most once per profile per local 04:00 day.
  *
  * Returns true when a new marker was written.
  */
@@ -134,6 +132,9 @@ export async function recordDailyActivity(profileId: number, executor?: Executor
   if (!Number.isFinite(profileId) || profileId <= 0) return false;
   try {
     if (!executor) return await withProfileLock(profileId, (tx) => recordDailyActivity(profileId, tx));
+    const savedTimeZone = await schollyTimeZone(profileId, executor);
+    const timeZone = isSupportedTimeZone(savedTimeZone) ? savedTimeZone : "Asia/Tashkent";
+    const localBoundary = sql`date_trunc('day', timezone(${timeZone}, now()) - interval '4 hours') + interval '4 hours'`;
     const result = await executor.execute(sql`
       INSERT INTO points_ledger (profile_id, points, reason)
       SELECT ${profileId}, 0, ${DAILY_ACTIVITY_REASON}
@@ -141,9 +142,8 @@ export async function recordDailyActivity(profileId: number, executor?: Executor
         SELECT 1 FROM points_ledger
         WHERE profile_id = ${profileId}
           AND reason = ${DAILY_ACTIVITY_REASON}
-          -- UTC day start, independent of the connection's TimeZone setting:
-          -- created_at is stored as a UTC wall clock (timestamp without tz).
-          AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC')
+          AND created_at >= timezone('UTC', timezone(${timeZone}, ${localBoundary}))
+          AND created_at < timezone('UTC', timezone(${timeZone}, ${localBoundary} + interval '1 day'))
       )
       RETURNING id
     `);
@@ -315,10 +315,8 @@ export async function grantBadges(profileId: number, executor?: Executor): Promi
   return toGrant;
 }
 
-/** How far back the streak reads (the largest milestone is 365 days). */
-const STREAK_HISTORY_DAYS = 400;
-/** Safety net against pathological ledgers; 400 days of normal use stays far below it. */
-const STREAK_HISTORY_MAX_ROWS = 20_000;
+const POINTS_HISTORY_DAYS = 400;
+const POINTS_HISTORY_SIZE = 50;
 
 /** Return the full gamification snapshot for a profile. */
 export async function getGamification(profileId: number, timeZone = "Asia/Tashkent", dayStartHour = 4) {
@@ -337,31 +335,15 @@ export async function getGamification(profileId: number, timeZone = "Asia/Tashke
     .where(eq(userBadges.profileId, profileId))
     .orderBy(desc(userBadges.awardedAt));
 
-  // Up to ~13 months of activity is enough for the visible streak and its
-  // milestones (the longest is 365 days). The cap used to be a flat "last 1000
-  // rows", which silently dropped older days for anyone who studied a lot — the
-  // record run and the streak reset then depended on how chatty the ledger was,
-  // not on the calendar. A date window keeps the answer honest; the row cap is
-  // only a safety net for pathological accounts.
-  const activitySince = new Date(Date.now() - STREAK_HISTORY_DAYS * 24 * 60 * 60 * 1000);
-  const activityLedger = await db
-    .select()
-    .from(pointsLedger)
-    .where(and(eq(pointsLedger.profileId, profileId), gte(pointsLedger.createdAt, activitySince)))
-    .orderBy(desc(pointsLedger.createdAt))
-    .limit(STREAK_HISTORY_MAX_ROWS);
-  // Only actions the student performed themselves count towards the streak
-  // (points received for someone else's like or referral must not extend it).
-  const streakActivity = activityLedger.filter((entry) => isStreakActivity(entry.reason));
-  const streak = computeDailyStreak(
-    streakActivity.map((entry) => entry.createdAt),
-    new Date(),
-    timeZone,
-    dayStartHour
-  );
-  // The `ledger` payload is the points history the UI may show — the 0-point
-  // activity markers are internal bookkeeping and stay out of it.
-  const ledger = activityLedger.filter((entry) => entry.points > 0).slice(0, 50);
+  const now = new Date();
+  const activitySince = new Date(now.getTime() - POINTS_HISTORY_DAYS * 24 * 60 * 60 * 1000);
+  const [ledger, streak] = await Promise.all([
+    db.select().from(pointsLedger)
+      .where(and(eq(pointsLedger.profileId, profileId), gte(pointsLedger.createdAt, activitySince), sql`${pointsLedger.points} > 0`))
+      .orderBy(desc(pointsLedger.createdAt))
+      .limit(POINTS_HISTORY_SIZE),
+    loadSchollyStreak(profileId, now, timeZone, dayStartHour),
+  ]);
 
   // Next level target for the progress bar.
   let nextLevel = null;

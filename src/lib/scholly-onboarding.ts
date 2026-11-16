@@ -37,6 +37,7 @@ export function transitionSchollyOnboarding(
   current: SchollyOnboardingSnapshot,
   input: unknown,
   now = new Date(),
+  stageKnown = false,
 ): SchollyOnboardingTransition {
   if (!input || typeof input !== "object" || Array.isArray(input)) return { error: "Invalid onboarding action" };
   const body = input as Record<string, unknown>;
@@ -45,6 +46,13 @@ export function transitionSchollyOnboarding(
 
   if (action === "start" || action === "resume") {
     if (action === "start" && current.onboardingState !== "not_started") return { error: "Onboarding has already started" };
+    if (action === "resume" && stageKnown && current.onboardingStep === "challenge") {
+      return {
+        patch: { onboardingState: "completed", onboardingStep: "complete", onboardedAt: now },
+        event: "onboarding_completed",
+        payload: { answeredQuestions: 2, challengeSkipped: "stage_known" },
+      };
+    }
     return {
       patch: { onboardingState: "in_progress" },
       event: action === "start" ? "onboarding_started" : "onboarding_step",
@@ -87,6 +95,13 @@ export function transitionSchollyOnboarding(
   if (action === "tone" && current.onboardingStep === "tone") {
     if (typeof body.value !== "string" || !tones.has(body.value as SchollyTone)) return { error: "Choose a supported tone" };
     const answers = { ...current.onboardingAnswers, tone: body.value };
+    if (stageKnown) {
+      return {
+        patch: { tone: body.value, onboardingState: "completed", onboardingStep: "complete", onboardingAnswers: answers, onboardedAt: now },
+        event: "onboarding_completed",
+        payload: { answeredQuestions: 2, challengeSkipped: "stage_known" },
+      };
+    }
     return {
       patch: { tone: body.value, onboardingAnswers: answers, onboardingStep: "challenge" },
       event: "onboarding_step",

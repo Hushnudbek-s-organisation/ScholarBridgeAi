@@ -9,6 +9,16 @@ export interface DailyStreak {
   recentDays: { date: string; active: boolean }[];
 }
 
+export interface SchollyStreak extends DailyStreak {
+  freezes: number;
+  recentDays: { date: string; active: boolean; frozen?: boolean; restored?: boolean }[];
+}
+
+export interface StreakMissionCompletion {
+  day: string;
+  doneAt: Date;
+}
+
 export const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100, 365] as const;
 
 /**
@@ -63,12 +73,7 @@ function shiftDay(day: string, amount: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function computeDailyStreak(
-  activityDates: readonly (Date | string)[],
-  now: Date = new Date(),
-  timeZone = "UTC",
-  dayStartHour = 0,
-): DailyStreak {
+function getDayKey(timeZone: string, dayStartHour: number) {
   let formatter: Intl.DateTimeFormat;
   try {
     formatter = new Intl.DateTimeFormat("en-CA", {
@@ -91,8 +96,18 @@ export function computeDailyStreak(
     });
   }
   const boundary = Number.isInteger(dayStartHour) && dayStartHour >= 0 && dayStartHour <= 23 ? dayStartHour : 0;
-  const today = dayKey(now, formatter, boundary)!;
-  const days = new Set(activityDates.map((value) => dayKey(value, formatter, boundary)).filter((day): day is string => !!day && day <= today));
+  return (value: Date | string) => dayKey(value, formatter, boundary);
+}
+
+export function computeDailyStreak(
+  activityDates: readonly (Date | string)[],
+  now: Date = new Date(),
+  timeZone = "UTC",
+  dayStartHour = 0,
+): DailyStreak {
+  const key = getDayKey(timeZone, dayStartHour);
+  const today = key(now)!;
+  const days = new Set(activityDates.map(key).filter((day): day is string => !!day && day <= today));
   const ordered = [...days].sort();
 
   let longest = 0;
@@ -125,6 +140,80 @@ export function computeDailyStreak(
     recentDays: Array.from({ length: 7 }, (_, index) => {
       const date = shiftDay(today, index - 6);
       return { date, active: days.has(date) };
+    }),
+  };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const FREEZE_EVERY_DAYS = 7;
+const MAX_FREEZES = 2;
+
+/**
+ * Replay localized activity rather than spending a freeze on every read.
+ * A protected day bridges a gap but is never counted as a day of study.
+ */
+export function computeSchollyStreak(
+  activityDays: readonly string[],
+  missions: readonly StreakMissionCompletion[],
+  today: string,
+  now: Date,
+): SchollyStreak {
+  const doneAtByDay = new Map(missions
+    .filter(({ day, doneAt }) => day <= today && doneAt.getTime() <= now.getTime())
+    .map(({ day, doneAt }) => [day, doneAt.getTime()]));
+  const days = new Set([...activityDays.filter(day => day <= today), ...doneAtByDay.keys()]);
+  const ordered = [...days].sort();
+  const frozenDays = new Set<string>();
+  const restoredDays = new Set<string>();
+  let freezes = 0;
+  let current = 0;
+  let longest = 0;
+  let previous: string | undefined;
+
+  function closeGap(nextDay: string, canRestore: boolean) {
+    if (!previous || !current) return;
+    let missed = shiftDay(previous, 1);
+    const singleMissedDay = shiftDay(missed, 1) === nextDay;
+    while (missed < nextDay && freezes > 0) {
+      freezes--;
+      frozenDays.add(missed);
+      missed = shiftDay(missed, 1);
+    }
+    if (missed >= nextDay) return;
+
+    // A second mission can land on the next local day while still being
+    // within 24 hours of the first. Reuse real completed missions only.
+    const first = doneAtByDay.get(nextDay);
+    const second = doneAtByDay.get(shiftDay(nextDay, 1));
+    if (canRestore && singleMissedDay && first != null && second != null && second > first && second - first <= DAY_MS) {
+      restoredDays.add(missed);
+      return;
+    }
+    current = 0;
+  }
+
+  for (const day of ordered) {
+    closeGap(day, true);
+    current++;
+    longest = Math.max(longest, current);
+    if (current % FREEZE_EVERY_DAYS === 0) freezes = Math.min(MAX_FREEZES, freezes + 1);
+    previous = day;
+  }
+  // Today is still open until the next 04:00 local boundary.
+  closeGap(today, false);
+
+  const nextMilestone = STREAK_MILESTONES.find(milestone => milestone > current) ?? null;
+  return {
+    current,
+    longest,
+    freezes,
+    activeToday: days.has(today),
+    lastActiveDate: ordered.at(-1) ?? null,
+    nextMilestone,
+    daysToMilestone: nextMilestone == null ? 0 : nextMilestone - current,
+    recentDays: Array.from({ length: 7 }, (_, index) => {
+      const date = shiftDay(today, index - 6);
+      return { date, active: days.has(date), frozen: frozenDays.has(date), restored: restoredDays.has(date) };
     }),
   };
 }
