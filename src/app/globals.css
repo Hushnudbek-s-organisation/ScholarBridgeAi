@@ -1575,7 +1575,6 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
   --scholly-above: calc(var(--scholly-dock-bottom) + var(--sb-dock-height) + 12px);
   --scholly-right: var(--scholly-edge);
 }
-:root[data-scholly-quiet] { --scholly-size: 48px; }
 :root[data-scholly-docked] .sb-grouped-dock {
   left: calc(50% - var(--scholly-slot) / 2);
   width: calc(100% - var(--scholly-edge) * 2 - var(--scholly-slot));

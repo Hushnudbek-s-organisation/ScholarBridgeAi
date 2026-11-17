@@ -85,8 +85,8 @@ test("Scholly docks on mobile, keeps a dragged position, and yields to the keybo
 
   for (const route of ["visa/speaking", "visa/daily-speaking", "payments", "materials/documents"]) {
     await page.evaluate(hash => { window.location.hash = hash; }, route);
-    await expect(launcher).toHaveCSS("width", "48px");
-    await expect(launcher).toHaveCSS("height", "48px");
+    await expect(launcher).toHaveCSS("width", "56px");
+    await expect(launcher).toHaveCSS("height", "56px");
     await expect(launcher).toHaveAttribute("data-motion", "idle");
   }
 });

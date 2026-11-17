@@ -824,7 +824,7 @@ export function Navbar({
 
       {/* ================= PHONE: TOP BAR ================= */}
       <header data-sb-shell-header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        <div className="sb-shell-bar flex h-14 items-center gap-2 px-3 sm:px-4">
+        <div className="sb-shell-bar flex h-14 items-center gap-1 px-2 sm:gap-2 sm:px-4">
           <Button variant="unstyled"
             onClick={() => setDrawerOpen(true)}
             className="sb-shell-menu flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -861,7 +861,7 @@ export function Navbar({
             <span className="sb-shell-theme hidden sm:inline-flex">
               <ThemeSwitch />
             </span>
-            {activeTab === "dashboard" && <Button variant="unstyled" className="sb-home-avatar" onClick={() => setDrawerOpen(true)} aria-label={t("openMenu")} aria-expanded={drawerOpen} aria-haspopup="dialog">{initials}</Button>}
+            {activeTab === "dashboard" && <Button variant="unstyled" className="sb-home-avatar hidden min-[400px]:inline-flex" onClick={() => setDrawerOpen(true)} aria-label={t("openMenu")} aria-expanded={drawerOpen} aria-haspopup="dialog">{initials}</Button>}
           </div>
         </div>
       </header>
