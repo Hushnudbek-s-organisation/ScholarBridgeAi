@@ -38,6 +38,6 @@ test("Scholly defers a near-deadline cue while the user is editing", async ({ pa
   await expect(launcher).not.toHaveAttribute("data-motion", "concern");
   await page.locator("#deadline-cue-test-editor").evaluate((editor: HTMLTextAreaElement) => editor.blur());
   await expect(launcher).toHaveAttribute("data-motion", "concern");
-  await expect(page.locator(".sb-scholly [role='status']")).toHaveText("Due in 2 days");
+  await expect(page.locator(".sb-scholly").getByRole("status").filter({ hasText: /^Due in 2 days$/ })).toHaveCount(1);
   expect(await page.evaluate(key => sessionStorage.getItem(key), storageKey)).toBe("1");
 });
