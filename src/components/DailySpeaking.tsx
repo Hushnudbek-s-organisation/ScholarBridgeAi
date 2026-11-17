@@ -361,7 +361,7 @@ export function DailySpeaking() {
                 <p lang={destination.locale} className="break-words">{line.text}</p>
               </div>)}
             </div>
-            {notice && <p role="status" className="text-xs">{notice}</p>}
+            {notice && <p role="status" className="text-sm">{notice}</p>}
             <div className="flex flex-wrap gap-2">
               {micSupported && <Button variant="outline" type="button" disabled={state === "SPEAKING" || state === "THINKING"} onClick={record}>
                 {state === "LISTENING" ? <MicOff size={16} aria-hidden /> : <Mic size={16} aria-hidden />} {state === "LISTENING" ? t.stop : t.mic}

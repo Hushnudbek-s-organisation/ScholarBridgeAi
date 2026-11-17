@@ -153,7 +153,7 @@ export function SchollyWeeklyReport({ profileId, onNavigate }: { profileId: numb
       {report && <>
         <p className="text-sm text-[var(--sb-ink-muted)]">{labels.ending} <time dateTime={report.endedOn}>{date}</time></p>
         <dl className="grid gap-2 sm:grid-cols-3">
-          {(["missions", "points", "sopWords"] as const).map((key) => <div key={key} className="rounded-xl bg-[var(--sb-well)] p-3">
+          {(["missions", "points", "sopWords"] as const).map((key) => <div key={key} className="rounded-surface bg-[var(--sb-well)] p-3">
             <dt className="text-sm">{labels[key]}</dt>
             <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--sb-ink-heading)]">{number.format(report.current[key])}</dd>
             <dd className="mt-1 text-xs text-[var(--sb-ink-muted)]">{labels.previous} · {number.format(report.previous[key])}</dd>

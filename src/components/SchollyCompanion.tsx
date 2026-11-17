@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent } from "react";
 import { useTranslations } from "next-intl";
 import { ArrowUp, GraduationCap, PanelBottom, Shirt, RotateCcw, Scan, X } from "lucide-react";
@@ -525,7 +526,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
 
   return (
     <div className="sb-scholly print:hidden" data-look-bubble={outfit?.bubble} data-no-dock={!hasDock || undefined} data-paused={hidden || undefined} data-quiet={quiet || undefined} data-keyboard={keyboardOpen || undefined} onKeyDown={event => { if (event.key === "Escape" && open) { event.stopPropagation(); close(); } }}>
-      <button type="button" ref={launcher} className="sb-scholly-launcher" style={style} aria-label={t.open}
+      <Button variant="unstyled" type="button" ref={launcher} className="sb-scholly-launcher" style={style} aria-label={t.open}
         data-inspecting={selecting || undefined} data-motion={animation}
         aria-expanded={chatOpen} aria-controls="scholly-chat" data-placement={hasDock && placement === "dock" ? "dock" : undefined}
         data-held={held || undefined} data-dizzy={dizzy || undefined} onPointerDown={pointerDown} onPointerMove={pointerMove}
@@ -551,13 +552,13 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
           })}
         </span>}
         {animation === "easter" && <span className="sb-scholly-dizzy-text sb-scholly-mood-text" aria-hidden="true">{t.easter}</span>}
-      </button>
+      </Button>
       {messageCue && <div className="sb-scholly-queue-anchor" style={style} data-placement={hasDock && placement === "dock" ? "dock" : undefined}>
         <div className="sb-scholly-dizzy-text sb-scholly-queue-text"
           data-inline-start={typeof placement === "object" && placement.x < 0.5 || undefined}
           data-below={typeof placement === "object" && placement.y < 0.16 || undefined}>
           <span aria-hidden="true">{messageCue}</span>
-          <button type="button" onClick={() => { muteToday(); launcher.current?.focus({ preventScroll: true }); }}>{t.quietToday}</button>
+          <Button variant="unstyled" type="button" onClick={() => { muteToday(); launcher.current?.focus({ preventScroll: true }); }}>{t.quietToday}</Button>
         </div>
       </div>}
       {submissionCue && <div className="sb-scholly-submission" aria-hidden="true">
@@ -581,13 +582,13 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
       {chatOpen && <section className="sb-scholly-chat" id="scholly-chat" aria-label="Scholly">
         <header className="sb-scholly-chat-header">
           <div><strong>Scholly</strong><small>{aiReady ? t.ai : t.guide}</small></div>
-          {hasDock && <button type="button" onClick={() => place(placement === "dock" ? "corner" : "dock")} title={placement === "dock" ? t.reset : t.dock} aria-label={placement === "dock" ? t.reset : t.dock}>
+          {hasDock && <Button variant="unstyled" type="button" onClick={() => place(placement === "dock" ? "corner" : "dock")} title={placement === "dock" ? t.reset : t.dock} aria-label={placement === "dock" ? t.reset : t.dock}>
             {placement === "dock" ? <RotateCcw size={17} /> : <PanelBottom size={17} />}
-          </button>}
-          {typeof placement === "object" && <button type="button" onClick={() => place("corner")} title={t.reset} aria-label={t.reset}><RotateCcw size={17} /></button>}
-          {profileId && <button type="button" title={wardrobeTitle} aria-label={wardrobeTitle} aria-pressed={wardrobeOpen}
-            onClick={() => setWardrobeOpen(previous => !previous)}><Shirt size={17} aria-hidden="true" /></button>}
-          <button type="button" onClick={close} title={t.close} aria-label={t.close}><X size={19} /></button>
+          </Button>}
+          {typeof placement === "object" && <Button variant="unstyled" type="button" onClick={() => place("corner")} title={t.reset} aria-label={t.reset}><RotateCcw size={17} /></Button>}
+          {profileId && <Button variant="unstyled" type="button" title={wardrobeTitle} aria-label={wardrobeTitle} aria-pressed={wardrobeOpen}
+            onClick={() => setWardrobeOpen(previous => !previous)}><Shirt size={17} aria-hidden="true" /></Button>}
+          <Button variant="unstyled" type="button" onClick={close} title={t.close} aria-label={t.close}><X size={19} /></Button>
         </header>
         {wardrobeOpen && profileId ? <SchollyWardrobe key={profileId} profileId={profileId} locale={language} onEquip={applyOutfit} /> : <>
         <div className="sb-scholly-feed" role="log" ref={feed}>
@@ -597,29 +598,29 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
             {schollyProfile.onboardingState === "not_started" && <>
               <p>{displayName ? (facts ? st("welcomeFacts", { name: displayName, facts }) : st("welcomeSimple", { name: displayName })) : st("welcomeGeneric")}</p>
               <div className="sb-scholly-onboarding-actions">
-                <button type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "start" })}>{st("start")}</button>
-                <button type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "skip" })}>{st("later")}</button>
+                <Button variant="unstyled" type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "start" })}>{st("start")}</Button>
+                <Button variant="unstyled" type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "skip" })}>{st("later")}</Button>
               </div>
             </>}
             {schollyProfile.onboardingState === "skipped" && <>
               <p>{displayName ? st("welcomeSimple", { name: displayName }) : st("welcomeGeneric")}</p>
-              <button type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "resume" })}>{st("resume")}</button>
+              <Button variant="unstyled" type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "resume" })}>{st("resume")}</Button>
             </>}
             {schollyProfile.onboardingState === "in_progress" && <>
               {schollyProfile.onboardingStep === "name" && <>
                 <p>{st("nameQuestion", { name: displayName || st("welcomeGeneric") })}</p>
                 {!editingName ? <div className="sb-scholly-onboarding-actions">
-                  <button type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "name", confirmed: true })}>{st("yes")}</button>
-                  <button type="button" disabled={onboardingBusy} onClick={() => { setPreferredNameInput(""); setEditingName(true); }}>{st("differentName")}</button>
+                  <Button variant="unstyled" type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "name", confirmed: true })}>{st("yes")}</Button>
+                  <Button variant="unstyled" type="button" disabled={onboardingBusy} onClick={() => { setPreferredNameInput(""); setEditingName(true); }}>{st("differentName")}</Button>
                 </div> : <form className="sb-scholly-onboarding-name" onSubmit={event => { event.preventDefault(); void saveOnboarding({ action: "name", confirmed: false, namePref: preferredNameInput }); }}>
                   <input value={preferredNameInput} onChange={event => setPreferredNameInput(event.target.value)} maxLength={40} autoComplete="given-name" aria-label={st("preferredName")} placeholder={st("preferredName")} />
-                  <button type="submit" disabled={onboardingBusy || !preferredNameInput.trim()}>{st("save")}</button>
+                  <Button variant="unstyled" type="submit" disabled={onboardingBusy || !preferredNameInput.trim()}>{st("save")}</Button>
                 </form>}
               </>}
               {schollyProfile.onboardingStep === "reminder" && <>
                 <p><small>{st("questionCount", { number: onboardingQuestion, total: schollyProfile.stageKnown ? 2 : 3 })}</small><br />{st("reminderQuestion")}</p>
                 <div className="sb-scholly-onboarding-options">
-                  {([["before_school", "beforeSchool"], ["after_school", "afterSchool"], ["evening", "evening"], ["not_needed", "notNeeded"]] as const).map(([value, label]) => <button key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "reminder", value })}>{st(label)}</button>)}
+                  {([["before_school", "beforeSchool"], ["after_school", "afterSchool"], ["evening", "evening"], ["not_needed", "notNeeded"]] as const).map(([value, label]) => <Button variant="unstyled" key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "reminder", value })}>{st(label)}</Button>)}
                 </div>
               </>}
               {schollyProfile.onboardingStep === "tone" && <>
@@ -628,19 +629,19 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
                 )}
                 <p><small>{st("questionCount", { number: onboardingQuestion, total: schollyProfile.stageKnown ? 2 : 3 })}</small><br />{st("toneQuestion")}</p>
                 <div className="sb-scholly-onboarding-options">
-                  {([["friendly", "friendly"], ["short", "short"]] as const).map(([value, label]) => <button key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "tone", value })}>{st(label)}</button>)}
+                  {([["friendly", "friendly"], ["short", "short"]] as const).map(([value, label]) => <Button variant="unstyled" key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "tone", value })}>{st(label)}</Button>)}
                 </div>
               </>}
               {schollyProfile.onboardingStep === "challenge" && schollyProfile.stageKnown && (
-                <button type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "resume" })}>{st("finishSetup")}</button>
+                <Button variant="unstyled" type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "resume" })}>{st("finishSetup")}</Button>
               )}
               {schollyProfile.onboardingStep === "challenge" && !schollyProfile.stageKnown && <>
                 <p><small>{st("questionCount", { number: onboardingQuestion, total: 3 })}</small><br />{st("challengeQuestion")}</p>
                 <div className="sb-scholly-onboarding-options">
-                  {([["university", "university"], ["grant", "grant"], ["ielts", "ielts"], ["documents", "documents"]] as const).map(([value, label]) => <button key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "challenge", value })}>{st(label)}</button>)}
+                  {([["university", "university"], ["grant", "grant"], ["ielts", "ielts"], ["documents", "documents"]] as const).map(([value, label]) => <Button variant="unstyled" key={value} type="button" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "challenge", value })}>{st(label)}</Button>)}
                 </div>
               </>}
-              <button type="button" className="sb-scholly-onboarding-later" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "skip" })}>{st("later")}</button>
+              <Button variant="unstyled" type="button" className="sb-scholly-onboarding-later" disabled={onboardingBusy} onClick={() => void saveOnboarding({ action: "skip" })}>{st("later")}</Button>
             </>}
             {onboardingError && <p role="alert">{st("saveFailed")}</p>}
           </section>}
@@ -648,21 +649,21 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
             <div key={index} data-role={message.role}>
               <p>{message.text}</p>
               {message.role === "assistant" && !message.ai && <small>{t.guide}</small>}
-              {message.target && navigate && <button type="button" onClick={() => { close(); navigate(message.target!.id); }}>{message.target.title} →</button>}
+              {message.target && navigate && <Button variant="unstyled" type="button" onClick={() => { close(); navigate(message.target!.id); }}>{message.target.title} →</Button>}
             </div>
           ))}
           {pending && <p>{t.wait}</p>}
         </div>
         <div className="sb-scholly-inspect-actions">
-          <button ref={inspectButton} type="button" className="sb-scholly-inspect-trigger" onClick={() => { setSelection(null); setSelecting(true); }}>
+          <Button variant="unstyled" ref={inspectButton} type="button" className="sb-scholly-inspect-trigger" onClick={() => { setSelection(null); setSelecting(true); }}>
             <Scan size={16} aria-hidden />{t.inspect}
-          </button>
-          {selection && <button type="button" className="sb-scholly-inspect-clear" aria-label={t.clear} title={t.clear}
-            onClick={() => { setSelection(null); input.current?.focus(); }}><X size={14} aria-hidden /><span>{t.selected}</span></button>}
+          </Button>
+          {selection && <Button variant="unstyled" type="button" className="sb-scholly-inspect-clear" aria-label={t.clear} title={t.clear}
+            onClick={() => { setSelection(null); input.current?.focus(); }}><X size={14} aria-hidden /><span>{t.selected}</span></Button>}
         </div>
         <form className="sb-scholly-form" onSubmit={ask}>
           <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} placeholder={t.prompt} aria-label={t.prompt} maxLength={400} />
-          <button type="submit" disabled={!draft.trim() || pending} aria-label={t.send}><ArrowUp size={18} /></button>
+          <Button variant="unstyled" type="submit" disabled={!draft.trim() || pending} aria-label={t.send}><ArrowUp size={18} /></Button>
         </form>
         </>}
       </section>}

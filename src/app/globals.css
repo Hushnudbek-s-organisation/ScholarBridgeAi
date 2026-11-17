@@ -1524,8 +1524,8 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
 .sbOverviewDeadlineChip[data-urgent] { border-color: #c2410c; background: #fff7ed; color: #9a3412; }
 .dark .sbOverviewDeadlineChip[data-urgent] { border-color: #9a3412; background: #431407; color: #fed7aa; }
 @media (max-width: 480px) {
-  .sb-overview-hero:has(.sbOverviewReadiness) { flex-wrap: wrap; gap: 12px; }
-  .sb-overview-hero:has(.sbOverviewReadiness) .sb-overview-hero-copy { flex-basis: 100%; }
+  .sb-overview-hero.sbOverviewNextStep { flex-wrap: wrap; gap: 12px; }
+  .sb-overview-hero.sbOverviewNextStep .sb-overview-hero-copy { flex-basis: 100%; }
   .sbOverviewReadiness [role="progressbar"] { flex-direction: row; text-align: start; }
 }
 .sbOverviewMissionTask { margin-top: 12px; color: var(--sb-ink-heading); font-size: 1rem; font-weight: 600; }

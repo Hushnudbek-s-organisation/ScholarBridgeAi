@@ -1,11 +1,12 @@
+import { COMPANION_PAINT } from "@/lib/companion-paint";
 import { useId, useSyncExternalStore, type CSSProperties } from "react";
 import type { SchollyMotion } from "./useSchollyMotion";
 import type { schollyPalette } from "@/lib/scholly-wardrobe";
 
 const auraParticles: Record<string, { count: number; shape: string; colors: string[] }> = {
-  stars: { count: 8, shape: "✦", colors: ["#FFFFFF", "#FFE9A8"] },
-  snow: { count: 12, shape: "❄", colors: ["#FFFFFF", "#CFE8FF"] },
-  nowruz: { count: 10, shape: "", colors: ["#FF7AA2", "#FFD166", "#7AE582"] },
+  stars: { count: 8, shape: "✦", colors: [COMPANION_PAINT.sparkWhite, COMPANION_PAINT.starGold] },
+  snow: { count: 12, shape: "❄", colors: [COMPANION_PAINT.sparkWhite, COMPANION_PAINT.snowBlue] },
+  nowruz: { count: 10, shape: "", colors: [COMPANION_PAINT.petalPink, COMPANION_PAINT.petalYellow, COMPANION_PAINT.petalGreen] },
 };
 
 const subscribeToDevice = () => () => {};
@@ -36,7 +37,7 @@ export function SchollyRecoloredPortrait({ palette, body, motion }: {
   motion: SchollyMotion;
 }) {
   const id = useId();
-  const rim = body === "night" ? "#7CC4FF80" : body === "silver" ? "#7B8AA8" : "none";
+  const rim = body === "night" ? COMPANION_PAINT.nightRim : body === "silver" ? COMPANION_PAINT.silverRim : "none";
   return <svg className="sb-scholly-colored-portrait" data-portrait-motion={motion} viewBox="0 0 221 250" aria-hidden="true">
     <defs>
       <radialGradient id={`${id}-shell`} cx="30%" cy="18%" r="90%">
@@ -45,10 +46,10 @@ export function SchollyRecoloredPortrait({ palette, body, motion }: {
         <stop offset="1" stopColor={palette.shade} />
       </radialGradient>
       <linearGradient id={`${id}-visor`} x2="0" y2="1">
-        <stop stopColor="#16224A" /><stop offset="1" stopColor="#0B1020" />
+        <stop stopColor={COMPANION_PAINT.visorLight} /><stop offset="1" stopColor={COMPANION_PAINT.visorDark} />
       </linearGradient>
     </defs>
-    <ellipse cx="111" cy="223" rx="55" ry="10" fill="#000" opacity=".25" />
+    <ellipse cx="111" cy="223" rx="55" ry="10" fill={COMPANION_PAINT.shadow} opacity=".25" />
     <g fill={`url(#${id}-shell)`} stroke={rim} strokeWidth="2">
       <g className="sb-scholly-color-arm"><ellipse cx="51" cy="175" rx="13" ry="24" transform="rotate(31 51 175)" /></g>
       <g className="sb-scholly-color-arm sb-scholly-color-arm-right"><ellipse cx="167" cy="175" rx="13" ry="24" transform="rotate(-31 167 175)" /></g>
@@ -56,7 +57,7 @@ export function SchollyRecoloredPortrait({ palette, body, motion }: {
       <ellipse cx="110" cy="97" rx="82" ry="64" />
     </g>
     <ellipse cx="112" cy="108" rx="68" ry="40" fill={`url(#${id}-visor)`} />
-    <path d="M58 93q14-18 51-20" fill="none" stroke="#fff" opacity=".12" strokeWidth="5" strokeLinecap="round" />
-    <path d="M101 174h18" stroke="#B779FF" strokeWidth="4" strokeLinecap="round" />
+    <path d="M58 93q14-18 51-20" fill="none" stroke={COMPANION_PAINT.sparkWhite} opacity=".12" strokeWidth="5" strokeLinecap="round" />
+    <path d="M101 174h18" stroke={COMPANION_PAINT.statusViolet} strokeWidth="4" strokeLinecap="round" />
   </svg>;
 }

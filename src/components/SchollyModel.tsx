@@ -1,5 +1,6 @@
 "use client";
 
+import { COMPANION_PAINT } from "@/lib/companion-paint";
 import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { DEFAULT_SCHOLLY_OUTFIT, schollyPalette, SCHOLLY_RAINBOW, type SchollyOutfit } from "@/lib/scholly-wardrobe";
 import { SchollyAura, SchollyRecoloredPortrait } from "./SchollyLook";
@@ -190,9 +191,9 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         const appearance = look.current;
         if (renderedLook !== appearance) {
           const body = appearance.body;
-          shell.color.set(!body || body === "blue" ? "#1846C0" : appearance.palette.main);
+          shell.color.set(!body || body === "blue" ? COMPANION_PAINT.shellBlue : appearance.palette.main);
           shell.metalness = body === "silver" || body === "gold" ? .38 : .16;
-          rim.color.set(body === "night" ? "#7CC4FF" : "#1CBDFF");
+          rim.color.set(body === "night" ? COMPANION_PAINT.nightEdge : COMPANION_PAINT.blueEdge);
           rim.intensity = body === "night" ? 4 : 3;
           neutralEyes.set(appearance.palette.eye);
           renderedLook = appearance;
@@ -259,7 +260,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
   const concerned = motion === "concern";
   const showArms = dragging || waving || happy || pointing || concerned;
   const useFallbackEyes = customizedBody || customizedEyes;
-  const eyeColor = concerned && !customizedEyes ? "#FFB869" : palette.eye;
+  const eyeColor = concerned && !customizedEyes ? COMPANION_PAINT.concernAmber : palette.eye;
   const closed = sleeping || dizzy || dragging;
   const eyePositions = customizedBody ? { left: 90, right: 135, y: 104, offset: 0 } : { left: 91, right: 166, y: 103, offset: -4 };
 
@@ -279,8 +280,8 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         <svg className="sb-scholly-lids sb-scholly-expression" viewBox="0 0 221 250">
           {useFallbackEyes && <>
             {!customizedBody && <>
-              <ellipse cx="91" cy="103" rx="14" ry="19" fill="#131f3f" />
-              <ellipse cx="166" cy="99" rx="14" ry="19" fill="#122044" />
+              <ellipse cx="91" cy="103" rx="14" ry="19" fill={COMPANION_PAINT.leftEyeSocket} />
+              <ellipse cx="166" cy="99" rx="14" ry="19" fill={COMPANION_PAINT.rightEyeSocket} />
             </>}
             {[eyePositions.left, eyePositions.right].map((x, index) => {
               const y = eyePositions.y + index * eyePositions.offset;
@@ -297,16 +298,16 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
           </>}
           {!useFallbackEyes && (dragging || dizzy || sleeping || happy || concerned || motion === "idle" || motion === "think" || motion === "talk") &&
             <g data-eyes={sleeping || dizzy || dragging ? "closed" : happy ? "happy" : motion}>
-              <ellipse cx="91" cy="103" rx="14" ry="19" fill="#131f3f" />
-              <ellipse cx="166" cy="99" rx="14" ry="19" fill="#122044" />
+              <ellipse cx="91" cy="103" rx="14" ry="19" fill={COMPANION_PAINT.leftEyeSocket} />
+              <ellipse cx="166" cy="99" rx="14" ry="19" fill={COMPANION_PAINT.rightEyeSocket} />
               {happy
-                ? <path d="M84 104l7-7 7 7m61-4l7-7 7 7" stroke="#68efff" strokeWidth="3" fill="none" />
+                ? <path d="M84 104l7-7 7 7m61-4l7-7 7 7" stroke={COMPANION_PAINT.cyanEye} strokeWidth="3" fill="none" />
                 : motion === "think" || motion === "talk" || concerned
-                  ? <g fill={concerned ? "#ffb869" : "#68efff"}><circle cx="91" cy="103" r="5" /><circle cx="166" cy="99" r="5" /></g>
-                  : <path d="M85 103q6 4 12 0m63-4q6 4 12 0" stroke="#68efff" strokeWidth="3" strokeLinecap="round" fill="none" />}
+                  ? <g fill={concerned ? COMPANION_PAINT.concernAmber : COMPANION_PAINT.cyanEye}><circle cx="91" cy="103" r="5" /><circle cx="166" cy="99" r="5" /></g>
+                  : <path d="M85 103q6 4 12 0m63-4q6 4 12 0" stroke={COMPANION_PAINT.cyanEye} strokeWidth="3" strokeLinecap="round" fill="none" />}
             </g>}
           {!customizedBody && (motion === "talk" || happy || sleeping) && <>
-            <ellipse cx="132" cy="115" rx="20" ry="11" fill="#101b36" />
+            <ellipse cx="132" cy="115" rx="20" ry="11" fill={COMPANION_PAINT.mouthShade} />
             {happy ? <path d="M119 112q13 17 26 0" stroke={eyeColor} strokeWidth="3" fill="none" /> :
               <ellipse data-scholly-mouth cx="132" cy="115" rx={sleeping ? 4 : 8} ry={sleeping ? 3 : 5} fill={eyeColor} />}
           </>}

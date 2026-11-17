@@ -132,7 +132,7 @@ function QuizForm({ profileId, locale }: { profileId: number; locale: Locale }) 
           <fieldset key={question.id} disabled={busy} className="space-y-2">
             <legend className="mb-2 text-sm font-medium">{question.prompt}</legend>
             {question.options.map((label, index) => (
-              <label key={label} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+              <label key={label} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-surface border border-border px-3 py-2 text-sm">
                 <input
                   type="radio"
                   className="accent-indigo-600"

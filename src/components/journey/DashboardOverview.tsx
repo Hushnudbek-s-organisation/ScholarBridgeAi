@@ -290,7 +290,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
           <p className="sbOverviewDetail">{primaryDetail}</p>
           <div className="sb-overview-actions">
             <Button data-action="primary" onClick={() => onNavigate(primaryTab)}>{primaryLabel}<ArrowRight aria-hidden className="h-4 w-4" /></Button>
-            <button type="button" className="sbOverviewStudyPlan" onClick={() => onNavigate("study-plan")}><CalendarDays aria-hidden />{t("overviewStudyPlan")}</button>
+            <Button variant="unstyled" type="button" className="sbOverviewStudyPlan" onClick={() => onNavigate("study-plan")}><CalendarDays aria-hidden />{t("overviewStudyPlan")}</Button>
           </div>
           <p className="sb-overview-stage">{t("overviewCurrentStage", { stage: currentStage })}</p>
         </div>
@@ -303,7 +303,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
         <ol>
           {data.journey.stages.slice(0, 4).map((stage) => <li key={stage.id}>
             <span className={stage.done ? "sbOverviewDone" : "sbOverviewStageCircle"}>{stage.done ? <CheckCircle2 aria-hidden /> : <Circle aria-hidden />}</span>
-            <button type="button" onClick={() => onNavigate(stage.tab)}>{stage.label}</button>
+            <Button variant="unstyled" type="button" onClick={() => onNavigate(stage.tab)}>{stage.label}</Button>
             <ChevronRight aria-hidden className="sbOverviewChevron" />
           </li>)}
         </ol>
@@ -317,7 +317,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
       </div>
       {points && <SchollyPointsSummary snapshot={points} locale={missionLocale} />}
       {!mission && !missionError && <p className="sbOverviewMissionMessage" role="status">{copy.loading}</p>}
-      {missionError && <div><p className="sbOverviewMissionMessage" role="status">{copy.error}</p><button className="sbOverviewMissionRetry" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.retry}</button></div>}
+      {missionError && <div><p className="sbOverviewMissionMessage" role="status">{copy.error}</p><Button variant="unstyled" className="sbOverviewMissionRetry" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.retry}</Button></div>}
       {mission && <>
         <div className="sbOverviewMissionSource">
           <Image src="/scholly.webp" alt="" width={28} height={28} />
@@ -349,16 +349,16 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
         )}
         {mission.status === "pending" && <div className="sbOverviewMissionActions">
             {(mission.type === "daily_quiz" || mission.type === "weekly_review") && (
-              <button type="button" className="sbOverviewMissionPrimary" onClick={() => openWeekendMission(mission.type as SchollyWeekendMission)}>{copy.open}<ArrowRight aria-hidden /></button>
+              <Button variant="unstyled" type="button" className="sbOverviewMissionPrimary" onClick={() => openWeekendMission(mission.type as SchollyWeekendMission)}>{copy.open}<ArrowRight aria-hidden /></Button>
             )}
             {missionTab[mission.type] && <>
-              <button type="button" className="sbOverviewMissionPrimary" onClick={() => onNavigate(missionTab[mission.type]!)}>{copy.open}<ArrowRight aria-hidden /></button>
-              <button type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.check}</button>
+              <Button variant="unstyled" type="button" className="sbOverviewMissionPrimary" onClick={() => onNavigate(missionTab[mission.type]!)}>{copy.open}<ArrowRight aria-hidden /></Button>
+              <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.check}</Button>
             </>}
-            {mission.sprint === null && <button type="button" disabled={missionBusy}
-              onClick={() => void updateMission("start_sprint")}>{schollySprintStartLabel(missionLocale)}</button>}
-            {!mission.anotherUsed && <button type="button" disabled={missionBusy} onClick={() => updateMission("another")}>{copy.another}</button>}
-            <button type="button" disabled={missionBusy} onClick={() => updateMission("skip")}>{copy.skip}</button>
+            {mission.sprint === null && <Button variant="unstyled" type="button" disabled={missionBusy}
+              onClick={() => void updateMission("start_sprint")}>{schollySprintStartLabel(missionLocale)}</Button>}
+            {!mission.anotherUsed && <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("another")}>{copy.another}</Button>}
+            <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("skip")}>{copy.skip}</Button>
         </div>}
       </>}
     </section>
@@ -379,35 +379,35 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
         <h2><ListChecks aria-hidden />{t("overviewTasks")}</h2>
         {tasks.length ? <ul>{tasks.map((task) => <li key={task.id}>
           <span className="sbOverviewTaskDot"><CheckCircle2 aria-hidden /></span>
-          <button type="button" onClick={() => onNavigate(task.tab)}><strong>{getStepTitle(task)}</strong><small>{getStepDetail(task)}</small></button>
+          <Button variant="unstyled" type="button" onClick={() => onNavigate(task.tab)}><strong>{getStepTitle(task)}</strong><small>{getStepDetail(task)}</small></Button>
           <ArrowRight aria-hidden className="sbOverviewChevron" />
         </li>)}</ul> : <p className="sbOverviewEmpty">{t("overviewNoTasks")}</p>}
-        <button type="button" className="sbOverviewMoreLink" onClick={() => onNavigate("tasks")}>{t("overviewAllTasks")} <ArrowRight aria-hidden /></button>
+        <Button variant="unstyled" type="button" className="sbOverviewMoreLink" onClick={() => onNavigate("tasks")}>{t("overviewAllTasks")} <ArrowRight aria-hidden /></Button>
       </section>
       <section className="sb-overview-panel sbOverviewCalendar">
         <h2><CalendarDays aria-hidden />{t("overviewDeadlines")}</h2>
         <div className="sbOverviewCalendarBody">
           <div className="sbOverviewMonthPanel">
             <div className="sbOverviewMonthTitle">
-              <button type="button" onClick={() => moveMonth(-1)} aria-label={t("overviewPreviousMonth")}><ChevronLeft aria-hidden /></button>
+              <Button variant="unstyled" type="button" onClick={() => moveMonth(-1)} aria-label={t("overviewPreviousMonth")}><ChevronLeft aria-hidden /></Button>
               <strong>{monthLabel}</strong>
-              <button type="button" onClick={() => moveMonth(1)} aria-label={t("overviewNextMonth")}><ChevronRight aria-hidden /></button>
+              <Button variant="unstyled" type="button" onClick={() => moveMonth(1)} aria-label={t("overviewNextMonth")}><ChevronRight aria-hidden /></Button>
             </div>
             <div className="sbOverviewCalendarDays">{weekdays.map((day, i) => <span key={`${day}-${i}`} className="sbOverviewWeekday">{day}</span>)}
               {monthDays.map((day, i) => {
                 if (day == null) return <span key={`blank-${i}`} />;
                 const key = dateKey(new Date(month.getFullYear(), month.getMonth(), day));
                 const hasDeadline = (deadlinesByDate.get(key)?.length ?? 0) > 0;
-                return <button key={key} type="button" data-selected={selectedDate === key || undefined} data-deadline={hasDeadline || undefined} onClick={() => setSelectedDate(key)} aria-pressed={selectedDate === key}>{day}</button>;
+                return <Button variant="unstyled" key={key} type="button" data-selected={selectedDate === key || undefined} data-deadline={hasDeadline || undefined} onClick={() => setSelectedDate(key)} aria-pressed={selectedDate === key}>{day}</Button>;
               })}
             </div>
           </div>
           <div className="sbOverviewDeadlineDetail">
-            {selectedDeadlines.length ? selectedDeadlines.map((deadline) => <button type="button" key={deadline.id} onClick={() => onNavigate(deadline.tab)}>
+            {selectedDeadlines.length ? selectedDeadlines.map((deadline) => <Button variant="unstyled" type="button" key={deadline.id} onClick={() => onNavigate(deadline.tab)}>
               <strong>{deadline.kind === "departure" ? tDeparture("dateLabel") : deadline.title}</strong>
               <span className="sbOverviewDeadlineChip" data-urgent={deadline.daysRemaining != null && deadline.daysRemaining >= 0 && deadline.daysRemaining <= 3 || undefined}>{dayLabel(deadline.daysRemaining)}</span>
-            </button>) : <p>{t("overviewNoDeadlines")}</p>}
-            <button className="sbOverviewOpenCalendar" type="button" onClick={() => onNavigate("tasks")}><CalendarDays aria-hidden />{t("overviewOpenCalendar")}</button>
+            </Button>) : <p>{t("overviewNoDeadlines")}</p>}
+            <Button variant="unstyled" className="sbOverviewOpenCalendar" type="button" onClick={() => onNavigate("tasks")}><CalendarDays aria-hidden />{t("overviewOpenCalendar")}</Button>
           </div>
         </div>
       </section>
@@ -430,14 +430,14 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
     </section>
 
     <section className="sb-overview-panel sbOverviewRecommendations">
-      <div className="sbOverviewRecommendationHeading"><h2><Sparkles aria-hidden />{t("overviewRecommended")}</h2><button type="button" onClick={() => onNavigate(recommendationTab)}>{t("overviewViewAll")} <ArrowRight aria-hidden /></button></div>
+      <div className="sbOverviewRecommendationHeading"><h2><Sparkles aria-hidden />{t("overviewRecommended")}</h2><Button variant="unstyled" type="button" onClick={() => onNavigate(recommendationTab)}>{t("overviewViewAll")} <ArrowRight aria-hidden /></Button></div>
       <div className="sbOverviewTabs" role="tablist" aria-label={t("overviewRecommended")}>
-        {(["universities", "scholarships", "opportunities"] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={recommendationTab === tab} onClick={() => setRecommendationTab(tab)}>{t(`overviewTab.${tab}` as never)}</button>)}
+        {(["universities", "scholarships", "opportunities"] as const).map((tab) => <Button variant="unstyled" key={tab} type="button" role="tab" aria-selected={recommendationTab === tab} onClick={() => setRecommendationTab(tab)}>{t(`overviewTab.${tab}` as never)}</Button>)}
       </div>
-      {recommendations.length ? <div className="sbOverviewRecommendationGrid">{recommendations.map((item, i) => <button type="button" key={`${item.title}-${i}`} onClick={() => onNavigate(item.tab)}>
+      {recommendations.length ? <div className="sbOverviewRecommendationGrid">{recommendations.map((item, i) => <Button variant="unstyled" type="button" key={`${item.title}-${i}`} onClick={() => onNavigate(item.tab)}>
         <span className="sbOverviewRecommendationFallback">{recommendationTab === "universities" ? <Compass aria-hidden /> : recommendationTab === "scholarships" ? <Bookmark aria-hidden /> : <Sparkles aria-hidden />}</span>
         <strong>{item.title}</strong><small>{item.detail}</small>
-      </button>)}</div> : <p className="sbOverviewEmpty">{t("overviewNoRecommendations")}</p>}
+      </Button>)}</div> : <p className="sbOverviewEmpty">{t("overviewNoRecommendations")}</p>}
     </section>
 
     <SchollyFriends key={profileId} profileId={profileId} locale={missionLocale} />

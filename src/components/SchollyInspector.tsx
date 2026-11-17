@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Scan, X } from "lucide-react";
@@ -135,9 +136,9 @@ export function SchollyInspector({ selecting, selected, instruction, cancel, onC
       {selecting && <div className="sb-scholly-inspector-bar">
         <Scan size={18} aria-hidden />
         <span role="status" id="scholly-inspector-instruction">{instruction}</span>
-        <button ref={cancelButton} type="button" aria-describedby="scholly-inspector-instruction" onClick={onCancel}>
+        <Button variant="unstyled" ref={cancelButton} type="button" aria-describedby="scholly-inspector-instruction" onClick={onCancel}>
           <X size={15} aria-hidden />{cancel}
-        </button>
+        </Button>
       </div>}
     </div>,
     document.body,

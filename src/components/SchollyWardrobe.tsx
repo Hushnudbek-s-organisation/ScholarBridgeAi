@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties } from "react";
+import { Button } from "@/components/ui/Button";
 import { useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import type { Locale } from "@/i18n/config";
@@ -120,7 +122,7 @@ export function SchollyWardrobe({ profileId, locale, onEquip }: {
   }
 
   if (!snapshot) return <div className="sb-scholly-wardrobe">
-    {error ? <><p role="alert">{error}</p><button type="button" onClick={() => { setError(""); setReload(value => value + 1); }}>{t.retry}</button></>
+    {error ? <><p role="alert">{error}</p><Button variant="unstyled" type="button" onClick={() => { setError(""); setReload(value => value + 1); }}>{t.retry}</Button></>
       : <p role="status">{t.loading}</p>}
   </div>;
 
@@ -133,7 +135,7 @@ export function SchollyWardrobe({ profileId, locale, onEquip }: {
       <div className="sb-scholly-wardrobe-preview">
         <div className="sb-scholly-wardrobe-avatar"><SchollyModel outfit={shown} staticPreview /></div>
         <span className="sb-scholly-wardrobe-sample sb-scholly-look-bubble" data-bubble={shown.bubble}>{t.sample}</span>
-        {preview && <button type="button" onClick={() => tryOn(null)}>{t.stop}</button>}
+        {preview && <Button variant="unstyled" type="button" onClick={() => tryOn(null)}>{t.stop}</Button>}
       </div>
       <div className="sb-scholly-wardrobe-totals">
         <span>{t.count(owned.size, SCHOLLY_WARDROBE.length)}</span>
@@ -142,16 +144,16 @@ export function SchollyWardrobe({ profileId, locale, onEquip }: {
       <div className="sb-scholly-wardrobe-tabs">
         {WARDROBE_SLOTS.map(value => {
           const group = SCHOLLY_WARDROBE.filter(item => item.slot === value);
-          return <button key={value} type="button" aria-pressed={slot === value}
+          return <Button variant="unstyled" key={value} type="button" aria-pressed={slot === value}
             onClick={() => { setSlot(value); tryOn(null); }}>
             {t[value]} <small>{group.filter(item => owned.has(wardrobeId(item))).length}/{group.length}</small>
-          </button>;
+          </Button>;
         })}
       </div>
-      {slot === "aura" && snapshot.outfit.aura && <button type="button" disabled={saving}
-        onClick={() => void change("equip", "aura", null)}>{t.removeAura}</button>}
-      {slot === "eyes" && snapshot.outfit.eyes !== "cyan" && <button type="button" disabled={saving}
-        onClick={() => void change("equip", "eyes", "cyan")}>{t.originalEyes}</button>}
+      {slot === "aura" && snapshot.outfit.aura && <Button variant="unstyled" type="button" disabled={saving}
+        onClick={() => void change("equip", "aura", null)}>{t.removeAura}</Button>}
+      {slot === "eyes" && snapshot.outfit.eyes !== "cyan" && <Button variant="unstyled" type="button" disabled={saving}
+        onClick={() => void change("equip", "eyes", "cyan")}>{t.originalEyes}</Button>}
       {error && <p role="alert">{error}</p>}
       <ul className="sb-scholly-wardrobe-items">
         {items.map(item => {
@@ -167,18 +169,18 @@ export function SchollyWardrobe({ profileId, locale, onEquip }: {
           return (
             <li key={wardrobeId(item)} data-rarity={item.rarity} data-owned={isOwned}>
               <div className="sb-scholly-wardrobe-item-label">
-                {isOwned && item.color ? <i style={{ backgroundColor: item.color }} aria-hidden="true" />
+                {isOwned && item.color ? <i style={{ "--sb-scholly-swatch": item.color } as CSSProperties} aria-hidden="true" />
                   : !isOwned ? <Lock size={14} aria-hidden="true" /> : null}
                 <strong>{item.label[locale]}</strong>
               </div>
               {hint && <small>{hint}</small>}
               <div className="sb-scholly-wardrobe-actions">
-                {!equipped && <button type="button" onClick={() => tryOn(item)}>{t.preview}</button>}
-                {isOwned && <button type="button" disabled={saving || equipped}
-                  onClick={() => void change("equip", slot, item.key)}>{equipped ? t.equipped : t.equip}</button>}
-                {starter ? <button type="button" disabled={saving} onClick={() => void change("starter", slot, item.key)}>{t.starter}</button>
-                  : !isOwned && unlock.type === "buy" ? <button type="button" disabled={saving || snapshot.balance < unlock.price}
-                    onClick={() => void change("buy", slot, item.key)}>{t.purchase(unlock.price)}</button> : null}
+                {!equipped && <Button variant="unstyled" type="button" onClick={() => tryOn(item)}>{t.preview}</Button>}
+                {isOwned && <Button variant="unstyled" type="button" disabled={saving || equipped}
+                  onClick={() => void change("equip", slot, item.key)}>{equipped ? t.equipped : t.equip}</Button>}
+                {starter ? <Button variant="unstyled" type="button" disabled={saving} onClick={() => void change("starter", slot, item.key)}>{t.starter}</Button>
+                  : !isOwned && unlock.type === "buy" ? <Button variant="unstyled" type="button" disabled={saving || snapshot.balance < unlock.price}
+                    onClick={() => void change("buy", slot, item.key)}>{t.purchase(unlock.price)}</Button> : null}
               </div>
             </li>
           );

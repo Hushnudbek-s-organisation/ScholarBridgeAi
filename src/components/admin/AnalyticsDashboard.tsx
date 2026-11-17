@@ -383,7 +383,7 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
             )} hint={`${scholly.activity.at(-1)?.completers ?? 0} ta foydalanuvchi bajardi`} tone="emerald" />
           </div>
           <div className="mt-4">
-            <p className="text-xs text-slate-600">Ustunlar – missiyani bajarganlar. Chiziq – dashboard yoki missiyaga kirganlar.</p>
+            <p className="text-sm text-slate-600">Ustunlar – missiyani bajarganlar. Chiziq – dashboard yoki missiyaga kirganlar.</p>
             <BarLineChart
               points={scholly.activity.map(({ date, visitors, completers }) => ({
                 title: longDay(date), label: shortDay(date), value: completers, secondary: visitors,

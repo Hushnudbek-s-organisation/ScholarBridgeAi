@@ -53,7 +53,7 @@
 .sb-scholly-wardrobe-items li[data-owned="false"] { background: color-mix(in srgb, #1a2038 15%, var(--sb-well)); }
 .sb-scholly-wardrobe-item-label, .sb-scholly-wardrobe-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .sb-scholly-wardrobe-item-label { font-size: .825rem; }
-.sb-scholly-wardrobe-item-label i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #8a94a8; }
+.sb-scholly-wardrobe-item-label i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #8a94a8; background-color: var(--sb-scholly-swatch); }
 
 .sb-scholly-look-bubble,
 .sb-scholly[data-look-bubble] .sb-scholly-feed > [data-role="assistant"],
