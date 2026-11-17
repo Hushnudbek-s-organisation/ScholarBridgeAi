@@ -1617,6 +1617,11 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
   max-width: 100%;
 }
 .sb-scholly-portrait img, .sb-scholly-portrait-arm, .sb-scholly-lids { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sb-scholly-model[data-reference-look] .sb-scholly-portrait { aspect-ratio: 1; }
+.sb-scholly-model[data-reference-look] .sb-scholly-portrait img { object-fit: contain; }
+img[src*="scholly-front.webp"] {
+  clip-path: polygon(50% 8%, 70% 8%, 84% 18%, 90% 31%, 90% 46%, 83% 56%, 72% 59%, 81% 63%, 87% 70%, 87% 77%, 80% 81%, 72% 76%, 68% 85%, 59% 91%, 41% 91%, 32% 85%, 28% 76%, 20% 81%, 13% 77%, 13% 70%, 19% 63%, 28% 59%, 17% 56%, 10% 46%, 10% 31%, 16% 18%, 30% 8%);
+}
 .sb-scholly-portrait-arm { background: url("/scholly.webp") center / 100% 100% no-repeat; }
 .sb-scholly-portrait[data-arms] img {
   clip-path: polygon(0 0, 100% 0, 100% 66%, 81% 66%, 81% 76%, 100% 87%, 100% 100%, 0 100%, 0 89%, 20% 75%, 20% 66%, 0 66%);

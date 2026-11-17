@@ -565,7 +565,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         <div className="sb-scholly-submission-card">
           <div className="sb-scholly-submission-art">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/scholly.webp" alt="" draggable={false} />
+            <img src="/scholly-front.webp" alt="" draggable={false} />
             <GraduationCap aria-hidden="true" />
           </div>
           <strong>{st("submissionMarked")}</strong>

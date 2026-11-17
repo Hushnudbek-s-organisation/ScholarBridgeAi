@@ -29,10 +29,10 @@ assert.match(companion, /animation === "celebrate" \|\| animation === "proud" \|
 assert.match(companion, /hardwareConcurrency <= 4/);
 assert.match(companion, /quiet \|\| keyboardOpen \|\| hidden/);
 assert.match(model, /const showArms = dragging \|\| waving \|\| happy \|\| pointing \|\| concerned/);
-assert.match(model, /\{showArms && !customizedBody && <>/);
+assert.match(model, /\{showArms && !customizedBody && !referenceLook && <>/);
 assert.match(model, /<SchollyRecoloredPortrait palette=\{palette\} body=\{outfit\.body\} motion=\{motion\}/);
 assert.match(model, /pose === "happy" \|\| celebrating/);
-assert.match(model, /concerned \? "#ffb869" : "#68efff"/);
+assert.match(model, /concerned && !appearance\.customizedEyes \? concernEyes : neutralEyes/);
 assert.match(activityCues, /element\.matches\("input, textarea"\) \|\| element\.isContentEditable/);
 assert.match(activityCues, /if \(userIsEditing\(\) \|\| document\.hidden\) return/);
 assert.match(activityCues, /detail\.daysRemaining < 0 \|\| detail\.daysRemaining > 3/);

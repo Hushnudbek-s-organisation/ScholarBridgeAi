@@ -320,7 +320,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
       {missionError && <div><p className="sbOverviewMissionMessage" role="status">{copy.error}</p><Button variant="unstyled" className="sbOverviewMissionRetry" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.retry}</Button></div>}
       {mission && <>
         <div className="sbOverviewMissionSource">
-          <Image src="/scholly.webp" alt="" width={28} height={28} />
+          <Image src="/scholly-front.webp" alt="" width={28} height={28} />
           <span>{copy.chosen}</span>
           <span className="sbOverviewMissionTheme">{copy.theme[mission.theme]}</span>
         </div>

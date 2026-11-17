@@ -126,7 +126,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
       <div className="sb-brand-hero text-white p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-500/20 rounded-surface border border-indigo-400/30">
-            <Image src="/scholly.webp" alt="" width={30} height={34} className="h-8 w-auto object-contain" />
+            <Image src="/scholly-front.webp" alt="" width={30} height={34} className="h-8 w-auto object-contain" />
           </div>
           <div>
             {/* h2 — the hosting hub already renders the screen's <h1>. */}
@@ -162,7 +162,7 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
                   : "bg-slate-900 text-amber-300"
               }`}
             >
-              {m.sender === "user" ? <User className="h-4 w-4" /> : <Image src="/scholly.webp" alt="" width={25} height={28} className="h-7 w-auto object-contain" />}
+              {m.sender === "user" ? <User className="h-4 w-4" /> : <Image src="/scholly-front.webp" alt="" width={25} height={28} className="h-7 w-auto object-contain" />}
             </div>
 
             <div
