@@ -1,0 +1,43 @@
+name: Scholly feature verification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/scholly-feature-verification.yml'
+      - 'src/components/Scholly*'
+      - 'src/components/journey/Scholly*'
+      - 'src/lib/scholly*'
+      - 'src/app/api/scholly/**'
+      - 'e2e/scholly-*.spec.ts'
+      - 'supabase/scholly*'
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - name: Production build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      # Runs independently of the required dependency audit so feature
+      # regressions remain visible while an upstream advisory is unresolved.
+      - name: Missions, streak, reminders, analytics and companion browser tests
+        run: npm run test:e2e -- e2e/scholly-*.spec.ts
+        env:
+          E2E_NEXT_MODE: start
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scholly-browser-evidence
+          path: |
+            test-results/e2e-report.json
+            test-results/e2e/
+          if-no-files-found: ignore
+          retention-days: 7
