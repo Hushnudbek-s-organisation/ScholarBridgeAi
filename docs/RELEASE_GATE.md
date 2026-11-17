@@ -28,6 +28,16 @@ This document separates two things that are easy to confuse:
 > gated with no exceptions in either half.
 > [Activate the gate](#activate-the-gate).
 
+> **Update (2026-11-17):** `picomatch` has a new high-severity advisory with
+> no patched release. The production graph no longer includes it after pinning
+> the Next.js 16 compatible `next-intl@4.5.0`. The remaining dev-toolchain paths
+> have a reviewed, dated exception in `audit-exceptions.json`; the production
+> audit still has no exceptions and the dev exception must disappear when a
+> fixed package becomes available.
+> `next-intl@4.5.0` still has moderate advisories in its navigation redirect
+> helper and experimental message precompiler. This app uses neither path;
+> revisit the pin when a watcher fix permits a newer release.
+
 ---
 
 ## 1. What CI runs (automatic)

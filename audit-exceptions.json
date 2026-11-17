@@ -1,4 +1,13 @@
 {
   "_comment": "Reviewed exceptions for high/critical advisories that currently have NO released fix. Production dependencies are never excepted — they are gated separately and hard by `npm audit --omit=dev --audit-level=high`. Every entry must carry an advisory id, the affected package, a reason and a review date; the gate fails on an entry that is no longer needed, so this list can only shrink. See docs/RELEASE_GATE.md.",
-  "exceptions": []
+  "exceptions": [
+    {
+      "advisory": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "severity": "high",
+      "reason": "The production dependency audit passes. Remaining paths are development and CI glob tooling with repository-controlled patterns, not untrusted user patterns. Upstream has no patched release as of 2026-11-17; remove this exception when a fix is published.",
+      "reviewedOn": "2026-11-17",
+      "upstream": "https://github.com/advisories/GHSA-fc5q-39xc-vjpf"
+    }
+  ]
 }
