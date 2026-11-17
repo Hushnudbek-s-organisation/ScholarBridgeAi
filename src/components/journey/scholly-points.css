@@ -1,0 +1,28 @@
+.sbOverviewPointsSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: start;
+  gap: .8rem 1.15rem;
+  padding: .75rem 0;
+  margin-block: .6rem .2rem;
+  border-block: 1px solid var(--sb-border);
+  color: var(--sb-ink-muted);
+  font-size: .84rem;
+}
+
+.sbOverviewPointsSummary strong { color: var(--sb-ink-heading); }
+.sbOverviewPointsMeter { min-width: 0; }
+.sbOverviewPointsMeter progress { display: block; width: 100%; height: .5rem; margin-block: .25rem; accent-color: #8b5cf6; }
+.sbOverviewPointsMeter small { display: block; font-size: .78rem; }
+.sbOverviewPointsToday { justify-self: end; }
+.sbOverviewPointsBreakdown { margin-top: .65rem; }
+.sbOverviewPointsBreakdown dl { display: grid; gap: .2rem; margin-top: .3rem; color: var(--sb-ink-muted); font-size: .84rem; }
+.sbOverviewPointsBreakdown dl > div { display: flex; justify-content: space-between; gap: 1rem; }
+.sbOverviewPointsBreakdown dd { flex: none; color: var(--sb-ink-heading); font-weight: 650; }
+.sbOverviewSprint { display: flex; gap: .3rem .7rem; align-items: center; flex-wrap: wrap; }
+.sbOverviewSprint time { color: var(--sb-ink-heading); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 520px) {
+  .sbOverviewPointsSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sbOverviewPointsToday { grid-column: 1 / -1; grid-row: 1; justify-self: start; }
+}

@@ -2,13 +2,16 @@ import { NextResponse } from "next/server";
 import { writingReferenceNotes } from "@/lib/ai/writingReferenceNotes";
 import { db } from "@/db";
 import { applications, essayVersions, studentProfiles } from "@/db/schema";
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
 import { readJsonBody, clampString, optionalNumber, positiveInt } from "@/lib/request";
 import { analyzeEssay, compareVersions, countWords, type EssayType } from "@/lib/essay";
 import { scoreConversationBehaviors } from "@/lib/ai/behaviorScore";
-import { awardSchollyMicroRewards, recordDailyActivity } from "@/lib/gamification";
+import { recordDailyActivity } from "@/lib/gamification";
+import { awardSchollyPoints } from "@/lib/scholly-points.server";
+import { schollySopCandidates, SCHOLLY_SOP_DAILY_PARAGRAPHS } from "@/lib/scholly-sop-reward.server";
+import { logSchollyEvent } from "@/lib/scholly-events";
 
 /**
  * Essay versions + rubric (#8).
@@ -21,7 +24,6 @@ import { awardSchollyMicroRewards, recordDailyActivity } from "@/lib/gamificatio
 
 const ESSAY_TYPES = ["sop", "personal_statement", "why_us", "supplemental", "scholarship"];
 const MAX_CHARS = 60_000; // ~9k words, far above any real limit
-const SOP_PARAGRAPH_WORDS = 50;
 
 function parseType(value: unknown): EssayType {
   return ESSAY_TYPES.includes(String(value)) ? (String(value) as EssayType) : "sop";
@@ -143,7 +145,7 @@ export async function POST(req: Request) {
       ],
     });
 
-    const { row, last } = await db.transaction(async (tx) => {
+    const { row, last, schollyPointsAwarded } = await db.transaction(async (tx) => {
       await tx.select({ id: studentProfiles.id }).from(studentProfiles)
         .where(eq(studentProfiles.id, profileId)).for("no key update");
       const draft = and(
@@ -153,11 +155,28 @@ export async function POST(req: Request) {
       );
       const [last] = await tx.select().from(essayVersions).where(draft)
         .orderBy(desc(essayVersions.versionNumber)).limit(1);
-      const ownSop = essayType === "sop" && access.session.profile.id === profileId;
-      const [{ longestDraft }] = ownSop
-        ? await tx.select({ longestDraft: sql<number>`coalesce(max(${essayVersions.wordCount}), 0)::int` })
-          .from(essayVersions).where(draft)
-        : [{ longestDraft: 0 }];
+      const ownSop = essayType === "sop" && access.session.profile.id === profileId
+        && body.writingSource !== "generated_draft";
+      let newParagraphs: string[] = [];
+      if (ownSop && last?.content !== content && schollySopCandidates(content).length) {
+        const ownDrafts = and(eq(essayVersions.profileId, profileId), or(
+          eq(essayVersions.essayType, "sop"),
+          and(eq(essayVersions.essayType, "private_memory"), inArray(essayVersions.title, [
+            "Private essay memory (draft)", "Private essay memory (adaptation)",
+          ])),
+        ));
+        const [duplicate] = await tx.select({ id: essayVersions.id }).from(essayVersions)
+          .where(and(ownDrafts, eq(essayVersions.content, content))).limit(1);
+        if (!duplicate) {
+          // Always compare the previous draft and also check recent SOPs for
+          // other applications. The durable fingerprint covers exact repeats
+          // after a prior version falls out of this near-copy comparison.
+          const history = await tx.select({ content: essayVersions.content }).from(essayVersions)
+            .where(ownDrafts).orderBy(desc(essayVersions.id)).limit(16);
+          const previousDrafts = [...new Set([...(last ? [last.content] : []), ...history.map(version => version.content)])];
+          newParagraphs = schollySopCandidates(content, previousDrafts);
+        }
+      }
       const versionNumber = (last?.versionNumber ?? 0) + 1;
       const [row] = await tx.insert(essayVersions).values({
         profileId,
@@ -179,15 +198,28 @@ export async function POST(req: Request) {
         rubricTotal: feedback.scores.total,
         aiFeedback: clampString(body.aiFeedback, 20_000) || null,
       }).returning();
-      if (ownSop && Math.floor(row.wordCount / SOP_PARAGRAPH_WORDS) > Math.floor(longestDraft / SOP_PARAGRAPH_WORDS)) {
-        await awardSchollyMicroRewards(profileId, "scholly_sop_paragraph", [row.id], tx);
+      let meaningful = false;
+      let awardedParagraphs = 0;
+      let schollyPointsAwarded = 0;
+      const rewardAt = new Date();
+      for (const fingerprint of newParagraphs) {
+        const result = await awardSchollyPoints(profileId, "sop_paragraph", `sop:${profileId}:${fingerprint}`, tx,
+          { relatedEntityId: row.id, at: rewardAt });
+        meaningful ||= result.awarded || result.limited;
+        if (result.awarded) awardedParagraphs++;
+        schollyPointsAwarded += result.points;
+        if (result.limited || awardedParagraphs >= SCHOLLY_SOP_DAILY_PARAGRAPHS) break;
       }
-      if (ownSop && last?.content !== content) await recordDailyActivity(profileId, tx);
-      return { row, last };
+      if (meaningful) {
+        await logSchollyEvent(profileId, "sop_practiced", { versionId: row.id }, tx);
+        await recordDailyActivity(profileId, tx);
+      }
+      return { row, last, schollyPointsAwarded };
     });
     const behaviorSignals = await behaviorSignalsPromise;
     return NextResponse.json({
       version: row,
+      schollyPointsAwarded,
       feedback,
       behaviorSignals,
       // What changed against the previous draft, so the history is readable.

@@ -1764,6 +1764,21 @@ html[data-scholly-inspecting] body :where(*:not(.sb-scholly-inspector-bar, .sb-s
   color: #ffd369;
   filter: drop-shadow(0 0 4px #ffb34299);
 }
+.sb-scholly-points-pop {
+  position: absolute;
+  inset-block-start: -5px;
+  inset-inline-end: 0;
+  z-index: 2;
+  border-radius: 999px;
+  background: #182342;
+  color: #d6fce8;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+  font-size: .75rem;
+  padding: 5px 7px;
+  pointer-events: none;
+}
 .sb-scholly-dizzy-stars span {
   position: absolute;
   left: calc(50% - .5em);

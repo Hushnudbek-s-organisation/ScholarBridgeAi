@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { useTranslations } from "next-intl";
 import { ArrowUp, GraduationCap, PanelBottom, Shirt, RotateCcw, Scan, X } from "lucide-react";
 import { useSchollyActivityCues } from "./useSchollyActivityCues";
+import { SCHOLLY_POINTS_CHANGED, type SchollyPointsChange } from "@/lib/scholly-points-client";
 import { SchollyModel } from "./SchollyModel";
 import { SchollyWardrobe, schollyWardrobeTitle } from "./SchollyWardrobe";
 import type { SchollyOutfit } from "@/lib/scholly-wardrobe";
@@ -139,6 +140,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   const [open, setOpen] = useState(false);
   const [schollyProfile, setSchollyProfile] = useState<SchollyOnboardingProfile | null>(null);
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
+  const [pointsPop, setPointsPop] = useState<SchollyPointsChange | null>(null);
   const [equippedOutfit, setEquippedOutfit] = useState<{ profileId: number; outfit: SchollyOutfit } | null>(null);
   const applyOutfit = useCallback((outfit: SchollyOutfit) => {
     if (profileId) setEquippedOutfit({ profileId, outfit });
@@ -173,6 +175,22 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
     window.addEventListener("scholly:mission-done", celebrateMission);
     return () => window.removeEventListener("scholly:mission-done", celebrateMission);
   }, [playMotion]);
+  useEffect(() => {
+    let timer: number | undefined;
+    function celebratePoints(event: Event) {
+      const change = (event as CustomEvent<SchollyPointsChange>).detail;
+      if (!change || change.profileId !== profileId || change.awardedPoints <= 0) return;
+      setPointsPop(change);
+      playMotion("happy");
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setPointsPop(null), 1900);
+    }
+    window.addEventListener(SCHOLLY_POINTS_CHANGED, celebratePoints);
+    return () => {
+      window.removeEventListener(SCHOLLY_POINTS_CHANGED, celebratePoints);
+      window.clearTimeout(timer);
+    };
+  }, [playMotion, profileId]);
   const welcomed = useRef(false);
   const gesture = useRef<{ id: number; x: number; y: number; left: number; top: number; moved: boolean; shake: ReturnType<typeof createSchollyShakeDetector> } | null>(null);
   const moved = useRef(false);
@@ -490,6 +508,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
     : activityCue.kind === "deadline" ? st("deadlineNear", { days: activityCue.daysRemaining })
       : schollyMessageText(activityCue, language, schollyProfile?.tone, audience);
   const submissionCue = animation === "proud" && activityCue?.kind === "submission";
+  const earnedPoints = !hidden && !keyboardOpen && pointsPop?.profileId === profileId ? pointsPop.awardedPoints : null;
   const lowPower = typeof navigator === "undefined" || !navigator.hardwareConcurrency || navigator.hardwareConcurrency <= 4;
   const celebrating = animation === "celebrate" || animation === "proud" || animation === "levelup";
   const confettiCount = lowPower ? 12 : 24;
@@ -509,6 +528,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         onLostPointerCapture={event => pointerEnd(event, true)} onContextMenu={event => event.preventDefault()}
         onClick={activateLauncher}>
         <SchollyModel outfit={outfit} trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} />
+        {earnedPoints !== null && <span className="sb-scholly-points-pop" aria-hidden="true">+{earnedPoints}</span>}
         {animation === "shake" && <span className="sb-scholly-dizzy-stars" aria-hidden="true">
           <span data-index="0">★</span><span data-index="1">★</span><span data-index="2">★</span>
         </span>}
@@ -547,6 +567,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         </div>
       </div>}
       <span className="sr-only" role="status">{submissionCue ? `${st("submissionMarked")} ${st("submissionHint")}` : messageCue ?? (animation === "shake" ? t.dizzy : animation === "easter" ? t.easter : animation === "wave" && !open && !profileId ? t.hello : "")}</span>
+      <span className="sr-only" role="status">{earnedPoints === null ? "" : `+${earnedPoints} ${language === "uz" ? "ball" : language === "ru" ? "баллов" : "points"}`}</span>
       <SchollyInspector selecting={selecting} selected={chatOpen ? selection?.element ?? null : null}
         instruction={t.pick} cancel={t.cancel} onCancel={() => {
           returningFromPicker.current = true;

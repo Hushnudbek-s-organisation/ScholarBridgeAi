@@ -4,16 +4,18 @@ import { sql } from "drizzle-orm";
 import { bumpCacheRevision } from "@/lib/cacheRevision";
 import { NextResponse } from "next/server";
 import { privateNoStoreJson } from "@/lib/apiResponse";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
   applicationDocumentLinks,
   applications,
+  pointsLedger,
   userDocuments,
 } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, isoDate, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { premiumGate } from "@/lib/premium";
-import { awardSchollyMicroRewards, recordDailyActivity } from "@/lib/gamification";
+import { recordDailyActivity } from "@/lib/gamification";
+import { awardSchollyPoints } from "@/lib/scholly-points.server";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +46,39 @@ export const DOC_TYPES = [
 ] as const;
 
 const DOC_STATUSES = ["self_confirmed", "uploaded", "verified", "needs_update", "expired", "rejected"] as const;
+
+type VaultTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function awardVaultAttachment(
+  tx: VaultTransaction,
+  profileId: number,
+  doc: Pick<typeof userDocuments.$inferSelect, "id" | "docType" | "fileUrl">,
+  applicationIds: readonly number[],
+) {
+  if (!doc.fileUrl || !applicationIds.length || !DOC_TYPES.some(type => type === doc.docType)) return 0;
+  // Older awards used a document row ID rather than (application, category).
+  // Keep existing credits when their linked application and document survive.
+  const legacy = await tx.selectDistinct({ applicationId: applicationDocumentLinks.applicationId })
+    .from(applicationDocumentLinks)
+    .innerJoin(userDocuments, eq(userDocuments.id, applicationDocumentLinks.documentId))
+    .innerJoin(pointsLedger, and(eq(pointsLedger.profileId, profileId),
+      eq(pointsLedger.relatedEntityId, userDocuments.id),
+      eq(pointsLedger.reason, "scholly_document_uploaded"),
+      isNull(pointsLedger.idempotencyKey),
+      gt(pointsLedger.points, 0)))
+    .where(and(eq(userDocuments.profileId, profileId), eq(userDocuments.docType, doc.docType),
+      inArray(applicationDocumentLinks.applicationId, applicationIds)));
+  const paidLegacyApplications = new Set(legacy.map(row => row.applicationId));
+  let points = 0;
+  const rewardAt = new Date();
+  for (const applicationId of applicationIds) {
+    if (paidLegacyApplications.has(applicationId)) continue;
+    const result = await awardSchollyPoints(profileId, "document_uploaded", `doc:${profileId}:${applicationId}:${doc.docType}`, tx,
+      { relatedEntityId: applicationId, at: rewardAt });
+    points += result.points;
+  }
+  return points;
+}
 
 /**
  * GET /api/vault/documents?profileId=
@@ -179,14 +214,14 @@ export async function POST(req: Request) {
           .onConflictDoNothing();
       }
     }
+    let schollyPointsAwarded = 0;
     if (doc.fileUrl && g.value.session.profile.id === profileId) {
-      await awardSchollyMicroRewards(profileId, "scholly_document_uploaded", [doc.id], tx);
+      schollyPointsAwarded = await awardVaultAttachment(tx, profileId, doc, owned.map(application => application.id));
+      await recordDailyActivity(profileId, tx);
     }
-    return NextResponse.json({ ok: true, document: doc });
+    return NextResponse.json({ ok: true, document: doc, schollyPointsAwarded });
     });
     if (response.ok) {
-      const addedFile = text(b.value.fileUrl, 600) || text(b.value.fileName, 240) || Number(b.value.fileSizeBytes) > 0;
-      if (addedFile && g.value.session.profile.id === profileId) await recordDailyActivity(profileId);
       await bumpCacheRevision(`documents:${profileId}`, "document created");
     }
     return response;
@@ -210,9 +245,9 @@ export async function PATCH(req: Request) {
   const hasFile = Boolean(text(b.value.fileUrl,600) || text(b.value.fileName,240) || b.value.fileSizeBytes || b.value.mimeType);
   if(hasFile){const locked=await premiumGate(profileId,"documents_upload");if(locked)return locked;}
   try {
-    let uploadedFileChanged = false;
     const response = await db.transaction(async(tx)=>{
-    if(hasFile){await tx.execute(sql`SELECT id FROM public.student_profiles WHERE id=${profileId} FOR NO KEY UPDATE`);await tx.execute(sql`SELECT id FROM public.subscriptions WHERE profile_id=${profileId} FOR SHARE`);const locked=await premiumGate(profileId,"documents_upload",tx);if(locked)return locked;}
+    if(hasFile||ids.length) await tx.execute(sql`SELECT id FROM public.student_profiles WHERE id=${profileId} FOR NO KEY UPDATE`);
+    if(hasFile){await tx.execute(sql`SELECT id FROM public.subscriptions WHERE profile_id=${profileId} FOR SHARE`);const locked=await premiumGate(profileId,"documents_upload",tx);if(locked)return locked;}
     const [doc] = await tx
       .select()
       .from(userDocuments)
@@ -244,28 +279,32 @@ export async function PATCH(req: Request) {
     if(b.value.fileName!==undefined)patch.fileName=text(b.value.fileName,240);
     if(b.value.fileSizeBytes!==undefined)patch.fileSizeBytes=Number(b.value.fileSizeBytes)||null;
     if(b.value.mimeType!==undefined)patch.mimeType=text(b.value.mimeType,120);
-    uploadedFileChanged = Boolean(patch.fileName && patch.fileName !== doc.fileName)
-      || Boolean(patch.fileUrl && patch.fileUrl !== doc.fileUrl)
-      || (typeof patch.fileSizeBytes === "number" && patch.fileSizeBytes > 0 && patch.fileSizeBytes !== doc.fileSizeBytes);
     const contentChanged=["docType","title","verificationNote","fileUrl","fileName","fileSizeBytes","mimeType","expiresAt","issuedAt"].some(k=>k in patch && String(patch[k])!==String(doc[k as keyof typeof doc]));
     if(contentChanged||linksChanged){patch.verifiedAt=null;if(patch.status==null||patch.status==="verified")patch.status="needs_update";}
     const reviewed = patch.status === "verified" && g.value.session.profile.isAdmin;
     if(reviewed){await tx.execute(sql`INSERT INTO public.document_review_records(document_id,content_hash,reviewer_profile_id,verified_at) VALUES (${id},${documentIdentity({...doc,...patch},currentLinks)},${g.value.session.profile.id},now()) ON CONFLICT(document_id) DO UPDATE SET content_hash=EXCLUDED.content_hash,reviewer_profile_id=EXCLUDED.reviewer_profile_id,verified_at=EXCLUDED.verified_at`);}
-    await tx.update(userDocuments).set(patch).where(eq(userDocuments.id, id));
+    const [updated] = await tx.update(userDocuments).set(patch).where(eq(userDocuments.id, id)).returning();
 
+    const added=linksChanged ? owned.filter(application=>!currentIds.includes(application.id)) : [];
     if (linksChanged) {
       const removed=currentIds.filter(value=>!ids.includes(value));
       if(removed.length)await tx.delete(applicationDocumentLinks).where(and(eq(applicationDocumentLinks.documentId,id),inArray(applicationDocumentLinks.applicationId,removed)));
-      const added=owned.filter(application=>!currentIds.includes(application.id));
       if(added.length)await tx.insert(applicationDocumentLinks).values(added.map(application=>({applicationId:application.id,documentId:id,usage:"required"}))).onConflictDoNothing();
     }
-    if (!doc.fileUrl && patch.fileUrl && g.value.session.profile.id === profileId) {
-      await awardSchollyMicroRewards(profileId, "scholly_document_uploaded", [doc.id], tx);
+    let schollyPointsAwarded = 0;
+    if (updated.fileUrl && g.value.session.profile.id === profileId) {
+      if (!doc.fileUrl) {
+        const links = linksChanged ? owned : currentIds.length ? await tx.select({ id: applications.id })
+          .from(applications).where(and(eq(applications.profileId, profileId), inArray(applications.id, currentIds))).for("share") : [];
+        schollyPointsAwarded = await awardVaultAttachment(tx, profileId, updated, links.map(application => application.id));
+      } else if (added.length && updated.docType === doc.docType) {
+        schollyPointsAwarded = await awardVaultAttachment(tx, profileId, updated, added.map(application => application.id));
+      }
+      if (updated.fileUrl !== doc.fileUrl || added.length) await recordDailyActivity(profileId, tx);
     }
-    return NextResponse.json({ ok: true, id });
+    return NextResponse.json({ ok: true, id, schollyPointsAwarded });
     });
     if (response.ok) {
-      if (uploadedFileChanged && g.value.session.profile.id === profileId) await recordDailyActivity(profileId);
       await bumpCacheRevision(`documents:${profileId}`, "document updated");
     }
     return response;

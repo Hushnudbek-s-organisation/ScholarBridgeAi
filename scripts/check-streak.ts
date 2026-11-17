@@ -5,6 +5,7 @@ import {
   DAILY_ACTIVITY_REASON,
   STREAK_MILESTONES,
 } from "../src/lib/streak";
+import { schollyStreakBonusCandidates } from "../src/lib/scholly-streak-bonuses";
 
 let passed = 0;
 function check(label: string, condition: boolean) {
@@ -125,5 +126,34 @@ const lateRepair = computeSchollyStreak(activeDays(3), [
   repairMissions[0], { ...repairMissions[1], doneAt: new Date("2026-01-06T20:00:01Z") },
 ], january(6), new Date("2026-01-06T21:00:00Z"));
 check("two missions more than 24 hours apart do not restore a run", lateRepair.current === 2 && lateRepair.longest === 3);
+
+console.log("\nScholly streak reward eligibility");
+const earned = (day: number, active: string[], missions: { day: string; doneAt: Date }[] = [], missionDone = false) =>
+  schollyStreakBonusCandidates(active, missions, january(day), new Date(`${january(day)}T20:00:00Z`), missionDone);
+const done = (day: number) => ({ day: january(day), doneAt: new Date(`${january(day)}T11:00:00Z`) });
+check("a real third activity day creates the lifetime milestone key", earned(3, activeDays(3)).some(
+  bonus => bonus.reason === "streak_3" && bonus.key === "streak:3",
+));
+check("passive reads, a lapse, and freeze spending cannot trigger a milestone", earned(9, activeDays(7)).length === 0);
+check("all four milestones use stable lifetime keys", earned(30, activeDays(30))
+  .filter(bonus => bonus.reason.startsWith("streak_")).map(bonus => bonus.key).join(",") === "streak:3,streak:7,streak:14,streak:30");
+check("a restarted streak reuses the first milestone key", earned(13, [...activeDays(3), january(11), january(12), january(13)])
+  .some(bonus => bonus.reason === "streak_3" && bonus.key === "streak:3"));
+check("four distinct active days in the local Monday week qualify", earned(8, [january(5), january(6), january(7), january(8)])
+  .some(bonus => bonus.reason === "weekly_activity" && bonus.key === "active-week:2026-01-05"));
+check("a used freeze and duplicate activity do not qualify as days of study", !earned(8, [
+  "2025-12-30", "2025-12-31", ...activeDays(5), january(7), january(8), january(8),
+]).some(bonus => bonus.reason === "weekly_activity"));
+check("the first verified mission after seven fully inactive days earns comeback", earned(9, [january(1)], [done(9)], true)
+  .some(bonus => bonus.reason === "comeback" && bonus.key === "comeback:2026-01-09"));
+check("six inactive days, a first-ever visit and other activity alone do not trigger comeback", [
+  earned(8, [january(1)], [done(8)], true),
+  earned(9, [], [done(9)], true),
+  earned(9, [january(1), january(9)]),
+].every(bonuses => !bonuses.some(bonus => bonus.reason === "comeback")));
+check("meaningful non-mission return activity can precede the first mission", earned(10, [january(1), january(9)], [done(10)], true)
+  .some(bonus => bonus.reason === "comeback" && bonus.key === "comeback:2026-01-09"));
+check("the second completed mission in the same return run cannot earn another comeback bonus",
+  !earned(10, [january(1), january(9)], [done(9), done(10)], true).some(bonus => bonus.reason === "comeback"));
 
 console.log(`\nstreak test passed (${passed} assertions)`);

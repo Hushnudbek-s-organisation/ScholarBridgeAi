@@ -54,8 +54,12 @@ const WINDOWS = {
   evening: ["19:00", "20:00"],
 } as const;
 
-export function shouldRemindAboutMission(prefs: SchollyReminderPreferences, localTime: string): boolean {
-  if (prefs.mode !== "full" || !prefs.missionTelegram || prefs.reminderWindow === "not_needed") return false;
+export function shouldRemindAboutMission(
+  prefs: SchollyReminderPreferences,
+  localTime: string,
+  channel: "telegram" | "push" = "telegram",
+): boolean {
+  if (prefs.mode !== "full" || (channel === "telegram" && !prefs.missionTelegram) || prefs.reminderWindow === "not_needed") return false;
   const [start, end] = WINDOWS[prefs.reminderWindow];
   if (localTime < start || localTime >= end) return false;
   const { quietStart, quietEnd } = prefs;
@@ -64,6 +68,16 @@ export function shouldRemindAboutMission(prefs: SchollyReminderPreferences, loca
     ? localTime >= quietStart && localTime < quietEnd
     : localTime >= quietStart || localTime < quietEnd;
   return !inQuietHours;
+}
+
+/** Keep delayed Web Push delivery inside today's selected window and quiet hours. */
+export function schollyMissionPushTtl(prefs: SchollyReminderPreferences, now: Date, localTime: string): number {
+  if (!shouldRemindAboutMission(prefs, localTime, "push") || prefs.reminderWindow === "not_needed") return 0;
+  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+  const windowEnd = WINDOWS[prefs.reminderWindow][1];
+  const end = prefs.quietStart !== prefs.quietEnd && prefs.quietStart > localTime && prefs.quietStart < windowEnd
+    ? prefs.quietStart : windowEnd;
+  return Math.min(900, (minutes(end) - minutes(localTime)) * 60 - now.getUTCSeconds() - 1);
 }
 
 export function schollyReminderLocalTime(now: Date, timeZone: string): { day: string; time: string } | null {

@@ -131,6 +131,7 @@ const CURATED_INDEXES: Record<string, string> = {
 // CHECK constraints by table (drizzle exposes them only as opaque chunks in
 // this version — the expressions mirror schema.ts line-for-line).
 const CURATED_CHECKS: Record<string, { name: string; expr: string }[]> = {
+  points_ledger: [{ name: "points_ledger_bucket_check", expr: "bucket IS NULL OR bucket IN ('main', 'small', 'bonus', 'spend')" }],
   platform_ownership: [{ name: "platform_ownership_id_check", expr: "id = 1" }],
   ownership_transfers: [
     { name: "ownership_transfers_status_check", expr: "status IN ('pending', 'accepted', 'completed', 'rejected', 'expired', 'cancelled')" },
@@ -142,7 +143,7 @@ const CURATED_CHECKS: Record<string, { name: string; expr: string }[]> = {
   ],
   daily_missions: [
     { name: "daily_missions_status_check", expr: "status IN ('pending', 'done', 'skipped')" },
-    { name: "daily_missions_type_check", expr: "type IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph', 'ielts_vocabulary', 'visa_practice')" },
+    { name: "daily_missions_type_check", expr: "type IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph', 'ielts_vocabulary', 'visa_practice', 'daily_quiz', 'weekly_review')" },
     { name: "daily_missions_size_check", expr: "size_min BETWEEN 1 AND 5" },
     { name: "daily_missions_target_count_check", expr: "target_count BETWEEN 1 AND 5000" },
     { name: "daily_missions_points_check", expr: "points IN (10, 20)" },

@@ -23,6 +23,8 @@ test("Scholly micro rewards are idempotent and share a 60-point cap across concu
     const signIn = await request.post("/api/auth/sign-in", { data: { email, password: fixtures.adminPassword } });
     expect(signIn.status()).toBe(200);
 
+    await pool.query(`INSERT INTO points_ledger (profile_id, points, reason, bucket)
+      SELECT $1, 5, 'scholly_forum_helpful', 'small' FROM generate_series(1, 11)`, [profileId]);
     const profileUrl = `/api/profiles/${profileId}`;
     for (const country of ["Uzbekistan", null, "Uzbekistan"]) {
       expect((await request.put(profileUrl, { data: { country } })).ok()).toBe(true);
@@ -46,17 +48,19 @@ test("Scholly micro rewards are idempotent and share a 60-point cap across concu
     )).rows.map(({ points }) => points);
 
     expect(await ledger("scholly_profile_field_filled")).toEqual([3]);
-    expect(await ledger("scholly_university_saved")).toEqual([3]);
-    expect(await ledger("scholly_document_uploaded")).toEqual([15, 15, 15, 9, 0]);
+    expect(await ledger("scholly_university_saved")).toEqual([2]);
+    expect(await ledger("scholly_document_uploaded")).toEqual([]);
     const { rows: events } = await pool.query<{ points: number }>(
       `SELECT sum((payload->>'points')::integer)::integer AS points FROM scholly_events
        WHERE user_id = $1 AND type = 'points_awarded'`, [profileId],
     );
-    expect(events).toEqual([{ points: 60 }]);
+    expect(events).toEqual([{ points: 5 }]);
+    expect(await (await request.get("/api/scholly/points")).json()).toMatchObject({ smallPoints: 60 });
 
     await pool.query("UPDATE points_ledger SET created_at = created_at - interval '2 days' WHERE profile_id = $1", [profileId]);
-    expect((await attachDocument(6)).ok()).toBe(true);
-    expect(await ledger("scholly_document_uploaded")).toEqual([15, 15, 15, 15, 9, 0]);
+    expect((await request.put(profileUrl, { data: { targetMajor: "Computer Science" } })).ok()).toBe(true);
+    expect(await ledger("scholly_profile_field_filled")).toEqual([3, 3]);
+    expect(await (await request.get("/api/scholly/points")).json()).toMatchObject({ smallPoints: 3 });
   } finally {
     if (profileId) await pool.query("DELETE FROM student_profiles WHERE id = $1", [profileId]);
     await pool.end();

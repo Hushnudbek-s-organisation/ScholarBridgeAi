@@ -5,7 +5,7 @@ import { forumThreads, forumReplies, forumLikes, studentProfiles, forumCategorie
 import { seedForum } from "@/db/seed";
 import { requestPathSeedingEnabled } from "@/lib/db/requestSeeding";
 import { eq, desc, and, count, sql } from "drizzle-orm";
-import { awardPoints } from "@/lib/gamification";
+import { recordDailyActivity } from "@/lib/gamification";
 import { notifyAdminsLocalized } from "@/lib/notifications";
 import { requireProfileAccess } from "@/lib/auth";
 import { requireFeatureSession, premiumGate } from "@/lib/premium";
@@ -190,11 +190,7 @@ export async function POST(req: Request) {
       verificationStatus: "unverified",
     })).catch((err) => console.warn("Forum advisory scoring failed:", err instanceof Error ? err.message : String(err)));
 
-    try {
-      await awardPoints(thread.authorId, 5, "thread_created", thread.id);
-    } catch (err) {
-      console.error("Failed to award thread points:", err);
-    }
+    if (thread.authorId === access.session.profile.id) await recordDailyActivity(thread.authorId);
 
     // Notify admins about the new community thread (site activity).
     try {

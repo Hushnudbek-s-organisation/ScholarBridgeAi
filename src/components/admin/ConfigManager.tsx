@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { Gift, Settings2, Loader2, RefreshCw, Save, Upload, Download, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { REFERRAL_POINTS_REFERRER } from "@/lib/referral-point-rules";
 
 interface ConfigManagerProps {
   adminProfileId: number;
@@ -30,7 +31,7 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
       const res = await fetch(`/api/admin/config?adminProfileId=${adminProfileId}`);
       const data = await res.json();
       if (res.ok && data.config) {
-        setRows(data.config);
+        setRows(data.config.filter((row: ConfigRow) => row.key !== "referral_points_referrer"));
         setBranding({
           logo: data.config.find((r: ConfigRow) => r.key === "branding_logo_url")?.value || "",
           favicon: data.config.find((r: ConfigRow) => r.key === "branding_favicon_url")?.value || "",
@@ -97,7 +98,7 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Settings (App Config)</h2>
           <p className="text-sm text-slate-500">
-            No hardcoded business values — prices, limits and schedules live here.
+            Manage application prices, limits and schedules.
           </p>
         </div>
         <Button variant="unstyled"
@@ -214,7 +215,7 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
  *
  * The keys below drive the live engine (src/lib/referrals.ts) and the student
  * card (/api/referral → rules): how many ACTIVATED referrals buy one Premium
- * grant, how many days that grant is worth, what each side earns in points,
+ * grant, how many days that grant is worth, the invitee’s existing bonus,
  * and how complete the invited profile must be before a referral counts — so
  * a bare signup cannot be farmed for free Premium.
  *
@@ -225,7 +226,6 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
 const REFERRAL_FIELDS: { key: string; labelKey: string; hintKey: string; min: number; max: number }[] = [
   { key: "referral_premium_multiple", labelKey: "refMultipleLabel", hintKey: "refMultipleHint", min: 1, max: 1000 },
   { key: "referral_premium_days", labelKey: "refDaysLabel", hintKey: "refDaysHint", min: 1, max: 3650 },
-  { key: "referral_points_referrer", labelKey: "refReferrerPointsLabel", hintKey: "refReferrerPointsHint", min: 0, max: 100000 },
   { key: "referral_points_referred", labelKey: "refReferredPointsLabel", hintKey: "refReferredPointsHint", min: 0, max: 100000 },
   { key: "referral_activation_completeness", labelKey: "refCompletenessLabel", hintKey: "refCompletenessHint", min: 0, max: 100 },
 ];
@@ -244,7 +244,7 @@ function ReferralRewardsCard({
   const [draft, setDraft] = useState<Record<string, string>>({});
 
   const numbers = REFERRAL_FIELDS.map((f) => Number(draft[f.key] ?? valueOf(f.key)));
-  const [multiple, days, referrerPoints, referredPoints, completeness] = numbers;
+  const [multiple, days, referredPoints, completeness] = numbers;
   const preview = REFERRAL_FIELDS.every((f, i) => Number.isFinite(numbers[i]) && numbers[i] >= f.min && numbers[i] <= f.max);
 
   return (
@@ -299,7 +299,7 @@ function ReferralRewardsCard({
           {t("refPreview", {
             multiple: multiple || 1,
             days: days || 1,
-            referrer: referrerPoints || 0,
+            referrer: REFERRAL_POINTS_REFERRER,
             referred: referredPoints || 0,
             percent: completeness || 0,
           })}

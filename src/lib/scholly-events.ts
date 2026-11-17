@@ -15,12 +15,18 @@ export const SCHOLLY_EVENT_TYPES = [
   "mission_done",
   "mission_skipped",
   "mission_another",
+  "mission_sprint_started",
   "quiz_done",
+  "friend_mission_nudge",
+  "weekly_report_reviewed",
+  "sop_practiced",
   "points_awarded",
   "item_unlocked",
   "item_bought",
   "item_equipped",
   "level_up",
+  "push_subscribed",
+  "push_unsubscribed",
 ] as const;
 export type SchollyEventType = (typeof SCHOLLY_EVENT_TYPES)[number];
 

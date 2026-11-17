@@ -13,7 +13,7 @@ import "./scholly-wardrobe.css";
 const labels = {
   uz: {
     title: "Scholly shkafi", body: "Tana", eyes: "Ko‘z", aura: "Aura", bubble: "Xabar",
-    balance: (points: number) => `${points} ball`, count: (owned: number, total: number) => `${owned}/${total} ta`,
+    balance: "Balans", lifetime: "umumiy", count: (owned: number, total: number) => `${owned}/${total} ta`,
     purchase: (points: number) => `${points} ballga olish`, preview: "Sinab ko‘rish", stop: "Sinovni tugatish",
     equip: "Tanlash", equipped: "Tanlangan", removeAura: "Aurasiz", originalEyes: "Asl ko‘z rangi",
     level: (n: number) => `${n}-darajada ochiladi`, streak: (n: number) => `${n} kunlik streakda ochiladi`,
@@ -24,7 +24,7 @@ const labels = {
   },
   en: {
     title: "Scholly wardrobe", body: "Body", eyes: "Eyes", aura: "Aura", bubble: "Bubble",
-    balance: (points: number) => `${points} points`, count: (owned: number, total: number) => `${owned}/${total} owned`,
+    balance: "Balance", lifetime: "lifetime", count: (owned: number, total: number) => `${owned}/${total} owned`,
     purchase: (points: number) => `Buy for ${points} points`, preview: "Try on", stop: "End preview",
     equip: "Equip", equipped: "Equipped", removeAura: "No aura", originalEyes: "Original eye color",
     level: (n: number) => `Unlocks at level ${n}`, streak: (n: number) => `Unlocks at a ${n}-day streak`,
@@ -35,7 +35,7 @@ const labels = {
   },
   ru: {
     title: "Гардероб Scholly", body: "Корпус", eyes: "Глаза", aura: "Аура", bubble: "Реплика",
-    balance: (points: number) => `Баллы: ${points}`, count: (owned: number, total: number) => `${owned}/${total} в коллекции`,
+    balance: "Баланс", lifetime: "всего", count: (owned: number, total: number) => `${owned}/${total} в коллекции`,
     purchase: (points: number) => `Купить за ${points} б.`, preview: "Примерить", stop: "Закончить примерку",
     equip: "Выбрать", equipped: "Выбрано", removeAura: "Без ауры", originalEyes: "Исходный цвет глаз",
     level: (n: number) => `Откроется на уровне ${n}`, streak: (n: number) => `Откроется за серию из ${n} дней`,
@@ -127,6 +127,7 @@ export function SchollyWardrobe({ profileId, locale, onEquip }: {
   const shown = preview ? { ...snapshot.outfit, [preview.slot]: preview.key } : snapshot.outfit;
   const owned = new Set(snapshot.owned);
   const items = SCHOLLY_WARDROBE.filter(item => item.slot === slot);
+  const numbers = new Intl.NumberFormat(locale);
   return (
     <div className="sb-scholly-wardrobe" aria-label={t.title}>
       <div className="sb-scholly-wardrobe-preview">
@@ -135,7 +136,8 @@ export function SchollyWardrobe({ profileId, locale, onEquip }: {
         {preview && <button type="button" onClick={() => tryOn(null)}>{t.stop}</button>}
       </div>
       <div className="sb-scholly-wardrobe-totals">
-        <span>{t.count(owned.size, SCHOLLY_WARDROBE.length)}</span><strong>{t.balance(snapshot.balance)}</strong>
+        <span>{t.count(owned.size, SCHOLLY_WARDROBE.length)}</span>
+        <span><strong>{t.balance} {numbers.format(snapshot.balance)}</strong> ({t.lifetime} {numbers.format(snapshot.lifetimePoints)})</span>
       </div>
       <div className="sb-scholly-wardrobe-tabs">
         {WARDROBE_SLOTS.map(value => {

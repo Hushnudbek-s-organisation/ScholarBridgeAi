@@ -17,7 +17,7 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { parseStudyInterestSelections } from "@/lib/studyInterests";
 import { invalidateProfileMatchCache } from "@/lib/catalogCache";
 import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
-import { awardSchollyMicroRewards } from "@/lib/gamification";
+import { awardSchollyPoints } from "@/lib/scholly-points.server";
 import { missingSchollyProfileFields } from "@/lib/scholly-mission-store.server";
 import type { SchollyProfileField } from "@/lib/scholly-missions";
 
@@ -354,16 +354,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .where(eq(studentProfiles.id, profileId))
       .returning();
 
+    let schollyPointsAwarded = 0;
     const [updatedProfile] = actorIsTarget ? await db.transaction(async (tx) => {
       const [previous] = await tx.select().from(studentProfiles)
         .where(eq(studentProfiles.id, profileId)).for("no key update");
       const updated = await updateProfile(tx);
       if (previous && updated[0]) {
         const stillMissing = new Set(missingSchollyProfileFields(updated[0]));
-        const filled = missingSchollyProfileFields(previous)
-          .filter((field) => !stillMissing.has(field))
-          .map((field) => SCHOLLY_PROFILE_FIELD_REWARD_IDS[field]);
-        await awardSchollyMicroRewards(profileId, "scholly_profile_field_filled", filled, tx);
+        const filled = missingSchollyProfileFields(previous).filter(field => !stillMissing.has(field));
+        for (const field of filled) {
+          const award = await awardSchollyPoints(profileId, "profile_field_filled", `field:${field}`, tx,
+            { relatedEntityId: SCHOLLY_PROFILE_FIELD_REWARD_IDS[field] });
+          schollyPointsAwarded += award.points;
+        }
       }
       return updated;
     }) : await updateProfile(db);
@@ -404,7 +407,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (newPasswordHash && !actorIsTarget) {
       await revokeAllSessionsForProfile(profileId);
     }
-    const response = privateNoStoreJson({ profile: sanitizeProfile(updatedProfile) });
+    const response = privateNoStoreJson({ profile: sanitizeProfile(updatedProfile), schollyPointsAwarded });
     /**
      * Re-issue the cookie ONLY for the account that changed its own password.
      *

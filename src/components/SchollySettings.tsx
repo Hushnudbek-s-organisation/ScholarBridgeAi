@@ -1,5 +1,7 @@
 "use client";
 
+import { SchollyPushControls } from "./SchollyPushControls";
+
 import { useEffect, useState } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/Button";
@@ -145,6 +147,7 @@ export function SchollySettings({ profileId }: { profileId: number }) {
           {state === "save-failed" && <p role="alert">{t.saveFailed}</p>}
         </form>
       )}
+      <SchollyPushControls profileId={profileId} locale={locale.startsWith("ru") ? "ru" : locale.startsWith("en") ? "en" : "uz"} />
     </section>
   );
 }

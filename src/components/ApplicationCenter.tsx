@@ -15,6 +15,7 @@ import { RecLetterPanel } from "./RecLetterPanel";
 import { Button } from "@/components/ui/Button";
 import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 import { announceSchollySubmission } from "@/lib/scholly-client-events";
+import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
 
 /**
  * Universal application tracker (#12) and private outcome history.
@@ -214,6 +215,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("addError"));
+      announceSchollyPointsChanged(activeProfile.id, data.schollyPointsAwarded);
       setDraft({ universityName: "", programName: "", deadline: "", applicationRound: "RD" });
       setAdding(false);
       await load();
@@ -234,8 +236,11 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
         body: JSON.stringify({ id, status }),
       });
       if (!res.ok) throw new Error(t("statusError"));
+      const saved = await res.json().catch(() => null);
+      if (activeProfileId && typeof saved?.schollyPointsAwarded === "number") {
+        announceSchollyPointsChanged(activeProfileId, saved.schollyPointsAwarded);
+      }
       if (activeProfileId && prior && !prior.submittedAt && prior.status !== "submitted" && status === "submitted") {
-        const saved = await res.json().catch(() => null);
         if (saved?.application?.status === "submitted" && saved.application.submittedAt) {
           announceSchollySubmission(activeProfileId, id);
         }

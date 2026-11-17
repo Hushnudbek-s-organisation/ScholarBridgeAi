@@ -58,7 +58,7 @@ const shortSop = pickSchollyMission(
   { recentStatuses: ["missed", "skipped"], completedStreak: 0 },
 );
 assert.equal(shortSop.type, "sop_paragraph");
-assert.equal(shortSop.targetCount, 25);
+assert.equal(shortSop.targetCount, 40);
 assert.equal(shortSop.sizeMin, 1);
 assert.deepEqual(buildSchollyMissionHistory("2026-11-16", []), { recentStatuses: [], completedStreak: 0 });
 assert.deepEqual(buildSchollyMissionHistory("2026-11-16", [
@@ -155,7 +155,7 @@ assert.notEqual(selectSchollyDailyGrant([verifiedGrant, secondGrant], "2026-11-1
 const route = readFileSync(resolve(__dirname, "../src/app/api/scholly/mission/route.ts"), "utf8");
 assert.match(route, /requireProfileAccess/);
 assert.match(route, /for\("update"\)/);
-assert.match(route, /awardPoints\(profileId, done\.points, "scholly_daily_mission", done\.id, tx\)/);
+assert.match(route, /awardSchollyPoints\(profileId, "mission_complete"/);
 assert.match(route, /logSchollyEvent\(profileId, "mission_done"/);
 assert.match(route, /logSchollyEvent\(profileId, "mission_skipped"/);
 assert.match(route, /logSchollyEvent\(profileId, "mission_another"/);

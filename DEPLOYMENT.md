@@ -127,6 +127,18 @@ Hosting assumptions (all portable):
    version. Apply [the base Scholly schema](./supabase/scholly_profile_events_2026-11-15.sql)
    first, then [the mission practice patch](./supabase/scholly_mission_practice_2026-11-16.sql)
    and [the wardrobe patch](./supabase/scholly_wardrobe_2026-11-16.sql).
+   Then apply the [points ledger](./supabase/scholly_points_ledger_2026-11-17.sql),
+   [weekend missions](./supabase/scholly_weekend_missions_2026-11-17.sql),
+   [friend streak](./supabase/scholly_friend_streak_2026-11-17.sql) and
+   [Web Push](./supabase/scholly_web_push_2026-11-17.sql) patches.
+   Browser reminders use `SCHOLLY_VAPID_PUBLIC_KEY`, `SCHOLLY_VAPID_PRIVATE_KEY`
+   and `SCHOLLY_VAPID_SUBJECT` on the server.
+   For a reviewed spam or fabricated submission award, an authenticated admin
+   can call `POST /api/gamification/reverse` with its ledger `awardId` and
+   `reason` (`spam` or `fabricated_submission`). A reversal is recorded
+   once in the audit log and reduces spendable points without changing lifetime
+   points or level.
+
 
 ## 3. Domain and canonical URL
 

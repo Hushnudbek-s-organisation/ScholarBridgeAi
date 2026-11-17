@@ -21,6 +21,7 @@ import { profileFromSessionEnvelope } from "@/lib/authenticatedProfile";
 import {useResource,getJson} from "@/components/journey/useResource";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { loadBootConfig } from "@/lib/bootConfig";
+import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
 import { PageTransition } from "@/components/motion";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
@@ -831,6 +832,7 @@ export function Home({
       if (!res.ok || !data.profile) {
         throw new Error(data.error || "Profil yangilanmadi");
       }
+      announceSchollyPointsChanged(activeProfile.id, data.schollyPointsAwarded);
       setProfiles((prev) => prev.map((p) => (p.id === data.profile.id ? data.profile : p)));
       setActiveProfile(data.profile);
       // A profile edit changes GPA / scores / budget: drop BOTH the explorer
@@ -863,6 +865,7 @@ export function Home({
         body: JSON.stringify({ profileId: activeProfile.id, universityId }),
       });
       const data = await res.json();
+      if (res.ok) announceSchollyPointsChanged(activeProfile.id, data.schollyPointsAwarded);
       fetchSavedUniversities(activeProfile.id);
     } catch (err) {
       console.error(err);

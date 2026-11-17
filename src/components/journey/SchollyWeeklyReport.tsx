@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BarChart3 } from "lucide-react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/Button";
+import { announceSchollyMissionPractice } from "@/lib/scholly-client-events";
 import type { SchollyWeeklyReportResponse } from "@/lib/scholly-weekly-report";
 
 const copy = {
@@ -22,6 +23,8 @@ const copy = {
     universities: "Universitetlarni saralash",
     essays: "SOPni tahrirlash",
     documents: "Hujjatlarni tayyorlash",
+    confirm: "Hisobotni ko‘rib chiqdim",
+    confirmed: "Ko‘rib chiqildi",
   },
   ru: {
     title: "Итоги недели со Scholly",
@@ -38,6 +41,8 @@ const copy = {
     universities: "Подобрать университеты",
     essays: "Доработать SOP",
     documents: "Подготовить документы",
+    confirm: "Я посмотрел отчёт",
+    confirmed: "Отчёт просмотрен",
   },
   en: {
     title: "Your week with Scholly",
@@ -54,6 +59,8 @@ const copy = {
     universities: "Shortlist universities",
     essays: "Revise my SOP",
     documents: "Prepare documents",
+    confirm: "Mark report as reviewed",
+    confirmed: "Report reviewed",
   },
 } as const;
 
@@ -67,6 +74,9 @@ export function SchollyWeeklyReport({ profileId, onNavigate }: { profileId: numb
   const [open, setOpen] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [state, setState] = useState<ReportState | null>(null);
+  const [confirmed, setConfirmed] = useState<{profileId: number; endedOn: string} | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -104,6 +114,27 @@ export function SchollyWeeklyReport({ profileId, onNavigate }: { profileId: numb
   const number = new Intl.NumberFormat(locale);
   const date = report && new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" })
     .format(new Date(`${report.endedOn}T00:00:00.000Z`));
+  const reviewed = confirmed?.profileId === profileId && confirmed.endedOn === report?.endedOn;
+
+  async function confirmReview(endedOn: string) {
+    if (confirmBusy) return;
+    setConfirmBusy(true);
+    setConfirmError(false);
+    try {
+      const response = await fetch("/api/scholly/weekly-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId, endedOn }),
+      });
+      if (!response.ok) throw new Error("weekly_review_unavailable");
+      setConfirmed({ profileId, endedOn });
+      announceSchollyMissionPractice(profileId, "weekly_review");
+    } catch {
+      setConfirmError(true);
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
 
   return <details className="sb-overview-panel" onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-base font-semibold text-[var(--sb-ink-heading)]">
@@ -128,6 +159,10 @@ export function SchollyWeeklyReport({ profileId, onNavigate }: { profileId: numb
             <dd className="mt-1 text-xs text-[var(--sb-ink-muted)]">{labels.previous} · {number.format(report.previous[key])}</dd>
           </div>)}
         </dl>
+        <Button variant="outline" disabled={reviewed || confirmBusy} onClick={() => void confirmReview(report.endedOn)}>
+          {reviewed ? labels.confirmed : labels.confirm}
+        </Button>
+        {confirmError && <p className="text-sm" role="alert">{labels.error}</p>}
         <div className="space-y-2">
           <p className="font-semibold text-[var(--sb-ink-heading)]">{labels.goals}</p>
           <div className="flex flex-wrap gap-2">

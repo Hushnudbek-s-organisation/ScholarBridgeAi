@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumReplies, forumLikes, studentProfiles, forumThreads } from "@/db/schema";
 import { eq, and, count, asc, desc } from "drizzle-orm";
-import { awardSchollyMicroRewards } from "@/lib/gamification";
+import { recordDailyActivity } from "@/lib/gamification";
 import { createLocalizedNotification, notifyAdminsLocalized } from "@/lib/notifications";
 import { requireProfileAccess } from "@/lib/auth";
 import { requireFeatureSession, premiumGate } from "@/lib/premium";
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
         parentReplyId: parentReplyId ? Number(parentReplyId) : null,
         body: replyBody,
       }).returning();
-      if (ownReply) await awardSchollyMicroRewards(created.authorId, "reply_created", [created.id], tx);
+      if (ownReply && String(replyBody).trim()) await recordDailyActivity(created.authorId, tx);
       return created;
     });
 

@@ -19,6 +19,11 @@ import type { SchollyMissionTheme, SchollyMissionType } from "@/lib/scholly-miss
 import type { JourneyDashboard } from "./JourneyControlCenter";
 import SchollyDailyQuiz from "./SchollyDailyQuiz";
 import { SchollyWeeklyReport } from "./SchollyWeeklyReport";
+import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
+import { SchollyPointsBreakdown, SchollyPointsSummary, useSchollyPoints } from "./SchollyPointsSummary";
+import { SchollySprint, schollySprintStartLabel, type SchollySprintTiming } from "./SchollySprint";
+import { SchollyFriends } from "./SchollyFriends";
+import "./scholly-points.css";
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -37,9 +42,11 @@ type MissionView = {
   complete: boolean;
   anotherUsed: boolean;
   exercise?: SchollyIeltsExercise;
+  sprint?: SchollySprintTiming | null;
 };
 
 type MissionResponse = { mission?: MissionView; justCompleted?: boolean; ieltsCorrect?: number };
+type SchollyWeekendMission = "daily_quiz" | "weekly_review";
 
 function completionKey(profileId: number) {
   return `scholly:mission-dismissed:${profileId}`;
@@ -58,7 +65,7 @@ const missionCopy = {
     title: "Bugungi missiya", dailyGrant: "Bugungi grant", readiness: "Ariza tayyorligi", chosen: "Scholly tanladi",
     theme: { plan: "Reja", writing: "Yozuv", language: "Til", search: "Qidiruv", speaking: "Speaking va viza", light: "Yengil kun", review: "Hafta yakuni" },
     finished: "Bugunga bo‘ldi!", dismiss: "Bugunni yakunlash", tomorrow: "Ertaga yangi missiya kutadi.", loading: "Missiya yuklanmoqda…", error: "Bugungi missiya hozir ochilmadi.",
-    tasks: { fill_profile_fields: "Profil ma’lumotlarini to‘ldiring", save_universities: "Universitetlarni saqlang", upload_document: "Hujjat yuklang", visa_practice: "Viza suhbatini mashq qiling" },
+    tasks: { fill_profile_fields: "Profil ma’lumotlarini to‘ldiring", save_universities: "Universitetlarni saqlang", upload_document: "Hujjat yuklang", visa_practice: "Viza suhbatini mashq qiling", daily_quiz: "Kunlik mini-o‘yinni bajaring", weekly_review: "Haftalik hisobotni ko‘rib chiqing" },
     ieltsTask: (words: number) => `${words} ta IELTS so‘zini o‘rganing va mini-testni bajaring`,
     sopTask: (words: number) => `SOP uchun ${words} ta so‘z yozing`,
     open: "Vazifani ochish", check: "Progressni tekshirish", another: "Boshqa missiya", skip: "Bugun o‘tkazib yuborish", retry: "Qayta urinish",
@@ -68,7 +75,7 @@ const missionCopy = {
     title: "Today’s mission", dailyGrant: "Today’s scholarship", readiness: "Application readiness", chosen: "Chosen by Scholly",
     theme: { plan: "Planning", writing: "Writing", language: "Language", search: "Discovery", speaking: "Speaking and visas", light: "Light day", review: "Weekly review" },
     finished: "You’re done for today!", dismiss: "Done for today", tomorrow: "A new mission will be ready tomorrow.", loading: "Loading mission…", error: "Today's mission is unavailable right now.",
-    tasks: { fill_profile_fields: "Complete profile details", save_universities: "Save universities", upload_document: "Upload a document", visa_practice: "Practise a visa interview" },
+    tasks: { fill_profile_fields: "Complete profile details", save_universities: "Save universities", upload_document: "Upload a document", visa_practice: "Practise a visa interview", daily_quiz: "Complete the daily mini-game", weekly_review: "Review your weekly report" },
     ieltsTask: (words: number) => `Learn ${words} IELTS vocabulary words and take a short quiz`,
     sopTask: (words: number) => `Write ${words} words for your SOP`,
     open: "Open task", check: "Check progress", another: "Another mission", skip: "Skip for today", retry: "Retry",
@@ -78,7 +85,7 @@ const missionCopy = {
     title: "Задание на сегодня", dailyGrant: "Стипендия дня", readiness: "Готовность заявки", chosen: "Выбор Scholly",
     theme: { plan: "Планирование", writing: "Письмо", language: "Язык", search: "Поиск", speaking: "Разговорная практика и визы", light: "Лёгкий день", review: "Итоги недели" },
     finished: "На сегодня всё!", dismiss: "Завершить день", tomorrow: "Завтра вас ждёт новое задание.", loading: "Загрузка задания…", error: "Сегодняшнее задание сейчас недоступно.",
-    tasks: { fill_profile_fields: "Заполните профиль", save_universities: "Сохраните университеты", upload_document: "Загрузите документ", visa_practice: "Потренируйтесь проходить собеседование на визу" },
+    tasks: { fill_profile_fields: "Заполните профиль", save_universities: "Сохраните университеты", upload_document: "Загрузите документ", visa_practice: "Потренируйтесь проходить собеседование на визу", daily_quiz: "Пройдите ежедневную мини-игру", weekly_review: "Просмотрите отчёт за неделю" },
     ieltsTask: (words: number) => `Изучите слова для IELTS (${words}) и пройдите мини-тест`,
     sopTask: (words: number) => `Добавьте слова в SOP (${words})`,
     open: "Открыть задачу", check: "Проверить прогресс", another: "Другое задание", skip: "Пропустить сегодня", retry: "Повторить",
@@ -110,7 +117,11 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
   const [ieltsScore, setIeltsScore] = useState<number | null>(null);
   const [dismissedMission, setDismissedMission] = useState<number | null>(null);
   const missionHeading = useRef<HTMLHeadingElement>(null);
+  const quizPanel = useRef<HTMLDivElement>(null);
+  const weeklyPanel = useRef<HTMLDivElement>(null);
+  const [practiceRevision, setPracticeRevision] = useState(0);
   const profileId = data.profile.id;
+  const points = useSchollyPoints(profileId);
   const missionLocale = locale.startsWith("ru") ? "ru" : locale.startsWith("en") ? "en" : "uz";
   const copy = missionCopy[missionLocale];
   const [greetingBefore, greetingAfter] = t("overviewGreeting", { name: "\uFFF0" }).split("\uFFF0");
@@ -125,16 +136,37 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
       .then(({ mission: next, justCompleted }) => {
         if (controller.signal.aborted) return;
         if (!next) throw new Error("mission_unavailable");
-        if (justCompleted) window.dispatchEvent(new Event("scholly:mission-done"));
+        if (justCompleted) {
+          window.dispatchEvent(new Event("scholly:mission-done"));
+          announceSchollyPointsChanged(profileId, next.points);
+        }
         setDismissedMission(isCompletionDismissed(profileId, next.id) ? next.id : null);
         setMission(next);
         setMissionError(false);
       })
       .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setMissionError(true); });
     return () => controller.abort();
-  }, [profileId]);
+  }, [profileId, practiceRevision]);
 
-  async function updateMission(action: "skip" | "another" | "refresh" | "submit_ielts", answers?: number[]) {
+  useEffect(() => {
+    if (mission?.status !== "pending") return;
+    function handlePractice(event: Event) {
+      const detail = (event as CustomEvent<{ profileId: number; type: SchollyWeekendMission }>).detail;
+      if (detail?.profileId === profileId && detail.type === mission?.type) setPracticeRevision((value) => value + 1);
+    }
+    window.addEventListener("scholly:mission-practice", handlePractice);
+    return () => window.removeEventListener("scholly:mission-practice", handlePractice);
+  }, [mission?.status, mission?.type, profileId]);
+
+  function openWeekendMission(type: SchollyWeekendMission) {
+    const details = (type === "daily_quiz" ? quizPanel : weeklyPanel).current?.querySelector("details");
+    if (!details) return;
+    details.open = true;
+    details.scrollIntoView({ block: "nearest" });
+    details.querySelector("summary")?.focus({ preventScroll: true });
+  }
+
+  async function updateMission(action: "skip" | "another" | "refresh" | "submit_ielts" | "start_sprint", answers?: number[]) {
     setMissionBusy(true);
     setMissionError(false);
     try {
@@ -145,7 +177,10 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
       });
       const result = await response.json() as MissionResponse;
       if (!response.ok || !result.mission) throw new Error("mission_update_failed");
-      if (result.justCompleted) window.dispatchEvent(new Event("scholly:mission-done"));
+      if (result.justCompleted) {
+        window.dispatchEvent(new Event("scholly:mission-done"));
+        announceSchollyPointsChanged(profileId, result.mission.points);
+      }
       setDismissedMission(isCompletionDismissed(profileId, result.mission.id) ? result.mission.id : null);
       setMission(result.mission);
       setIeltsScore(result.ieltsCorrect ?? null);
@@ -197,7 +232,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
 
   const missionTab = {
     fill_profile_fields: "profile", save_universities: "universities", upload_document: "documents",
-    sop_paragraph: "essays", visa_practice: "speaking", ielts_vocabulary: null,
+    sop_paragraph: "essays", visa_practice: "speaking", ielts_vocabulary: null, daily_quiz: null, weekly_review: null,
   };
   const missionTitle = mission && (mission.type === "sop_paragraph" ? copy.sopTask(mission.target)
     : mission.type === "ielts_vocabulary" ? copy.ieltsTask(mission.target) : copy.tasks[mission.type]);
@@ -279,6 +314,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
         <h2 id="sb-daily-mission-title" ref={missionHeading} tabIndex={-1}><Target aria-hidden />{copy.title}</h2>
         {mission && <span className="sbOverviewMissionPoints">{mission.sizeMin} {copy.minutes} · {mission.points} {copy.points}</span>}
       </div>
+      {points && <SchollyPointsSummary snapshot={points} locale={missionLocale} />}
       {!mission && !missionError && <p className="sbOverviewMissionMessage" role="status">{copy.loading}</p>}
       {missionError && <div><p className="sbOverviewMissionMessage" role="status">{copy.error}</p><button className="sbOverviewMissionRetry" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.retry}</button></div>}
       {mission && <>
@@ -298,6 +334,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
               <h3>{copy.finished}</h3>
               <p>+{mission.points} {copy.points} · {copy.readiness} {new Intl.NumberFormat(locale, { style: "percent" }).format(readiness / 100)}</p>
               <p>{copy.tomorrow}</p>
+              {points && <SchollyPointsBreakdown snapshot={points} locale={missionLocale} />}
             </div>
             <Button variant="outline" onClick={() => dismissCompletion(mission.id)}>{copy.dismiss}</Button>
           </div>
@@ -306,11 +343,19 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
           <SchollyIeltsMission key={`${profileId}-${mission.id}`} locale={missionLocale} exercise={mission.exercise}
             busy={missionBusy} score={ieltsScore} onSubmit={(answers) => void updateMission("submit_ielts", answers)} />
         )}
+        {mission.status === "pending" && mission.sprint && (
+          <SchollySprint sprint={mission.sprint} points={mission.points} locale={missionLocale} />
+        )}
         {mission.status === "pending" && <div className="sbOverviewMissionActions">
+            {(mission.type === "daily_quiz" || mission.type === "weekly_review") && (
+              <button type="button" className="sbOverviewMissionPrimary" onClick={() => openWeekendMission(mission.type as SchollyWeekendMission)}>{copy.open}<ArrowRight aria-hidden /></button>
+            )}
             {missionTab[mission.type] && <>
               <button type="button" className="sbOverviewMissionPrimary" onClick={() => onNavigate(missionTab[mission.type]!)}>{copy.open}<ArrowRight aria-hidden /></button>
               <button type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.check}</button>
             </>}
+            {mission.sprint === null && <button type="button" disabled={missionBusy}
+              onClick={() => void updateMission("start_sprint")}>{schollySprintStartLabel(missionLocale)}</button>}
             {!mission.anotherUsed && <button type="button" disabled={missionBusy} onClick={() => updateMission("another")}>{copy.another}</button>}
             <button type="button" disabled={missionBusy} onClick={() => updateMission("skip")}>{copy.skip}</button>
         </div>}
@@ -394,7 +439,8 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
       </button>)}</div> : <p className="sbOverviewEmpty">{t("overviewNoRecommendations")}</p>}
     </section>
 
-    <SchollyDailyQuiz profileId={profileId} />
-    <SchollyWeeklyReport profileId={profileId} onNavigate={onNavigate} />
+    <SchollyFriends key={profileId} profileId={profileId} locale={missionLocale} />
+    <div ref={quizPanel}><SchollyDailyQuiz profileId={profileId} /></div>
+    <div ref={weeklyPanel}><SchollyWeeklyReport profileId={profileId} onNavigate={onNavigate} /></div>
   </>;
 }

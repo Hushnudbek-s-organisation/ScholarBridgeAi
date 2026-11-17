@@ -73,6 +73,7 @@ export type WardrobeSnapshot = {
   outfit: SchollyOutfit;
   owned: string[];
   balance: number;
+  lifetimePoints: number;
   starterAvailable: boolean;
 };
 

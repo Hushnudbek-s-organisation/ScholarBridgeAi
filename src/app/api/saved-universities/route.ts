@@ -10,7 +10,8 @@ import { enforceFreeCap } from "@/lib/planLimits";
 import { localeFromRequest } from "@/lib/engineText";
 import { localizeUniversityRow } from "@/lib/catalogLocalizer";
 import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRecommendationCache";
-import { awardSchollyMicroRewards, recordDailyActivity } from "@/lib/gamification";
+import { recordDailyActivity } from "@/lib/gamification";
+import { awardSchollyPoints } from "@/lib/scholly-points.server";
 
 const SAVED_UNIVERSITY_STATUSES = new Set([
   "Shortlisted",
@@ -150,18 +151,21 @@ export async function POST(req: Request) {
         .where(eq(studentProfiles.id, profileId)).for("no key update");
       const savedKey = and(eq(savedUniversities.profileId, profileId), eq(savedUniversities.universityId, universityId));
       const [savedBeforeInsert] = await tx.select().from(savedUniversities).where(savedKey).limit(1);
-      if (savedBeforeInsert) return { saved: savedBeforeInsert, message: "Already saved" };
+      if (savedBeforeInsert) return { saved: savedBeforeInsert, message: "Already saved", schollyPointsAwarded: 0 };
       const [newSaved] = await tx.insert(savedUniversities).values({ profileId, universityId, status, notes })
         .onConflictDoNothing().returning();
       if (!newSaved) {
         const [alreadySaved] = await tx.select().from(savedUniversities).where(savedKey).limit(1);
-        return { saved: alreadySaved, message: "Already saved" };
+        return { saved: alreadySaved, message: "Already saved", schollyPointsAwarded: 0 };
       }
+      let schollyPointsAwarded = 0;
       if (ownSave) {
-        await awardSchollyMicroRewards(profileId, "scholly_university_saved", [universityId], tx);
+        const award = await awardSchollyPoints(profileId, "university_saved", `uni_saved:${universityId}`, tx,
+          { relatedEntityId: universityId });
+        schollyPointsAwarded = award.points;
         await recordDailyActivity(profileId, tx);
       }
-      return { saved: newSaved };
+      return { saved: newSaved, schollyPointsAwarded };
     });
     await invalidateDashboardRecommendationsForProfile(profileId);
 

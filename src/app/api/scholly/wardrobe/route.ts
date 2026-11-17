@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { schollyProfiles, schollyWardrobeItems, studentProfiles, userPoints } from "@/db/schema";
+import { pointsLedger, schollyProfiles, schollyWardrobeItems, studentProfiles } from "@/db/schema";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { requireProfileAccess } from "@/lib/auth";
 import { readJsonBody } from "@/lib/request";
@@ -8,6 +8,7 @@ import { logSchollyEvent } from "@/lib/scholly-events";
 import { currentSchollyDay, ensureSchollyProfile } from "@/lib/scholly-mission-store.server";
 import { loadSchollyStreak } from "@/lib/scholly-streak.server";
 import { grantSeasonalSchollyWardrobe } from "@/lib/scholly-wardrobe.server";
+import { readSchollyBalance, syncSchollyPointCache } from "@/lib/scholly-points-balance.server";
 import {
   sanitizeSchollyOutfit, SCHOLLY_LEVEL_THRESHOLDS, SCHOLLY_WARDROBE,
   STARTER_SCHOLLY_COLORS, wardrobeId, wardrobeItem, type WardrobeSnapshot,
@@ -51,15 +52,14 @@ async function wardrobe(req: Request, requestedProfileId: unknown, body?: Record
       .from(schollyProfiles).where(eq(schollyProfiles.userId, profileId)).for("update").limit(1);
     if (!profile) return reject("profile_not_found", 404);
 
-    const [pointsRow] = await tx.select({ total: userPoints.totalPoints }).from(userPoints)
-      .where(eq(userPoints.profileId, profileId)).limit(1);
-    const lifetimePoints = pointsRow?.total ?? 0;
+    const totals = await readSchollyBalance(profileId, tx);
+    const { lifetimePoints } = totals;
     const level = SCHOLLY_LEVEL_THRESHOLDS.filter(threshold => lifetimePoints >= threshold).length;
     const owned = await tx.select().from(schollyWardrobeItems).where(eq(schollyWardrobeItems.userId, profileId));
     const ownedIds = new Set([...defaultIds, ...owned.map(row => row.itemKey)]);
     // Spending changes the cosmetic balance while lifetime achievement points
     // continue to determine levels, badges and leaderboard entries.
-    let balance = Math.max(0, lifetimePoints - owned.reduce((sum, row) => sum + row.spentPoints, 0));
+    let balance = totals.balance;
     let starterAvailable = Boolean(profile.onboardedAt) && !owned.some(row => row.source === "starter");
     const outfit = sanitizeSchollyOutfit(profile.outfit);
     const storedOutfit = { ...(profile.outfit as Record<string, unknown>) };
@@ -71,6 +71,13 @@ async function wardrobe(req: Request, requestedProfileId: unknown, body?: Record
       if (!inserted) return;
       ownedIds.add(key);
       balance -= spentPoints;
+      if (source === "purchase") {
+        await tx.insert(pointsLedger).values({
+          profileId, points: -spentPoints, bucket: "spend", reason: "scholly_cosmetic_purchase",
+          idempotencyKey: `scholly:${profileId}:outfit:${key}`, createdAt: now,
+        });
+        await syncSchollyPointCache(profileId, lifetimePoints, tx);
+      }
       if (source === "starter") starterAvailable = false;
       await logSchollyEvent(profileId, source === "purchase" ? "item_bought" : "item_unlocked",
         { itemKey: key, ...(spentPoints ? { spentPoints } : {}), source }, tx);
@@ -118,7 +125,7 @@ async function wardrobe(req: Request, requestedProfileId: unknown, body?: Record
       }
     }
 
-    const snapshot: WardrobeSnapshot = { outfit, owned: [...ownedIds], balance, starterAvailable };
+    const snapshot: WardrobeSnapshot = { outfit, owned: [...ownedIds], balance, lifetimePoints, starterAvailable };
     return privateNoStoreJson(snapshot);
   });
 }

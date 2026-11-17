@@ -1080,7 +1080,8 @@ async function engagementStats(bounds: WindowBounds, warnings: string[]): Promis
     safe("quiz attempts", warnings, 0, () => countTable(quizAttempts)),
     safe("quiz passed", warnings, 0, () => countTable(quizAttempts, eq(quizAttempts.passed, true))),
     safe("points awarded", warnings, 0, () =>
-      db.select({ value: sql<number>`coalesce(sum(${pointsLedger.points}), 0)` }).from(pointsLedger).then((r) => num(r[0]?.value))
+      db.select({ value: sql<number>`coalesce(sum(${pointsLedger.points}), 0)` }).from(pointsLedger)
+        .where(gt(pointsLedger.points, 0)).then((r) => num(r[0]?.value))
     ),
     safe("badges awarded", warnings, 0, () => countTable(userBadges)),
     safe("badge kinds", warnings, 0, () => countTable(badges)),

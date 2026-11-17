@@ -126,3 +126,64 @@ test("a planned departure triggers visa practice and only a finished answer coun
     await db.end();
   }
 });
+
+test("star Sprint pays 30 once and a mutual seven-day streak pays both friends once", async ({ page, playwright, baseURL }) => {
+  const db = practiceDatabase();
+  const other = await playwright.request.newContext({ baseURL });
+  try {
+    const profileId = await practiceAccount(page, db, "scholly-sprint-friend@example.test");
+    const signedIn = await other.post("/api/auth/sign-in", {
+      data: { email: fixtures.adminEmail, password: fixtures.adminPassword },
+    });
+    expect(signedIn.ok()).toBe(true);
+    const day = schollyDayKey(new Date(), "Asia/Tashkent");
+    const invite = await page.request.post("/api/scholly/friends", { data: { action: "invite" } });
+    expect(invite.ok()).toBe(true);
+    const { code } = await invite.json();
+    expect((await page.request.post("/api/scholly/friends", { data: { action: "accept", code } })).status()).toBe(409);
+    expect((await other.post("/api/scholly/friends", { data: { action: "accept", code } })).ok()).toBe(true);
+    const { rows: [pair] } = await db.query<{ friend_id: number }>(
+      "UPDATE scholly_friend_links SET accepted_at = now() - interval '9 days' WHERE inviter_id = $1 RETURNING friend_id",
+      [profileId],
+    );
+    for (const id of [profileId, pair.friend_id]) {
+      await db.query(`INSERT INTO points_ledger (profile_id, points, reason, created_at)
+        SELECT $1, 0, 'daily_active', ($2::date - tick)::timestamp + interval '6 hours'
+        FROM generate_series(1,7) AS tick`, [id, day]);
+    }
+    const { rows: [mission] } = await db.query<{ id: number }>(`INSERT INTO daily_missions
+      (user_id,day,type,points,target_count,is_star) VALUES ($1,$2,'ielts_vocabulary',20,5,true) RETURNING id`, [profileId, day]);
+    const start = () => page.request.post(missionUrl, { data: { action: "start_sprint", missionId: mission.id } });
+    const startedResponse = await start();
+    expect(startedResponse.ok()).toBe(true);
+    const started = (await startedResponse.json()).mission;
+    expect((await (await start()).json()).mission.sprint).toEqual(started.sprint);
+    const exercise: SchollyIeltsExercise = started.exercise;
+    const answers = exercise.questions.map((question, index) => question.options.indexOf(exercise.words[index].definition));
+    const submit = () => page.request.post(missionUrl, { data: { action: "submit_ielts", missionId: mission.id, answers } });
+    for (const response of await Promise.all([submit(), submit()])) {
+      expect(response.ok()).toBe(true);
+      expect((await response.json()).mission).toMatchObject({ status: "done", points: 30 });
+    }
+    const { rows: awards } = await db.query<{ id: number; profile_id: number; points: number; reason: string }>(
+      `SELECT id, profile_id, points, reason FROM points_ledger WHERE profile_id IN ($1, $2)
+        AND reason IN ('scholly_daily_mission', 'scholly_friend_streak') ORDER BY id`, [profileId, pair.friend_id],
+    );
+    expect(awards.filter(row => row.reason === "scholly_friend_streak").map(row => row.points)).toEqual([15, 15]);
+    const missionAwards = awards.filter(row => row.reason === "scholly_daily_mission" && row.profile_id === profileId);
+    expect(missionAwards.map(row => row.points)).toEqual([30]);
+
+    const revoke = { awardId: missionAwards[0].id, reason: "spam" };
+    const before = await (await page.request.get("/api/scholly/points")).json();
+    const denied = await page.request.post("/api/gamification/reverse", { data: revoke });
+    expect(denied.status()).toBe(403);
+    const first = await other.post("/api/gamification/reverse", { data: revoke });
+    expect(first.ok()).toBe(true);
+    expect(await first.json()).toMatchObject({ reversed: true, lifetimePoints: before.lifetimePoints, balance: before.balance - 30 });
+    const repeated = await other.post("/api/gamification/reverse", { data: revoke });
+    expect(await repeated.json()).toMatchObject({ reversed: false, balance: before.balance - 30 });
+  } finally {
+    await other.dispose();
+    await db.end();
+  }
+});

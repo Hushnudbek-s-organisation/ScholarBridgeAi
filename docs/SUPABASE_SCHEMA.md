@@ -896,6 +896,8 @@ and the migration is safely retried.
 | `profile_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
 | `points` | integer |  | — |  |
 | `reason` | text |  | — |  |
+| `bucket` | text | yes | — | main, small, bonus or spend |
+| `idempotency_key` | text | yes | — | Unique award or purchase claim |
 | `related_entity_id` | integer | yes | — |  |
 | `created_at` | timestamp |  | yes |  |
 
@@ -1946,6 +1948,8 @@ must collapse colliding names before re-pointing the rest.
 | `longest_streak` | integer |  | yes | |
 | `freezes` | integer |  | yes | Bounded 0–2 |
 | `points` | integer |  | yes | |
+| `balance` | integer |  | yes | Spendable points cache |
+| `lifetime_points` | integer |  | yes | Lifetime points cache |
 | `level` | integer |  | yes | |
 | `skin` | text |  | yes | |
 | `outfit` | jsonb |  | yes | Object |
@@ -1972,6 +1976,44 @@ must collapse colliding names before re-pointing the rest.
 | `acquired_at` | timestamp with time zone |  | yes | UTC |
 | `source` | text |  | — | purchase / starter / achievement; one starter per user |
 | `spent_points` | integer |  | yes | Acquisition price for purchases; zero for unlocks |
+
+### `scholly_friend_links`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | serial |   | yes |  |
+| `inviter_id` | integer |   | — |  |
+| `friend_id` | integer | yes | — |  |
+| `token_hash` | text |   | — |  |
+| `expires_at` | timestamptz |   | — |  |
+| `accepted_at` | timestamptz | yes | — |  |
+| `ended_at` | timestamptz | yes | — |  |
+
+### `scholly_push_subscriptions`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `endpoint_hash` | text |   | — |  |
+| `user_id` | integer |   | — |  |
+| `endpoint` | text |   | — |  |
+| `p256dh` | text |   | — |  |
+| `auth` | text |   | — |  |
+| `updated_at` | timestamptz |   | yes |  |
+
+### `scholly_notification_log`
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | text |   | — |  |
+| `user_id` | integer |   | — |  |
+| `type` | text |   | — |  |
+| `channel` | text |   | — |  |
+| `local_day` | date |   | — |  |
+| `status` | text |   | — |  |
+| `created_at` | timestamptz |   | yes |  |
+| `sent_at` | timestamptz | yes | — |  |
+| `opened_at` | timestamptz | yes | — |  |
+| `acted_at` | timestamptz | yes | — |  |
 
 ### `daily_missions`
 

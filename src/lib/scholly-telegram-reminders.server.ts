@@ -11,12 +11,13 @@ import { formatNotification, pickLang, shouldDeliver, type BotLang } from "@/lib
 import { ensureTelegramTables } from "@/lib/telegram/db";
 import { publicSiteUrl, sendToChat, siteButton } from "@/lib/telegram/messaging";
 import { getBotToken, getTelegramSettings } from "@/lib/telegram/settings";
+import { claimSchollyMissionReminder, markSchollyReminderDelivery, SCHOLLY_MISSION_REMINDER } from "@/lib/scholly-notification-log.server";
 
-const TYPE = "scholly_daily_mission";
+const TYPE = SCHOLLY_MISSION_REMINDER;
 const CLAIM_EVENT = "mission_telegram_claim";
 const PAGE_SIZE = 200;
 
-const copy = {
+export const schollyMissionReminderCopy = {
   uz: {
     title: "Scholly · Bugungi missiya",
     friendly: "Bugungi kichik vazifang dashboardda kutyapti. Birga boshlaymizmi?",
@@ -43,7 +44,7 @@ const copy = {
   },
 } satisfies Record<BotLang, Record<SchollyReminderPreferences["tone"] | "title" | "open" | "settings", string>>;
 
-export async function runSchollyTelegramReminders(now?: Date) {
+export async function runSchollyTelegramReminders(now?: Date, pausedPushUsers: ReadonlySet<number> = new Set()) {
   const summary = { candidates: 0, sent: 0, failed: 0 };
 
   const [{ token }, settings] = await Promise.all([getBotToken(), getTelegramSettings()]);
@@ -75,10 +76,12 @@ export async function runSchollyTelegramReminders(now?: Date) {
     if (!candidates.length) break;
 
     for (const candidate of candidates) {
+      if (pausedPushUsers.has(candidate.id)) continue;
       const local = schollyReminderLocalTime(now ?? new Date(), candidate.tz);
       if (!local || !shouldRemindAboutMission(parseSchollyReminderPreferences(candidate), local.time)) continue;
       const { id } = candidate;
       summary.candidates++;
+      let deliveryId: string | null = null;
       try {
         const reminder = await db.transaction(async (tx) => {
           // Lock the per-user row through the check and claim. Claims survive a
@@ -87,7 +90,8 @@ export async function runSchollyTelegramReminders(now?: Date) {
           const [profile] = await tx.select().from(schollyProfiles)
             .where(eq(schollyProfiles.userId, id)).for("update").limit(1);
           if (!profile) return null;
-          const local = schollyReminderLocalTime(now ?? new Date(), profile.tz);
+          const clock = now ?? new Date();
+          const local = schollyReminderLocalTime(clock, profile.tz);
           const prefs = parseSchollyReminderPreferences(profile);
           if (!local || !shouldRemindAboutMission(prefs, local.time)) return null;
 
@@ -99,22 +103,19 @@ export async function runSchollyTelegramReminders(now?: Date) {
             .where(and(eq(dailyMissions.userId, id), eq(dailyMissions.day, local.day))).limit(1);
           if (mission && mission.status !== "pending") return null;
 
-          const [existing] = await tx.select({ id: schollyEvents.id }).from(schollyEvents)
-            .where(and(
-              eq(schollyEvents.userId, id), eq(schollyEvents.type, CLAIM_EVENT),
-              sql`${schollyEvents.payload}->>'day' = ${local.day}`,
-            )).limit(1);
-          if (existing) return null;
+          const deliveryId = await claimSchollyMissionReminder(tx, id, local.day, "telegram", clock);
+          if (!deliveryId) return null;
 
           await tx.insert(schollyEvents).values({
             userId: id, type: CLAIM_EVENT, payload: { day: local.day },
           });
-          return { link, lang: pickLang(profile.lang), tone: prefs.tone };
+          return { deliveryId, link, lang: pickLang(profile.lang), tone: prefs.tone };
         });
         if (!reminder) continue;
 
+        deliveryId = reminder.deliveryId;
         const { link, lang, tone } = reminder;
-        const text = copy[lang];
+        const text = schollyMissionReminderCopy[lang];
         const result = await sendToChat(
           token,
           link.chatId,
@@ -123,9 +124,11 @@ export async function runSchollyTelegramReminders(now?: Date) {
           { profileId: id, kind: "notification", type: TYPE, preview: text.title, singleAttempt: true },
           [...siteButton(site, lang, "#dashboard", text.open), ...siteButton(site, lang, "#notifications", text.settings)],
         );
+        await markSchollyReminderDelivery(deliveryId, result.ok, now ?? new Date());
         if (result.ok) summary.sent++;
         else summary.failed++;
       } catch (error) {
+        if (deliveryId) await markSchollyReminderDelivery(deliveryId, false, now ?? new Date()).catch(() => {});
         summary.failed++;
         console.warn("[scholly reminders] candidate failed:", error instanceof Error ? error.message : error);
       }

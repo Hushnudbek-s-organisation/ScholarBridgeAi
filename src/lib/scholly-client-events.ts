@@ -4,6 +4,19 @@ import type { SchollyQueuedMessage } from "./scholly-messages";
 export const SCHOLLY_DEADLINE_NEAR = "scholly:deadline-near";
 export const SCHOLLY_APPLICATION_SUBMITTED = "scholly:application-submitted";
 export const SCHOLLY_DASHBOARD_MESSAGES = "scholly:dashboard-messages";
+export const SCHOLLY_MISSION_PRACTICE = "scholly:mission-practice";
+
+export interface SchollyMissionPractice {
+  profileId: number;
+  type: "daily_quiz" | "weekly_review";
+}
+
+export function announceSchollyMissionPractice(profileId: number, type: SchollyMissionPractice["type"]) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<SchollyMissionPractice>(SCHOLLY_MISSION_PRACTICE, {
+    detail: { profileId, type },
+  }));
+}
 
 export interface SchollyDashboardMessages {
   profileId: number;
