@@ -2009,6 +2009,8 @@ must collapse colliding names before re-pointing the rest.
 | `type` | text |   | — |  |
 | `channel` | text |   | — |  |
 | `local_day` | date |   | — |  |
+| `category` | text |   | yes | Mission, streak or friend reminder |
+| `variant` | text | yes | — | Browser reminder A/B assignment |
 | `status` | text |   | — |  |
 | `created_at` | timestamptz |   | yes |  |
 | `sent_at` | timestamptz | yes | — |  |

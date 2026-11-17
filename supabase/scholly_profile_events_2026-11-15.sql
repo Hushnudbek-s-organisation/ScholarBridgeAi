@@ -80,3 +80,18 @@ CREATE TABLE IF NOT EXISTS daily_missions (
 CREATE INDEX IF NOT EXISTS idx_daily_missions_user_status_day
   ON daily_missions (user_id, status, day);
 COMMENT ON TABLE daily_missions IS 'One deterministic Scholly mission per student-local 04:00 day; completion is verified from existing product data.';
+
+ALTER TABLE public.scholly_profile ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scholly_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.daily_missions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.scholly_profile, public.scholly_events, public.daily_missions FROM PUBLIC;
+DO $$
+DECLARE role_name text;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+      EXECUTE format('REVOKE ALL ON TABLE public.scholly_profile, public.scholly_events, public.daily_missions FROM %I', role_name);
+    END IF;
+  END LOOP;
+END;
+$$;

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { safeEqual } from "@/lib/payments";
-import { runSchollyTelegramReminders } from "@/lib/scholly-telegram-reminders.server";
-import { runSchollyPushReminders } from "@/lib/scholly-push-reminders.server";
+import { runSchollyReminderSweep } from "@/lib/scholly-reminder-sweep.server";
 
 async function handle(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -10,15 +9,7 @@ async function handle(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const { pausedUsers, ...push } = await runSchollyPushReminders();
-    const telegram = await runSchollyTelegramReminders(undefined, pausedUsers);
-    return NextResponse.json({
-      ok: true,
-      candidates: push.candidates + telegram.candidates,
-      sent: push.sent + telegram.sent,
-      failed: push.failed + telegram.failed,
-      push, telegram,
-    });
+    return NextResponse.json({ ok: true, ...await runSchollyReminderSweep() });
   } catch (error) {
     console.error("/api/cron/scholly-reminders failed:", error);
     return NextResponse.json({ error: "Scholly reminder sweep failed" }, { status: 500 });

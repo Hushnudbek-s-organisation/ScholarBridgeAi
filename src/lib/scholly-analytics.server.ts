@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import { schollyEvents } from "@/db/schema";
+import { dailyMissions, schollyEvents, schollyNotificationLog } from "@/db/schema";
 
 const timeZone = "Asia/Tashkent";
 const activityTypes = sql`('dashboard_open', 'mission_shown', 'mission_done')`;
@@ -21,12 +21,13 @@ export type SchollyAnalytics = {
   retention1: Cohort;
   retention7: Cohort;
   onboarding: { step: string; users: number }[];
+  reminderExperiment: { variant: string; sent: number; opened: number; completed: number }[];
 };
 
 export async function getSchollyAnalytics(days: number, now: Date): Promise<SchollyAnalytics> {
   const boundary = sql`(${now.toISOString()}::timestamptz AT TIME ZONE ${timeZone})::date`;
   const localDate = sql`(${schollyEvents.createdAt} AT TIME ZONE ${timeZone})::date`;
-  const [activity, overview, onboarding] = await Promise.all([
+  const [activity, overview, onboarding, reminderExperiment] = await Promise.all([
     db.execute<DailyActivity>(sql`
       WITH bounds AS (SELECT ${boundary} AS today),
       activity AS (
@@ -105,6 +106,20 @@ export async function getSchollyAnalytics(days: number, now: Date): Promise<Scho
       WHERE step IN ('started', 'name', 'reminder', 'tone', 'challenge', 'completed', 'skipped')
       GROUP BY step
     `),
+    db.execute<SchollyAnalytics["reminderExperiment"][number]>(sql`
+      SELECT variant, count(*)::int AS sent,
+        count(opened_at)::int AS opened,
+        count(*) FILTER (WHERE EXISTS (
+          SELECT 1 FROM ${dailyMissions} mission
+          WHERE mission.user_id = delivery.user_id AND mission.day = delivery.local_day
+            AND mission.status = 'done' AND mission.done_at BETWEEN delivery.sent_at AND ${now.toISOString()}::timestamptz
+        ))::int AS completed
+      FROM ${schollyNotificationLog} delivery
+      WHERE channel = 'push' AND category = 'mission' AND variant IN ('A', 'B') AND status = 'sent'
+        AND sent_at BETWEEN ((${boundary} - ${days - 1}::int)::timestamp AT TIME ZONE ${timeZone})
+          AND ${now.toISOString()}::timestamptz
+      GROUP BY variant ORDER BY variant
+    `),
   ]);
 
   const totals = overview.rows[0];
@@ -116,5 +131,6 @@ export async function getSchollyAnalytics(days: number, now: Date): Promise<Scho
     retention1: { eligible: totals.eligible1, returned: totals.returned1 },
     retention7: { eligible: totals.eligible7, returned: totals.returned7 },
     onboarding: onboarding.rows,
+    reminderExperiment: reminderExperiment.rows,
   };
 }

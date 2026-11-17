@@ -1,3 +1,4 @@
+import { getSchollyReminderMessage, schollyReminderBody } from "@/lib/scholly-reminder-message.server";
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { dailyMissions, schollyEvents, schollyProfiles, telegramLinks } from "@/db/schema";
@@ -103,23 +104,24 @@ export async function runSchollyTelegramReminders(now?: Date, pausedPushUsers: R
             .where(and(eq(dailyMissions.userId, id), eq(dailyMissions.day, local.day))).limit(1);
           if (mission && mission.status !== "pending") return null;
 
-          const deliveryId = await claimSchollyMissionReminder(tx, id, local.day, "telegram", clock);
+          const message = await getSchollyReminderMessage(tx, id, clock, local.day, profile.tz, "telegram", prefs.tone);
+          const deliveryId = await claimSchollyMissionReminder(tx, id, local.day, "telegram", clock, message);
           if (!deliveryId) return null;
 
           await tx.insert(schollyEvents).values({
             userId: id, type: CLAIM_EVENT, payload: { day: local.day },
           });
-          return { deliveryId, link, lang: pickLang(profile.lang), tone: prefs.tone };
+          return { deliveryId, link, message, lang: pickLang(profile.lang), tone: prefs.tone };
         });
         if (!reminder) continue;
 
         deliveryId = reminder.deliveryId;
-        const { link, lang, tone } = reminder;
+        const { link, lang, tone, message } = reminder;
         const text = schollyMissionReminderCopy[lang];
         const result = await sendToChat(
           token,
           link.chatId,
-          formatNotification(lang, { title: text.title, body: text[tone] }),
+          formatNotification(lang, { title: text.title, body: schollyReminderBody(lang, message, text[tone]) }),
           // No delayed retry that could arrive outside the allowed hour.
           { profileId: id, kind: "notification", type: TYPE, preview: text.title, singleAttempt: true },
           [...siteButton(site, lang, "#dashboard", text.open), ...siteButton(site, lang, "#notifications", text.settings)],

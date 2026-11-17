@@ -201,6 +201,8 @@ export const schollyNotificationLog = pgTable("scholly_notification_log", {
   type: text("type").notNull(),
   channel: text("channel").notNull(),
   localDay: date("local_day").notNull(),
+  category: text("category").notNull().default("mission"),
+  variant: text("variant"),
   status: text("status").$type<"claimed" | "sent" | "failed">().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   sentAt: timestamp("sent_at", { withTimezone: true }),

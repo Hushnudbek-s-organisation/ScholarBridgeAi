@@ -105,6 +105,12 @@ services:
       # --- Supabase Storage (branding uploads: logo / favicon) ---------------
       # Without these two, Admin → Branding returns 503 "Storage is not
       # configured". Supabase dashboard → Project Settings → API.
+      - key: SCHOLLY_VAPID_PUBLIC_KEY
+        sync: false
+      - key: SCHOLLY_VAPID_PRIVATE_KEY
+        sync: false
+      - key: SCHOLLY_VAPID_SUBJECT
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

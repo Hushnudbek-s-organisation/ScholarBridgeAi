@@ -22,12 +22,7 @@ function unavailable(error: unknown) {
   return reject("wardrobe_unavailable", 500);
 }
 
-async function wardrobe(req: Request, requestedProfileId: unknown, body?: Record<string, unknown>) {
-  const access = await requireProfileAccess(req, requestedProfileId);
-  if (!access.ok) return reject(access.code, access.status);
-  const profileId = access.session.profile.id;
-  if (access.targetId !== profileId) return reject("forbidden", 403);
-
+async function wardrobe(profileId: number, body?: Record<string, unknown>) {
   const action = body?.action;
   const item = wardrobeItem(body?.slot, body?.key);
   const removeAura = action === "equip" && body?.slot === "aura" && body.key === null;
@@ -132,7 +127,10 @@ async function wardrobe(req: Request, requestedProfileId: unknown, body?: Record
 
 export async function GET(req: Request) {
   try {
-    return await wardrobe(req, new URL(req.url).searchParams.get("profileId"));
+    const access = await requireProfileAccess(req, new URL(req.url).searchParams.get("profileId"));
+    if (!access.ok) return reject(access.code, access.status);
+    if (access.targetId !== access.session.profile.id) return reject("forbidden", 403);
+    return await wardrobe(access.targetId);
   } catch (error) {
     return unavailable(error);
   }
@@ -142,7 +140,10 @@ export async function POST(req: Request) {
   try {
     const parsed = await readJsonBody<Record<string, unknown>>(req, 4096);
     if (!parsed.ok) return reject(parsed.code, parsed.status);
-    return await wardrobe(req, parsed.body.profileId, parsed.body);
+    const access = await requireProfileAccess(req, parsed.body.profileId);
+    if (!access.ok) return reject(access.code, access.status);
+    if (access.targetId !== access.session.profile.id) return reject("forbidden", 403);
+    return await wardrobe(access.targetId, parsed.body);
   } catch (error) {
     return unavailable(error);
   }

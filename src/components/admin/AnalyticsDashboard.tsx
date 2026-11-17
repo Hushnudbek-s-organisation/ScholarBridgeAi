@@ -399,6 +399,15 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
                 value={formatNumber(scholly.onboarding.find((entry) => entry.step === step)?.users)} />
             ))}
           </div>
+          <h4 className="mb-2 mt-4 text-sm font-semibold text-slate-800">Missiya eslatmasi A/B sinovi</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {(["A", "B"] as const).map(variant => {
+              const result = scholly.reminderExperiment?.find(row => row.variant === variant);
+              return <MiniStat key={variant} label={`Variant ${variant}`}
+                value={schollyPercent(result?.completed ?? 0, result?.sent ?? 0)}
+                hint={`${result?.sent ?? 0} yuborildi · ${result?.opened ?? 0} ochildi · ${result?.completed ?? 0} bajarildi`} />;
+            })}
+          </div>
         </Panel>
       )}
 

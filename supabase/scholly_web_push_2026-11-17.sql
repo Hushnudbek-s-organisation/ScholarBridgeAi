@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS public.scholly_notification_log (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_scholly_notification_user_day_type
   ON public.scholly_notification_log (user_id, local_day, type);
+ALTER TABLE public.scholly_notification_log ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'mission';
+ALTER TABLE public.scholly_notification_log ADD COLUMN IF NOT EXISTS variant text;
 
 ALTER TABLE public.scholly_push_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.scholly_notification_log ENABLE ROW LEVEL SECURITY;

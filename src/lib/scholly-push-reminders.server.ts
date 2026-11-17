@@ -1,3 +1,4 @@
+import { getSchollyReminderMessage, schollyReminderBody } from "@/lib/scholly-reminder-message.server";
 import { and, asc, desc, eq, exists, gt, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { dailyMissions, schollyNotificationLog, schollyProfiles, schollyPushSubscriptions } from "@/db/schema";
@@ -67,18 +68,19 @@ export async function runSchollyPushReminders(now?: Date, request: typeof fetch 
             .where(and(eq(dailyMissions.userId, id), eq(dailyMissions.day, local.day))).limit(1);
           if (mission && mission.status !== "pending") return null;
 
-          const deliveryId = await claimSchollyMissionReminder(tx, id, local.day, "push", instant);
-          return deliveryId ? { deliveryId, subscription, ttl, lang: pickLang(profile.lang), tone: prefs.tone } : null;
+          const message = await getSchollyReminderMessage(tx, id, instant, local.day, profile.tz, "push", prefs.tone);
+          const deliveryId = await claimSchollyMissionReminder(tx, id, local.day, "push", instant, message);
+          return deliveryId ? { deliveryId, subscription, ttl, message, lang: pickLang(profile.lang), tone: prefs.tone } : null;
         });
         if (!reminder) continue;
         deliveryId = reminder.deliveryId;
-        const { subscription, lang, tone } = reminder;
+        const { subscription, lang, tone, message } = reminder;
         const [stillEnrolled] = await db.select({ id: schollyPushSubscriptions.endpointHash }).from(schollyPushSubscriptions)
           .where(and(eq(schollyPushSubscriptions.endpointHash, subscription.endpointHash), eq(schollyPushSubscriptions.userId, id))).limit(1);
         const text = schollyMissionReminderCopy[lang];
         const result = stillEnrolled ? await sendSchollyWebPush({
           endpoint: subscription.endpoint, keys: { auth: subscription.auth, p256dh: subscription.p256dh },
-        }, { title: text.title, body: text[tone], settingsLabel: text.settings, deliveryId }, config, reminder.ttl, request)
+        }, { title: text.title, body: schollyReminderBody(lang, message, text[tone]), settingsLabel: text.settings, deliveryId }, config, reminder.ttl, request)
           : { sent: false, expired: false };
         await markSchollyReminderDelivery(deliveryId, result.sent, now ?? new Date());
         if (result.expired) await db.delete(schollyPushSubscriptions).where(and(

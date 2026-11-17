@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { schollyEvents, schollyNotificationLog } from "@/db/schema";
+import type { SchollyReminderMessage } from "@/lib/scholly-reminder-message.server";
 
 export const SCHOLLY_MISSION_REMINDER = "scholly_daily_mission";
 
@@ -13,6 +14,7 @@ export async function claimSchollyMissionReminder(
   localDay: string,
   channel: "telegram" | "push",
   now: Date,
+  message: SchollyReminderMessage,
 ) {
   const [legacyClaim] = await tx.select({ id: schollyEvents.id }).from(schollyEvents).where(and(
     eq(schollyEvents.userId, userId), eq(schollyEvents.type, "mission_telegram_claim"),
@@ -21,6 +23,7 @@ export async function claimSchollyMissionReminder(
   if (legacyClaim) return null;
   const [claim] = await tx.insert(schollyNotificationLog).values({
     id: randomUUID(), userId, type: SCHOLLY_MISSION_REMINDER, localDay, channel, status: "claimed", createdAt: now,
+    category: message.category, variant: message.variant,
   }).onConflictDoNothing({
     target: [schollyNotificationLog.userId, schollyNotificationLog.localDay, schollyNotificationLog.type],
   }).returning({ id: schollyNotificationLog.id });

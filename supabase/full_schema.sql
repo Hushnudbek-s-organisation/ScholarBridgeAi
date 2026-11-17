@@ -1258,6 +1258,8 @@ CREATE TABLE IF NOT EXISTS "scholly_notification_log" (
   "type" text NOT NULL,
   "channel" text NOT NULL,
   "local_day" date NOT NULL,
+  "category" text NOT NULL DEFAULT 'mission',
+  "variant" text,
   "status" text NOT NULL,
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
   "sent_at" timestamp with time zone,
@@ -2629,6 +2631,8 @@ ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "user_id" intege
 ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "type" text;
 ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "channel" text;
 ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "local_day" date;
+ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "category" text NOT NULL DEFAULT 'mission';
+ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "variant" text;
 ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "status" text;
 ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "created_at" timestamp with time zone NOT NULL DEFAULT now();
 ALTER TABLE "scholly_notification_log" ADD COLUMN IF NOT EXISTS "sent_at" timestamp with time zone;

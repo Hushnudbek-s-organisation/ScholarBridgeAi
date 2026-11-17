@@ -41,6 +41,18 @@ test("Scholly reports unique daily completers and mature retention cohorts to ad
       profileIds,
     );
 
+    await pool.query(`
+      INSERT INTO scholly_notification_log (id, user_id, type, category, variant, channel, local_day, status, sent_at, opened_at)
+      VALUES ($1, $3, 'scholly_daily_mission', 'mission', 'A', 'push', (now() AT TIME ZONE 'Asia/Tashkent')::date,
+        'sent', now() - interval '3 minutes', now() - interval '2 minutes'),
+        ($2, $4, 'scholly_daily_mission', 'mission', 'B', 'push', (now() AT TIME ZONE 'Asia/Tashkent')::date,
+        'sent', now() - interval '3 minutes', NULL)
+    `, [randomUUID(), randomUUID(), ...profileIds]);
+    await pool.query(`
+      INSERT INTO daily_missions (user_id, day, type, status, done_at)
+      VALUES ($1, (now() AT TIME ZONE 'Asia/Tashkent')::date, 'fill_profile_fields', 'done', now() - interval '1 minute')
+    `, [profileIds[0]]);
+
     const response = await request.get(url);
     expect(response.status()).toBe(200);
     const result = (await response.json() as AnalyticsOverview).scholly;
@@ -50,6 +62,14 @@ test("Scholly reports unique daily completers and mature retention cohorts to ad
       retention1: { eligible: initial.retention1.eligible + 2, returned: initial.retention1.returned + 1 },
       retention7: { eligible: initial.retention7.eligible + 2, returned: initial.retention7.returned + 1 },
     });
+    for (const variant of ["A", "B"]) {
+      const previous = initial.reminderExperiment.find(row => row.variant === variant);
+      const completed = variant === "A" ? 1 : 0;
+      expect(result?.reminderExperiment).toContainEqual({
+        variant, sent: (previous?.sent ?? 0) + 1,
+        opened: (previous?.opened ?? 0) + completed, completed: (previous?.completed ?? 0) + completed,
+      });
+    }
     const day = initial.activity.at(-4)!;
     expect(result?.activity.find(({ date }) => date === day.date)).toEqual({
       date: day.date, visitors: day.visitors + 1, completers: day.completers + 1,

@@ -23,6 +23,7 @@ import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
 import { SchollyPointsBreakdown, SchollyPointsSummary, useSchollyPoints } from "./SchollyPointsSummary";
 import { SchollySprint, schollySprintStartLabel, type SchollySprintTiming } from "./SchollySprint";
 import { SchollyFriends } from "./SchollyFriends";
+import { SchollyRanking } from "./SchollyRanking";
 import "./scholly-points.css";
 
 function dateKey(date: Date) {
@@ -440,6 +441,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
     </section>
 
     <SchollyFriends key={profileId} profileId={profileId} locale={missionLocale} />
+    <SchollyRanking key={profileId} locale={missionLocale} />
     <div ref={quizPanel}><SchollyDailyQuiz profileId={profileId} /></div>
     <div ref={weeklyPanel}><SchollyWeeklyReport profileId={profileId} onNavigate={onNavigate} /></div>
   </>;
