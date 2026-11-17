@@ -138,7 +138,8 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   const [drag, setDrag] = useState<Position | null>(null);
   const [dockPreview, setDockPreview] = useState(false);
   const [open, setOpen] = useState(false);
-  const [schollyProfile, setSchollyProfile] = useState<SchollyOnboardingProfile | null>(null);
+  const [storedSchollyProfile, setSchollyProfile] = useState<SchollyOnboardingProfile | null>(null);
+  const schollyProfile = storedSchollyProfile?.userId === profileId ? storedSchollyProfile : null;
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [pointsPop, setPointsPop] = useState<SchollyPointsChange | null>(null);
   const [equippedOutfit, setEquippedOutfit] = useState<{ profileId: number; outfit: SchollyOutfit } | null>(null);
@@ -149,13 +150,21 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   const outfit = equippedOutfit && equippedOutfit.profileId === profileId
     ? equippedOutfit.outfit
     : schollyProfile && schollyProfile.userId === profileId ? schollyProfile.outfit : undefined;
-  const [schollyProfileLoaded, setSchollyProfileLoaded] = useState(false);
+  const [loadedProfile, setLoadedProfile] = useState<string | null>(null);
+  const profileRequest = profileId ? `${profileId}:${locale}` : null;
+  const schollyProfileLoaded = !profileRequest || loadedProfile === profileRequest;
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [preferredNameInput, setPreferredNameInput] = useState("");
   const [selecting, setSelecting] = useState(false);
   const [selection, setSelection] = useState<{ element: Element; label: string; answer: string } | null>(null);
+  const [previousPage, setPreviousPage] = useState({ activeTab, activePane });
+  if (previousPage.activeTab !== activeTab || previousPage.activePane !== activePane) {
+    setPreviousPage({ activeTab, activePane });
+    setSelecting(false);
+    setSelection(null);
+  }
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [pending, setPending] = useState(false);
@@ -204,7 +213,8 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   const engine = useRef<BrowserModel | null>(null);
 
   useLayoutEffect(() => {
-    setPlacement(savedPlacement(hasDock));
+    const frame = requestAnimationFrame(() => setPlacement(savedPlacement(hasDock)));
+    return () => cancelAnimationFrame(frame);
   }, [hasDock]);
 
   useEffect(() => {
@@ -222,8 +232,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   }, []);
 
   useEffect(() => {
-    if (!profileId) { setSchollyProfile(null); setSchollyProfileLoaded(true); return; }
-    setSchollyProfileLoaded(false);
+    if (!profileRequest || !profileId) return;
     let active = true;
     void fetch(`/api/scholly/profile?profileId=${profileId}`, { cache: "no-store" })
       .then(async response => {
@@ -248,9 +257,9 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         }
       })
       .catch(() => {})
-      .finally(() => { if (active) setSchollyProfileLoaded(true); });
+      .finally(() => { if (active) setLoadedProfile(profileRequest); });
     return () => { active = false; };
-  }, [profileId, locale]);
+  }, [profileId, locale, profileRequest]);
 
   useEffect(() => {
     function updateSettings(event: Event) {
@@ -303,21 +312,17 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
 
   const chatOpen = open && !selecting;
   const returningFromPicker = useRef(false);
+  const onboardingState = schollyProfile?.onboardingState;
   useEffect(() => {
     if (!chatOpen || (profileId && !schollyProfileLoaded)) return;
     if (returningFromPicker.current) inspectButton.current?.focus({ preventScroll: true });
-    else if (schollyProfile && schollyProfile.onboardingState !== "completed") onboardingCard.current?.focus({ preventScroll: true });
+    else if (onboardingState && onboardingState !== "completed") onboardingCard.current?.focus({ preventScroll: true });
     else input.current?.focus({ preventScroll: true });
     returningFromPicker.current = false;
-  }, [chatOpen, profileId, schollyProfileLoaded, schollyProfile?.onboardingState]);
+  }, [chatOpen, profileId, schollyProfileLoaded, onboardingState]);
   useEffect(() => {
     if (feed.current) feed.current.scrollTop = feed.current.scrollHeight;
   }, [messages, pending, chatOpen]);
-
-  useEffect(() => {
-    setSelecting(false);
-    setSelection(null);
-  }, [activeTab, activePane]);
 
   async function saveOnboarding(action: Record<string, unknown>) {
     if (!profileId || onboardingBusy) return false;
