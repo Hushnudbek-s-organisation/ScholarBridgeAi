@@ -158,7 +158,7 @@ export async function POST(req: Request) {
       const ownSop = essayType === "sop" && access.session.profile.id === profileId
         && body.writingSource !== "generated_draft";
       let newParagraphs: string[] = [];
-      if (ownSop && last?.content !== content && schollySopCandidates(content).length) {
+      if (ownSop && last?.content !== content && (await schollySopCandidates(content)).length) {
         const ownDrafts = and(eq(essayVersions.profileId, profileId), or(
           eq(essayVersions.essayType, "sop"),
           and(eq(essayVersions.essayType, "private_memory"), inArray(essayVersions.title, [
@@ -174,7 +174,7 @@ export async function POST(req: Request) {
           const history = await tx.select({ content: essayVersions.content }).from(essayVersions)
             .where(ownDrafts).orderBy(desc(essayVersions.id)).limit(16);
           const previousDrafts = [...new Set([...(last ? [last.content] : []), ...history.map(version => version.content)])];
-          newParagraphs = schollySopCandidates(content, previousDrafts);
+          newParagraphs = await schollySopCandidates(content, previousDrafts);
         }
       }
       const versionNumber = (last?.versionNumber ?? 0) + 1;

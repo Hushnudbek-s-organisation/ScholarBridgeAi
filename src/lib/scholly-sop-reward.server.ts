@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { paragraphs } from "./essay";
-import { ESSAY_RUBRIC_SAMPLES, SOP_SAMPLES } from "./samples/exemplars";
 
 export const SCHOLLY_SOP_DAILY_PARAGRAPHS = 3;
 const MIN_PARAGRAPH_WORDS = 40;
@@ -50,15 +49,21 @@ function writingSamples(drafts: readonly string[]) {
     .filter((sample): sample is WritingSample => sample !== null);
 }
 
-const teachingExamples = writingSamples([...SOP_SAMPLES, ...ESSAY_RUBRIC_SAMPLES].map(sample => sample.text));
+let teachingExamples: Promise<WritingSample[]> | undefined;
+
+function loadTeachingExamples() {
+  return teachingExamples ??= import("./samples/exemplars").then(({ SOP_SAMPLES, ESSAY_RUBRIC_SAMPLES }) =>
+    writingSamples([...SOP_SAMPLES, ...ESSAY_RUBRIC_SAMPLES].map(sample => sample.text)));
+}
 
 /** Score local novelty and obvious filler deterministically; this is not an authorship check. */
-export function schollySopCandidates(content: string, previousDrafts: readonly string[] = []) {
-  const known = [...teachingExamples, ...writingSamples(previousDrafts)];
+export async function schollySopCandidates(content: string, previousDrafts: readonly string[] = []) {
+  const samples = writingSamples([content]);
+  if (!samples.length) return [];
+  const known = [...await loadTeachingExamples(), ...writingSamples(previousDrafts)];
   const novel: string[] = [];
-  for (const text of paragraphs(content)) {
-    const sample = writingSample(text);
-    if (!sample || known.some(existing => substantiallySame(sample, existing))) continue;
+  for (const sample of samples) {
+    if (known.some(existing => substantiallySame(sample, existing))) continue;
     novel.push(sample.fingerprint);
     known.push(sample);
   }
