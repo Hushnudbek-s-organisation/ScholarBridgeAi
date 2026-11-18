@@ -17,7 +17,7 @@ const root = resolve(__dirname, "..");
 const gamificationRoute = readFileSync(resolve(root, "src/app/api/gamification/route.ts"), "utf8");
 const preferenceRoute = readFileSync(resolve(root, "src/app/api/scholly/profile/route.ts"), "utf8");
 assert.match(gamificationRoute, /schollyProfiles\.tz/);
-assert.doesNotMatch(gamificationRoute, /searchParams\.get\("timeZone"\)/);
+assert.match(gamificationRoute, /preferences\?\.timeZone \?\? fallback/);
 assert.match(preferenceRoute, /isSupportedTimeZone\(body\.tz\)/);
 assert.match(preferenceRoute, /tz: hasTimezone \? body\.tz/);
 

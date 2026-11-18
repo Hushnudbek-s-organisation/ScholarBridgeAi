@@ -10,7 +10,7 @@
  * Disable with NOTIFICATION_SCHEDULER=off. Never runs in `next dev` unless
  * NOTIFICATION_SCHEDULER=on (keeps local development quiet).
  */
-const g = globalThis as unknown as { __sbSchedulerStarted?: boolean; __sbSweepRunning?: boolean };
+const g = globalThis as unknown as { __sbSchedulerStarted?: boolean; __sbSweepRunning?: boolean; __sbSchollySweepRunning?: boolean };
 
 export function startNotificationScheduler() {
   const mode = (process.env.NOTIFICATION_SCHEDULER || "").toLowerCase();
@@ -40,6 +40,20 @@ export function startNotificationScheduler() {
 
   const first = setTimeout(tick, 2 * 60_000);
   const every = setInterval(tick, hours * 3_600_000);
+  const tickScholly = async () => {
+    if (g.__sbSchollySweepRunning) return;
+    g.__sbSchollySweepRunning = true;
+    try {
+      const { runSchollyReminderSweep } = await import("@/lib/scholly-reminder-sweep.server");
+      await runSchollyReminderSweep();
+    } catch (error) {
+      console.warn("[scheduler] Scholly reminder sweep failed:", (error as Error)?.name);
+    } finally {
+      g.__sbSchollySweepRunning = false;
+    }
+  };
+  setTimeout(tickScholly, 2 * 60_000).unref?.();
+  setInterval(tickScholly, 15 * 60_000).unref?.();
   // Never keep the process alive just for the timers.
   first.unref?.();
   every.unref?.();

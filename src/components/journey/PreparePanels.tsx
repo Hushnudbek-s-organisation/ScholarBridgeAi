@@ -16,6 +16,7 @@ import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
 import { SmartTimelineCalendar } from "@/components/SmartTimelineCalendar";
 import { Empty, ErrorNote, Field, InlineAlert, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "@/components/ui/journey";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
 import { AppNote } from "@/components/AppNote";
 import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
@@ -75,7 +76,9 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
   };
 
   const patchDoc = async (body: Record<string, unknown>) => {
-    await sendJson("/api/vault/documents", { method: "PATCH", body: JSON.stringify(body) }, t("dvUpdateError"));
+    const result = await sendJson<{ schollyPointsAwarded?: number }>("/api/vault/documents",
+      { method: "PATCH", body: JSON.stringify(body) }, t("dvUpdateError"));
+    if (result.schollyPointsAwarded) announceSchollyPointsChanged(profileId, result.schollyPointsAwarded);
     await reload();
   };
 

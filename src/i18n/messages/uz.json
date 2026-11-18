@@ -2855,6 +2855,11 @@
     }
   },
   "departure": {
+    "dateLabel": "Rejalashtirilgan jo‘nash sanasi",
+    "saveDate": "Sanani saqlash",
+    "dateSaved": "Jo‘nash sanasi saqlandi.",
+    "dateError": "Jo‘nash sanasini saqlab bo‘lmadi.",
+    "dateHint": "Scholly viza suhbatini mashq qilishni taklif etishda bu ixtiyoriy sanadan foydalanadi. Sanani olib tashlash uchun maydonni bo‘sh qoldiring.",
     "title": "Jo'nash ro'yxati",
     "subtitle": "Taklifni qabul qilishdan chet eldagi birinchi haftagacha — hech narsa esdan chiqmaydi.",
     "signInTitle": "Ro'yxatdan foydalanish uchun kiring",

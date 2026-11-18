@@ -172,8 +172,15 @@ export const NOTIFY_TEXTS = {
    */
   referralRewarded(lang: NotifyLang, p: { name: string; points: number; premiumDays: number }): NotifyText {
     const n = cut(p.name, 60);
-    const pts = p.points > 0 ? `+${p.points}` : "";
+    const pts = `+${p.points}`;
     const prem = p.premiumDays > 0 ? p.premiumDays : 0;
+    if (p.points <= 0) {
+      return {
+        uz: { title: "🎉 Taklifingiz ishladi!", body: prem ? `${n} profilini to‘ldirdi. Siz ${prem} kunlik Premium oldingiz.` : `${n} profilini to‘ldirdi. Taklif hisobga olindi.` },
+        ru: { title: "🎉 Ваше приглашение сработало!", body: prem ? `${n} заполнил(а) профиль. Вы получили Premium на ${prem} дней.` : `${n} заполнил(а) профиль. Приглашение засчитано.` },
+        en: { title: "🎉 Your invite paid off!", body: prem ? `${n} completed their profile. You earned ${prem} days of Premium.` : `${n} completed their profile. Your invite counted.` },
+      }[lang];
+    }
     return {
       uz: {
         title: "🎉 Taklifingiz ishladi!",

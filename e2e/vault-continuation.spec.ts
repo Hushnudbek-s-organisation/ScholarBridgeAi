@@ -50,11 +50,11 @@ test("C11 vault Free/Pro, review CAS, every metadata edit, ownership, downgrade 
   expect(race[0].status()).toBe(200);expect([200,409]).toContain(race[1].status());expect((await record()).status).toBe("needs_update");
   const parallel=await Promise.all(Array.from({length:8},(_,index)=>patch({fileName:`fixture-${index}.pdf`})));expect(parallel.map(response=>response.status())).toEqual(Array(8).fill(200));
   const oldFile=(await record()).fileName;
-  // The preflight sees old Pro MVCC state, but the in-transaction SHARE lock
+  // The preflight sees old Pro MVCC state, but the in-transaction row lock
   // must wait for the actual downgrade and then recheck on THAT connection.
   await db.query("BEGIN");await db.query("UPDATE student_profiles SET is_premium=false,premium_until=NULL WHERE id=$1",[f.studentId]);
   const pending=patch({fileName:"must-not-survive-downgrade.pdf"});
-  await expect.poll(async()=>{await db.query("SELECT pg_stat_clear_snapshot()");return Number((await db.query("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query ILIKE '%student_profiles%FOR SHARE%'")).rows[0].count);}).toBeGreaterThan(0);
+  await expect.poll(async()=>{await db.query("SELECT pg_stat_clear_snapshot()");return Number((await db.query("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query ILIKE '%student_profiles%FOR NO KEY UPDATE%'")).rows[0].count);}).toBeGreaterThan(0);
   await db.query("COMMIT");expect((await pending).status()).toBe(403);expect((await record()).fileName).toBe(oldFile);
   await db.query("INSERT INTO subscriptions(profile_id,status,current_period_end) VALUES($1,'active',now()+interval '1 day')",[f.studentId]);
   expect((await patch({fileName:"subscription-only.pdf"})).status()).toBe(200);

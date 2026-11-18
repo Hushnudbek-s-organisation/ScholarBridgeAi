@@ -118,6 +118,8 @@ const CURATED_INDEXES: Record<string, string> = {
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_programs_university_name_degree ON programs (university_id, lower(btrim(name)), lower(btrim(coalesce(degree_level, ''))))",
   uq_program_requirements_program_year:
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_program_requirements_program_year ON program_requirements (program_id, academic_year) WHERE academic_year IS NOT NULL",
+  uq_scholly_wardrobe_starter:
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_scholly_wardrobe_starter ON scholly_wardrobe_items (user_id) WHERE source = 'starter'",
   ownership_transfers_one_open:
     "CREATE UNIQUE INDEX IF NOT EXISTS ownership_transfers_one_open ON ownership_transfers ((true)) WHERE status IN ('pending', 'accepted')",
   uq_payments_provider_transaction:
@@ -129,14 +131,19 @@ const CURATED_INDEXES: Record<string, string> = {
 // CHECK constraints by table (drizzle exposes them only as opaque chunks in
 // this version — the expressions mirror schema.ts line-for-line).
 const CURATED_CHECKS: Record<string, { name: string; expr: string }[]> = {
+  points_ledger: [{ name: "points_ledger_bucket_check", expr: "bucket IS NULL OR bucket IN ('main', 'small', 'bonus', 'spend')" }],
   platform_ownership: [{ name: "platform_ownership_id_check", expr: "id = 1" }],
   ownership_transfers: [
     { name: "ownership_transfers_status_check", expr: "status IN ('pending', 'accepted', 'completed', 'rejected', 'expired', 'cancelled')" },
     { name: "ownership_transfers_check", expr: "from_profile_id <> to_profile_id" },
   ],
+  scholly_wardrobe_items: [
+    { name: "scholly_wardrobe_items_source_check", expr: "source IN ('purchase', 'starter', 'achievement')" },
+    { name: "scholly_wardrobe_purchase_cost", expr: "(source = 'purchase' AND spent_points > 0) OR (source <> 'purchase' AND spent_points = 0)" },
+  ],
   daily_missions: [
     { name: "daily_missions_status_check", expr: "status IN ('pending', 'done', 'skipped')" },
-    { name: "daily_missions_type_check", expr: "type IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph')" },
+    { name: "daily_missions_type_check", expr: "type IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph', 'ielts_vocabulary', 'visa_practice', 'daily_quiz', 'weekly_review')" },
     { name: "daily_missions_size_check", expr: "size_min BETWEEN 1 AND 5" },
     { name: "daily_missions_target_count_check", expr: "target_count BETWEEN 1 AND 5000" },
     { name: "daily_missions_points_check", expr: "points IN (10, 20)" },

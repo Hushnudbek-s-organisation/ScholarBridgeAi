@@ -24,6 +24,7 @@ import { isUnmodifiedSample } from "@/lib/samples/text";
 import { EssayHighlightField } from "./EssayHighlightField";
 import { Button } from "@/components/ui/Button";
 import { ProgressFill } from "@/components/ui/ProgressBar";
+import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
 
 /**
  * Advanced Essay AI (#8) — the rubric and version-history half.
@@ -340,6 +341,7 @@ export function EssayRubricStudio({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save the version");
+      if (data.schollyPointsAwarded) announceSchollyPointsChanged(activeProfile.id, data.schollyPointsAwarded);
       setFeedback(data.feedback);
       setBehaviorSignals(normalizeBehaviorSignals(data.behaviorSignals));
       setComparison(data.comparison);

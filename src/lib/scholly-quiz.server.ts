@@ -116,6 +116,134 @@ const questionSets: readonly Question[][] = [
       correctIndex: 1,
     },
   ],
+  [
+    {
+      id: "allocate",
+      prompt: ["“Allocate” so‘zi nimani anglatadi?", "Что означает слово «allocate»?", "What does “allocate” mean?"],
+      options: [
+        ["Ajratmoq yoki taqsimlamoq", "Выделять или распределять", "To set aside or distribute"],
+        ["Bekor qilmoq", "Отменять", "To cancel"],
+        ["Qayta topshirmoq", "Подавать заново", "To resubmit"],
+      ],
+      correctIndex: 0,
+    },
+    {
+      id: "office-hours",
+      prompt: ["Universitetda o‘qituvchining “office hours” vaqti nimaga mo‘ljallangan?", "Для чего преподаватель в вузе назначает «office hours»?", "What are a university instructor’s office hours for?"],
+      options: [
+        ["Darsga ro‘yxatdan o‘tish uchun", "Для записи на занятия", "Registering for classes"],
+        ["Yotoqxonaga ariza berish uchun", "Для подачи заявления в общежитие", "Applying for housing"],
+        ["Talabalar savol berishi va yordam olishi uchun", "Чтобы студенты могли задать вопросы и получить помощь", "For students to ask questions and get help"],
+      ],
+      correctIndex: 2,
+    },
+    {
+      id: "visa-document-translation",
+      prompt: ["Viza hujjatiga tarjima kerakligini qanday aniqlaysiz?", "Как узнать, нужен ли перевод документа для визы?", "How can you find out whether a visa document needs a translation?"],
+      options: [
+        ["Hujjat rangiga qarab", "По цвету документа", "By looking at the document’s colour"],
+        ["Arizangizga tegishli rasmiy ro‘yxatdan", "По официальному списку для вашей категории заявления", "By checking the official instructions for your application"],
+        ["Do‘stingiz boshdan kechirgan jarayonga qarab", "По опыту друга", "By following a friend’s experience"],
+      ],
+      correctIndex: 1,
+    },
+  ],
+  [
+    {
+      id: "coherent",
+      prompt: ["“Coherent” javob qanday bo‘ladi?", "Каким будет «coherent» ответ?", "What is a “coherent” answer like?"],
+      options: [
+        ["Juda uzun", "Очень длинный", "Very long"],
+        ["Mantiqan bog‘langan va tushunarli", "Логичный и понятный", "Logical and easy to follow"],
+        ["Faqat misollardan iborat", "Состоит только из примеров", "Made up entirely of examples"],
+      ],
+      correctIndex: 1,
+    },
+    {
+      id: "elective",
+      prompt: ["Universitetda “elective” nima?", "Что такое «elective» в университете?", "What is an “elective” at university?"],
+      options: [
+        ["Talaba tanlashi mumkin bo‘lgan fan", "Дисциплина по выбору студента", "A course the student can choose"],
+        ["O‘qishga kirish imtihoni", "Вступительный экзамен", "An entrance exam"],
+        ["Majburiy amaliyot", "Обязательная практика", "A mandatory internship"],
+      ],
+      correctIndex: 0,
+    },
+    {
+      id: "visa-interview-mismatch",
+      prompt: ["Viza arizasini yuborishdan oldin ikkita hujjatda ism yozilishi farq qilsa, nima qilasiz?", "Что делать перед отправкой заявления, если имя в двух документах написано по-разному?", "Before submitting a visa application, what should you do if two documents spell your name differently?"],
+      options: [
+        ["Faqat qisqa ism ishlatasiz", "Использовать только сокращённое имя", "Use only a shortened name"],
+        ["Farqni yashirish uchun hujjatni tahrirlaysiz", "Отредактировать документ, чтобы скрыть различие", "Edit the document to hide the difference"],
+        ["Rasmiy yo‘riqnomani tekshirib, kerak bo‘lsa hujjatni bergan tashkilotga murojaat qilasiz", "Проверить официальные инструкции и при необходимости связаться с выдавшей документ организацией", "Check the official instructions and contact the issuing organisation if needed"],
+      ],
+      correctIndex: 2,
+    },
+  ],
+  [
+    {
+      id: "substantial",
+      prompt: ["“Substantial increase” qanday o‘sishni bildiradi?", "Какой рост означает «substantial increase»?", "What kind of increase is a “substantial increase”?"],
+      options: [
+        ["Sezilarli o‘sish", "Значительный рост", "A considerable increase"],
+        ["Juda oz o‘sish", "Очень небольшой рост", "A very slight increase"],
+        ["Vaqtinchalik pasayish", "Временное падение", "A temporary decrease"],
+      ],
+      correctIndex: 0,
+    },
+    {
+      id: "conditional-offer",
+      prompt: ["Qabul xatidagi “conditional offer” nimani anglatadi?", "Что означает «conditional offer» в письме о зачислении?", "What is a “conditional offer” in university admissions?"],
+      options: [
+        ["Ariza rad etilgan", "Заявление отклонено", "The application was rejected"],
+        ["Qabul uchun xatda ko‘rsatilgan shartlarni bajarish kerak", "Для зачисления нужно выполнить указанные условия", "You must meet the stated conditions to be admitted"],
+        ["Talabaga stipendiya tayinlangan", "Студенту назначена стипендия", "The student was awarded a scholarship"],
+      ],
+      correctIndex: 1,
+    },
+    {
+      id: "visa-upload-confirmation",
+      prompt: ["Viza arizasini yuborgach, qaysi ma’lumotni saqlash foydali?", "Что полезно сохранить после подачи визового заявления?", "What is useful to keep after submitting a visa application?"],
+      options: [
+        ["Qidiruv sahifasining rasmi", "Скриншот страницы поиска", "A screenshot of a search page"],
+        ["Ijtimoiy tarmoqdagi maslahat", "Совет из социальных сетей", "A tip from social media"],
+        ["Ariza tasdiqnomasi va murojaat raqami", "Подтверждение подачи и номер заявления", "The submission confirmation and application reference number"],
+      ],
+      correctIndex: 2,
+    },
+  ],
+  [
+    {
+      id: "constraint",
+      prompt: ["“Constraint” so‘zi nimani anglatadi?", "Что означает слово «constraint»?", "What does “constraint” mean?"],
+      options: [
+        ["Qo‘shimcha imkoniyat", "Дополнительная возможность", "An extra opportunity"],
+        ["Cheklov", "Ограничение", "A limit or restriction"],
+        ["Yakuniy natija", "Итоговый результат", "A final result"],
+      ],
+      correctIndex: 1,
+    },
+    {
+      id: "defer-admission",
+      prompt: ["Universitet qabulini “defer” qilish nimani bildiradi?", "Что означает «defer» в контексте зачисления?", "What does it mean to “defer” admission?"],
+      options: [
+        ["Yo‘nalishni o‘zgartirish", "Сменить специальность", "Change your major"],
+        ["Ariza nusxasini olish", "Получить копию заявления", "Get a copy of the application"],
+        ["O‘qishni boshlashni keyingi davrga ko‘chirish", "Перенести начало учёбы на более поздний срок", "Postpone the start of your studies"],
+      ],
+      correctIndex: 2,
+    },
+    {
+      id: "visa-funding-interview",
+      prompt: ["Suhbatda o‘qish xarajatlari haqida so‘rashsa, qanday javob foydali?", "Как лучше ответить на вопрос о расходах на обучение на собеседовании?", "What is a useful way to answer a visa interview question about study costs?"],
+      options: [
+        ["Arizadagi haqiqiy xarajatlar va ularni qanday qoplashingizni tushuntirish", "Объяснить реальные расходы из заявления и способ их оплаты", "Explain the actual costs in your application and how you plan to cover them"],
+        ["Boshqa talabaning budjetini takrorlash", "Повторить бюджет другого студента", "Repeat another student’s budget"],
+        ["Har safar boshqa raqam aytish", "Каждый раз называть другую сумму", "Give a different figure each time"],
+      ],
+      correctIndex: 0,
+    },
+  ],
 ];
 
 export function questionsForDay(day: string) {
@@ -126,7 +254,12 @@ export function questionsForDay(day: string) {
 
 export function publicQuiz(day: string, locale: Locale, result: QuizResult | null): DailyQuiz {
   const language = { uz: 0, ru: 1, en: 2 }[locale];
-  const questions = questionsForDay(day).map(({ id, prompt, options }) => ({
+  // Keep completed quizzes paired with their original questions when the bank grows.
+  const submittedIds = result?.answers.map(({ questionId }) => questionId);
+  const originalSet = submittedIds && questionSets.find(
+    (set) => set.length === submittedIds.length && set.every(({ id }, index) => id === submittedIds[index]),
+  );
+  const questions = (originalSet ?? questionsForDay(day)).map(({ id, prompt, options }) => ({
     id, prompt: prompt[language], options: options.map((label) => label[language]),
   }));
   return { day, questions, result };

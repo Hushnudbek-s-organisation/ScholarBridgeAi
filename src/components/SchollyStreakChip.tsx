@@ -138,7 +138,7 @@ export function SchollyStreakChip({ profileId }: { profileId: number }) {
                 const Icon = day.active ? Check : day.frozen ? Snowflake : day.restored ? RotateCcw : null;
                 return (
                   <li key={day.date} title={status} aria-current={today ? "date" : undefined}
-                    className={`flex min-w-0 flex-col items-center gap-0.5 rounded-control p-1 text-xs ${today ? "ring-1 ring-orange-500" : ""}`}>
+                    className={`flex min-w-0 flex-col items-center gap-0.5 rounded-control p-1 text-sm ${today ? "ring-1 ring-orange-500" : ""}`}>
                     <span className="sr-only">{dateLabel.format(date)} · {status}</span>
                     <span aria-hidden className="text-slate-600 dark:text-slate-300">{weekday.format(date)}</span>
                     <span aria-hidden className="font-semibold">{dateNumber.format(date)}</span>

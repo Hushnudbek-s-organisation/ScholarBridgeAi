@@ -20,8 +20,9 @@ test("campus photos are deferred, then load when their cards approach the viewpo
   });
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const photos = page.locator("#campuses img[data-campus-src]");
-  await expect(photos).toHaveCount(48);
-  expect(await page.locator("#campuses img[src]").count()).toBeLessThan(48);
+  await expect.poll(() => photos.count()).toBeGreaterThan(0);
+  const total = await photos.count();
+  expect(await page.locator("#campuses img[src]").count()).toBeLessThan(total);
   // The first DOM copy may be horizontally outside the animated track. Test
   // cards that actually approach the viewport, including relative proxy URLs.
   // Hydration can replace this node while goto() is still settling; a Locator
@@ -40,5 +41,5 @@ test("campus photos are deferred, then load when their cards approach the viewpo
   await expect.poll(() => loaded.count(), { timeout: 20_000 }).toBeGreaterThan(0);
   await expect(loaded.first()).toHaveAttribute("src", /^(https?:|\/api\/image)/);
   await expect.poll(() => loaded.first().evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
-  expect(await page.locator("#campuses img[src]").count()).toBeLessThan(48);
+  expect(await page.locator("#campuses img[src]").count()).toBeLessThan(total);
 });

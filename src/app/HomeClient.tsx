@@ -21,6 +21,7 @@ import { profileFromSessionEnvelope } from "@/lib/authenticatedProfile";
 import {useResource,getJson} from "@/components/journey/useResource";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { loadBootConfig } from "@/lib/bootConfig";
+import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
 import { PageTransition } from "@/components/motion";
 import {
   DEFAULT_HIDDEN_NAV_ITEMS,
@@ -59,6 +60,7 @@ const ParentDashboard = dynamic(() => withFeatureMessages(import("@/components/P
 const AdminPanel = dynamic(() => withFeatureMessages(import("@/components/AdminPanel").then((m) => m.AdminPanel)), { loading: panelLoading });
 const GuidedJourneyBar = dynamic(() => import("@/components/GuidedJourneyBar").then((m) => m.GuidedJourneyBar), { loading: () => null });
 const TelegramSettings = dynamic(() => withFeatureMessages(import("@/components/telegram/TelegramSettings").then((m) => m.TelegramSettings)), { loading: panelLoading });
+const SchollySettings = dynamic(() => import("@/components/SchollySettings").then((m) => m.SchollySettings), { loading: panelLoading });
 const SessionsPanel = dynamic(() => withFeatureMessages(import("@/components/SessionsPanel").then((m) => m.SessionsPanel)), { loading: panelLoading });
 
 const UniversitiesHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.UniversitiesHub)));
@@ -830,6 +832,7 @@ export function Home({
       if (!res.ok || !data.profile) {
         throw new Error(data.error || "Profil yangilanmadi");
       }
+      announceSchollyPointsChanged(activeProfile.id, data.schollyPointsAwarded);
       setProfiles((prev) => prev.map((p) => (p.id === data.profile.id ? data.profile : p)));
       setActiveProfile(data.profile);
       // A profile edit changes GPA / scores / budget: drop BOTH the explorer
@@ -862,6 +865,7 @@ export function Home({
         body: JSON.stringify({ profileId: activeProfile.id, universityId }),
       });
       const data = await res.json();
+      if (res.ok) announceSchollyPointsChanged(activeProfile.id, data.schollyPointsAwarded);
       fetchSavedUniversities(activeProfile.id);
     } catch (err) {
       console.error(err);
@@ -1345,6 +1349,7 @@ export function Home({
           {activeTab === "notifications" && (
             <div className="space-y-6">
               <TelegramSettings activeProfile={activeProfile} onNavigate={handleNavigateTab} />
+              {activeProfile && <SchollySettings key={activeProfile.id} profileId={activeProfile.id} />}
               <SessionsPanel />
             </div>
           )}

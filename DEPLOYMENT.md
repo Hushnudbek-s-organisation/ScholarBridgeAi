@@ -85,7 +85,10 @@ Hosting assumptions (all portable):
   instances, set `CRON_SECRET` and call `GET /api/cron/notifications` (and
   optionally `/api/cron/refresh`) from an external scheduler with
   `Authorization: Bearer <CRON_SECRET>`. A database marker prevents double
-  sweeps.
+  sweeps. Long-running hosts also check opted-in Scholly reminders every 15
+  minutes while awake. On sleeping or serverless hosts, call `POST /api/cron/scholly-reminders` every 15 minutes with the
+  same authorization header. Set the bot’s public HTTPS site URL so reminders
+  can include the link to turn them off.
 - **Rate limits are per process** (in memory). With several instances each
   enforces its own window — acceptable, but not a global limit.
 - Behind a proxy/CDN set `TRUSTED_PROXY_HOPS` / `CLIENT_IP_HEADER` so per-IP
@@ -97,7 +100,7 @@ Hosting assumptions (all portable):
    (Supabase: *Project settings → Database*; add `?sslmode=require` if the
    host requires SSL).
 2. **Run the canonical schema once** — one file covers everything the app
-   reads or writes (95 tables, 1,050 columns, 77 indexes, 117 FKs, RLS lockdown):
+   reads or writes (120 tables, 1,309 columns, 106 indexes, 138 FKs, RLS lockdown):
    paste [`supabase/full_schema.sql`](./supabase/full_schema.sql) into the
    Supabase SQL Editor and Run. It is **additive and idempotent** — safe on a
    fresh database and safe to re-run on an existing one (it only creates
@@ -120,6 +123,26 @@ Hosting assumptions (all portable):
 5. The daily AI limits index (`ai_usage(profile_id, created_at)`) is part of
    the canonical schema; standalone it is
    [`supabase/add_ai_usage_quota_index.sql`](./supabase/add_ai_usage_quota_index.sql).
+6. On an existing database, apply the Scholly patches before deploying this
+   version. Apply [the base Scholly schema](./supabase/scholly_profile_events_2026-11-15.sql)
+   first, then [the mission practice patch](./supabase/scholly_mission_practice_2026-11-16.sql)
+   and [the wardrobe patch](./supabase/scholly_wardrobe_2026-11-16.sql).
+   Then apply the [points ledger](./supabase/scholly_points_ledger_2026-11-17.sql),
+   [weekend missions](./supabase/scholly_weekend_missions_2026-11-17.sql),
+   [friend streak](./supabase/scholly_friend_streak_2026-11-17.sql) and
+   [Web Push](./supabase/scholly_web_push_2026-11-17.sql) patches.
+   Browser reminders use `SCHOLLY_VAPID_PUBLIC_KEY`, `SCHOLLY_VAPID_PRIVATE_KEY`
+   and `SCHOLLY_VAPID_SUBJECT` on the server. Set the subject to a monitored
+   `mailto:` address or a public HTTPS contact URL. Generate a durable pair
+   with `npx web-push generate-vapid-keys` and store the private key on the host.
+   The friendly-tone browser mission copy is assigned to A or B per account.
+   Admin analytics reports delivery, open and same-day completion counts.
+   For a reviewed spam or fabricated submission award, an authenticated admin
+   can call `POST /api/gamification/reverse` with its ledger `awardId` and
+   `reason` (`spam` or `fabricated_submission`). A reversal is recorded
+   once in the audit log and reduces spendable points without changing lifetime
+   points or level.
+
 
 ## 3. Domain and canonical URL
 

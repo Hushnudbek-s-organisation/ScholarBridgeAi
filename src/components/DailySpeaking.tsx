@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useLocale } from "next-intl";
 import { Check, Globe, Mic, MicOff, Search, Send, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +9,9 @@ import { SpeakingRoom } from "@/components/visa/SpeakingRoom";
 import { CountryFlag } from "@/components/CountryFlag";
 import { countrySearchMatch } from "@/lib/countryPicker";
 import { destinations, practicePrompt, speakerProfiles, type SpeakerStyle } from "@/lib/daily-speaking";
+
+function noAudioSubscription() { return () => {}; }
+function micAvailable() { return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition); }
 
 const copy = {
   uz: {
@@ -84,7 +87,8 @@ export function DailySpeaking() {
   const [notice, setNotice] = useState("");
   const [state, setState] = useState<AiOrbFaceState>("IDLE");
   const [usingAI, setUsingAI] = useState<boolean | null>(null);
-  const [micSupported, setMicSupported] = useState(false);
+  const micSupported = useSyncExternalStore(noAudioSubscription, micAvailable, () => false);
+  const [audioPending, setAudioPending] = useState(false);
   const destination = destinations.find(item => item.country === country) ?? destinations[0];
   const countryName = names.of(destination.country) ?? destination.country;
   const searching = Boolean(query.trim());
@@ -108,12 +112,12 @@ export function DailySpeaking() {
   function stopVoice() {
     const speech = utterance.current;
     utterance.current = null;
+    setAudioPending(false);
     if (speech) window.speechSynthesis?.cancel();
     clearTimeout(playbackTimeout.current);
   }
 
   useEffect(() => {
-    setMicSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
     return () => {
       const pending = job.current;
       job.current = null;
@@ -121,7 +125,10 @@ export function DailySpeaking() {
       const record = recognition.current;
       recognition.current = null;
       record?.abort();
-      stopVoice();
+      const speech = utterance.current;
+      utterance.current = null;
+      if (speech) window.speechSynthesis?.cancel();
+      clearTimeout(playbackTimeout.current);
     };
   }, []);
 
@@ -154,12 +161,14 @@ export function DailySpeaking() {
     }
     const speech = new SpeechSynthesisUtterance(text);
     utterance.current = speech;
+    setAudioPending(true);
     speech.lang = destination.locale;
     speech.rate = speakerProfiles[style].rate;
     speech.pitch = speakerProfiles[style].pitch * (partner === "Rica" ? 1.11 : 0.90);
     function finish(failed: boolean) {
       if (utterance.current !== speech) return;
       utterance.current = null;
+      setAudioPending(false);
       clearTimeout(playbackTimeout.current);
       setState("IDLE");
       if (failed) setNotice(t.noAudio);
@@ -352,12 +361,12 @@ export function DailySpeaking() {
                 <p lang={destination.locale} className="break-words">{line.text}</p>
               </div>)}
             </div>
-            {notice && <p role="status" className="text-xs">{notice}</p>}
+            {notice && <p role="status" className="text-sm">{notice}</p>}
             <div className="flex flex-wrap gap-2">
               {micSupported && <Button variant="outline" type="button" disabled={state === "SPEAKING" || state === "THINKING"} onClick={record}>
                 {state === "LISTENING" ? <MicOff size={16} aria-hidden /> : <Mic size={16} aria-hidden />} {state === "LISTENING" ? t.stop : t.mic}
               </Button>}
-              {utterance.current ? (
+              {audioPending ? (
                 <Button variant="ghost" type="button" onClick={() => { stopVoice(); setState("IDLE"); }}><VolumeX size={16} aria-hidden /> {t.stopVoice}</Button>
               ) : (
                 <Button variant="ghost" type="button" disabled={!latest || state !== "IDLE"} onClick={() => { setNotice(""); if (latest) speak(latest.text); }}><Volume2 size={16} aria-hidden /> {t.replay}</Button>

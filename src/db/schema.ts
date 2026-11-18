@@ -130,6 +130,8 @@ export const schollyProfiles = pgTable("scholly_profile", {
   longestStreak: integer("longest_streak").notNull().default(0),
   freezes: integer("freezes").notNull().default(0),
   points: integer("points").notNull().default(0),
+  balance: integer("balance").notNull().default(0),
+  lifetimePoints: integer("lifetime_points").notNull().default(0),
   level: integer("level").notNull().default(1),
   skin: text("skin").notNull().default("default"),
   outfit: jsonb("outfit").notNull().default({}),
@@ -147,6 +149,20 @@ export const schollyProfiles = pgTable("scholly_profile", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const schollyWardrobeItems = pgTable("scholly_wardrobe_items", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => studentProfiles.id, { onDelete: "cascade" }),
+  itemKey: text("item_key").notNull(),
+  acquiredAt: timestamp("acquired_at", { withTimezone: true }).defaultNow().notNull(),
+  source: text("source").notNull(),
+  spentPoints: integer("spent_points").notNull().default(0),
+}, (table) => [
+  uniqueIndex("uq_scholly_wardrobe_owned_item").on(table.userId, table.itemKey),
+  uniqueIndex("uq_scholly_wardrobe_starter").on(table.userId).where(sql`${table.source} = 'starter'`),
+  check("scholly_wardrobe_items_source_check", sql`${table.source} IN ('purchase', 'starter', 'achievement')`),
+  check("scholly_wardrobe_purchase_cost", sql`(${table.source} = 'purchase' AND ${table.spentPoints} > 0) OR (${table.source} <> 'purchase' AND ${table.spentPoints} = 0)`),
+]);
+
 export const schollyEvents = pgTable("scholly_events", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
@@ -155,6 +171,45 @@ export const schollyEvents = pgTable("scholly_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("idx_scholly_events_user_type_created").on(table.userId, table.type, table.createdAt),
+]);
+
+export const schollyFriendLinks = pgTable("scholly_friend_links", {
+  id: serial("id").primaryKey(),
+  inviterId: integer("inviter_id").notNull().references(() => studentProfiles.id, { onDelete: "cascade" }),
+  friendId: integer("friend_id").references(() => studentProfiles.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+}, table => [
+  index("idx_scholly_friend_links_inviter").on(table.inviterId, table.endedAt),
+  index("idx_scholly_friend_links_friend").on(table.friendId, table.endedAt),
+]);
+
+export const schollyPushSubscriptions = pgTable("scholly_push_subscriptions", {
+  endpointHash: text("endpoint_hash").primaryKey(),
+  userId: integer("user_id").notNull().references(() => studentProfiles.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [index("idx_scholly_push_user_updated").on(table.userId, table.updatedAt)]);
+
+export const schollyNotificationLog = pgTable("scholly_notification_log", {
+  id: text("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => studentProfiles.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  channel: text("channel").notNull(),
+  localDay: date("local_day").notNull(),
+  category: text("category").notNull().default("mission"),
+  variant: text("variant"),
+  status: text("status").$type<"claimed" | "sent" | "failed">().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  actedAt: timestamp("acted_at", { withTimezone: true }),
+}, table => [
+  uniqueIndex("uq_scholly_notification_user_day_type").on(table.userId, table.localDay, table.type),
 ]);
 
 export const dailyMissions = pgTable("daily_missions", {
@@ -176,7 +231,7 @@ export const dailyMissions = pgTable("daily_missions", {
   uniqueIndex("uq_daily_missions_user_day").on(table.userId, table.day),
   index("idx_daily_missions_user_status_day").on(table.userId, table.status, table.day),
   check("daily_missions_status_check", sql`${table.status} IN ('pending', 'done', 'skipped')`),
-  check("daily_missions_type_check", sql`${table.type} IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph')`),
+  check("daily_missions_type_check", sql`${table.type} IN ('fill_profile_fields', 'save_universities', 'upload_document', 'sop_paragraph', 'ielts_vocabulary', 'visa_practice', 'daily_quiz', 'weekly_review')`),
   check("daily_missions_size_check", sql`${table.sizeMin} BETWEEN 1 AND 5`),
   check("daily_missions_target_count_check", sql`${table.targetCount} BETWEEN 1 AND 5000`),
   check("daily_missions_points_check", sql`${table.points} IN (10, 20)`),
@@ -548,9 +603,15 @@ export const pointsLedger = pgTable("points_ledger", {
   profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
   points: integer("points").notNull(),
   reason: text("reason").notNull(),
+  bucket: text("bucket"),
+  idempotencyKey: text("idempotency_key"),
   relatedEntityId: integer("related_entity_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, table => [
+  uniqueIndex("uq_points_ledger_idempotency_key").on(table.idempotencyKey),
+  index("idx_points_ledger_profile_bucket_time").on(table.profileId, table.bucket, table.createdAt),
+  check("points_ledger_bucket_check", sql`${table.bucket} IS NULL OR ${table.bucket} IN ('main', 'small', 'bonus', 'spend')`),
+]);
 
 export const levels = pgTable("levels", {
   id: serial("id").primaryKey(),
@@ -2187,7 +2248,7 @@ export const journeyDeadlines = pgTable(
   {
     id: serial("id").primaryKey(),
     profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
-    kind: text("kind").notNull(), // university | scholarship | test | document | visa | other
+    kind: text("kind").notNull(), // university | scholarship | test | document | visa | departure | other
     title: text("title").notNull(),
     dueDate: date("due_date").notNull(),
     entityType: text("entity_type"),

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { writingReferenceNotes } from "@/lib/ai/writingReferenceNotes";
 import { db } from "@/db";
-import { applications, essayVersions } from "@/db/schema";
+import { applications, essayVersions, studentProfiles } from "@/db/schema";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { premiumGate } from "@/lib/premium";
@@ -9,6 +9,9 @@ import { readJsonBody, clampString, optionalNumber, positiveInt } from "@/lib/re
 import { analyzeEssay, compareVersions, countWords, type EssayType } from "@/lib/essay";
 import { scoreConversationBehaviors } from "@/lib/ai/behaviorScore";
 import { recordDailyActivity } from "@/lib/gamification";
+import { awardSchollyPoints } from "@/lib/scholly-points.server";
+import { schollySopCandidates, SCHOLLY_SOP_DAILY_PARAGRAPHS } from "@/lib/scholly-sop-reward.server";
+import { logSchollyEvent } from "@/lib/scholly-events";
 
 /**
  * Essay versions + rubric (#8).
@@ -142,22 +145,40 @@ export async function POST(req: Request) {
       ],
     });
 
-    const [last] = await db
-      .select()
-      .from(essayVersions)
-      .where(and(
+    const { row, last, schollyPointsAwarded } = await db.transaction(async (tx) => {
+      await tx.select({ id: studentProfiles.id }).from(studentProfiles)
+        .where(eq(studentProfiles.id, profileId)).for("no key update");
+      const draft = and(
         eq(essayVersions.profileId, profileId),
         eq(essayVersions.essayType, essayType),
         universityId != null ? eq(essayVersions.universityId, universityId) : isNull(essayVersions.universityId),
-      ))
-      .orderBy(desc(essayVersions.versionNumber))
-      .limit(1);
-
-    const versionNumber = (last?.versionNumber ?? 0) + 1;
-
-    const [row] = await db
-      .insert(essayVersions)
-      .values({
+      );
+      const [last] = await tx.select().from(essayVersions).where(draft)
+        .orderBy(desc(essayVersions.versionNumber)).limit(1);
+      const ownSop = essayType === "sop" && access.session.profile.id === profileId
+        && body.writingSource !== "generated_draft";
+      let newParagraphs: string[] = [];
+      if (ownSop && last?.content !== content && (await schollySopCandidates(content)).length) {
+        const ownDrafts = and(eq(essayVersions.profileId, profileId), or(
+          eq(essayVersions.essayType, "sop"),
+          and(eq(essayVersions.essayType, "private_memory"), inArray(essayVersions.title, [
+            "Private essay memory (draft)", "Private essay memory (adaptation)",
+          ])),
+        ));
+        const [duplicate] = await tx.select({ id: essayVersions.id }).from(essayVersions)
+          .where(and(ownDrafts, eq(essayVersions.content, content))).limit(1);
+        if (!duplicate) {
+          // Always compare the previous draft and also check recent SOPs for
+          // other applications. The durable fingerprint covers exact repeats
+          // after a prior version falls out of this near-copy comparison.
+          const history = await tx.select({ content: essayVersions.content }).from(essayVersions)
+            .where(ownDrafts).orderBy(desc(essayVersions.id)).limit(16);
+          const previousDrafts = [...new Set([...(last ? [last.content] : []), ...history.map(version => version.content)])];
+          newParagraphs = await schollySopCandidates(content, previousDrafts);
+        }
+      }
+      const versionNumber = (last?.versionNumber ?? 0) + 1;
+      const [row] = await tx.insert(essayVersions).values({
         profileId,
         universityId,
         essayType,
@@ -176,15 +197,29 @@ export async function POST(req: Request) {
         rubricFit: feedback.scores.fit,
         rubricTotal: feedback.scores.total,
         aiFeedback: clampString(body.aiFeedback, 20_000) || null,
-      })
-      .returning();
-
-    if (essayType === "sop" && last?.content !== content && access.session.profile.id === profileId) {
-      await recordDailyActivity(profileId);
-    }
+      }).returning();
+      let meaningful = false;
+      let awardedParagraphs = 0;
+      let schollyPointsAwarded = 0;
+      const rewardAt = new Date();
+      for (const fingerprint of newParagraphs) {
+        const result = await awardSchollyPoints(profileId, "sop_paragraph", `sop:${profileId}:${fingerprint}`, tx,
+          { relatedEntityId: row.id, at: rewardAt });
+        meaningful ||= result.awarded || result.limited;
+        if (result.awarded) awardedParagraphs++;
+        schollyPointsAwarded += result.points;
+        if (result.limited || awardedParagraphs >= SCHOLLY_SOP_DAILY_PARAGRAPHS) break;
+      }
+      if (meaningful) {
+        await logSchollyEvent(profileId, "sop_practiced", { versionId: row.id }, tx);
+        await recordDailyActivity(profileId, tx);
+      }
+      return { row, last, schollyPointsAwarded };
+    });
     const behaviorSignals = await behaviorSignalsPromise;
     return NextResponse.json({
       version: row,
+      schollyPointsAwarded,
       feedback,
       behaviorSignals,
       // What changed against the previous draft, so the history is readable.

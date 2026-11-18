@@ -4,7 +4,7 @@ import { schollyEvents, studentProfiles } from "@/db/schema";
 import { isLocale } from "@/i18n/config";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { requireProfileAccess } from "@/lib/auth";
-import { awardPoints } from "@/lib/gamification";
+import { awardSchollyPoints } from "@/lib/scholly-points.server";
 import { readJsonBody } from "@/lib/request";
 import { logSchollyEvent } from "@/lib/scholly-events";
 import { currentSchollyDay } from "@/lib/scholly-mission-store.server";
@@ -61,7 +61,8 @@ export async function POST(req: Request) {
         .where(eq(studentProfiles.id, profileId)).for("no key update").limit(1);
       if (!locked) return privateNoStoreJson({ code: "profile_not_found" }, { status: 404 });
 
-      const { day } = await currentSchollyDay(profileId, new Date(), tx);
+      const now = new Date();
+      const { day } = await currentSchollyDay(profileId, now, tx);
       if (parsed.body.day !== day) return privateNoStoreJson({ code: "quiz_day_changed" }, { status: 409 });
 
       const existing = await getResult(profileId, day, tx);
@@ -70,9 +71,11 @@ export async function POST(req: Request) {
       const result = gradeQuiz(day, parsed.body.answers);
       if (!result) return privateNoStoreJson({ code: "invalid_quiz_answers" }, { status: 400 });
 
-      await awardPoints(profileId, result.points, "scholly_daily_quiz", Number(day.replace(/-/g, "")), tx);
-      await logSchollyEvent(profileId, "quiz_done", { day, points: result.points, result }, tx);
-      return privateNoStoreJson(publicQuiz(day, locale, result));
+      const reward = await awardSchollyPoints(profileId, "daily_quiz", `quiz:${profileId}:${day}`, tx,
+        { relatedEntityId: Number(day.replace(/-/g, "")), at: now, points: result.points });
+      const savedResult = { ...result, points: reward.points };
+      await logSchollyEvent(profileId, "quiz_done", { day, points: reward.points, result: savedResult }, tx);
+      return privateNoStoreJson({ ...publicQuiz(day, locale, savedResult), awardedPoints: reward.points });
     });
   } catch (error) {
     return unavailable(error);

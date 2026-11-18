@@ -222,6 +222,8 @@ test("Scholly mission only shows the end-of-day summary after completion", async
 
   const profile = await page.request.put(`/api/profiles/${fixtures.studentId}`, { data: { ieltsScore: 6.5 } });
   expect(profile.ok()).toBe(true);
+  const profilePoints = (await profile.json()).schollyPointsAwarded ?? 0;
+  expect([0, 3]).toContain(profilePoints);
   await mission.getByRole("button", { name: "Check progress" }).click();
   await expect(mission.getByRole("heading", { name: "You’re done for today!" })).toBeVisible();
   await expect(mission.getByText(/\+10 points/)).toBeVisible();
@@ -229,7 +231,7 @@ test("Scholly mission only shows the end-of-day summary after completion", async
   expect(refreshed.ok()).toBe(true);
   expect(await refreshed.json()).toMatchObject({
     mission: { id: started.mission.id, status: "done" },
-    points: started.points + 10,
+    points: started.points + profilePoints + 10,
     justCompleted: false,
   });
   await mission.getByRole("button", { name: "Done for today" }).click();

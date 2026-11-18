@@ -1,26 +1,27 @@
-import { eq, and, desc, isNotNull, isNull } from "drizzle-orm";
+import { eq, and, asc, desc, gt, inArray, isNotNull, isNull } from "drizzle-orm";
 import { configuredAppUrl } from "@/lib/appUrl";
 import { db } from "@/db";
-import { referrals, studentProfiles } from "@/db/schema";
+import { pointsLedger, referrals, studentProfiles } from "@/db/schema";
 import { generateReferralCode, awardPoints } from "@/lib/gamification";
 import { getConfigNumber } from "@/lib/config";
 import { profileCompletenessRatio, type ChancingProfile } from "@/lib/chancing";
 import { createLocalizedNotification } from "@/lib/notifications";
 import { NOTIFY_TEXTS } from "@/lib/notificationTexts";
+import { awardSchollyPoints } from "@/lib/scholly-points.server";
+import { REFERRAL_MONTHLY_POINT_LIMIT, REFERRAL_POINTS_REFERRER } from "@/lib/referral-point-rules";
+
+export { REFERRAL_POINTS_REFERRER } from "@/lib/referral-point-rules";
 
 /** Base for shareable referral links — the canonical APP_URL (see appUrl.ts). */
 export function referralLinkBase(): string {
   return configuredAppUrl();
 }
 /**
- * DEFAULT reward rules. The live values come from `app_config` so an admin can
- * change "5 referrals → 30 days premium", the points, or the activation bar
- * from Admin → Settings without a deploy. The constants below are only the
- * fallback when a key was never saved (and the documented defaults).
+ * Premium milestones, the invitee bonus and the profile completion threshold
+ * use the configured program rules. Scholly applies its fixed inviter credit.
  */
 export const REFERRAL_PREMIUM_MULTIPLE = 5;
 export const REFERRAL_PREMIUM_DAYS = 30;
-export const REFERRAL_POINTS_REFERRER = 100;
 export const REFERRAL_POINTS_REFERRED = 50;
 /**
  * Default activation bar, in percent of the canonical completeness engine
@@ -37,6 +38,8 @@ export interface ReferralRules {
   premiumDays: number;
   /** Gamification points the referrer earns per activated referral. */
   referrerPoints: number;
+  /** Maximum number of credited Scholly referrals per local calendar month. */
+  referrerMonthlyLimit: number;
   /** Gamification points the referred student earns (0 = none). */
   referredPoints: number;
   /** Profile completeness (%) required before an activation counts. */
@@ -45,10 +48,9 @@ export interface ReferralRules {
 
 /** Read the admin-configured reward rules (single source of truth). */
 export async function referralRules(): Promise<ReferralRules> {
-  const [multiple, days, referrerPoints, referredPoints, activation] = await Promise.all([
+  const [multiple, days, referredPoints, activation] = await Promise.all([
     getConfigNumber("referral_premium_multiple", REFERRAL_PREMIUM_MULTIPLE),
     getConfigNumber("referral_premium_days", REFERRAL_PREMIUM_DAYS),
-    getConfigNumber("referral_points_referrer", REFERRAL_POINTS_REFERRER),
     getConfigNumber("referral_points_referred", REFERRAL_POINTS_REFERRED),
     getConfigNumber("referral_activation_completeness", REFERRAL_ACTIVATION_COMPLETENESS),
   ]);
@@ -57,7 +59,8 @@ export async function referralRules(): Promise<ReferralRules> {
     // by zero in the progress math — the honest floor is 1.
     premiumMultiple: multiple >= 1 ? Math.floor(multiple) : REFERRAL_PREMIUM_MULTIPLE,
     premiumDays: days >= 1 ? Math.floor(days) : REFERRAL_PREMIUM_DAYS,
-    referrerPoints: referrerPoints >= 0 ? Math.floor(referrerPoints) : REFERRAL_POINTS_REFERRER,
+    referrerPoints: REFERRAL_POINTS_REFERRER,
+    referrerMonthlyLimit: REFERRAL_MONTHLY_POINT_LIMIT,
     referredPoints: referredPoints >= 0 ? Math.floor(referredPoints) : REFERRAL_POINTS_REFERRED,
     activationCompleteness:
       activation >= 0 && activation <= 100 ? Math.floor(activation) : REFERRAL_ACTIVATION_COMPLETENESS,
@@ -201,27 +204,59 @@ export async function applyReferralCode(profileId: number, code: string) {
     return { error: "SELF" };
   }
 
-  // A profile can only be referred once.
-  const already = await db
-    .select()
-    .from(referrals)
-    .where(eq(referrals.referredProfileId, profileId));
-  if (already.length > 0) {
-    return { error: "EXISTS" };
-  }
+  return db.transaction(async (tx) => {
+    const [profile] = await tx.select({ referredBy: studentProfiles.referredBy })
+      .from(studentProfiles).where(eq(studentProfiles.id, profileId)).for("no key update");
+    if (!profile) return { error: "INVALID" };
+    const [already] = await tx.select({ id: referrals.id }).from(referrals)
+      .where(eq(referrals.referredProfileId, profileId)).limit(1);
+    if (already || profile.referredBy != null) return { error: "EXISTS" };
 
-  const [referral] = await db
-    .insert(referrals)
-    .values({
+    // The share code belongs to its anchor. Each tracked activation has its
+    // own unique record code so many invitees can use the same share code.
+    const [referral] = await tx.insert(referrals).values({
       referrerProfileId: anchor.referrerProfileId,
       referredProfileId: profileId,
-      referralCode: normalized,
+      referralCode: generateReferralCode(),
       status: "pending",
       pointsAwarded: 0,
-    })
-    .returning();
+    }).returning();
+    return { referral };
+  });
+}
 
-  return { referral };
+type ReferralTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function lockReferralProfiles(tx: ReferralTransaction, profileId: number, referrerId: number) {
+  // A stable order also covers old data in which two accounts referred each other.
+  return tx.select().from(studentProfiles)
+    .where(inArray(studentProfiles.id, [profileId, referrerId]))
+    .orderBy(asc(studentProfiles.id)).for("no key update");
+}
+
+async function awardReferralCredits(
+  tx: ReferralTransaction,
+  profileId: number,
+  referrerId: number,
+  rules: ReferralRules,
+  legacyReferralId?: number,
+) {
+  const oldInviterCredit = legacyReferralId == null ? [] : await tx.select({ id: pointsLedger.id })
+    .from(pointsLedger).where(and(eq(pointsLedger.profileId, referrerId), eq(pointsLedger.reason, "referral_referrer"),
+      eq(pointsLedger.relatedEntityId, legacyReferralId), isNull(pointsLedger.idempotencyKey), gt(pointsLedger.points, 0))).limit(1);
+  const referrerPointsAwarded = oldInviterCredit.length ? 0 : (await awardSchollyPoints(
+    referrerId, "referral_completed", `referral:${referrerId}:${profileId}`, tx, { relatedEntityId: profileId },
+  )).points;
+
+  // The existing invitee-side benefit has a separate rule. Both referral entry
+  // points now use the same identity, including v1 credits paid before Scholly.
+  const inviteeRewardIds = legacyReferralId == null ? [profileId] : [profileId, legacyReferralId];
+  const inviteeCredits = rules.referredPoints === 0 ? [] : await tx.select({ id: pointsLedger.id })
+    .from(pointsLedger).where(and(eq(pointsLedger.profileId, profileId), eq(pointsLedger.reason, "referral_referred"),
+      inArray(pointsLedger.relatedEntityId, inviteeRewardIds), gt(pointsLedger.points, 0))).limit(1);
+  const referredPointsAwarded = inviteeCredits.length ? 0 : rules.referredPoints;
+  if (referredPointsAwarded) await awardPoints(profileId, referredPointsAwarded, "referral_referred", profileId, tx);
+  return { referrerPointsAwarded, referredPointsAwarded };
 }
 
 /**
@@ -238,29 +273,25 @@ export async function completeReferralIfDue(profileId: number) {
         eq(referrals.status, "pending")
       )
     );
-  if (!ref) return null;
-
-  const [referred] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, profileId));
-  if (!referred) return null;
-
-  // Same admin-configured bar and the same completeness engine as the v2 path
-  // — the two rules can never disagree about what "an activated referral" is.
+  if (!ref || ref.referrerProfileId === profileId) return null;
   const rules = await referralRules();
-  if (referralCompleteness(referred) < rules.activationCompleteness) return null;
+  return db.transaction(async (tx) => {
+    const people = await lockReferralProfiles(tx, profileId, ref.referrerProfileId);
+    const invited = people.find(person => person.id === profileId);
+    if (!invited || people.length !== 2 || referralCompleteness(invited) < rules.activationCompleteness) return null;
+    if (invited.referredBy != null && invited.referredBy !== ref.referrerProfileId) return null;
 
-  await db
-    .update(referrals)
-    .set({ status: "completed", pointsAwarded: rules.referrerPoints + rules.referredPoints })
-    .where(eq(referrals.id, ref.id));
-
-  if (rules.referrerPoints > 0) {
-    await awardPoints(ref.referrerProfileId, rules.referrerPoints, "referral_referrer", ref.id);
-  }
-  if (rules.referredPoints > 0) {
-    await awardPoints(profileId, rules.referredPoints, "referral_referred", ref.id);
-  }
-
-  return { ...ref, status: "completed" };
+    const [active] = await tx.select().from(referrals)
+      .where(and(eq(referrals.id, ref.id), eq(referrals.status, "pending"))).for("update").limit(1);
+    if (!active) return null;
+    const credits = invited.referralRewarded
+      ? { referrerPointsAwarded: 0, referredPointsAwarded: 0 }
+      : await awardReferralCredits(tx, profileId, ref.referrerProfileId, rules, ref.id);
+    const [completed] = await tx.update(referrals)
+      .set({ status: "completed", pointsAwarded: credits.referrerPointsAwarded + credits.referredPointsAwarded })
+      .where(eq(referrals.id, active.id)).returning();
+    return completed ?? null;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -314,22 +345,18 @@ export async function applyReferralCodeToProfile(profileId: number, code: string
     .where(eq(studentProfiles.referralCode, normalized));
   if (!target) return { error: "INVALID" };
 
-  const [newProfile] = await db
-    .select()
-    .from(studentProfiles)
-    .where(eq(studentProfiles.id, profileId));
-  if (!newProfile) return { error: "INVALID" };
-
   // Self-referral is not allowed — and must never be written.
   if (target.id === profileId) return { error: "SELF" };
-  if (newProfile.referredBy != null) return { error: "EXISTS" };
-
-  await db
-    .update(studentProfiles)
-    .set({ referredBy: target.id })
-    .where(eq(studentProfiles.id, profileId));
-
-  return { ok: true, referrerId: target.id };
+  return db.transaction(async (tx) => {
+    const [newProfile] = await tx.select({ referredBy: studentProfiles.referredBy })
+      .from(studentProfiles).where(eq(studentProfiles.id, profileId)).for("no key update");
+    if (!newProfile) return { error: "INVALID" };
+    const [legacy] = await tx.select({ id: referrals.id }).from(referrals)
+      .where(eq(referrals.referredProfileId, profileId)).limit(1);
+    if (newProfile.referredBy != null || legacy) return { error: "EXISTS" };
+    await tx.update(studentProfiles).set({ referredBy: target.id }).where(eq(studentProfiles.id, profileId));
+    return { ok: true, referrerId: target.id };
+  });
 }
 
 /**
@@ -338,60 +365,36 @@ export async function applyReferralCodeToProfile(profileId: number, code: string
  * Everything runs inside ONE atomic transaction — safe against concurrent
  * activation calls. Only called server-side.
  */
-export async function grantReferralReward(referrerId: number) {
-  const rules = await referralRules();
-  return db.transaction(async (tx) => {
-    // FOR UPDATE: the counter and the premium window are read-modify-write, so
-    // two referrals activating at the same moment must serialise here instead
-    // of both reading the same "before" value (and losing a milestone).
-    const [referrer] = await tx
-      .select()
-      .from(studentProfiles)
-      .where(eq(studentProfiles.id, referrerId))
-      .for("update");
-    if (!referrer) return null;
-
-    const newPoints = (referrer.referralPoints ?? 0) + 1;
-
-    const now = new Date();
-    let isPremium = referrer.isPremium ?? false;
-    let premiumUntil = referrer.premiumUntil ?? null;
-
-    const premiumGranted = newPoints % rules.premiumMultiple === 0;
-    if (premiumGranted) {
-      const base = premiumUntil && new Date(premiumUntil).getTime() > now.getTime()
-        ? new Date(premiumUntil)
-        : now;
-      premiumUntil = new Date(base.getTime() + rules.premiumDays * 86400000);
-      isPremium = true;
-    }
-
-    const [updated] = await tx
-      .update(studentProfiles)
-      .set({
-        referralPoints: newPoints,
-        isPremium,
-        premiumUntil,
-        updatedAt: now,
-      })
-      .where(eq(studentProfiles.id, referrerId))
-      .returning();
-
-    return {
-      referrer: updated,
-      points: newPoints,
-      premiumGranted,
-      premiumDays: premiumGranted ? rules.premiumDays : 0,
-      premiumMultiple: rules.premiumMultiple,
-      premiumUntil,
-    };
-  });
+async function grantReferralPremium(
+  tx: ReferralTransaction,
+  referrer: typeof studentProfiles.$inferSelect,
+  rules: ReferralRules,
+) {
+  const points = (referrer.referralPoints ?? 0) + 1;
+  const now = new Date();
+  let isPremium = referrer.isPremium;
+  let premiumUntil = referrer.premiumUntil;
+  const premiumGranted = points % rules.premiumMultiple === 0;
+  if (premiumGranted) {
+    const base = Math.max(premiumUntil?.getTime() ?? 0, now.getTime());
+    premiumUntil = new Date(base + rules.premiumDays * 86_400_000);
+    isPremium = true;
+  }
+  await tx.update(studentProfiles)
+    .set({ referralPoints: points, isPremium, premiumUntil, updatedAt: now })
+    .where(eq(studentProfiles.id, referrer.id));
+  return {
+    referrer: { id: referrer.id, name: referrer.name },
+    points, premiumGranted, premiumUntil,
+    premiumDays: premiumGranted ? rules.premiumDays : 0,
+    premiumMultiple: rules.premiumMultiple,
+  };
 }
 
 export interface ReferralRewardResult {
   ok: boolean;
   reason?: string;
-  referrer?: typeof studentProfiles.$inferSelect;
+  referrer?: Pick<typeof studentProfiles.$inferSelect, "id" | "name">;
   points?: number;
   premiumGranted?: boolean;
   premiumDays?: number;
@@ -418,6 +421,7 @@ export async function activateReferralReward(profileId: number): Promise<Referra
     .where(eq(studentProfiles.id, profileId));
   if (!profile) return { ok: false, reason: "NOT_FOUND" };
   if (profile.referredBy == null) return { ok: false, reason: "NO_REFERRER" };
+  if (profile.referredBy === profileId) return { ok: false, reason: "SELF" };
   if (profile.referralRewarded) return { ok: false, reason: "ALREADY_REWARDED" };
 
   // Activation bar (admin-configured): a bare signup that flips
@@ -433,42 +437,27 @@ export async function activateReferralReward(profileId: number): Promise<Referra
     };
   }
 
-  const [result] = await db.transaction(async (tx) => {
-    // FOR UPDATE — the reward must be granted exactly once even if the PATCH
-    // and the explicit POST /api/referral arrive together.
-    const [locked] = await tx
-      .select()
-      .from(studentProfiles)
-      .where(eq(studentProfiles.id, profileId))
-      .for("update");
-    if (!locked || locked.referralRewarded || locked.referredBy == null) return [null];
-
-    await tx
-      .update(studentProfiles)
-      .set({ referralRewarded: true, updatedAt: new Date() })
+  const referrerId = profile.referredBy;
+  const outcome = await db.transaction(async (tx) => {
+    const people = await lockReferralProfiles(tx, profileId, referrerId);
+    const invited = people.find(person => person.id === profileId);
+    const referrer = people.find(person => person.id === referrerId);
+    if (!invited || !referrer || invited.referredBy !== referrerId) return { reason: "NO_REFERRER" } as const;
+    if (invited.referralRewarded) return { reason: "ALREADY_REWARDED" } as const;
+    const liveCompleteness = referralCompleteness(invited);
+    if (liveCompleteness < rules.activationCompleteness) {
+      return { reason: "NOT_ACTIVE_YET", completeness: liveCompleteness, activationCompleteness: rules.activationCompleteness } as const;
+    }
+    const [legacy] = await tx.select({ id: referrals.id }).from(referrals)
+      .where(and(eq(referrals.referredProfileId, profileId), eq(referrals.referrerProfileId, referrerId))).limit(1);
+    const credits = await awardReferralCredits(tx, profileId, referrerId, rules, legacy?.id);
+    const result = await grantReferralPremium(tx, referrer, rules);
+    await tx.update(studentProfiles).set({ referralRewarded: true, updatedAt: new Date() })
       .where(eq(studentProfiles.id, profileId));
-
-    const reward = await grantReferralReward(locked.referredBy);
-    return [reward];
+    return { result, credits };
   });
-
-  if (!result) return { ok: false, reason: "ALREADY_REWARDED" };
-
-  // Gamification points (the second half of the promise: "you both earn
-  // points"). Idempotent per referred profile, so a retry adds nothing.
-  const referrerPointsAwarded = rules.referrerPoints;
-  const referredPointsAwarded = rules.referredPoints;
-  try {
-    if (referrerPointsAwarded > 0) {
-      await awardPoints(result.referrer.id, referrerPointsAwarded, "referral_referrer", profileId);
-    }
-    if (referredPointsAwarded > 0) {
-      await awardPoints(profileId, referredPointsAwarded, "referral_referred", profileId);
-    }
-  } catch (err) {
-    // Points are a bonus; a ledger failure must not undo the premium grant.
-    console.error("Failed to award referral gamification points:", err);
-  }
+  if ("reason" in outcome) return { ok: false, ...outcome };
+  const { result, credits: { referrerPointsAwarded, referredPointsAwarded } } = outcome;
 
   // Tell BOTH sides in their own language — the promise is "you both earn",
   // and until now nothing in the bell reflected it. The `link` doubles as the
@@ -485,15 +474,16 @@ export async function activateReferralReward(profileId: number): Promise<Referra
           premiumDays: result.premiumGranted ? result.premiumDays ?? 0 : 0,
         }),
     });
-    await createLocalizedNotification(profileId, {
-      type: "referral",
-      link: dedupe,
-      text: (lang) =>
-        NOTIFY_TEXTS.referralWelcome(lang, {
+    if (referredPointsAwarded) {
+      await createLocalizedNotification(profileId, {
+        type: "referral",
+        link: dedupe,
+        text: (lang) => NOTIFY_TEXTS.referralWelcome(lang, {
           points: referredPointsAwarded,
-          referrerName: result.referrer?.name ?? null,
+          referrerName: result.referrer.name,
         }),
-    });
+      });
+    }
   } catch (err) {
     // Notifications are informational; never fail the reward over them.
     console.error("Failed to send referral notifications:", err);

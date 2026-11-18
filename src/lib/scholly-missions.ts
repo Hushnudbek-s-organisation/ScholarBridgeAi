@@ -1,4 +1,11 @@
-export const SCHOLLY_MISSION_TYPES = ["fill_profile_fields", "save_universities", "upload_document", "sop_paragraph"] as const;
+import type { SchollySegment } from "./scholly-audience";
+
+export const SCHOLLY_DEPARTURE_KIND = "departure";
+
+export const SCHOLLY_MISSION_TYPES = [
+  "fill_profile_fields", "save_universities", "upload_document", "sop_paragraph",
+  "ielts_vocabulary", "visa_practice", "daily_quiz", "weekly_review",
+] as const;
 export type SchollyMissionType = (typeof SCHOLLY_MISSION_TYPES)[number];
 export type SchollyMissionTheme = "plan" | "writing" | "language" | "search" | "speaking" | "light" | "review";
 
@@ -16,11 +23,19 @@ export interface SchollyMissionContext {
   sopWordCount: number;
   hasDeadlineWithinSevenDays: boolean;
   hasIncompleteRequiredDocuments: boolean;
+  hasIeltsScoreGap?: boolean;
+  hasDepartureWithinSixtyDays?: boolean;
+  latestVisaPracticeId?: number;
+  dailyQuizDone?: boolean;
+  weeklyReportReviewed?: boolean;
+  todaySavedUniversityIds?: number[];
+  vettedSopWordCount?: number;
 }
 
 export interface SchollyMissionHistory {
   recentStatuses: readonly string[];
   completedStreak: number;
+  segments?: readonly SchollySegment[];
 }
 
 export interface SchollyMissionChoice {
@@ -37,6 +52,11 @@ export interface SchollyMissionCriteria {
   savedUniversityIds: number[];
   uploadedDocumentIds: number[];
   sopWordCount: number;
+  latestVisaPracticeId?: number;
+  dailyQuizDone?: boolean;
+  weeklyReportReviewed?: boolean;
+  todaySavedUniversityIds?: number[];
+  vettedSopWordCount?: number;
 }
 
 export interface SchollyMissionProgress {
@@ -98,18 +118,25 @@ function candidates(context: SchollyMissionContext, theme: SchollyMissionTheme):
   if (context.missingProfileFields.length) choices.push({ type: "fill_profile_fields", targetCount: Math.min(2, context.missingProfileFields.length) });
   if (context.savedUniversityIds.length < 3) choices.push({ type: "save_universities", targetCount: Math.max(1, 3 - context.savedUniversityIds.length) });
   if (context.sopWordCount < 500) choices.push({ type: "sop_paragraph", targetCount: 50 });
+  if (context.hasIeltsScoreGap) choices.push({ type: "ielts_vocabulary", targetCount: 5 });
+  if (context.hasDepartureWithinSixtyDays && !context.latestVisaPracticeId) choices.push({ type: "visa_practice", targetCount: 1 });
   if (context.hasIncompleteRequiredDocuments) choices.push({ type: "upload_document", targetCount: 1 });
 
   const fallback: Record<SchollyMissionTheme, SchollyMissionType> = {
     plan: context.missingProfileFields.length ? "fill_profile_fields" : "save_universities",
     writing: "sop_paragraph",
-    language: context.sopWordCount < 500 ? "sop_paragraph" : "save_universities",
+    language: "ielts_vocabulary",
     search: "save_universities",
-    speaking: context.sopWordCount < 500 ? "sop_paragraph" : "save_universities",
-    light: "save_universities",
-    review: context.missingProfileFields.length ? "fill_profile_fields" : "sop_paragraph",
+    speaking: "visa_practice",
+    light: context.dailyQuizDone ? "save_universities" : "daily_quiz",
+    review: context.weeklyReportReviewed ? "sop_paragraph" : "weekly_review",
   };
-  choices.push({ type: fallback[theme], targetCount: fallback[theme] === "save_universities" ? 1 : fallback[theme] === "fill_profile_fields" ? Math.min(2, context.missingProfileFields.length) || 1 : 50 });
+  const targets: Record<SchollyMissionType, number> = {
+    fill_profile_fields: Math.max(1, Math.min(2, context.missingProfileFields.length)),
+    save_universities: 1, upload_document: 1, sop_paragraph: 50, ielts_vocabulary: 5, visa_practice: 1,
+    daily_quiz: 1, weekly_review: 1,
+  };
+  choices.push({ type: fallback[theme], targetCount: targets[fallback[theme]] });
   return choices;
 }
 
@@ -122,18 +149,21 @@ export function pickSchollyMission(
   const selected = candidates(context, theme).find((candidate) => candidate.type !== excludeType)
     ?? { type: "save_universities" as const, targetCount: 1 };
   const missedInRecentThree = history.recentStatuses.slice(0, 3).filter((status) => status !== "done").length;
-  const reduceSize = missedInRecentThree >= 2;
+  const shortSession = history.segments?.some((segment) => segment === "new" || segment === "cooling" || segment === "returned");
+  const reduceSize = missedInRecentThree >= 2 || shortSession;
   const isStar = history.completedStreak >= 5;
   let targetCount = selected.targetCount;
   if (reduceSize) {
-    targetCount = selected.type === "sop_paragraph" ? 25 : 1;
+    targetCount = selected.type === "sop_paragraph" ? 40 : 1;
   } else if (isStar) {
     if (selected.type === "fill_profile_fields") targetCount = Math.min(context.missingProfileFields.length, targetCount + 1);
     if (selected.type === "save_universities") targetCount++;
     if (selected.type === "sop_paragraph") targetCount += 25;
+    if (selected.type === "ielts_vocabulary") targetCount += 2;
   }
   const sizeMin = reduceSize ? 1 : isStar || selected.type === "sop_paragraph" ? 5 : 3;
-  return { type: selected.type, targetCount, sizeMin, isStar, points: isStar ? 20 : 10, theme };
+  const missionTheme = selected.type === "ielts_vocabulary" ? "language" : selected.type === "visa_practice" ? "speaking" : theme;
+  return { type: selected.type, targetCount, sizeMin, isStar, points: isStar ? 20 : 10, theme: missionTheme };
 }
 
 export function missionProgress(
@@ -148,12 +178,19 @@ export function missionProgress(
     progress = baseline.missingFields.filter((field) => !now.has(field)).length;
   } else if (type === "save_universities") {
     const existing = new Set(baseline.savedUniversityIds);
-    progress = current.savedUniversityIds.filter((id) => !existing.has(id)).length;
+    progress = new Set((current.todaySavedUniversityIds ?? current.savedUniversityIds)
+      .filter((id) => !existing.has(id))).size;
   } else if (type === "upload_document") {
     const existing = new Set(baseline.uploadedDocumentIds);
     progress = current.uploadedDocumentIds.filter((id) => !existing.has(id)).length;
-  } else {
-    progress = Math.max(0, current.sopWordCount - baseline.sopWordCount);
+  } else if (type === "sop_paragraph") {
+    progress = Math.max(0, (current.vettedSopWordCount ?? current.sopWordCount) - baseline.sopWordCount);
+  } else if (type === "visa_practice") {
+    progress = (current.latestVisaPracticeId ?? 0) > (baseline.latestVisaPracticeId ?? 0) ? 1 : 0;
+  } else if (type === "daily_quiz") {
+    progress = current.dailyQuizDone && !baseline.dailyQuizDone ? 1 : 0;
+  } else if (type === "weekly_review") {
+    progress = current.weeklyReportReviewed && !baseline.weeklyReportReviewed ? 1 : 0;
   }
   // Older short SOP rows stored 1 while displaying and requiring 50 words.
   let target = Math.max(1, targetCount);

@@ -110,7 +110,7 @@ async function main() {
   };
 
   // -------------------------------------------------------------------------
-  section("1. Reward rules are admin-configurable (nothing hardcoded)");
+  section("1. Premium and activation are configurable; the inviter point rule is fixed");
 
   const defaults = await referralRules();
   check(
@@ -132,10 +132,10 @@ async function main() {
 
   const configured = await referralRules();
   check(
-    "an admin edit changes the live rules",
+    "an admin edit changes Premium and invitee settings while the inviter earns 50",
     configured.premiumMultiple === 2 &&
       configured.premiumDays === 7 &&
-      configured.referrerPoints === 30 &&
+      configured.referrerPoints === REFERRAL_POINTS_REFERRER &&
       configured.referredPoints === 15,
     JSON.stringify(configured)
   );
@@ -180,7 +180,7 @@ async function main() {
   check("a rejected self-referral writes nothing", referrerAfterSelf.referredBy === null);
 
   const applied = await applyReferralCodeToProfile(invited.id, code.toLowerCase());
-  check("a valid code applies case-insensitively", applied.ok === true, JSON.stringify(applied));
+  check("a valid code applies case-insensitively", "ok" in applied && applied.ok === true, JSON.stringify(applied));
   const secondApply = await applyReferralCodeToProfile(invited.id, code);
   check("a second code cannot be applied", secondApply.error === "EXISTS", JSON.stringify(secondApply));
 

@@ -44,10 +44,13 @@ export async function POST(req: Request) {
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
+    if (access.targetId !== access.session.profile.id) {
+      return NextResponse.json({ error: "You can only claim an invite for your own account.", code: "forbidden" }, { status: 403 });
+    }
     const limit = await checkSharedRateLimit(`referral:apply:${access.session.profile.id}`, LIMITS.contact);
     if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
     const result = await applyReferralCode(access.targetId!, clampString(referralCode, 64));
-    if (result.error) {
+    if (!("referral" in result)) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
     return NextResponse.json({ referral: result.referral });

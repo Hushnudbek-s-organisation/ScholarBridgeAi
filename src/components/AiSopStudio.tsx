@@ -154,6 +154,7 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
           applicationId: applicationId ?? undefined,
           universityId: universityId ?? undefined,
           essayType: "sop",
+          writingSource: "generated_draft",
           title: universityName ? `SOP — ${universityName}` : t("sopStudio.defaultDraftTitle"),
           targetName: targetUni || targetProgram || undefined,
           content: toPlainText(generatedSop),

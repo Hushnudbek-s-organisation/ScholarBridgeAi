@@ -63,6 +63,20 @@ const RANGES = [
   { days: 90, label: "90 kun" },
 ];
 
+const SCHOLLY_ONBOARDING_STEPS = [
+  ["started", "Boshlaganlar"],
+  ["name", "Ismni kiritganlar"],
+  ["reminder", "Eslatma vaqtini tanlaganlar"],
+  ["tone", "Muloqot uslubini tanlaganlar"],
+  ["challenge", "Maqsad savoliga javob berganlar"],
+  ["completed", "Tugatganlar"],
+  ["skipped", "O‘tkazib yuborganlar"],
+] as const;
+
+function schollyPercent(part: number, total: number): string {
+  return total > 0 ? `${(part * 100 / total).toFixed(1)}%` : "—";
+}
+
 /** In-app section ids → readable names (Uzbek, like the sidebar). */
 const SCREEN_LABELS: Record<string, string> = {
   landing: "Landing (bosh sahifa)",
@@ -191,6 +205,7 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
   const r = data?.revenue;
   const c = data?.content;
   const e = data?.engagement;
+  const scholly = data?.scholly;
 
   const totals = useMemo(() => {
     const series = data?.series ?? [];
@@ -350,6 +365,51 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
           </ul>
         </details>
       ) : null}
+
+      {scholly && (
+        <Panel
+          title="Scholly"
+          subtitle={`Dashboard va missiya faolligi · ${scholly.timeZone}`}
+        >
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <MiniStat label="1-kuni qaytganlar" value={schollyPercent(scholly.retention1.returned, scholly.retention1.eligible)}
+              hint={`${scholly.retention1.returned} / ${scholly.retention1.eligible}`} tone="indigo" />
+            <MiniStat label="7-kuni qaytganlar" value={schollyPercent(scholly.retention7.returned, scholly.retention7.eligible)}
+              hint={`${scholly.retention7.returned} / ${scholly.retention7.eligible}`} tone="indigo" />
+            <MiniStat label="WAU / MAU" value={schollyPercent(scholly.active7, scholly.active30)}
+              hint={`${scholly.active7} / ${scholly.active30} faol foydalanuvchi`} tone="sky" />
+            <MiniStat label="Bugungi missiya" value={schollyPercent(
+              scholly.activity.at(-1)?.completers ?? 0, scholly.activity.at(-1)?.visitors ?? 0,
+            )} hint={`${scholly.activity.at(-1)?.completers ?? 0} ta foydalanuvchi bajardi`} tone="emerald" />
+          </div>
+          <div className="mt-4">
+            <p className="text-sm text-slate-600">Ustunlar – missiyani bajarganlar. Chiziq – dashboard yoki missiyaga kirganlar.</p>
+            <BarLineChart
+              points={scholly.activity.map(({ date, visitors, completers }) => ({
+                title: longDay(date), label: shortDay(date), value: completers, secondary: visitors,
+              }))}
+              barName="Bajarganlar"
+              lineName="Tashrifchilar"
+            />
+          </div>
+          <h4 className="mb-2 mt-4 text-sm font-semibold text-slate-800">Onboarding bosqichlari</h4>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            {SCHOLLY_ONBOARDING_STEPS.map(([step, label]) => (
+              <MiniStat key={step} label={label}
+                value={formatNumber(scholly.onboarding.find((entry) => entry.step === step)?.users)} />
+            ))}
+          </div>
+          <h4 className="mb-2 mt-4 text-sm font-semibold text-slate-800">Missiya eslatmasi A/B sinovi</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {(["A", "B"] as const).map(variant => {
+              const result = scholly.reminderExperiment?.find(row => row.variant === variant);
+              return <MiniStat key={variant} label={`Variant ${variant}`}
+                value={schollyPercent(result?.completed ?? 0, result?.sent ?? 0)}
+                hint={`${result?.sent ?? 0} yuborildi · ${result?.opened ?? 0} ochildi · ${result?.completed ?? 0} bajarildi`} />;
+            })}
+          </div>
+        </Panel>
+      )}
 
       {/* ------------------------------------------------------------------ KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

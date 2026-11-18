@@ -1,10 +1,13 @@
 import { randomInt } from "crypto";
-import { eq, and, desc, gte, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { DAILY_ACTIVITY_REASON, isStreakActivity } from "@/lib/streak";
 import { loadSchollyStreak } from "@/lib/scholly-streak.server";
 import { schollyTimeZone } from "@/lib/scholly-mission-store.server";
 import { isSupportedTimeZone } from "@/lib/scholly-profile";
+import { logSchollyEvent } from "@/lib/scholly-events";
+import { syncSchollyPointCache } from "@/lib/scholly-points-balance.server";
+import type { SchollyPointBucket } from "@/lib/scholly-point-rules";
 import { profileCompletenessRatio, type ChancingProfile } from "@/lib/chancing";
 import {
   userPoints,
@@ -114,6 +117,16 @@ interface AwardResult {
   newlyAwardedBadges: (typeof badges.$inferSelect)[];
 }
 
+async function schollyLedgerDay(profileId: number, recordedAt: string, executor: Executor) {
+  const zone = await schollyTimeZone(profileId, executor);
+  const timeZone = isSupportedTimeZone(zone) && !/^[+-]/.test(zone) ? zone : "Asia/Tashkent";
+  const localBoundary = sql`date_trunc('day', timezone(${timeZone}, ${recordedAt}::timestamptz) - interval '4 hours') + interval '4 hours'`;
+  return {
+    start: sql`timezone('UTC', timezone(${timeZone}, ${localBoundary}))`,
+    end: sql`timezone('UTC', timezone(${timeZone}, ${localBoundary} + interval '1 day'))`,
+  };
+}
+
 /**
  * Mark "the student showed up today" in the ledger.
  *
@@ -132,22 +145,27 @@ export async function recordDailyActivity(profileId: number, executor?: Executor
   if (!Number.isFinite(profileId) || profileId <= 0) return false;
   try {
     if (!executor) return await withProfileLock(profileId, (tx) => recordDailyActivity(profileId, tx));
-    const savedTimeZone = await schollyTimeZone(profileId, executor);
-    const timeZone = isSupportedTimeZone(savedTimeZone) ? savedTimeZone : "Asia/Tashkent";
-    const localBoundary = sql`date_trunc('day', timezone(${timeZone}, now()) - interval '4 hours') + interval '4 hours'`;
+    const recordedAt = new Date();
+    const timestamp = recordedAt.toISOString();
+    const { start, end } = await schollyLedgerDay(profileId, timestamp, executor);
     const result = await executor.execute(sql`
-      INSERT INTO points_ledger (profile_id, points, reason)
-      SELECT ${profileId}, 0, ${DAILY_ACTIVITY_REASON}
+      INSERT INTO points_ledger (profile_id, points, reason, created_at)
+      SELECT ${profileId}, 0, ${DAILY_ACTIVITY_REASON}, ${timestamp}::timestamptz AT TIME ZONE 'UTC'
       WHERE NOT EXISTS (
         SELECT 1 FROM points_ledger
         WHERE profile_id = ${profileId}
           AND reason = ${DAILY_ACTIVITY_REASON}
-          AND created_at >= timezone('UTC', timezone(${timeZone}, ${localBoundary}))
-          AND created_at < timezone('UTC', timezone(${timeZone}, ${localBoundary} + interval '1 day'))
+          AND created_at >= ${start}
+          AND created_at < ${end}
       )
       RETURNING id
     `);
-    return ((result as unknown as { rows?: unknown[] }).rows?.length ?? 0) > 0;
+    const marked = result.rows.length > 0;
+    if (marked) {
+      const { awardSchollyStreakBonuses } = await import("./scholly-streak-bonuses.server");
+      await awardSchollyStreakBonuses(profileId, executor, recordedAt);
+    }
+    return marked;
   } catch (err) {
     // Activity tracking must never break the action the student actually took.
     console.error("recordDailyActivity failed:", err);
@@ -165,7 +183,8 @@ export async function awardPoints(
   points: number,
   reason: string,
   relatedEntityId?: number | null,
-  executor?: Executor
+  executor?: Executor,
+  metadata?: { bucket: SchollyPointBucket; idempotencyKey: string; createdAt: Date },
 ): Promise<AwardResult> {
   if (!Number.isSafeInteger(points) || points <= 0 || points > 2_147_483_647) {
     throw new Error("points must be a positive integer");
@@ -180,7 +199,7 @@ export async function awardPoints(
     }
 
     // Idempotency: skip if this exact grant already exists in the ledger.
-    if (relatedEntityId != null) {
+    if (relatedEntityId != null && !metadata) {
       const dup = await tx
         .select()
         .from(pointsLedger)
@@ -208,6 +227,7 @@ export async function awardPoints(
       points,
       reason,
       relatedEntityId: relatedEntityId ?? null,
+      ...metadata,
     });
 
     await ensureUserPoints(profileId, tx);
@@ -219,6 +239,7 @@ export async function awardPoints(
       .where(eq(userPoints.profileId, profileId))
       .returning({ totalPoints: userPoints.totalPoints });
     const newTotal = updatedPoints.totalPoints;
+    await syncSchollyPointCache(profileId, newTotal, tx);
     const levelRows = await getLevels(tx);
     const currentLevel = computeLevel(newTotal, levelRows);
 
@@ -228,6 +249,10 @@ export async function awardPoints(
       .where(eq(userPoints.profileId, profileId));
 
     const newlyAwardedBadges = await grantBadges(profileId, tx);
+    const previousLevel = computeLevel(newTotal - points, levelRows);
+    if (currentLevel.id !== previousLevel.id) {
+      await logSchollyEvent(profileId, "level_up", { id: currentLevel.id, name: currentLevel.name }, tx);
+    }
 
     return {
       points,

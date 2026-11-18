@@ -12,6 +12,7 @@ import {
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
 import { clampString, positiveInt, readJsonBody } from "@/lib/request";
 import { enforceFreeCap } from "@/lib/planLimits";
+import { rewardTrackedSubmission, updateTrackedApplication } from "@/lib/scholly-application-reward.server";
 
 export const dynamic = "force-dynamic";
 
@@ -169,28 +170,34 @@ export async function POST(req: Request) {
     const round = ROUNDS.includes(String(body.applicationRound)) ? String(body.applicationRound) : null;
     const status = APPLICATION_STATUSES.includes(body.status) ? String(body.status) : "not_started";
 
-    const [row] = await db
-      .insert(applications)
-      .values({
-        profileId,
-        universityId,
-        universityName,
-        programName: clampString(body.programName, 200) || null,
-        applicationRound: round,
-        // Next general intake season when the catalogue has no cycle row —
-        // the tracker's "intake" column would otherwise always start blank.
-        intakeTerm: clampString(body.intakeTerm, 60) || "Fall 2027",
-        deadline: /^\d{4}-\d{2}-\d{2}$/.test(String(body.deadline ?? "")) ? String(body.deadline) : null,
-        status,
-        applicationFeePaid: Boolean(body.applicationFeePaid),
-        feeAmount: positiveInt(body.feeAmount),
-        portalUrl: clampString(body.portalUrl, 500) || null,
-        notes: clampString(body.notes, 2000) || null,
-      })
-      .returning();
+    const { application: row, schollyPointsAwarded } = await db.transaction(async tx => {
+      const [application] = await tx
+        .insert(applications)
+        .values({
+          profileId,
+          universityId,
+          universityName,
+          programName: clampString(body.programName, 200) || null,
+          applicationRound: round,
+          // Next general intake season when the catalogue has no cycle row —
+          // the tracker's "intake" column would otherwise always start blank.
+          intakeTerm: clampString(body.intakeTerm, 60) || "Fall 2027",
+          deadline: /^\d{4}-\d{2}-\d{2}$/.test(String(body.deadline ?? "")) ? String(body.deadline) : null,
+          status,
+          submittedAt: status === "submitted" ? new Date() : null,
+          applicationFeePaid: Boolean(body.applicationFeePaid),
+          feeAmount: positiveInt(body.feeAmount),
+          portalUrl: clampString(body.portalUrl, 500) || null,
+          notes: clampString(body.notes, 2000) || null,
+        })
+        .returning();
+      const award = status === "submitted" && access.session.profile.id === profileId
+        ? await rewardTrackedSubmission(application, tx) : null;
+      return { application, schollyPointsAwarded: award?.points ?? 0 };
+    });
 
     await bumpCacheRevision(`applications:${profileId}`,"application created");
-    return NextResponse.json({ application: row, outcome: null });
+    return NextResponse.json({ application: row, outcome: null, schollyPointsAwarded });
   } catch (error) {
     console.error("POST /api/applications error:", error);
     return NextResponse.json({ error: "Failed to add application" }, { status: 500 });
@@ -216,9 +223,8 @@ export async function PATCH(req: Request) {
 
     const status = APPLICATION_STATUSES.includes(body.status) ? String(body.status) : undefined;
 
-    const [row] = await db
-      .update(applications)
-      .set({
+    const { application: row, schollyPointsAwarded } = await db.transaction(tx =>
+      updateTrackedApplication(tx, existing!.profileId, id, {
         status,
         programName: body.programName !== undefined ? clampString(body.programName, 200) || null : undefined,
         applicationRound:
@@ -235,16 +241,12 @@ export async function PATCH(req: Request) {
         feeAmount: body.feeAmount !== undefined ? positiveInt(body.feeAmount) : undefined,
         portalUrl: body.portalUrl !== undefined ? clampString(body.portalUrl, 500) || null : undefined,
         notes: body.notes !== undefined ? clampString(body.notes, 2000) || null : undefined,
-        // Entering "submitted" stamps the time once.
-        submittedAt:
-          status === "submitted" && !existing.submittedAt ? new Date() : undefined,
         updatedAt: new Date(),
-      })
-      .where(eq(applications.id, id))
-      .returning();
+      }, access.session.profile.id === existing!.profileId));
+    if (!row) return NextResponse.json({ error: "Application not found" }, { status: 404 });
 
     await bumpCacheRevision(`applications:${existing!.profileId}`,"application updated");
-    return NextResponse.json({ application: row });
+    return NextResponse.json({ application: row, schollyPointsAwarded });
   } catch (error) {
     console.error("PATCH /api/applications error:", error);
     return NextResponse.json({ error: "Failed to update application" }, { status: 500 });

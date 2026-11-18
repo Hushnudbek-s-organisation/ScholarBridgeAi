@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -27,9 +28,9 @@ export function SchollyReminderPermission({ disabled }: { disabled: boolean }) {
     <>
       <p>{t("reminderPermissionHint")}</p>
       <div className="sb-scholly-onboarding-actions">
-        <button type="button" disabled={disabled || status === "requesting"} onClick={() => void allowReminders()}>
+        <Button variant="unstyled" type="button" disabled={disabled || status === "requesting"} onClick={() => void allowReminders()}>
           {t("reminderPermissionAllow")}
-        </button>
+        </Button>
       </div>
     </>
   );

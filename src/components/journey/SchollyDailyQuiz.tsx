@@ -6,6 +6,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { isLocale, type Locale } from "@/i18n/config";
 import type { DailyQuiz } from "@/lib/scholly-quiz.server";
+import { announceSchollyMissionPractice } from "@/lib/scholly-client-events";
+import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
 
 export default function SchollyDailyQuiz({ profileId }: { profileId: number }) {
   const language = useLocale();
@@ -79,8 +81,10 @@ function QuizForm({ profileId, locale }: { profileId: number; locale: Locale }) 
         return;
       }
       if (!response.ok) throw new Error("quiz_submit_failed");
-      const next: DailyQuiz = await response.json();
+      const next: DailyQuiz & { awardedPoints?: number } = await response.json();
       setQuiz(next);
+      if (next.result) announceSchollyMissionPractice(profileId, "daily_quiz");
+      if (next.awardedPoints) announceSchollyPointsChanged(profileId, next.awardedPoints);
     } catch {
       setSubmitError(true);
     } finally {
@@ -128,7 +132,7 @@ function QuizForm({ profileId, locale }: { profileId: number; locale: Locale }) 
           <fieldset key={question.id} disabled={busy} className="space-y-2">
             <legend className="mb-2 text-sm font-medium">{question.prompt}</legend>
             {question.options.map((label, index) => (
-              <label key={label} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+              <label key={label} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-surface border border-border px-3 py-2 text-sm">
                 <input
                   type="radio"
                   className="accent-indigo-600"

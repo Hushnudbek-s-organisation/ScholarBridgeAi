@@ -70,10 +70,17 @@ export async function sendToChat(
   token: string,
   chatId: string,
   html: string,
-  meta: { profileId?: number | null; kind: string; type?: string | null; preview?: string | null; retryPayload?: RetryPayload | null },
+  meta: {
+    profileId?: number | null;
+    kind: string;
+    type?: string | null;
+    preview?: string | null;
+    retryPayload?: RetryPayload | null;
+    singleAttempt?: boolean;
+  },
   buttons: Keyboard = []
 ): Promise<{ ok: boolean; error?: string; errorCode?: number; messageId?: number }> {
-  const res = await tgSendMessage(token, chatId, html, buttons);
+  const res = await tgSendMessage(token, chatId, html, buttons, meta.singleAttempt);
   // Codes are never written to the log — only the fact that one was sent.
   await logMessage({
     ...meta,

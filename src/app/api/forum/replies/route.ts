@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { forumReplies, forumLikes, studentProfiles, forumThreads } from "@/db/schema";
 import { eq, and, count, asc, desc } from "drizzle-orm";
-import { awardPoints } from "@/lib/gamification";
+import { recordDailyActivity } from "@/lib/gamification";
 import { createLocalizedNotification, notifyAdminsLocalized } from "@/lib/notifications";
 import { requireProfileAccess } from "@/lib/auth";
 import { requireFeatureSession, premiumGate } from "@/lib/premium";
@@ -93,15 +93,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "This thread is locked" }, { status: 403 });
     }
 
-    const [reply] = await db
-      .insert(forumReplies)
-      .values({
+    const reply = await db.transaction(async (tx) => {
+      const ownReply = access.session.profile.id === Number(authorId);
+      if (ownReply) {
+        await tx.select({ id: studentProfiles.id }).from(studentProfiles)
+          .where(eq(studentProfiles.id, Number(authorId))).for("no key update");
+      }
+      const [created] = await tx.insert(forumReplies).values({
         threadId: Number(threadId),
         authorId: Number(authorId),
         parentReplyId: parentReplyId ? Number(parentReplyId) : null,
         body: replyBody,
-      })
-      .returning();
+      }).returning();
+      if (ownReply && String(replyBody).trim()) await recordDailyActivity(created.authorId, tx);
+      return created;
+    });
 
     // Advisory reply scoring is deliberately fire-and-forget; never delay a
     // successful reply. Audit contains only aggregate labels, not reply text.
@@ -123,11 +129,6 @@ export async function POST(req: Request) {
     await db.update(forumThreads).set({ updatedAt: new Date() }).where(eq(forumThreads.id, Number(threadId)));
 
     const [author] = await db.select().from(studentProfiles).where(eq(studentProfiles.id, Number(authorId)));
-    try {
-      await awardPoints(reply.authorId, 2, "reply_created", reply.id);
-    } catch (err) {
-      console.error("Failed to award reply points:", err);
-    }
 
     // Tell the thread author that someone answered (bell + Telegram) …
     const snippet = String(replyBody);

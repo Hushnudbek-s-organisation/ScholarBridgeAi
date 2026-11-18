@@ -1,5 +1,6 @@
 "use client";
 
+import { COMPANION_PAINT } from "@/lib/companion-paint";
 import { useEffect, useRef } from "react";
 
 const size = 256;
@@ -44,17 +45,17 @@ function fire(ctx: CanvasRenderingContext2D, time: number, still: boolean) {
   ctx.globalAlpha = intensity;
 
   const glow = ctx.createRadialGradient(center, 55, 9, center, 55, 98);
-  glow.addColorStop(0, "#ff581d67");
-  glow.addColorStop(1, "#ff491400");
+  glow.addColorStop(0, COMPANION_PAINT.fireHalo);
+  glow.addColorStop(1, COMPANION_PAINT.clearFireHalo);
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, size, 153);
 
   // A continuous hot rim connects the tongues across the round silhouette.
   const rimGlow = ctx.createLinearGradient(61, 0, 195, 0);
-  rimGlow.addColorStop(0, "#ff532900");
-  rimGlow.addColorStop(.26, "#ff692d");
-  rimGlow.addColorStop(.7, "#ff8b39");
-  rimGlow.addColorStop(1, "#ff532900");
+  rimGlow.addColorStop(0, COMPANION_PAINT.clearFireRim);
+  rimGlow.addColorStop(.26, COMPANION_PAINT.fireRim);
+  rimGlow.addColorStop(.7, COMPANION_PAINT.fireRimHighlight);
+  rimGlow.addColorStop(1, COMPANION_PAINT.clearFireRim);
   ctx.strokeStyle = rimGlow;
   ctx.lineWidth = 8;
   ctx.beginPath();
@@ -75,9 +76,9 @@ function fire(ctx: CanvasRenderingContext2D, time: number, still: boolean) {
 
   for (const { x, rim, top, tip, lift } of flames) {
     const outer = ctx.createLinearGradient(x, top, x, rim + 9);
-    outer.addColorStop(0, "#ff6846");
-    outer.addColorStop(.51, "#ff4b28");
-    outer.addColorStop(1, "#ff7c28");
+    outer.addColorStop(0, COMPANION_PAINT.flameOuterTip);
+    outer.addColorStop(.51, COMPANION_PAINT.flameOuterMiddle);
+    outer.addColorStop(1, COMPANION_PAINT.flameOuterBase);
     ctx.fillStyle = outer;
     flameShape(ctx, x, rim, top, tip, 15 + lift * 2);
   }
@@ -85,9 +86,9 @@ function fire(ctx: CanvasRenderingContext2D, time: number, still: boolean) {
   for (const { x, rim, top, tip } of flames) {
     const coreTop = top + (rim + 6 - top) * .48;
     const core = ctx.createLinearGradient(x, coreTop, x, rim + 4);
-    core.addColorStop(0, "#ff962c");
-    core.addColorStop(.64, "#ffc04a");
-    core.addColorStop(1, "#fff3a1");
+    core.addColorStop(0, COMPANION_PAINT.flameCoreTip);
+    core.addColorStop(.64, COMPANION_PAINT.flameCoreMiddle);
+    core.addColorStop(1, COMPANION_PAINT.flameCoreBase);
     ctx.fillStyle = core;
     flameShape(ctx, x, rim, coreTop, (x + tip) / 2, 8);
   }
@@ -98,7 +99,7 @@ function fire(ctx: CanvasRenderingContext2D, time: number, still: boolean) {
     const x = 88 + index * 16 + Math.sin(age * 3 + index) * 9 * age;
     const y = 42 - age * 34;
     ctx.globalAlpha = intensity * Math.sin(age * Math.PI) * .68;
-    ctx.fillStyle = "#ffc267";
+    ctx.fillStyle = COMPANION_PAINT.fireEmber;
     ctx.beginPath();
     ctx.arc(x, y, 1.6 - age * .95, 0, Math.PI * 2);
     ctx.fill();
@@ -120,13 +121,13 @@ function bolt(ctx: CanvasRenderingContext2D, from: Point, to: Point, seed: numbe
   ctx.moveTo(...from);
   for (const point of points.slice(1)) ctx.lineTo(...point);
   ctx.lineWidth = width * 4;
-  ctx.strokeStyle = "#3c88ff55";
-  ctx.shadowColor = "#567bff";
+  ctx.strokeStyle = COMPANION_PAINT.electricHalo;
+  ctx.shadowColor = COMPANION_PAINT.electricEdge;
   ctx.shadowBlur = glow;
   ctx.stroke();
   ctx.lineWidth = width;
-  ctx.strokeStyle = "#d9ffff";
-  ctx.shadowColor = "#6af5ff";
+  ctx.strokeStyle = COMPANION_PAINT.electricCore;
+  ctx.shadowColor = COMPANION_PAINT.electricGlow;
   ctx.stroke();
   ctx.shadowBlur = 0;
   if (branch) {

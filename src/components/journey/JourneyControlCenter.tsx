@@ -67,6 +67,10 @@ export interface JourneyDashboard {
   }[];
   deadlines: { id: string; kind: string; title: string; dueDate: string; daysRemaining: number | null; tab: string }[];
   schollyDeadline?: JourneyDashboard["deadlines"][number] | null;
+  schollySignals?: {
+    audience: import("@/lib/scholly-audience").SchollySegment[];
+    achievements: { badges: { id: number; name: string }[]; level: { id: number; name: string } | null };
+  } | null;
   applications: { total: number; preparing: number; submitted: number; decision: number };
   /** Optional for older cached/test payloads; live API returns full counts. */
   activity?: { savedUniversities: number; savedScholarships: number; applications: number };

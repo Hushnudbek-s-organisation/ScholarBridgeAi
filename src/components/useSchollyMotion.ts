@@ -60,13 +60,14 @@ export function useSchollyMotion(live: SchollyMotion, quiet: boolean, docked: bo
     return true;
   }, []);
 
+  if (cue && (quiet || states[live][0] > cue.priority)) setCue(null);
   useEffect(() => {
-    if (cue && (quiet || states[live][0] > cue.priority)) {
+    const active = current.current;
+    if (active && (quiet || states[live][0] > active.priority)) {
       if (timer.current) clearTimeout(timer.current);
       current.current = null;
-      setCue(null);
     }
-  }, [live, quiet, cue]);
+  }, [live, quiet]);
 
   useEffect(() => {
     const target = window as Window & { scholly?: Controls };
@@ -84,10 +85,7 @@ export function useSchollyMotion(live: SchollyMotion, quiet: boolean, docked: bo
   }, [setState]);
 
   useEffect(() => {
-    if (!docked || quiet) {
-      setSleeping(false);
-      return;
-    }
+    if (!docked || quiet) return;
     const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tashkent", hour: "numeric", hourCycle: "h23" });
     let lastActivity = Date.now();
     function check() {
@@ -110,6 +108,6 @@ export function useSchollyMotion(live: SchollyMotion, quiet: boolean, docked: bo
     };
   }, [docked, quiet]);
 
-  const state = quiet ? "idle" : cue && cue.priority >= states[live][0] ? cue.name : live === "idle" && sleeping ? "sleep" : live;
+  const state = quiet ? "idle" : cue && cue.priority >= states[live][0] ? cue.name : live === "idle" && docked && sleeping ? "sleep" : live;
   return { state, setState, hidden };
 }

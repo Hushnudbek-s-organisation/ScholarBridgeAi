@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { publicIeltsExercise, gradeIeltsExercise } from "../src/lib/scholly-ielts.server";
 import { selectSchollyDailyGrant } from "../src/lib/scholly-daily-grant";
 import {
   buildSchollyMissionHistory,
@@ -57,7 +58,7 @@ const shortSop = pickSchollyMission(
   { recentStatuses: ["missed", "skipped"], completedStreak: 0 },
 );
 assert.equal(shortSop.type, "sop_paragraph");
-assert.equal(shortSop.targetCount, 25);
+assert.equal(shortSop.targetCount, 40);
 assert.equal(shortSop.sizeMin, 1);
 assert.deepEqual(buildSchollyMissionHistory("2026-11-16", []), { recentStatuses: [], completedStreak: 0 });
 assert.deepEqual(buildSchollyMissionHistory("2026-11-16", [
@@ -98,6 +99,38 @@ assert.equal(missionProgress("sop_paragraph", 50, baseline, {
   ...baseline, sopWordCount: 170,
 }).complete, true);
 
+const ready: SchollyMissionContext = {
+  ...context, missingProfileFields: [], savedUniversityIds: [1, 2, 3],
+  sopWordCount: 501, hasIncompleteRequiredDocuments: false, hasDeadlineWithinSevenDays: false,
+};
+const practice = { ...ready, hasIeltsScoreGap: true, hasDepartureWithinSixtyDays: true };
+assert.equal(pickSchollyMission(practice).type, "ielts_vocabulary");
+assert.equal(pickSchollyMission(practice).targetCount, 5);
+assert.equal(pickSchollyMission(practice, { recentStatuses: [], completedStreak: 5 }).targetCount, 7);
+assert.equal(pickSchollyMission(practice, { recentStatuses: [], completedStreak: 0, segments: ["returned"] }).targetCount, 1);
+assert.equal(pickSchollyMission(practice, undefined, "ielts_vocabulary").type, "visa_practice");
+assert.equal(pickSchollyMission({ ...practice, hasIeltsScoreGap: false, latestVisaPracticeId: 10 }).type, "save_universities");
+assert.equal(pickSchollyMission({ ...ready, day: "2026-11-18" }).type, "ielts_vocabulary");
+assert.equal(pickSchollyMission({ ...ready, day: "2026-11-20" }).type, "visa_practice");
+assert.equal(missionProgress("visa_practice", 1, { ...baseline, latestVisaPracticeId: 10 }, {
+  ...baseline, latestVisaPracticeId: 10,
+}).complete, false);
+assert.equal(missionProgress("visa_practice", 1, { ...baseline, latestVisaPracticeId: 10 }, {
+  ...baseline, latestVisaPracticeId: 11,
+}).complete, true);
+
+const exercise = publicIeltsExercise(practice.day, 5);
+assert.equal(exercise.words.length, 5);
+assert.equal(exercise.questions.length, 5);
+assert.equal(new Set(exercise.words.map((entry) => entry.word)).size, 5);
+assert.equal("correctIndex" in exercise.questions[0], false);
+assert.notDeepEqual(exercise, publicIeltsExercise("2026-11-17", 5));
+const correctAnswers = exercise.questions.map((q, i) => q.options.indexOf(exercise.words[i].definition));
+assert.equal(gradeIeltsExercise(practice.day, 5, correctAnswers), 5);
+assert.equal(gradeIeltsExercise(practice.day, 5, correctAnswers.map((index) => (index + 1) % 3)), 0);
+assert.equal(gradeIeltsExercise(practice.day, 5, correctAnswers.slice(1)), null);
+assert.equal(gradeIeltsExercise(practice.day, 5, [0, 1, 2, 1, 9]), null);
+
 const verifiedGrant = {
   id: 1, verificationStatus: "verified", sourceUrl: "https://university.test/scholarships/example",
   lastVerifiedAt: "2026-11-15T00:00:00Z", deadlineDate: "2026-11-30",
@@ -122,7 +155,7 @@ assert.notEqual(selectSchollyDailyGrant([verifiedGrant, secondGrant], "2026-11-1
 const route = readFileSync(resolve(__dirname, "../src/app/api/scholly/mission/route.ts"), "utf8");
 assert.match(route, /requireProfileAccess/);
 assert.match(route, /for\("update"\)/);
-assert.match(route, /awardPoints\(profileId, done\.points, "scholly_daily_mission", done\.id, tx\)/);
+assert.match(route, /awardSchollyPoints\(profileId, "mission_complete"/);
 assert.match(route, /logSchollyEvent\(profileId, "mission_done"/);
 assert.match(route, /logSchollyEvent\(profileId, "mission_skipped"/);
 assert.match(route, /logSchollyEvent\(profileId, "mission_another"/);
