@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } fro
 import { useLocale } from "next-intl";
 import { Check, Globe, Mic, MicOff, Search, Send, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { AiOrbFaceAvatar, type AiOrbFaceState } from "@/components/visa/AiOrbFaceAvatar";
+import { AiOrbFaceAvatar, SpeakingAvatarPreview, type AiOrbFaceState } from "@/components/visa/AiOrbFaceAvatar";
 import { SpeakingRoom } from "@/components/visa/SpeakingRoom";
 import { CountryFlag } from "@/components/CountryFlag";
 import { countrySearchMatch } from "@/lib/countryPicker";
@@ -341,6 +341,7 @@ export function DailySpeaking() {
       <div className="grid gap-4 sm:grid-cols-2">
         <fieldset className="min-w-0">
           <legend className="mb-2 text-sm font-bold">{t.speaker}</legend>
+          {messages.length === 0 && <SpeakingAvatarPreview name={partner} style={style} />}
           <div className="grid grid-cols-2 gap-2">
             {(Object.keys(partners) as Partner[]).map(name => <label key={name} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-slate-300 px-3 has-checked:border-blue-500 dark:border-slate-600">
               <input type="radio" name="daily-partner" checked={partner === name} onChange={() => { reset(); setPartner(name); }} />
@@ -350,8 +351,8 @@ export function DailySpeaking() {
         </fieldset>
         <fieldset className="min-w-0">
           <legend className="mb-2 text-sm font-bold">{t.style}</legend>
-          <div className="grid grid-cols-3 gap-2">
-            {styles.map(option => <label key={option} className="flex min-h-11 cursor-pointer items-start gap-1.5 rounded-control border border-slate-300 p-2 has-checked:border-blue-500 dark:border-slate-600">
+          <div className="grid gap-2 lg:grid-cols-3">
+            {styles.map(option => <label key={option} className="flex min-h-11 cursor-pointer items-start gap-1.5 rounded-control border border-slate-300 p-2 has-checked:border-blue-500 has-checked:bg-blue-500/10 dark:border-slate-600">
               <input className="mt-1 shrink-0" type="radio" name="daily-style" checked={style === option} onChange={() => { reset(); setAllowRough(false); setStyle(option); }} />
               <span className="min-w-0 break-words"><strong className="block">{t[option]}</strong><small className="text-slate-600 dark:text-slate-300">{t[`${option}Detail`]}</small></span>
             </label>)}

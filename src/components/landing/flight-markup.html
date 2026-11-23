@@ -1,0 +1,447 @@
+<svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#34d399" />
+        <stop offset="50%" stop-color="#38bdf8" />
+        <stop offset="100%" stop-color="#f5d08a" />
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- Film Grain -->
+  <div class="page-grain" aria-hidden="true"></div>
+
+  <!-- 4 Study-Abroad Photographic Worlds -->
+  <div class="scene-stage" aria-hidden="true">
+    <div class="scene-layer is-active" id="sceneLayer0"></div>
+    <div class="scene-layer" id="sceneLayer1"></div>
+    <div class="scene-layer" id="sceneLayer2"></div>
+    <div class="scene-layer" id="sceneLayer3"></div>
+    <div class="scene-scrim"></div>
+    <canvas id="constellationCanvas"></canvas>
+  </div>
+
+  <!-- Scroll Flight Path Jet -->
+  <div class="flight-overlay" aria-hidden="true">
+    <svg class="flight-svg" viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <path id="scrollFlightCurve"
+        d="M 1180 90 C 960 220, 420 280, 640 460 C 860 640, 1120 560, 760 850"
+        fill="none"
+        stroke="rgba(56, 189, 248, 0.20)"
+        stroke-width="1.6"
+        stroke-dasharray="7 7" />
+      <path id="scrollFlightActive"
+        d="M 1180 90 C 960 220, 420 280, 640 460 C 860 640, 1120 560, 760 850"
+        fill="none"
+        stroke="url(#gaugeGrad)"
+        stroke-width="2.4" />
+    </svg>
+  </div>
+  <div class="flight-jet-wrap" id="flightJet" aria-hidden="true">
+    <svg viewBox="0 0 44 44" width="42" height="42" fill="none">
+      <path d="M39 22L7 9L14 22L7 35L39 22Z" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M14 22H26" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <!-- Right-Edge Altimeter -->
+  <aside class="altimeter-hud" aria-hidden="true">
+    <div class="altimeter-badge liquid-glass">
+      <span class="altimeter-badge__dot"></span>
+      <span id="altimeterPct">000 %</span>
+    </div>
+    <div class="altimeter-track liquid-glass" id="altimeterTicks"></div>
+  </aside>
+
+  <!-- Floating 3-Part Liquid-Glass Navbar -->
+  <header class="nav-shell">
+    <nav class="nav-bar" aria-label="Primary Navigation">
+      <a href="#hero" class="nav-brand-Cluster">
+        <span class="nav-logo-disc liquid-glass">
+          <img id="navLogoImg" src="/landing/flight/logo.webp" decoding="async" alt="ScholarBridge AI" />
+        </span>
+        <span class="nav-brand-pill liquid-glass">
+          ScholarBridge <em>AI</em>
+        </span>
+      </a>
+
+      <div class="nav-center-pill liquid-glass">
+        <a href="#hero" class="nav-link is-active" data-i18n="nav_calc">1. Kalkulyator</a>
+        <a href="#steps" class="nav-link" data-i18n="nav_steps">2. 4 Qadam</a>
+        <a href="#workspace" class="nav-link" data-i18n="nav_workspace">3. Platforma</a>
+        <a href="#start" class="nav-link" data-i18n="nav_start">4. Boshlash</a>
+        <span class="nav-divider"></span>
+        <div class="scene-pills" role="group" aria-label="Study Abroad Background Scene">
+          <button type="button" class="scene-pill is-active" data-scene="0">01 Orbit</button>
+          <button type="button" class="scene-pill" data-scene="1">02 Campus</button>
+          <button type="button" class="scene-pill" data-scene="2">03 Aurora</button>
+          <button type="button" class="scene-pill" data-scene="3">04 Flight</button>
+        </div>
+      </div>
+
+      <div class="nav-right-cluster"><button class="scene-pill flight-theme" type="button" data-flight-theme aria-label="Switch to light mode">◐</button><button class="scene-pill flight-mobile-menu" type="button" aria-expanded="false" aria-label="Open navigation menu" aria-controls="flight-page-sections" data-flight-menu>☰</button><button class="btn-halo flight-sign-in flight-sign-in-desktop" type="button" data-flight-sign-in>Sign in</button>
+        <div class="lang-pill-group liquid-glass" role="group" aria-label="Language Switcher">
+          <button type="button" class="lang-btn is-active" data-lang="uz">UZ</button>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+          <button type="button" class="lang-btn" data-lang="ru">RU</button>
+        </div>
+        <button type="button" class="btn-roll btn-halo" id="navStartBtn" data-flight-start>
+          <span class="btn-roll__window">
+            <span class="btn-roll__stack">
+              <span data-i18n="cta_start">Boshlash</span>
+              <span data-i18n="cta_start">Boshlash</span>
+            </span>
+          </span>
+          <span class="btn-roll__chip">↗</span>
+        </button>
+      </div>
+    </nav>
+  <nav id="flight-page-sections" class="flight-page-sections liquid-glass" aria-label="Page sections"><button class="btn-halo flight-sign-in flight-sign-in-mobile" type="button" data-flight-sign-in>Sign in</button><a href="#hero" data-i18n="nav_calc">Kalkulyator</a><a href="#steps" data-i18n="nav_steps">4 qadam</a><a href="#workspace" data-i18n="nav_workspace">Platforma</a><a href="#start" data-i18n="nav_start">Boshlash</a></nav></header>
+
+  <main>
+    <!-- ======================================================================
+         SECTION 1: UNIFIED HERO + SIMPLE 2-CARD FIT CALCULATOR
+         ====================================================================== -->
+    <section class="hero-section" id="hero">
+      <div class="section-wrap">
+        <div class="hero-header">
+          <div class="eyebrow-pill liquid-glass">
+            <span class="eyebrow-dot"></span>
+            <span data-i18n="s1_eyebrow">CHET ELDA O‘QISH VA GRANTLAR PLATFORMASI</span>
+          </div>
+
+          <h1 class="hero-h1">
+            <span data-i18n="s1_h1_prefix">Xalqaro universitet va</span>
+            <span class="rotating-slot" id="heroRotatingWord">To‘liq Grantlar</span>
+            <span class="serif-italic" data-i18n="s1_h1_suffix">— aniq rejada.</span>
+          </h1>
+
+          <p class="hero-lead" data-i18n="s1_lead">
+            GPA, IELTS va byudjetingizni kiriting — sizga mos universitetlar, to‘liq grantlar va keyingi qadamlarni bir zumda ko‘ring.
+          </p>
+
+          <!-- Student Example Switcher -->
+          <div class="preset-switcher-bar" role="group" aria-label="Student Examples">
+            <button type="button" class="preset-pill liquid-glass is-active" data-preset="aziza">
+              <span class="preset-avatar">AS</span>
+              <span data-i18n="preset_aziza">Aziza · GPA 4.8 · IELTS 7.5 · ≤ $8k</span>
+            </button>
+            <button type="button" class="preset-pill liquid-glass" data-preset="jasur">
+              <span class="preset-avatar" style="background:linear-gradient(135deg,#34d399,#38bdf8)">JM</span>
+              <span data-i18n="preset_jasur">Jasur · GPA 4.5 · IELTS 7.0 · To‘liq grant</span>
+            </button>
+            <button type="button" class="preset-pill liquid-glass" data-preset="madina">
+              <span class="preset-avatar" style="background:linear-gradient(135deg,#f5d08a,#fb7185)">MK</span>
+              <span data-i18n="preset_madina">Madina · GPA 4.9 · IELTS 8.0 · ≤ $15k</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SIMPLE 2-CARD INTERACTIVE CALCULATOR -->
+        <div class="calculator-split">
+          <!-- Left Card: Your Profile Sliders -->
+          <article class="calc-card liquid-glass--strong">
+            <div>
+              <div class="calc-card__head">
+                <span class="calc-card__title" data-i18n="c1_title">1. Sizning ko‘rsatkichlaringiz</span>
+                <span class="status-chip" data-i18n="c1_ready">✓ Jonli hisob-kitob</span>
+              </div>
+
+              <div class="fit-summary-banner">
+                <div class="circular-gauge">
+                  <svg viewBox="0 0 84 84">
+                    <circle class="circular-gauge__bg" cx="42" cy="42" r="36"></circle>
+                    <circle class="circular-gauge__fill" id="fitGaugeCircle" cx="42" cy="42" r="36"></circle>
+                  </svg>
+                  <div class="circular-gauge__center">
+                    <span class="circular-gauge__val" id="liveFitScore">—</span>
+                    <span class="circular-gauge__lbl" data-i18n="c1_gauge_lbl">MOSLIK</span>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:15px;font-weight:600;color:#fff;margin-bottom:3px">
+                    <span data-i18n="c1_banner_t">Namuna bo‘yicha moslik:</span>
+                    <span id="inlineFitText" style="color:var(--emerald)">—</span>
+                  </div>
+                  <div style="font-size:12.5px;color:var(--text-secondary)" data-i18n="c1_banner_s">
+                    GPA, IELTS va byudjetni o‘zgartirib, namunadagi natijani ko‘ring.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="slider-stack">
+              <div class="slider-item">
+                <div class="slider-meta">
+                  <span data-i18n="c1_gpa_lbl">GPA (5.0 shkalada)</span>
+                  <strong id="gpaValLabel">4.8 / 5.0</strong>
+                </div>
+                <input type="range" class="glass-slider" id="gpaSlider" min="3.2" max="5.0" step="0.1" value="4.8" aria-label="GPA" />
+              </div>
+
+              <div class="slider-item">
+                <div class="slider-meta">
+                  <span data-i18n="c1_ielts_lbl">IELTS bali</span>
+                  <strong id="ieltsValLabel">7.5</strong>
+                </div>
+                <input type="range" class="glass-slider" id="ieltsSlider" min="5.5" max="8.5" step="0.5" value="7.5" aria-label="IELTS" />
+              </div>
+
+              <div class="slider-item">
+                <div class="slider-meta">
+                  <span data-i18n="c1_budget_lbl">Yillik kontrakt byudjeti</span>
+                  <strong id="budgetValLabel">≤ $8k/yil</strong>
+                </div>
+                <input type="range" class="glass-slider" id="budgetSlider" min="0" max="25" step="1" value="8" aria-label="Budget" />
+              </div>
+            </div>
+          </article>
+
+          <!-- Right Card: Matched Universities & Full Grants -->
+          <article class="calc-card liquid-glass">
+            <div>
+              <div class="calc-card__head">
+                <span class="calc-card__title" data-i18n="c2_title">2. Sizga mos universitet va grantlar</span>
+                <span class="status-chip status-chip--cyan" data-i18n="c2_chip">TOP-3 Moslik</span>
+              </div>
+
+              <div class="match-list" id="liveMatchList"></div>
+            </div>
+
+            <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+              <span style="font-size:12.5px;color:var(--text-secondary)" data-i18n="c2_foot">
+                Namuna. Amaldagi talablar va narxlar katalogda.
+              </span>
+              <button type="button" class="btn-halo" style="padding:8px 16px;font-size:12.5px" data-flight-start>
+                <span data-i18n="c2_btn">Barcha mos dasturlarni ko‘rish ↗</span>
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <!-- Edge-Faded Giant Ticker -->
+        <div class="giant-ticker-mask" aria-hidden="true">
+          <div class="giant-ticker-track">
+            <span class="giant-ticker-item">TU Munich <strong>UNIVERSITIES</strong> ·</span>
+            <span class="giant-ticker-item">Stipendium Hungaricum <strong>SCHOLARSHIPS</strong> ·</span>
+            <span class="giant-ticker-item">ETH Zurich <strong>UNIVERSITIES</strong> ·</span>
+            <span class="giant-ticker-item">NUS Singapore <strong>PROGRAMMES</strong> ·</span>
+            <span class="giant-ticker-item">KAIST Korea <strong>GKS</strong> ·</span>
+            <span class="giant-ticker-item">DAAD Germany <strong>FUNDING</strong> ·</span>
+            <span class="giant-ticker-item">TU Munich <strong>UNIVERSITIES</strong> ·</span>
+            <span class="giant-ticker-item">Stipendium Hungaricum <strong>SCHOLARSHIPS</strong> ·</span>
+            <span class="giant-ticker-item">ETH Zurich <strong>UNIVERSITIES</strong> ·</span>
+            <span class="giant-ticker-item">NUS Singapore <strong>PROGRAMMES</strong> ·</span>
+            <span class="giant-ticker-item">KAIST Korea <strong>GKS</strong> ·</span>
+            <span class="giant-ticker-item">DAAD Germany <strong>FUNDING</strong> ·</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SECTION 2: 4 SIMPLE STEPS (ASYMMETRIC 7/5/5/7 PHOTOGRAPHY BENTO GRID)
+         ====================================================================== -->
+    <section class="bento-section" id="steps">
+      <div class="section-wrap">
+        <div class="section-header-center">
+          <div class="eyebrow-pill liquid-glass">
+            <span class="eyebrow-dot"></span>
+            <span data-i18n="s2_eyebrow">QANDAY ISHLAYDI · 4 ODDIY QADAM</span>
+          </div>
+          <h2 class="section-h2">
+            <span data-i18n="s2_h2_1">Profildan tortib</span>
+            <span class="serif-italic text-gradient-champagne" data-i18n="s2_h2_2">viza va parvozgacha.</span>
+          </h2>
+          <p style="font-size:15px;color:var(--text-secondary)" data-i18n="s2_sub">
+            Murakkab qabul jarayoni 4 ta tushunarli bosqichga ajratilgan.
+          </p>
+        </div>
+
+        <div class="bento-grid-12">
+          <!-- Step 1 (Span 7) -->
+          <article class="bento-card bento-card--span-7 liquid-glass">
+            <img class="bento-card__photo" id="bentoImg1" src="/landing/flight/step1.webp" decoding="async" loading="lazy" alt="Step 1 Profile" />
+            <div class="bento-card__scrim"></div>
+            <div class="bento-card__top">
+              <span class="bento-step-num liquid-glass">01</span>
+              <span class="bento-tag-pill liquid-glass" data-i18n="b1_pill">1-QADAM · PROFIL</span>
+            </div>
+            <div class="bento-card__bottom">
+              <div class="bento-mini-pills">
+                <span class="bento-mini-pill">✓ GPA 4.8 / 5.0</span>
+                <span class="bento-mini-pill">✓ IELTS 7.5</span>
+                <span class="bento-mini-pill" data-i18n="b1_p3">✓ Byudjet ≤ $8k</span>
+              </div>
+              <h3 class="bento-card__title" data-i18n="b1_title">1. Profilingizni bir marta to‘ldiring</h3>
+              <p class="bento-card__desc" data-i18n="b1_desc">Baholar, IELTS/SAT sertifikat va byudjetingiz barcha hisob-kitoblar uchun asos bo‘ladi.</p>
+            </div>
+          </article>
+
+          <!-- Step 2 (Span 5) -->
+          <article class="bento-card bento-card--span-5 liquid-glass">
+            <img class="bento-card__photo" id="bentoImg2" src="/landing/flight/step2.webp" decoding="async" loading="lazy" alt="Step 2 Universities and Grants" />
+            <div class="bento-card__scrim"></div>
+            <div class="bento-card__top">
+              <span class="bento-step-num liquid-glass">02</span>
+              <span class="bento-tag-pill liquid-glass" data-i18n="b2_pill">2-QADAM · TANLOV</span>
+            </div>
+            <div class="bento-card__bottom">
+              <div class="bento-mini-pills">
+                <span class="bento-mini-pill" style="color:var(--emerald)">TU Munich 91%</span>
+                <span class="bento-mini-pill" style="color:var(--gold)" data-i18n="b2_p2">Stipendium Grant</span>
+              </div>
+              <h3 class="bento-card__title" data-i18n="b2_title">2. Mos universitet va grantni tanlang</h3>
+              <p class="bento-card__desc" data-i18n="b2_desc">Sizning natijalaringizga rostdan mos keladigan dasturlar va 100% grantlar saralanadi.</p>
+            </div>
+          </article>
+
+          <!-- Step 3 (Span 5) -->
+          <article class="bento-card bento-card--span-5 liquid-glass">
+            <img class="bento-card__photo" id="bentoImg3" src="/landing/flight/step3.webp" decoding="async" loading="lazy" alt="Step 3 SOP and Roadmap" />
+            <div class="bento-card__scrim"></div>
+            <div class="bento-card__top">
+              <span class="bento-step-num liquid-glass">03</span>
+              <span class="bento-tag-pill liquid-glass" data-i18n="b3_pill">3-QADAM · HUJJAT &amp; SOP</span>
+            </div>
+            <div class="bento-card__bottom">
+              <div class="bento-mini-pills">
+                <span class="bento-mini-pill" style="color:var(--gold)">SOP AI: 9.1 / 10</span>
+                <span class="bento-mini-pill" style="color:var(--accent)" data-i18n="b3_p2">Dedlayn: 14 kun</span>
+              </div>
+              <h3 class="bento-card__title" data-i18n="b3_title">3. Hujjat va SOP inshoni tayyorlang</h3>
+              <p class="bento-card__desc" data-i18n="b3_desc">AI yordamida motivatsion xatingizni kuchaytiring va dedlaynlarni haftalik rejada kuzating.</p>
+            </div>
+          </article>
+
+          <!-- Step 4 (Span 7) -->
+          <article class="bento-card bento-card--span-7 liquid-glass">
+            <img class="bento-card__photo" id="bentoImg4" src="/landing/flight/step4.webp" decoding="async" loading="lazy" alt="Step 4 Visa and Departure" />
+            <div class="bento-card__scrim"></div>
+            <div class="bento-card__top">
+              <span class="bento-step-num liquid-glass">04</span>
+              <span class="bento-tag-pill liquid-glass" data-i18n="b4_pill">4-QADAM · OFFER &amp; VIZA</span>
+            </div>
+            <div class="bento-card__bottom">
+              <div class="bento-mini-pills">
+                <span class="bento-mini-pill" style="color:var(--emerald)" data-i18n="b4_p1">✓ Hujjatlar 100%</span>
+                <span class="bento-mini-pill" style="color:var(--gold)" data-i18n="b4_p2">✓ Elchixona suhbati</span>
+                <span class="bento-mini-pill" style="color:var(--accent)" data-i18n="b4_p3">✓ Jo‘nab ketish rejasi</span>
+              </div>
+              <h3 class="bento-card__title" data-i18n="b4_title">4. Offer oling va vizaga tayyorlaning</h3>
+              <p class="bento-card__desc" data-i18n="b4_desc">Qabul xatidan so‘ng Apostil, elchixona savol-javob mashqi va yotoqxona rejasini yakunlang.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SECTION 3: 2-ROW OPPOSING WORKSPACE SHOWCASE (6 SIMPLE VISUAL CARDS)
+         ====================================================================== -->
+    <section class="workspace-section" id="workspace">
+      <div class="section-wrap">
+        <div class="section-header-center">
+          <div class="eyebrow-pill liquid-glass">
+            <span class="eyebrow-dot"></span>
+            <span data-i18n="s3_eyebrow">PLATFORMA ICHIDAGI VOSITALAR</span>
+          </div>
+          <h2 class="section-h2">
+            <span data-i18n="s3_h2_1">Barcha kerakli vositalar —</span>
+            <span class="serif-italic text-gradient-champagne" data-i18n="s3_h2_2">bitta kabinetda.</span>
+          </h2>
+        </div>
+      </div>
+
+      <div class="marquee-rows-stack">
+        <div class="ui-marquee-row ui-marquee-row--left" id="marqueeRowTop"></div>
+        <div class="ui-marquee-row ui-marquee-row--right" id="marqueeRowBottom"></div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SECTION 4: SPLIT CTA & 3-LANGUAGE SWITCHER FINALE
+         ====================================================================== -->
+    <section class="finale-section" id="start">
+      <div class="section-wrap">
+        <div class="finale-split-grid">
+          <div class="finale-main-card liquid-glass--strong">
+            <div>
+              <div class="eyebrow-pill liquid-glass">
+                <span class="eyebrow-dot"></span>
+                <span data-i18n="s4_eyebrow">HOZIROQ BOSHLANG</span>
+              </div>
+              <h2 class="finale-h2">
+                <span data-i18n="s4_h2_1">Chet elda o‘qish rejangizni</span>
+                <span class="serif-italic text-gradient-champagne" data-i18n="s4_h2_2">2 daqiqada tuzing.</span>
+              </h2>
+              <p style="font-size:15.5px;color:var(--text-secondary);max-width:520px" data-i18n="s4_lead">
+                Bepul profil yarating, universitetlarni taqqoslang va grant muddatlarini kuzating.
+              </p>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <button type="button" class="btn-roll btn-halo" data-flight-start>
+                <span class="btn-roll__window">
+                  <span class="btn-roll__stack">
+                    <span data-i18n="cta_create_profile">Profil yaratish — Bepul</span>
+                    <span data-i18n="cta_create_profile">Profil yaratish — Bepul</span>
+                  </span>
+                </span>
+                <span class="btn-roll__chip">↗</span>
+              </button>
+
+              <a href="https://t.me/scholarbridge_uz" target="_blank" rel="noopener" class="btn-roll btn-roll--glass liquid-glass">
+                <span class="btn-roll__window">
+                  <span class="btn-roll__stack">
+                    <span>Telegram · @scholarbridge_uz</span>
+                    <span>Telegram · @scholarbridge_uz</span>
+                  </span>
+                </span>
+                <span class="btn-roll__chip">↗</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="finale-lang-card liquid-glass">
+            <div>
+              <div class="scholly-header">
+                <div class="scholly-avatar-orb liquid-glass">
+                  <img id="schollyMascotImg" src="/landing/flight/scholly.webp" decoding="async" loading="lazy" alt="Scholly AI" />
+                </div>
+                <div>
+                  <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted)" data-i18n="s4_lang_tag">SCHOLLY AI · 3 TILDA</span>
+                  <h3 style="font-size:20px;font-weight:600" data-i18n="s4_lang_title">O‘zingizga qulay tilni tanlang</h3>
+                </div>
+              </div>
+
+              <div class="lang-stack-list">
+                <button type="button" class="lang-card-btn is-active" data-lang="uz">
+                  <span>🇺🇿 O‘zbek tili</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent)">UZ</span>
+                </button>
+                <button type="button" class="lang-card-btn" data-lang="en">
+                  <span>🇬🇧 English</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">EN</span>
+                </button>
+                <button type="button" class="lang-card-btn" data-lang="ru">
+                  <span>🇷🇺 Русский язык</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">RU</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="footer-minimal">
+          <div>© 2026 ScholarBridge AI · Global Admissions &amp; Scholarship Platform</div>
+          <div style="display:flex;gap:18px;flex-wrap:wrap">
+            <a href="#hero" data-i18n="nav_calc">1. Kalkulyator</a>
+            <a href="#steps" data-i18n="nav_steps">2. 4 Qadam</a>
+            <a href="#workspace" data-i18n="nav_workspace">3. Platforma</a>
+            <a href="/terms" data-i18n="terms">Terms</a><a href="/privacy" data-i18n="privacy">Privacy</a><a href="https://t.me/scholarbridge_uz" target="_blank" rel="noopener">@scholarbridge_uz</a>
+          </div>
+        </footer>
+      </div>
+    </section>
+  </main>

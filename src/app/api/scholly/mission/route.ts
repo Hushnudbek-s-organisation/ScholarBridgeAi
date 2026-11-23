@@ -6,7 +6,6 @@ import { awardSchollyPoints } from "@/lib/scholly-points.server";
 import { awardSchollyMissionBonuses } from "@/lib/scholly-streak-bonuses.server";
 import { logSchollyEvent } from "@/lib/scholly-events";
 import { awardSchollyFriendStreak } from "@/lib/scholly-friends.server";
-import { checkSchollySeasonalRewards } from "@/lib/scholly-wardrobe.server";
 import { loadSchollyAudience } from "@/lib/scholly-audience.server";
 import { gradeIeltsExercise, publicIeltsExercise } from "@/lib/scholly-ielts.server";
 import { requireProfileAccess } from "@/lib/auth";
@@ -207,7 +206,6 @@ async function responseFor(profileId: number, ielts?: { missionId: number; answe
   if (!row) return privateNoStoreJson({ error: "This IELTS exercise is no longer available" }, { status: 409 });
   const evaluated = await evaluateMission(profileId, row, day, ielts);
   if ("error" in evaluated) return privateNoStoreJson({ error: evaluated.error }, { status: evaluated.status });
-  if (evaluated.row.status === "done") await checkSchollySeasonalRewards(profileId, day);
   if (evaluated.justCompleted) {
     await awardSchollyFriendStreak(profileId).catch(error => {
       console.warn("Scholly friend reward could not be evaluated:", (error as Error)?.name);

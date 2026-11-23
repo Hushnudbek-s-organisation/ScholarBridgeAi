@@ -1,9 +1,10 @@
 "use client";
 
+import { SchollyModel } from "@/components/SchollyModel";
 import type { SpeakerStyle } from "@/lib/daily-speaking";
 import { SpeakingEffects } from "./SpeakingEffects";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 
 export type AiOrbFaceState = "LISTENING" | "THINKING" | "SPEAKING" | "IDLE";
 
@@ -53,13 +54,16 @@ function useSpeechOscillator(active: boolean, enabled: boolean, rate: number): n
     if (!running) return;
     let raf = 0;
     const start = performance.now();
+    let lastFrame = -Infinity;
     const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (document.hidden || now - lastFrame < 31) return;
+      lastFrame = now;
       const t = (now - start) / 1000;
       const syllable = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI * rate);
       const envelope = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI * 2.3 + 0.9);
       const gate = 0.55 + 0.45 * Math.sin(t * 2 * Math.PI * 1.15 + 2.1);
       setValue(Math.max(0, Math.min(1, syllable * (0.35 + 0.65 * envelope) * gate)));
-      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -69,30 +73,7 @@ function useSpeechOscillator(active: boolean, enabled: boolean, rate: number): n
   return running ? value : 0;
 }
 
-/** Blink state: periodic, restarted by a state change so it blinks on the turn. */
-function useBlink(state: AiOrbFaceState, reduced: boolean): boolean {
-  const [blink, setBlink] = useState(false);
-  useEffect(() => {
-    if (reduced) return;
-    let close = 0;
-    let next = 0;
-    const loop = () => {
-      setBlink(true);
-      close = window.setTimeout(() => setBlink(false), 150);
-      next = window.setTimeout(loop, 3500);
-    };
-    // One loop, restarted by `state`: the first blink lands right away so the
-    // orb blinks on the turn changing, then settles into the 3.5s rhythm. Both
-    // writes happen inside a timer callback; setting them inline in the effect
-    // body would cascade a render on every state change.
-    next = window.setTimeout(loop, 0);
-    return () => {
-      window.clearTimeout(close);
-      window.clearTimeout(next);
-    };
-  }, [state, reduced]);
-  return blink;
-}
+
 
 // ---------------------------------------------------------------------------
 // Palettes
@@ -177,6 +158,13 @@ export interface AiOrbFaceAvatarProps {
   countryName?: string;
 }
 
+export function SpeakingAvatarPreview({ name, style = "calm" }: { name: string; style?: SpeakerStyle }) {
+  return <div className="sb-speaking-preview" data-style={style} aria-hidden="true">
+    <SchollyModel studio paused angle={name === "Rica" ? -.25 : .25} />
+    <span>{name}</span>
+  </div>;
+}
+
 export function AiOrbFaceAvatar({
   state,
   level,
@@ -191,7 +179,6 @@ export function AiOrbFaceAvatar({
   const speaking = state === "SPEAKING";
   const rate = temperament === "fast" ? 9 : temperament === "irritated" ? 7 : 5.5;
   const oscillator = useSpeechOscillator(speaking, !measuredAudio && !reduced, rate);
-  const blink = useBlink(state, reduced) && !reduced;
   const measured = speaking ? Math.min(1, Math.max(0, level) * 1.4) : 0;
   const mouthOpen = speaking ? (reduced ? 0.45 : measuredAudio ? measured : oscillator) : 0;
 
@@ -199,17 +186,17 @@ export function AiOrbFaceAvatar({
     <div className="flex w-full flex-col items-center gap-4">
       <div className={"sb-speaking-face-stage"} data-speaking-avatar data-state={state}
         data-temperament={temperament}
+        style={{ "--sb-mouth-level": mouthOpen } as CSSProperties}
         role="img" aria-label={countryName ? `${roleLabel} — ${countryName}` : roleLabel}>
         <div className={"sb-speaking-face-halo"} aria-hidden="true" />
         {speaking && temperament !== "calm" && (
           <SpeakingEffects effect={temperament} reduced={reduced}
             className={temperament === "fast" ? "sb-speaking-face-electric" : "sb-speaking-face-fire"} />
         )}
-        <div className={"sb-speaking-face-shell"} aria-hidden="true">
-          <div className={"sb-speaking-face-visor"}>
-            <span className={"sb-speaking-face-eyes"} data-blink={blink || undefined}><i data-eye="left" /><i data-eye="right" /></span>
-            <span className={"sb-speaking-face-mouth"} style={{ transform: `scaleY(${1 + mouthOpen * 3.2})` }} />
-          </div>
+        <div className="sb-speaking-robot" aria-hidden="true">
+          <SchollyModel studio
+            motion={state === "SPEAKING" ? "talk" : state === "THINKING" ? "think" : state === "LISTENING" ? "look" : "idle"}
+            speechLevel={mouthOpen} />
         </div>
         {countryFlag && <span className={"sb-speaking-face-flag"} title={countryName} aria-hidden="true">{countryFlag}</span>}
       </div>

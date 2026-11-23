@@ -149,23 +149,8 @@
     "switchToLight": "Switch to light mode",
     "switchToDark": "Switch to dark mode"
   },
-  "wardrobePage": {
-    "title": "Customize",
-    "description": "Choose a companion and personalize its look.",
-    "savedTitle": "Saved looks",
-    "deviceNote": "Saved on this device.",
-    "lookName": "Look name",
-    "save": "Save look",
-    "wear": "Equip",
-    "delete": "Delete",
-    "empty": "No saved looks yet.",
-    "saveFailed": "Could not save the look.",
-    "unavailableItems": "Some items in this look are locked.",
-    "equipFailed": "Could not equip the look."
-  },
   "nav": {
     "study-map": "Study map",
-    "wardrobe": "Customize",
     "dashboard": "Dashboard",
     "universities": "Universities & Programs",
     "scholarships": "Scholarships",

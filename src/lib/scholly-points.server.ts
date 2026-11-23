@@ -7,7 +7,7 @@ import { readSchollyBalance } from "@/lib/scholly-points-balance.server";
 import { SCHOLLY_POINT_RULES, SCHOLLY_SMALL_LIMIT, type SchollyPointReason, type SchollyPointsSummary } from "@/lib/scholly-point-rules";
 import { schollyTimeZone } from "@/lib/scholly-mission-store.server";
 import { isSupportedTimeZone } from "@/lib/scholly-profile";
-import { SCHOLLY_LEVEL_THRESHOLDS } from "@/lib/scholly-wardrobe";
+import { SCHOLLY_LEVEL_THRESHOLDS } from "@/lib/scholly-levels";
 
 type Executor = Pick<typeof db, "execute" | "select" | "insert" | "update">;
 type AwardOptions = { relatedEntityId?: number; at?: Date; points?: number };

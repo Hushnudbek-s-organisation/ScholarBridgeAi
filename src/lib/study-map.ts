@@ -19,7 +19,7 @@ export type StudyEntry = {
   dueAt: string;
   interval: number;
 };
-export type StudyMapSnapshot = { nodes: StudyNode[]; entries: StudyEntry[] };
+export type StudyMapSnapshot = { nodes: StudyNode[]; entries: StudyEntry[]; trash?: StudyEntry[] };
 export function nextStudyReview(interval: number, remembered: boolean, now: Date) {
   const next = remembered ? Math.min(90, Math.max(1, interval * 2)) : 0;
   return { interval: next, dueAt: new Date(now.getTime() + (remembered ? next * 86_400_000 : 600_000)) };
@@ -27,6 +27,8 @@ export function nextStudyReview(interval: number, remembered: boolean, now: Date
 
 export const STUDY_COLORS = ["#b49aff", "#6de0ec", "#85b4ff", "#72ddb3", "#ffc38f", "#ec9dde"] as const;
 export const STUDY_BODY_LIMIT = 12000;
+export const STUDY_ENTRY_LIMIT = 120;
+export const STUDY_IMPORT_LIMIT = 50;
 export const STUDY_LINK_LIMIT = 12;
 export const STUDY_DAILY_FOLDER = "Daily";
 export type StudyEdge = { from: string; to: string };

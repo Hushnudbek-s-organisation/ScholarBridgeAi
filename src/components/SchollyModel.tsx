@@ -2,42 +2,31 @@
 
 import { COMPANION_PAINT } from "@/lib/companion-paint";
 import { scheduleWhenIdle } from "@/lib/idle";
-import { useEffect, useMemo, useRef, type CSSProperties } from "react";
-import { DEFAULT_SCHOLLY_OUTFIT, schollyPalette, SCHOLLY_COMPANIONS, SCHOLLY_RAINBOW, type SchollyOutfit } from "@/lib/scholly-wardrobe";
-import { SchollyAura, SchollyRecoloredPortrait } from "./SchollyLook";
+import { useEffect, useRef } from "react";
 import type * as Three from "three";
 import type { SchollyMotion } from "./useSchollyMotion";
 
-export function SchollyModel({ trackPointer = false, held = false, paused = false, motion = "idle", outfit = DEFAULT_SCHOLLY_OUTFIT, staticPreview = false, studio = false, floating = false, angle = 0, gesture = "" }: {
+export function SchollyModel({ trackPointer = false, held = false, paused = false, motion = "idle", staticPreview = false, studio = false, floating = false, angle = 0, speechLevel }: {
   trackPointer?: boolean;
   held?: boolean;
   paused?: boolean;
   motion?: SchollyMotion;
-  outfit?: SchollyOutfit;
   staticPreview?: boolean;
   studio?: boolean;
   floating?: boolean;
   angle?: number;
-  gesture?: string;
+  speechLevel?: number;
 }) {
   const host = useRef<HTMLSpanElement>(null);
-  const palette = useMemo(() => schollyPalette(outfit), [outfit]);
-  const { companion = "scholly", hat, antenna, back, hand } = outfit;
-  const signature = SCHOLLY_COMPANIONS[companion];
-  const customizedBody = companion !== "scholly" || Boolean(outfit.body && outfit.body !== "blue");
-  const customizedEyes = Boolean(outfit.eyes && outfit.eyes !== "cyan");
-  const rainbow = outfit.eyes === "rainbow";
-  const look = useRef({ palette, body: outfit.body, rainbow, customizedEyes });
-  useEffect(() => {
-    look.current = { palette, body: outfit.body, rainbow, customizedEyes };
-  }, [palette, outfit.body, rainbow, customizedEyes]);
+  const behavior = useRef({ trackPointer, speechLevel });
+  useEffect(() => { behavior.current = { trackPointer, speechLevel }; }, [trackPointer, speechLevel]);
   const facing = useRef(angle);
   useEffect(() => { facing.current = angle; }, [angle]);
-  const animation = useRef({ held, motion, paused, gesture, since: 0 });
+  const animation = useRef({ held, motion, paused, since: 0 });
   useEffect(() => {
-    const since = animation.current.motion === motion && animation.current.gesture === gesture ? animation.current.since : performance.now();
-    animation.current = { held, motion, paused, gesture, since };
-  }, [held, motion, paused, gesture]);
+    const since = animation.current.motion === motion ? animation.current.since : performance.now();
+    animation.current = { held, motion, paused, since };
+  }, [held, motion, paused]);
 
   useEffect(() => {
     const element = host.current;
@@ -70,9 +59,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
     let disposed = false;
     let cleanup: (() => void) | undefined;
     async function mount(element: HTMLSpanElement) {
-      const [T, { mountSchollyDetails }, { RoomEnvironment }] = await Promise.all([
-        import("three"), import("./SchollyMeshes"), import("three/addons/environments/RoomEnvironment.js"),
-      ]);
+      const T = await import("three");
       if (disposed) return;
       let renderer: Three.WebGLRenderer;
       try {
@@ -83,19 +70,8 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
 
       const scene = new T.Scene();
       renderer.toneMapping = T.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.02;
-      const environment = new RoomEnvironment();
-      const generator = new T.PMREMGenerator(renderer);
-      const reflection = generator.fromScene(environment, .06, .1, 100, { size: floating ? 64 : 256 });
-      scene.environment = reflection.texture;
-      scene.environmentIntensity = .52;
-      environment.dispose();
-      generator.dispose();
+      renderer.toneMappingExposure = 1.12;
       const camera = new T.PerspectiveCamera(29, 1, 0.1, 30);
-      const tall = Boolean(hat || antenna);
-      const cameraDistance = studio ? 6.65 : tall ? 6.1 : 5.2;
-      camera.position.set(0, studio ? .3 : .12, cameraDistance);
-      camera.lookAt(0, tall ? .15 : 0, 0);
       const robot = new T.Group();
       const head = new T.Group();
       scene.add(robot);
@@ -108,13 +84,16 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
       const rim = new T.DirectionalLight(0xa6caff, 2.2);
       rim.position.set(3, 0, -2);
       scene.add(rim);
+      const fill = new T.DirectionalLight(0xa6bfff, .55);
+      fill.position.set(-3, -1, 3);
+      scene.add(fill);
 
       const sphere = new T.SphereGeometry(1, 48, 32);
       const shell = new T.MeshPhysicalMaterial({ color: 0x1846c0, roughness: 0.13, metalness: 0.18, clearcoat: 1, clearcoatRoughness: 0.08 });
       const visor = new T.MeshPhysicalMaterial({ color: 0x080f2e, roughness: 0.23, clearcoat: .6, clearcoatRoughness: 0.26 });
       const cyan = new T.MeshBasicMaterial({ color: 0x68efff, transparent: true, toneMapped: false });
       const mouthColor = cyan.clone();
-      const trim = new T.MeshBasicMaterial({ color: signature.eye, toneMapped: false });
+      const trim = new T.MeshBasicMaterial({ color: COMPANION_PAINT.cyanEye, toneMapped: false });
       const mitten = new T.MeshPhysicalMaterial({ color: 0x2cbaff, roughness: 0.16, clearcoat: 1 });
       function orb(parent: Three.Group, material: Three.Material, position: [number, number, number], scale: [number, number, number]) {
         const mesh = new T.Mesh(sphere, material);
@@ -125,10 +104,13 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
       }
 
       orb(head, shell, [0, 0, 0], [0.97, 0.74, 0.61]);
+      const visorRim = new T.MeshStandardMaterial({ color: 0x233a64, roughness: .36, metalness: .12 });
+      orb(head, visorRim, [0, -.10, .285], [.852, .472, .441]);
       orb(head, visor, [0, -.10, .31], [.826, .448, .437]);
       const earGeometry = new T.TorusGeometry(0.155, 0.042, 10, 40);
       [-1, 1].forEach(side => {
         orb(head, shell, [side * .96, -.12, 0], [.17, .25, .21]);
+        orb(head, visorRim, [side * .984, -.12, .153], [.153, .184, .103]);
         const ear = new T.Mesh(earGeometry, trim);
         ear.position.set(side * 1.01, -.12, .19);
         head.add(ear);
@@ -163,7 +145,14 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         return fin;
       });
 
-      const disposeDetails = mountSchollyDetails(head, robot, { companion, hat, antenna, back, hand });
+      camera.position.set(0, studio ? .28 : .12, studio ? 5.65 : 5.25);
+      camera.lookAt(0, .04, 0);
+      orb(robot, visorRim, [0, -.68, .30], [.29, .21, .054]);
+      const shoulder = new T.MeshStandardMaterial({ color: COMPANION_PAINT.nightEdge, roughness: .34 });
+      for (const side of [-1, 1]) {
+        orb(robot, shoulder, [side * .60, -.59, .03], [.107, .124, .11]);
+        luminousLine([[side * .41, -.49, .29], [side * .47, -.59, .276], [side * .44, -.73, .255]], .01);
+      }
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.domElement.setAttribute("aria-hidden", "true");
       element.appendChild(renderer.domElement);
@@ -171,17 +160,15 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
       const target = { x: 0, y: 0 };
       const clamp = (value: number) => Math.min(1, Math.max(-1, value));
       function point(event: PointerEvent) {
-        if (event.pointerType !== "mouse" || motion.matches) return;
-        const rect = element!.getBoundingClientRect();
+        if (!behavior.current.trackPointer || event.pointerType !== "mouse" || motion.matches) return;
+        const rect = element.getBoundingClientRect();
         target.x = clamp((event.clientX - rect.left - rect.width / 2) / 245);
         target.y = clamp((event.clientY - rect.top - rect.height / 2) / 245);
       }
       function center() { target.x = target.y = 0; }
-      if (trackPointer) {
-        window.addEventListener("pointermove", point, { passive: true });
-        document.addEventListener("pointerleave", center);
-        window.addEventListener("blur", center);
-      }
+      window.addEventListener("pointermove", point, { passive: true });
+      document.addEventListener("pointerleave", center);
+      window.addEventListener("blur", center);
 
       let inView = true;
       const observer = new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; });
@@ -192,22 +179,20 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
-        renderer.render(scene, camera);
       });
       resize.observe(element);
 
       const pressedScale = new T.Vector3();
-      const surfaceHighlight = new T.Color();
-      const studioStart = performance.now();
-      const neutralEyes = new T.Color();
-      const rainbowColors = SCHOLLY_RAINBOW.map(color => new T.Color(color));
-      let renderedLook: typeof look.current | undefined;
+      const neutralEyes = new T.Color(COMPANION_PAINT.cyanEye);
       const concernEyes = new T.Color(0xffb869);
       let nextBlink = 0;
-      renderer.setAnimationLoop((ms) => {
+      let lastFrame = -Infinity;
+      function render(ms: number) {
         if (!inView || document.hidden || renderer.getContext().isContextLost()) return;
+        if (floating && ms - lastFrame < 29) return;
+        lastFrame = ms;
         const time = ms / 1000;
-        const { motion: pose, held: pressed, paused: staticPose, since, gesture: performanceMove } = animation.current;
+        const { motion: pose, held: pressed, paused: staticPose, since } = animation.current;
         const elapsed = Math.max(0, (performance.now() - since) / 1000);
         const reduced = staticPose || motion.matches;
         const sleeping = pose === "sleep";
@@ -221,7 +206,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         const dizzy = pose === "shake";
         const idle = pose === "idle" || pose === "look";
         const wobble = dizzy && !reduced ? Math.sin(elapsed * 12) : 0;
-        const follow = (idle || pointing) && trackPointer;
+        const follow = (idle || pointing) && behavior.current.trackPointer;
         const gaze = follow ? target.x * 0.14 : wobble * 0.20;
         const pitch = follow ? target.y * 0.14 : 0;
         head.rotation.y += ((reduced ? 0 : gaze) - head.rotation.y) * 0.2;
@@ -232,44 +217,13 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         const change = facing.current - robot.rotation.y;
         robot.rotation.y += change * (motion.matches ? 1 : .16);
         robot.rotation.z = 0;
-        if (!reduced && studio) {
-          const intro = Math.max(0, 1 - (performance.now() - studioStart) / 650);
-          robot.rotation.y += .016 * intro;
-          if (performanceMove.startsWith("dance:") && elapsed < 2) robot.rotation.z = Math.sin(elapsed * 12) * .16 * (1 - elapsed / 2);
-          if (performanceMove.startsWith("flip:") && elapsed < 1) robot.rotation.z = Math.PI * 2 * elapsed;
-          if (performanceMove.startsWith("super:") && elapsed < 1.2) robot.position.y += Math.sin(Math.PI * elapsed / 1.2) * .39;
-        }
         const settling = pose === "dock" && !reduced ? 0.06 * Math.sin(Math.PI * Math.min(1, elapsed / .2)) : 0;
         const scale = pressed ? 0.94 : element!.closest("button")?.matches(":hover") && idle ? 1.06 : 1;
         robot.scale.lerp(pressedScale.setScalar(scale + settling), 0.2);
         if (nextBlink === 0 || time > nextBlink + .12) nextBlink = time + 4 + Math.random() * 3;
         const blink = dragging || dizzy || sleeping || (!reduced && idle && time >= nextBlink) ? .09 : 1;
         cyan.opacity = pose === "talk" || thinking ? .85 + .15 * Math.sin(elapsed * 7) : 1;
-        const appearance = look.current;
-        if (renderedLook !== appearance) {
-          const body = companion === "scholly" ? appearance.body : undefined;
-          const metal = body === "silver" || body === "gold";
-          shell.color.set(companion === "scholly" && (!body || body === "blue") ? signature.shell : appearance.palette.main);
-          shell.metalness = metal ? .65 : .18;
-          shell.roughness = metal ? .25 : .29;
-          surfaceHighlight.set(companion === "scholly" ? appearance.palette.highlight : signature.trim);
-          if (companion === "scholly") surfaceHighlight.lerp(shell.color, .71);
-          if (body === "gold" || body === "orange") trim.color.set(body === "gold" ? 0xffde8c : 0xffc78f);
-          else if (body === "pink" || body === "purple") trim.color.set(body === "pink" ? 0xffb7e2 : 0xbfadff);
-          else if (body === "green") trim.color.set(0x92ffe1);
-          else trim.color.set(signature.eye);
-          mitten.color.copy(surfaceHighlight);
-          mitten.roughness = .34;
-          rim.color.set(body === "night" ? COMPANION_PAINT.nightEdge : 0xa6caff);
-          rim.intensity = body === "night" ? 3.7 : 2.2;
-          neutralEyes.set(appearance.palette.eye);
-          renderedLook = appearance;
-        }
-        const rainbowPhase = reduced ? 0 : (time % 6) / 6 * rainbowColors.length;
-        const rainbowIndex = Math.floor(rainbowPhase);
-        if (appearance.rainbow) cyan.color.lerpColors(rainbowColors[rainbowIndex],
-          rainbowColors[(rainbowIndex + 1) % rainbowColors.length], rainbowPhase - rainbowIndex);
-        else cyan.color.copy(concerned && !appearance.customizedEyes ? concernEyes : neutralEyes);
+        cyan.color.copy(concerned ? concernEyes : neutralEyes);
         mouthColor.color.copy(cyan.color);
         eyes.forEach((eye, index) => {
           const angle = elapsed * 5 + index * Math.PI;
@@ -292,14 +246,15 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         expression.scale.y = sleeping ? .2 : smiling ? 1.35 : 1;
         mouth.visible = speaking;
         mouthColor.opacity = cyan.opacity;
-        mouth.scale.y = reduced ? .045 : .032 + .022 * Math.sin(elapsed * 13);
+        const volume = behavior.current.speechLevel;
+        mouth.scale.y = reduced ? .045 : volume === undefined
+          ? .032 + .022 * Math.sin(elapsed * 13)
+          : .023 + .091 * Math.min(1, Math.max(0, volume));
         renderer.render(scene, camera);
-      });
+        if (element.dataset.rendering !== "3d") element.dataset.rendering = "3d";
+      }
       const lost = (event: Event) => { event.preventDefault(); element.dataset.rendering = "image"; };
-      const restored = () => { element.dataset.rendering = "3d"; };
       renderer.domElement.addEventListener("webglcontextlost", lost);
-      renderer.domElement.addEventListener("webglcontextrestored", restored);
-      restored();
       cleanup = () => {
         resize.disconnect();
         observer.disconnect();
@@ -307,89 +262,34 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         document.removeEventListener("pointerleave", center);
         window.removeEventListener("blur", center);
         renderer.setAnimationLoop(null);
-        disposeDetails();
-        reflection.dispose();
         sphere.dispose();
         smileGeometry.dispose();
         earGeometry.dispose();
         details.forEach(geometry => geometry.dispose());
-        [shell, visor, cyan, trim, mitten, mouthColor].forEach((material) => material.dispose());
+        [shell, visor, visorRim, cyan, trim, mitten, mouthColor, shoulder].forEach((material) => material.dispose());
+        renderer.domElement.removeEventListener("webglcontextlost", lost);
         renderer.dispose();
         renderer.forceContextLoss();
         renderer.domElement.remove();
         delete element.dataset.rendering;
       };
+      await renderer.compileAsync(scene, camera);
+      if (!disposed) renderer.setAnimationLoop(render);
     }
-    const start = () => { void mount(element).catch(() => {}); };
+    const start = () => { void mount(element).catch(() => { if (!disposed) cleanup?.(); }); };
     // Give the active page a chance to paint before the small launcher compiles
     // shaders. Its existing portrait already keeps the chat button usable.
     const cancelStart = floating ? scheduleWhenIdle(start, 1600, 600) : undefined;
     if (!floating) start();
     return () => { disposed = true; cancelStart?.(); cleanup?.(); };
-  }, [staticPreview, trackPointer, studio, floating, companion, hat, antenna, back, hand, signature]);
+  }, [staticPreview, studio, floating]);
 
-  const dragging = motion === "drag";
-  const dizzy = motion === "shake";
-  const sleeping = motion === "sleep";
-  const waving = motion === "wave";
-  const happy = motion === "happy" || motion === "celebrate" || motion === "proud" || motion === "levelup";
-  const pointing = motion === "point";
-  const concerned = motion === "concern";
-  const showArms = dragging || waving || happy || pointing || concerned;
-  const useFallbackEyes = customizedBody || customizedEyes;
-  const referenceLook = !customizedBody && !customizedEyes;
-  const eyeColor = concerned && !customizedEyes ? COMPANION_PAINT.concernAmber : palette.eye;
-  const closed = sleeping || dizzy || dragging;
-  const eyePositions = customizedBody ? { left: 90, right: 135, y: 104, offset: 0 } : { left: 91, right: 166, y: 103, offset: -4 };
-
+  const moving = motion === "drag" || motion === "wave" || motion === "happy" || motion === "point";
   return (
-    <span ref={host} className="sb-scholly-model" aria-hidden="true" data-eye-style={rainbow ? "rainbow" : undefined}
-      data-companion={companion} data-body-style={outfit.body} data-reference-look={referenceLook || undefined} data-look-paused={paused || undefined} style={{ "--scholly-eye": eyeColor } as CSSProperties}>
-      <SchollyAura aura={outfit.aura} eye={palette.eye} paused={paused} />
-      <span className="sb-scholly-portrait" data-dragging={dragging || undefined} data-dizzy={dizzy || undefined} data-arms={showArms && !customizedBody && !referenceLook || undefined}>
-        {customizedBody ? <SchollyRecoloredPortrait palette={palette} body={outfit.body} motion={motion} /> :
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={referenceLook ? "/scholly-front.webp" : "/scholly.webp"} alt="" draggable={false} />}
-        {showArms && !customizedBody && !referenceLook && <>
-          <span className="sb-scholly-portrait-arm sb-scholly-portrait-arm-left" />
-          <span className="sb-scholly-portrait-arm sb-scholly-portrait-arm-right" />
-        </>}
-        {dizzy && !customizedBody && !referenceLook && <span className="sb-scholly-dizzy-head" />}
-        {!referenceLook && <svg className="sb-scholly-lids sb-scholly-expression" viewBox="0 0 221 250">
-          {useFallbackEyes && <>
-            {!customizedBody && <>
-              <ellipse cx="91" cy="103" rx="14" ry="19" fill={COMPANION_PAINT.leftEyeSocket} />
-              <ellipse cx="166" cy="99" rx="14" ry="19" fill={COMPANION_PAINT.rightEyeSocket} />
-            </>}
-            {[eyePositions.left, eyePositions.right].map((x, index) => {
-              const y = eyePositions.y + index * eyePositions.offset;
-              return closed || happy
-                ? <path key={x} className="sb-scholly-look-eye-stroke" d={happy
-                  ? `M${x - 6} ${y + 2}l6-6 6 6` : `M${x - 6} ${y}q6 4 12 0`}
-                  strokeWidth="3" strokeLinecap="round" fill="none" />
-                : <ellipse key={x} className="sb-scholly-look-eye-fill" cx={x} cy={y} rx="6" ry="10" />;
-            })}
-            {customizedBody && (motion === "talk" || sleeping
-              ? <ellipse className="sb-scholly-look-eye-fill" cx="112" cy="127" rx={sleeping ? 4 : 7} ry={sleeping ? 3 : 5} />
-              : <path className="sb-scholly-look-eye-stroke" d="M101 120q11 12 22 0"
-                strokeWidth="4" strokeLinecap="round" fill="none" />)}
-          </>}
-          {!useFallbackEyes && (dragging || dizzy || sleeping || happy || concerned || motion === "idle" || motion === "think" || motion === "talk") &&
-            <g data-eyes={sleeping || dizzy || dragging ? "closed" : happy ? "happy" : motion}>
-              <ellipse cx="91" cy="103" rx="14" ry="19" fill={COMPANION_PAINT.leftEyeSocket} />
-              <ellipse cx="166" cy="99" rx="14" ry="19" fill={COMPANION_PAINT.rightEyeSocket} />
-              {happy
-                ? <path d="M84 104l7-7 7 7m61-4l7-7 7 7" stroke={COMPANION_PAINT.cyanEye} strokeWidth="3" fill="none" />
-                : motion === "think" || motion === "talk" || concerned
-                  ? <g fill={concerned ? COMPANION_PAINT.concernAmber : COMPANION_PAINT.cyanEye}><circle cx="91" cy="103" r="5" /><circle cx="166" cy="99" r="5" /></g>
-                  : <path d="M85 103q6 4 12 0m63-4q6 4 12 0" stroke={COMPANION_PAINT.cyanEye} strokeWidth="3" strokeLinecap="round" fill="none" />}
-            </g>}
-          {!customizedBody && (motion === "talk" || happy || sleeping) && <>
-            <ellipse cx="132" cy="115" rx="20" ry="11" fill={COMPANION_PAINT.mouthShade} />
-            {happy ? <path d="M119 112q13 17 26 0" stroke={eyeColor} strokeWidth="3" fill="none" /> :
-              <ellipse data-scholly-mouth cx="132" cy="115" rx={sleeping ? 4 : 8} ry={sleeping ? 3 : 5} fill={eyeColor} />}
-          </>}
-        </svg>}
+    <span ref={host} className="sb-scholly-model" aria-hidden="true" data-companion="scholly" data-reference-look>
+      <span className="sb-scholly-portrait" data-dragging={motion === "drag" || undefined}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={moving ? "/scholly.webp" : "/scholly-front.webp"} alt="" draggable={false} />
       </span>
     </span>
   );

@@ -22,8 +22,8 @@ test("Scholly clears the measured dock on desktop", async ({ page }) => {
   test.setTimeout(120_000);
   await openDashboard(page, 1440);
   const launcher = page.getByRole("button", { name: "Open Scholly chat" });
-  await expect(launcher).toHaveCSS("width", "64px");
-  await expect(launcher).toHaveCSS("height", "64px");
+  await expect(launcher).toHaveCSS("width", "128px");
+  await expect(launcher).toHaveCSS("height", "128px");
   const dock = await page.getByTestId("grouped-dock").boundingBox();
   const companion = await launcher.boundingBox();
   expect(dock!.y - companion!.y - companion!.height).toBeCloseTo(12, 0);
@@ -35,12 +35,12 @@ test("Scholly docks on mobile, keeps a dragged position, and yields to the keybo
   await openDashboard(page, 390);
   const launcher = page.locator(".sb-scholly-launcher");
   const dock = page.getByTestId("grouped-dock");
-  await expect(launcher).toHaveCSS("width", "56px");
-  await expect(launcher).toHaveCSS("height", "56px");
+  await expect(launcher).toHaveCSS("width", "112px");
+  await expect(launcher).toHaveCSS("height", "112px");
   await expect(launcher).toHaveAttribute("data-placement", "dock");
   await expect(page.locator("html")).toHaveAttribute("data-scholly-docked", "");
   const initial = (await launcher.boundingBox())!;
-  expect((await dock.boundingBox())!.x + (await dock.boundingBox())!.width).toBeLessThan(initial.x);
+  expect(initial.y + initial.height).toBeLessThan((await dock.boundingBox())!.y);
 
   await page.mouse.move(initial.x + initial.width / 2, initial.y + initial.height / 2);
   await page.mouse.down();
@@ -85,8 +85,8 @@ test("Scholly docks on mobile, keeps a dragged position, and yields to the keybo
 
   for (const route of ["visa/speaking", "visa/daily-speaking", "payments", "materials/documents"]) {
     await page.evaluate(hash => { window.location.hash = hash; }, route);
-    await expect(launcher).toHaveCSS("width", "56px");
-    await expect(launcher).toHaveCSS("height", "56px");
+    await expect(launcher).toHaveCSS("width", "112px");
+    await expect(launcher).toHaveCSS("height", "112px");
     await expect(launcher).toHaveAttribute("data-motion", "idle");
   }
 });

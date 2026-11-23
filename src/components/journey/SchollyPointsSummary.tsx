@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Locale } from "@/i18n/config";
 import { SCHOLLY_POINTS_CHANGED, type SchollyPointsChange, type SchollyPointsSnapshot } from "@/lib/scholly-points-client";
-import { SCHOLLY_LEVEL_THRESHOLDS } from "@/lib/scholly-wardrobe";
+import { SCHOLLY_LEVEL_THRESHOLDS } from "@/lib/scholly-levels";
 
 const copy = {
   uz: {

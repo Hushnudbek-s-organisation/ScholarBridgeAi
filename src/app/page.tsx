@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { shellMessagesFor } from "@/i18n/messages.server";
 import { Home } from "./HomeClient";
+import flightCopy from "@/components/landing/flight-copy.json";
 
 /**
  * Route entry: decide, on the server, whether this request has a session.
@@ -15,6 +18,18 @@ import { Home } from "./HomeClient";
  * The language cookie is resolved here too so the server-rendered page is in
  * the same language as the `<html lang>` the layout already sets.
  */
+const flightMarkup = readFileSync(join(process.cwd(), "src/components/landing/flight-markup.html"), "utf8");
+
+function localizedFlightMarkup(locale: keyof typeof flightCopy): string {
+  const copy = flightCopy[locale] as Record<string, string | string[]>;
+  const escapeText = (value: string) => value.replace(/[&<>]/g, character =>
+    character === "&" ? "&amp;" : character === "<" ? "&lt;" : "&gt;");
+  return flightMarkup.replace(/(data-i18n="([a-z0-9_]+)"[^>]*>)[^<]*(?=<)/g, (unchanged, opening, key) => {
+    const label = copy[key];
+    return typeof label === "string" ? opening + escapeText(label) : unchanged;
+  });
+}
+
 export default async function Page({
   searchParams,
 }: {
@@ -37,6 +52,7 @@ export default async function Page({
       startNow={startNow}
       initialLocale={initialLocale}
       initialMessages={shellMessagesFor(initialLocale)}
+      flightMarkup={localizedFlightMarkup(initialLocale)}
     />
   );
 }
