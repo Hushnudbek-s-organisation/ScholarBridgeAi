@@ -3,12 +3,10 @@
 import { Button } from "@/components/ui/Button";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowUp, GraduationCap, PanelBottom, Shirt, RotateCcw, Scan, X } from "lucide-react";
+import { ArrowUp, GraduationCap, PanelBottom, RotateCcw, Scan, X } from "lucide-react";
 import { useSchollyActivityCues } from "./useSchollyActivityCues";
 import { SCHOLLY_POINTS_CHANGED, type SchollyPointsChange } from "@/lib/scholly-points-client";
 import { SchollyModel } from "./SchollyModel";
-import { SchollyWardrobe, schollyWardrobeTitle } from "./SchollyWardrobe";
-import { SCHOLLY_COMPANIONS, SCHOLLY_OUTFIT_CHANGED, type SchollyOutfit } from "@/lib/scholly-wardrobe";
 import { SchollyInspector } from "./SchollyInspector";
 import { SchollyReminderPermission } from "./SchollyReminderPermission";
 import { explainPageElement } from "@/lib/scholly-page-guide";
@@ -22,7 +20,6 @@ type Topic = { id: string; title: string; hint?: string; keywords: string };
 type Message = { role: "user" | "assistant"; text: string; target?: Topic; ai?: boolean };
 type SchollyOnboardingProfile = {
   userId?: number;
-  outfit?: SchollyOutfit;
   namePref: string | null;
   nameConfirmed: boolean;
   lang: string;
@@ -97,8 +94,7 @@ const normalize = (value: string) => value.toLowerCase().replace(/[ʻ’‘'`]/g
 
 function nearDock(x: number, y: number, size: number, dock: DOMRect | undefined) {
   if (!dock) return false;
-  // The dock keeps its left edge when Scholly's slot opens on its right.
-  const edge = document.documentElement.clientWidth - dock.left;
+  const edge = Math.min(document.documentElement.clientWidth - 8, dock.right + size + 12);
   return y + size >= dock.top - 12 && Math.abs(x + size - edge) <= 24;
 }
 
@@ -142,25 +138,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   const [open, setOpen] = useState(false);
   const [storedSchollyProfile, setSchollyProfile] = useState<SchollyOnboardingProfile | null>(null);
   const schollyProfile = storedSchollyProfile?.userId === profileId ? storedSchollyProfile : null;
-  const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [pointsPop, setPointsPop] = useState<SchollyPointsChange | null>(null);
-  const [equippedOutfit, setEquippedOutfit] = useState<{ profileId: number; outfit: SchollyOutfit } | null>(null);
-  const applyOutfit = useCallback((outfit: SchollyOutfit) => {
-    if (profileId) setEquippedOutfit({ profileId, outfit });
-  }, [profileId]);
-  useEffect(() => {
-    function syncOutfit(event: Event) {
-      const detail = (event as CustomEvent<{ profileId: number; outfit: SchollyOutfit }>).detail;
-      if (detail?.profileId === profileId) applyOutfit(detail.outfit);
-    }
-    window.addEventListener(SCHOLLY_OUTFIT_CHANGED, syncOutfit);
-    return () => window.removeEventListener(SCHOLLY_OUTFIT_CHANGED, syncOutfit);
-  }, [profileId, applyOutfit]);
-  const wardrobeTitle = schollyWardrobeTitle(language);
-  const outfit = equippedOutfit && equippedOutfit.profileId === profileId
-    ? equippedOutfit.outfit
-    : schollyProfile && schollyProfile.userId === profileId ? schollyProfile.outfit : undefined;
-  const companionName = SCHOLLY_COMPANIONS[outfit?.companion ?? "scholly"].name;
   const [loadedProfile, setLoadedProfile] = useState<string | null>(null);
   const profileRequest = profileId ? `${profileId}:${locale}` : null;
   const schollyProfileLoaded = !profileRequest || loadedProfile === profileRequest;
@@ -494,7 +472,6 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
 
   function close() {
     setOpen(false);
-    setWardrobeOpen(false);
     setSelection(null);
     launcher.current?.focus({ preventScroll: true });
   }
@@ -535,15 +512,15 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
       : schollyProfile?.onboardingStep === "challenge" ? 3 : 0;
 
   return (
-    <div className="sb-scholly print:hidden" data-look-bubble={outfit?.bubble} data-no-dock={!hasDock || undefined} data-paused={hidden || undefined} data-quiet={quiet || undefined} data-keyboard={keyboardOpen || undefined} onKeyDown={event => { if (event.key === "Escape" && open) { event.stopPropagation(); close(); } }}>
-      <Button variant="unstyled" type="button" ref={launcher} className="sb-scholly-launcher" style={style} aria-label={t.open.replace("Scholly", companionName)}
+    <div className="sb-scholly print:hidden" data-no-dock={!hasDock || undefined} data-paused={hidden || undefined} data-quiet={quiet || undefined} data-keyboard={keyboardOpen || undefined} onKeyDown={event => { if (event.key === "Escape" && open) { event.stopPropagation(); close(); } }}>
+      <Button variant="unstyled" type="button" ref={launcher} className="sb-scholly-launcher" style={style} aria-label={t.open}
         data-inspecting={selecting || undefined} data-motion={animation}
         aria-expanded={chatOpen} aria-controls="scholly-chat" data-placement={hasDock && placement === "dock" ? "dock" : undefined}
         data-held={held || undefined} data-dizzy={dizzy || undefined} onPointerDown={pointerDown} onPointerMove={pointerMove}
         onPointerUp={event => pointerEnd(event)} onPointerCancel={event => pointerEnd(event, true)}
         onLostPointerCapture={event => pointerEnd(event, true)} onContextMenu={event => event.preventDefault()}
         onClick={activateLauncher}>
-        <SchollyModel floating staticPreview={deferModel} outfit={outfit} trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} />
+        <SchollyModel floating staticPreview={deferModel} trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} />
         {earnedPoints !== null && <span className="sb-scholly-points-pop" aria-hidden="true">+{earnedPoints}</span>}
         {animation === "shake" && <span className="sb-scholly-dizzy-stars" aria-hidden="true">
           <span data-index="0">★</span><span data-index="1">★</span><span data-index="2">★</span>
@@ -589,18 +566,15 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
           returningFromPicker.current = true;
           setSelecting(false);
         }} onSelect={selectElement} />
-      {chatOpen && <section className="sb-scholly-chat" id="scholly-chat" aria-label={companionName}>
+      {chatOpen && <section className="sb-scholly-chat" id="scholly-chat" aria-label="Scholly">
         <header className="sb-scholly-chat-header">
-          <div><strong>{companionName}</strong><small>{aiReady ? t.ai : t.guide}</small></div>
+          <div><strong>Scholly</strong><small>{aiReady ? t.ai : t.guide}</small></div>
           {hasDock && <Button variant="unstyled" type="button" onClick={() => place(placement === "dock" ? "corner" : "dock")} title={placement === "dock" ? t.reset : t.dock} aria-label={placement === "dock" ? t.reset : t.dock}>
             {placement === "dock" ? <RotateCcw size={17} /> : <PanelBottom size={17} />}
           </Button>}
           {typeof placement === "object" && <Button variant="unstyled" type="button" onClick={() => place("corner")} title={t.reset} aria-label={t.reset}><RotateCcw size={17} /></Button>}
-          {profileId && <Button variant="unstyled" type="button" title={wardrobeTitle} aria-label={wardrobeTitle} aria-pressed={wardrobeOpen}
-            onClick={() => setWardrobeOpen(previous => !previous)}><Shirt size={17} aria-hidden="true" /></Button>}
           <Button variant="unstyled" type="button" onClick={close} title={t.close} aria-label={t.close}><X size={19} /></Button>
         </header>
-        {wardrobeOpen && profileId ? <SchollyWardrobe key={profileId} profileId={profileId} locale={language} onEquip={applyOutfit} /> : <>
         <div className="sb-scholly-feed" role="log" ref={feed}>
           {messages.length === 0 && <p>{t.intro}</p>}
           {schollyProfile && schollyProfile.onboardingState !== "completed" && <section ref={onboardingCard} tabIndex={-1} className="sb-scholly-onboarding" aria-labelledby="scholly-onboarding-title" aria-live="polite">
@@ -675,7 +649,6 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
           <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} placeholder={t.prompt} aria-label={t.prompt} maxLength={400} />
           <Button variant="unstyled" type="submit" disabled={!draft.trim() || pending} aria-label={t.send}><ArrowUp size={18} /></Button>
         </form>
-        </>}
       </section>}
     </div>
   );

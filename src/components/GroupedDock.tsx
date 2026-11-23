@@ -88,20 +88,34 @@ export function GroupedDock({
     const element=nav.current;
     const header=document.querySelector("[data-sb-shell-header]");
     if(!element)return;
+    let frame = 0;
     const measure=()=>{
       if(header)root.style.setProperty("--sb-header-height",`${Math.ceil(header.getBoundingClientRect().height)}px`);
       root.style.setProperty("--sb-dock-height",`${Math.ceil(element.getBoundingClientRect().height)}px`);
+      const right = element.getBoundingClientRect().right;
+      root.style.setProperty("--scholly-docked-right", `max(var(--scholly-edge), calc(${document.documentElement.clientWidth - Math.ceil(right)}px - var(--scholly-slot)))`);
       const viewport=window.visualViewport;
       root.style.setProperty("--sb-keyboard-offset",`${viewport?Math.max(0,innerHeight-viewport.height-viewport.offsetTop):0}px`);
     };
-    const observer=new ResizeObserver(measure);
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    const observer=new ResizeObserver(schedule);
+    const positionObserver = new MutationObserver(schedule);
+    positionObserver.observe(root, { attributes: true, attributeFilter: ["data-scholly-docked"] });
     observer.observe(element);
     if(header)observer.observe(header);
     measure();
+    window.addEventListener("resize", schedule);
     window.visualViewport?.addEventListener("resize",measure);
     window.visualViewport?.addEventListener("scroll",measure);
     return ()=>{
       observer.disconnect();
+      positionObserver.disconnect();
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", schedule);
+      root.style.removeProperty("--scholly-docked-right");
       window.visualViewport?.removeEventListener("resize",measure);
       window.visualViewport?.removeEventListener("scroll",measure);
       root.style.removeProperty("--sb-dock-height");

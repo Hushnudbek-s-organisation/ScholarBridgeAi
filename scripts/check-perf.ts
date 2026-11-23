@@ -56,7 +56,7 @@ check("no client module imports the all-locales dictionary", () => {
   const candidates = [
     "src/i18n/LocaleProvider.tsx",
     "src/app/HomeClient.tsx",
-    "src/components/LandingPage.tsx",
+    "src/components/landing/FlightLanding.tsx",
     "src/components/AppNote.tsx",
     "src/components/telegram/MiniApp.tsx",
   ];
@@ -132,10 +132,13 @@ check("public visits do not mount closed auth/profile dialogs or heavyweight loa
 });
 
 check("the hero is visible in server HTML, without waiting for animation hydration", () => {
-  const landing = read("src/components/LandingPage.tsx");
-  // Extra layout attributes do not change the SSR-visible hero contract.
-  assert.match(landing, /<(?:motion|Motion)\.div initial=\{false\} animate="visible" variants=\{heroGroup\}[^>]*>/);
-  assert.doesNotMatch(landing, /initial=\{\{ opacity: 0, y: 28/);
+  const route = read("src/app/page.tsx");
+  const home = read("src/app/HomeClient.tsx");
+  const landing = read("src/components/landing/flight-markup.html");
+  assert.match(route, /flightMarkup=\{localizedFlightMarkup\(initialLocale\)\}/);
+  assert.match(home, /<FlightLanding markup=\{flightMarkup\}/);
+  assert.match(landing, /<h1[\s>]/);
+  assert.doesNotMatch(landing, /<script\b|<h1[^>]*opacity\s*:\s*0/i);
 });
 
 check("theme switching does not animate every descendant and SVG", () => {
@@ -144,18 +147,16 @@ check("theme switching does not animate every descendant and SVG", () => {
   assert.match(css, /html\.theme-transition :where\(body, header, main, nav, aside, footer\)/);
 });
 
-check("below-fold campus images and detached scroll animations do not compete with startup", () => {
-  const landing = read("src/components/LandingPage.tsx");
-  // PR #132 moved the campus images into an idle-deferred chunk. Assert the
-  // lazy loader against the file that actually renders/observes them, so a
-  // marker comment in LandingPage.tsx can never satisfy this guard again.
-  const marquee = read("src/components/landing/DeferredMarquee.tsx");
-  assert.match(marquee, /data-campus-src=\{campusPhotoSrc/);
-  assert.match(marquee, /rootMargin: "160px"/);
-  assert.doesNotMatch(marquee, /fetchPriority: "high"|eagerCount/);
-  // The shared scroll engine (and its teardown) still lives in LandingPage.
-  assert.match(landing, /if \(subs.size === 0\)/);
-  assert.match(landing, /resizeObserver\?\.disconnect\(\)/);
+check("below-fold landing images are lazy and scroll animation cleans up after navigation", () => {
+  const markup = read("src/components/landing/flight-markup.html");
+  const landing = read("src/components/landing/FlightLanding.tsx");
+  const interactions = read("src/components/landing/flight-interactions.js");
+  assert.equal((markup.match(/id="bentoImg\d"[^>]*loading="lazy"/g) ?? []).length, 4);
+  assert.doesNotMatch(markup, /data:image\/[^;]+;base64,/);
+  assert.match(landing, /import\("\.\/flight-interactions"\)/);
+  assert.match(interactions, /requestAnimationFrame\(updateScroll\)/);
+  assert.match(interactions, /controller\.abort\(\)/);
+  assert.match(interactions, /cancelAnimationFrame\(scrollFrame\)/);
 });
 
 check("destination changes never wait for outgoing nested animations", () => {

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { STUDY_COLORS, studyWikiTokens, type StudyStroke } from "@/lib/study-map";
 
 const markdownInline = /(`[^`\n]+`|!?\[[^\]\n]+\]\([^)\n]+\)|\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g;
+const tableDivider = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+const tableCells = (row: string) => row.trim().replace(/^\||\|$/g, "").split("|").map(cell => cell.trim());
 
 function inline(text: string, resolve: (target: string) => string | undefined, open: (id: string) => void) {
   return text.split(/(`[^`\n]+`|\[\[[^\n]+?\]\])/g).flatMap((part, index): ReactNode[] => {
@@ -44,6 +46,19 @@ export function StudyMarkdown({ body, resolve, open, toggleTask, taskLabel }: {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line.trim()) continue;
+    if (line.includes("|") && tableDivider.test(lines[i + 1] ?? "")) {
+      const key = i;
+      const headers = tableCells(line);
+      const rows: string[][] = [];
+      i += 1;
+      while (lines[i + 1]?.includes("|") && lines[i + 1].trim()) rows.push(tableCells(lines[++i]));
+      blocks.push(<div key={key} className="sb-study-table"><table>
+        <thead><tr>{headers.map((cell, column) => <th scope="col" key={column}>{inline(cell, resolve, open)}</th>)}</tr></thead>
+        <tbody>{rows.map((row, index) => <tr key={index}>{headers.map((_, column) =>
+          <td key={column}>{inline(row[column] ?? "", resolve, open)}</td>)}</tr>)}</tbody>
+      </table></div>);
+      continue;
+    }
     if (line.startsWith("```")) {
       const code: string[] = [];
       const key = i;
@@ -80,7 +95,16 @@ export function StudyMarkdown({ body, resolve, open, toggleTask, taskLabel }: {
       blocks.push(<Tag key={key}>{items}</Tag>);
       continue;
     }
-    if (line.startsWith("> ")) blocks.push(<blockquote key={i}>{inline(line.slice(2), resolve, open)}</blockquote>);
+    const callout = /^>\s*\[!(note|tip|important|warning|question)\]\s*(.*)$/i.exec(line);
+    if (callout) {
+      const key = i;
+      const content: string[] = [];
+      while (lines[i + 1]?.startsWith(">")) content.push(lines[++i].replace(/^>\s?/, ""));
+      blocks.push(<aside key={key} className="sb-study-callout" data-kind={callout[1].toLowerCase()}>
+        <strong>{inline(callout[2] || callout[1], resolve, open)}</strong>
+        {content.map((text, index) => text && <p key={index}>{inline(text, resolve, open)}</p>)}
+      </aside>);
+    } else if (line.startsWith("> ")) blocks.push(<blockquote key={i}>{inline(line.slice(2), resolve, open)}</blockquote>);
     else blocks.push(<p key={i}>{inline(line, resolve, open)}</p>);
   }
   return <div className="sb-study-markdown">{blocks}</div>;

@@ -3,12 +3,16 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent } from "react";
 import { useLocale } from "next-intl";
 import dynamic from "next/dynamic";
-import { ArrowRight, BookOpen, CalendarDays, Download, Filter, FolderOpen, Layers, LockKeyhole, Maximize2, Minus, Network, Plus, RotateCcw, Search, Star, Upload } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, ChevronLeft, ChevronRight, Download, Filter, FolderOpen, Layers, LockKeyhole, Maximize2, PanelRight, Type, Minus, Network, Plus, RotateCcw, Search, Star, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { buildStudyGraph, parseStudyNote, serializeStudyNote, studyTags, STUDY_BODY_LIMIT, STUDY_COLORS, STUDY_GROUPS, STUDY_LINK_LIMIT,
+import { ThemeSwitch } from "@/components/ThemeToggle";
+import { buildStudyGraph, parseStudyNote, serializeStudyNote, studyTags, STUDY_BODY_LIMIT, STUDY_COLORS, STUDY_GROUPS, STUDY_IMPORT_LIMIT, STUDY_LINK_LIMIT,
   type StudyEntry, type StudyGroup, type StudyMapSnapshot } from "@/lib/study-map";
 import type { GraphCommand } from "./StudyGraph3D";
 import { StudyMarkdown, StudySketch } from "./StudyNoteContent";
+import {
+  StudyCalendar, StudyDatabase, StudyFiles, StudyFocusTimer, StudyRoadmaps, studyTools, type WorkspaceRow,
+} from "./StudyWorkspaceViews";
 import "./study-map.css";
 
 const words = {
@@ -82,14 +86,42 @@ const localDay = () => {
   return [date.getFullYear(), date.getMonth() + 1, date.getDate()].map(value => String(value).padStart(2, "0")).join("-");
 };
 const anchors = [[390, 83], [652, 144], [650, 366], [390, 427], [129, 365], [129, 144]] as const;
+const workspaceLabels = {
+  en: { template: "Use a template", templates: ["Review a topic", "Plan an application", "Practice speaking"], updated: "Syncs with your profile while open", emptyResults: "No matching items", clear: "Clear filters", progress: "Completed", sourceConnected: "Connected items", due: "Cards due" },
+  uz: { template: "Shablondan foydalanish", templates: ["Mavzuni takrorlash", "Arizani rejalash", "Speaking mashqi"], updated: "Ochiq turganda profilingiz bilan yangilanadi", emptyResults: "Mos yozuv topilmadi", clear: "Filtrlarni tozalash", progress: "Bajarilgan", sourceConnected: "Bog‘langan yozuvlar", due: "Takrorlanadigan kartalar" },
+  ru: { template: "Использовать шаблон", templates: ["Повторить тему", "Спланировать заявку", "Практика речи"], updated: "Синхронизируется с профилем, пока открыта", emptyResults: "Ничего не найдено", clear: "Сбросить фильтры", progress: "Выполнено", sourceConnected: "Связанные записи", due: "Карточки к повторению" },
+};
+const templateNotes = {
+  en: [
+    "## What I learned\n\n## Questions to revisit\n- [ ] \n\n## Related notes\n",
+    "## Goal\n\n## Requirements\n- [ ] Check the official programme page\n- [ ] Record the next deadline\n\n## Next action\n",
+    "## Practice topic\n\n## Phrases to reuse\n\n## One thing to improve\n- [ ] Try the answer again\n",
+  ],
+  uz: [
+    "## Nimani o‘rgandim?\n\n## Qayta ko‘riladigan savollar\n- [ ] \n\n## Bog‘langan qaydlar\n",
+    "## Maqsad\n\n## Talablar\n- [ ] Dasturning rasmiy sahifasini tekshirish\n- [ ] Muddatni yozib olish\n\n## Keyingi qadam\n",
+    "## Mashq mavzusi\n\n## Qayta ishlatiladigan iboralar\n\n## Yaxshilaydigan bir narsa\n- [ ] Javobni qayta aytish\n",
+  ],
+  ru: [
+    "## Что я узнал\n\n## Вопросы для повторения\n- [ ] \n\n## Связанные заметки\n",
+    "## Цель\n\n## Требования\n- [ ] Проверить страницу программы\n- [ ] Записать срок подачи\n\n## Следующий шаг\n",
+    "## Тема практики\n\n## Полезные выражения\n\n## Что улучшить\n- [ ] Повторить ответ\n",
+  ],
+};
 
-export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }) {
+export function StudyMap({ onNavigate, onLock }: { onNavigate: (route: string) => void; onLock: () => void }) {
   const locale = useLocale();
-  const t = words[locale === "uz" || locale === "ru" ? locale : "en"];
+  const language = locale === "uz" || locale === "ru" ? locale : "en";
+  const t = words[language];
+  const workspace = workspaceLabels[language];
+  const tools = studyTools[language];
   const [snapshot, setSnapshot] = useState<StudyMapSnapshot | null>(null);
   const [status, setStatus] = useState("loading");
   const [refresh, setRefresh] = useState(0);
-  const [selected, selectNode] = useState("");
+  const [history, setHistory] = useState({ ids: [""], index: 0 });
+  const selected = history.ids[history.index];
+  const [details, setDetails] = useState(true);
+  const [largeText, setLargeText] = useState(false);
   const [topic, setTopic] = useState<StudyGroup | "all">("all");
   const [view, setView] = useState(0);
   const [query, setQuery] = useState("");
@@ -106,6 +138,8 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
   const [bookmarks, setBookmarks] = useState(false);
   const [editorTab, setEditorTab] = useState<"text" | "preview" | "drawing">("text");
   const importFile = useRef<HTMLInputElement>(null);
+  const importFolder = useRef<HTMLInputElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
   const editorTitle = useRef<HTMLInputElement>(null);
   const expandButton = useRef<HTMLButtonElement>(null);
   const graphWindow = useRef<HTMLDivElement>(null);
@@ -147,7 +181,11 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
       if (Date.now() - receivedAt.current > 60_000) setRefresh(value => value + 1);
     };
     window.addEventListener("focus", synchronize);
-    return () => window.removeEventListener("focus", synchronize);
+    const timer = window.setInterval(() => { if (!document.hidden) synchronize(); }, 65_000);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", synchronize);
+    };
   }, [status]);
 
   useEffect(() => {
@@ -173,6 +211,18 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
       document.removeEventListener("keydown", key);
       if (trigger?.isConnected) requestAnimationFrame(() => trigger.focus());
     };
+  }, [expanded]);
+
+  useEffect(() => {
+    function search(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k" || !searchInput.current || expanded) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      searchInput.current.focus();
+      searchInput.current.select();
+    }
+    window.addEventListener("keydown", search, true);
+    return () => window.removeEventListener("keydown", search, true);
   }, [expanded]);
 
   const { nodes, notes, edges, resolve } = useMemo(() => buildStudyGraph(snapshot ?? emptySnapshot), [snapshot]);
@@ -210,8 +260,39 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
   const outgoing = edges.filter(edge => edge.from === selected).flatMap(({ to }) => byId.get(to) ?? []);
   const incoming = edges.filter(edge => edge.to === selected).flatMap(({ from }) => byId.get(from) ?? []);
   const dueCards = snapshot?.entries.filter(entry => entry.kind === "card" && new Date(entry.dueAt).getTime() <= now && visibleIds.has(entry.id)) ?? [];
+  const completed = nodes.filter(node => node.done).length;
+  const hasFilters = query || topic !== "all" || folder || tag || bookmarks;
+  const rows: WorkspaceRow[] = view < 3 || view === 4 || view === 8 ? [] : filtered.map(node => ({
+    node, topic: groupName(node.group), folder: notes.get(node.id)?.folder ?? "",
+    tags: tagsById.get(node.id)?.map(tag => `#${tag}`).join(" ") ?? "",
+    date: node.date || notes.get(node.id)?.date || "",
+    status: node.done === undefined ? "" : node.done ? t.done : tools.pending,
+  }));
+  const viewProps = { rows, labels: tools, selected, open: selectNode, empty: t.empty };
+
+  function selectNode(id: string) {
+    setDetails(true);
+    setHistory(value => {
+      if (value.ids[value.index] === id) return value;
+      const ids = [...value.ids.slice(0, value.index + 1), id].slice(-60);
+      return { ids, index: ids.length - 1 };
+    });
+  }
+
+  function stepHistory(delta: number) {
+    const next = history.index + delta;
+    if (next < 0 || next >= history.ids.length) return;
+    setDetails(true);
+    setHistory({ ...history, index: next });
+    if (depth && byId.has(history.ids[next])) setCommand({ action: "focus", id: history.ids[next] });
+  }
+
+  function clearFilters() {
+    setQuery(""); setTopic("all"); setFolder(""); setTag(""); setBookmarks(false);
+  }
 
   function editDraft(value: Draft, tab: typeof editorTab = "text") {
+    setDetails(true);
     setDraft(value);
     setEditorTab(tab);
     setNotice("");
@@ -259,6 +340,28 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
     } catch { setNotice(t.failed); }
   }
 
+  async function importNotes(files: File[], fromFolder: boolean) {
+    const notes = files.filter(file => /\.(?:md|markdown|txt)$/i.test(file.name));
+    if (!notes.length) { setNotice(tools.noFiles); return; }
+    if (notes.length > STUDY_IMPORT_LIMIT) { setNotice(tools.importLimit); return; }
+    if (notes.length === 1 && !fromFolder) { await importNote(notes[0]); return; }
+    if (notes.some(file => file.size > STUDY_BODY_LIMIT * 4)) { setNotice(t.tooLong); return; }
+    try {
+      const items = await Promise.all(notes.map(async file => {
+        const raw = await file.text();
+        const source = parseStudyNote(raw);
+        // Keep paths relative to the chosen vault so imported [[folder/title]] links still resolve.
+        const path = file.webkitRelativePath.split("/").slice(1, -1).join("/");
+        const title = file.name.replace(/\.(?:md|markdown|txt)$/i, "").trim() || t.untitled;
+        return { kind: "note", title: title.slice(0, 120), links: [],
+          text: serializeStudyNote({ ...source, folder: source.folder || path || folder, body: source.body || `# ${title}` }) };
+      }));
+      if (items.some(item => item.text.length > STUDY_BODY_LIMIT)) { setNotice(t.tooLong); return; }
+      await mutate({ action: "import", items }, false);
+      setView(7);
+    } catch { setNotice(t.failed); }
+  }
+
   async function mutate(payload: object, closeEditor = true) {
     if (busy) return;
     setBusy(true);
@@ -272,6 +375,8 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
         setSnapshot(null);
         return;
       }
+      if (response.status === 409) { setNotice(tools.limit); return; }
+      if (response.status === 413) { setNotice(tools.payloadLimit); return; }
       if (!response.ok) throw new Error();
       const result = await response.json() as { id?: string };
       if (result.id) selectNode(result.id);
@@ -399,22 +504,42 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
         <Button type="button" variant="outline" onClick={() => setRefresh(value => value + 1)} aria-label={t.refreshed}><RotateCcw size={16} aria-hidden /></Button>
         <Button type="button" variant="outline" disabled={busy} onClick={() => void mutate({ action: "daily", day: localDay() })}><CalendarDays size={16} aria-hidden />{t.daily}</Button>
         <Button type="button" variant="outline" onClick={() => importFile.current?.click()}><Upload size={16} aria-hidden />{t.import}</Button>
-        <input ref={importFile} hidden type="file" accept=".md,.markdown,.txt" onChange={event => {
-          const file = event.target.files?.[0];
+        <input ref={importFile} hidden type="file" multiple accept=".md,.markdown,.txt" onChange={event => {
+          const files = Array.from(event.target.files ?? []);
           event.target.value = "";
-          if (file) void importNote(file);
+          if (files.length) void importNotes(files, false);
         }} />
         <Button type="button" variant="outline" onClick={() => editDraft(newDraft("card", folder))}><Layers size={16} aria-hidden />{t.card}</Button>
+        <label className="sb-study-template"><select aria-label={workspace.template} value="" onChange={event => {
+          if (!event.target.value) return;
+          const index = Number(event.target.value);
+          editDraft({ ...newDraft("note", folder), title: workspace.templates[index], body: templateNotes[language][index] });
+        }}>
+          <option value="">{workspace.template}</option>
+          {workspace.templates.map((title, index) => <option value={index} key={title}>{title}</option>)}
+        </select></label>
         <Button type="button" onClick={() => editDraft(newDraft("note", folder))}><Plus size={16} aria-hidden />{t.note}</Button>
       </div>
     </header>
-    <div className="sb-study-layout">
-      <div className="sb-study-panel">
-        <div className="sb-study-views" role="group" aria-label={t.title}>
-          {t.views.map((label, index) => <Button key={label} variant="unstyled" type="button" aria-pressed={index === view} onClick={() => { setView(index); setExpanded(false); }}>{label}</Button>)}
+    <div className="sb-study-status">
+      <span>{nodes.length} {workspace.sourceConnected}</span><span>{completed} {workspace.progress}</span>
+      <span>{dueCards.length} {workspace.due}</span><span>{workspace.updated}</span>
+    </div>
+    <div className="sb-study-layout" data-details={details || undefined}>
+      <aside className="sb-study-panel sb-study-sidebar">
+        <div className="sb-study-filter sb-study-search">
+          <label><Search size={16} aria-hidden /><input ref={searchInput} type="search" aria-label={t.filter} placeholder={tools.search}
+            aria-keyshortcuts="Control+K Meta+K" value={query} onChange={event => setQuery(event.target.value)} /><kbd>⌘K</kbd></label>
         </div>
+        <nav className="sb-study-views" aria-label={t.title}>
+          {[0, 1, 5, 3, 6, 4, 7, 2, 8].map(index => {
+            const label = [...t.views, tools.database, tools.roadmap, tools.files, tools.trash][index];
+            return <Button key={label} variant="unstyled" type="button" aria-pressed={index === view}
+              onClick={() => { setView(index); setExpanded(false); }}>{label}
+              {index === 8 && Boolean(snapshot.trash?.length) && <small>{snapshot.trash?.length}</small>}</Button>;
+          })}
+        </nav>
         <div className="sb-study-filter">
-          <label><Search size={16} aria-hidden /><input type="search" aria-label={t.filter} placeholder={t.filter} value={query} onChange={event => setQuery(event.target.value)} /></label>
           <label><Filter size={16} aria-hidden /><select aria-label={t.all} value={topic} onChange={event => setTopic(event.target.value as StudyGroup | "all")}>
             <option value="all">{t.all}</option>
             {STUDY_GROUPS.map(group => <option value={group} key={group}>{groupName(group)}</option>)}
@@ -428,7 +553,34 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
             <option value="">{t.allTags}</option>{tags.map(value => <option value={value} key={value}>#{value}</option>)}
           </select></label>
           <Button type="button" variant="outline" aria-pressed={bookmarks} onClick={() => setBookmarks(value => !value)}><Star size={15} aria-hidden />{t.bookmarks}</Button>
+          {hasFilters && <Button type="button" variant="ghost" onClick={clearFilters}>{workspace.clear}</Button>}
         </div>
+        <div className="sb-study-sidebar-actions">
+          <Button type="button" variant="ghost" disabled={busy} onClick={() => importFolder.current?.click()}><Upload size={15} aria-hidden />{tools.importFolder}</Button>
+          <input ref={element => { importFolder.current = element; element?.setAttribute("webkitdirectory", ""); }}
+            hidden type="file" multiple onChange={event => {
+              const files = Array.from(event.target.files ?? []);
+              event.target.value = "";
+              if (files.length) void importNotes(files, true);
+            }} />
+          <Button type="button" variant="ghost" onClick={() => { if (window.confirm(tools.lockConfirm)) onLock(); }}><LockKeyhole size={15} aria-hidden />{tools.lock}</Button>
+        </div>
+      </aside>
+      <div className="sb-study-panel sb-study-main">
+        <div className="sb-study-toolbar">
+          <div className="sb-study-actions">
+            <Button type="button" variant="ghost" aria-label={tools.back} disabled={!history.index} onClick={() => stepHistory(-1)}><ChevronLeft size={17} /></Button>
+            <Button type="button" variant="ghost" aria-label={tools.forward} disabled={history.index >= history.ids.length - 1} onClick={() => stepHistory(1)}><ChevronRight size={17} /></Button>
+            <Button type="button" variant="ghost" aria-label={details ? tools.hideDetails : tools.showDetails} aria-pressed={details}
+              onClick={() => setDetails(value => !value)}><PanelRight size={17} /></Button>
+            <Button type="button" variant="ghost" aria-label={tools.textSize} aria-pressed={largeText} onClick={() => setLargeText(value => !value)}><Type size={17} /></Button>
+            <ThemeSwitch />
+          </div>
+          <StudyFocusTimer labels={tools} />
+        </div>
+        <div className="sb-study-counts"><span>{snapshot.entries.filter(entry => entry.kind === "note").length} {tools.notes}</span><span>{graphEdges.length} {tools.links}</span></div>
+        {notice && <p className="sb-study-feedback" role={notice === t.saved ? "status" : "alert"}>{notice}</p>}
+        {hasFilters && !filtered.length && view !== 8 && <p className="sb-study-no-results" role="status">{workspace.emptyResults}</p>}
         {view === 0 && <>
           <div ref={graphWindow} className="sb-study-graph-window" data-expanded={expanded || undefined}
             role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined} aria-label={expanded ? t.views[0] : undefined}>
@@ -481,25 +633,42 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
           })}
           {!filtered.length && <p className="sb-study-empty">{t.empty}</p>}
         </div>}
-        {(view === 2 || view === 3) && <div className="sb-study-rows">
-          {(view === 3 ? filtered.map(node => ({ ...node, date: node.date || notes.get(node.id)?.date })).filter(node => node.date).sort((a,b) => (a.date ?? "").localeCompare(b.date ?? "")) : filtered).map(node =>
-            <Button variant="outline" key={node.id} type="button" aria-pressed={selected === node.id} onClick={() => selectNode(node.id)}>
-              <span>{node.title}</span><small>{node.date || groupName(node.group)}</small>
-            </Button>)}
-          {!filtered.some(node => view === 2 || node.date || notes.get(node.id)?.date) && <p>{t.empty}</p>}
+        {view === 2 && <div className="sb-study-rows">
+          {filtered.map(node => <Button variant="outline" key={node.id} type="button" aria-pressed={selected === node.id}
+            onClick={() => selectNode(node.id)}><span>{node.title}</span><small>{node.date || groupName(node.group)}</small></Button>)}
+          {!filtered.length && <p>{t.empty}</p>}
+        </div>}
+        {view === 3 && <StudyCalendar {...viewProps} locale={locale} daily={t.daily}
+          onDaily={day => void mutate({ action: "daily", day })} />}
+        {view === 5 && <StudyDatabase {...viewProps} locale={locale} />}
+        {view === 6 && <StudyRoadmaps {...viewProps} rows={rows.filter(({ node }) =>
+          /^(plan|lesson|exam|task|app):/.test(node.id))} />}
+        {view === 7 && <StudyFiles {...viewProps} rows={rows.filter(({ node }) => notes.has(node.id))} />}
+        {view === 8 && <div className="sb-study-rows">
+          <h2>{tools.trash}</h2>
+          {!snapshot.trash?.length && <p>{t.empty}</p>}
+          {snapshot.trash?.map(entry => <article className="sb-study-card" key={entry.id}>
+            <strong>{entry.title}</strong>
+            <div className="sb-study-actions">
+              <Button type="button" variant="outline" disabled={busy} onClick={() => void mutate({ action: "restore", id: entry.id }, false)}>{tools.restore}</Button>
+              <Button type="button" variant="ghost" disabled={busy} onClick={() => {
+                if (window.confirm(tools.purgeConfirm)) void mutate({ action: "purge", id: entry.id }, false);
+              }}><Trash2 size={15} aria-hidden />{tools.purge}</Button>
+            </div>
+          </article>)}
         </div>}
         {view === 4 && <div className="sb-study-rows">
           <p>{dueCards.length ? t.due : t.noDue}</p>
           {dueCards.map(entry => <article key={entry.id} className="sb-study-card">
             <strong>{entry.title}</strong>
-            {revealed === entry.id ? <><p>{entry.text}</p><div className="sb-study-actions">
+            {revealed === entry.id ? <><p>{notes.get(entry.id)?.body}</p><div className="sb-study-actions">
               <Button type="button" variant="outline" disabled={busy} onClick={() => void mutate({ action: "review", id: entry.id, remembered: false })}>{t.again}</Button>
               <Button type="button" disabled={busy} onClick={() => void mutate({ action: "review", id: entry.id, remembered: true })}>{t.remembered}</Button>
             </div></> : <Button type="button" variant="outline" onClick={() => reveal(entry.id)}>{t.reveal}</Button>}
           </article>)}
         </div>}
       </div>
-      <aside className="sb-study-panel sb-study-detail">
+      <aside className="sb-study-panel sb-study-detail" hidden={!details} data-large={largeText || undefined}>
         <h2><BookOpen size={19} aria-hidden />{active?.title || t.focus}</h2>
         {active ? <>
           <small>{groupName(active.group)}{active.done ? ` · ${t.done}` : ""}{active.date ? ` · ${active.date}` : ""}</small>
@@ -510,7 +679,7 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
             {(tagsById.get(activeEntry.id) ?? []).length > 0 && <div className="sb-study-tags">
               {tagsById.get(activeEntry.id)?.map(name => <Button key={name} type="button" variant="ghost" onClick={() => { setTag(name); setView(2); }}>#{name}</Button>)}
             </div>}
-          </> : active.detail && <p>{active.detail}</p>}
+          </> : (activeNote?.body || active.detail) && <p>{activeNote?.body || active.detail}</p>}
           {active.route && <Button type="button" variant="outline" onClick={() => onNavigate(active.route!)}>{t.open}<ArrowRight size={16} aria-hidden /></Button>}
           {activeEntry && activeNote && <div className="sb-study-actions">
             <Button type="button" variant="outline" onClick={() => editDraft(fromEntry(activeEntry))}>{t.edit}</Button>
@@ -533,6 +702,7 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
           <label>{t.name}<input ref={editorTitle} required maxLength={120} value={draft.title} onChange={event => setDraft({ ...draft, title: event.target.value })}/></label>
           {draft.kind === "note" && <>
             <label>{t.folder}<input maxLength={80} list="study-note-folders" value={draft.folder} onChange={event => setDraft({ ...draft, folder: event.target.value })} /></label>
+            <label>{tools.date}<input type="date" value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label>
             <datalist id="study-note-folders">{folders.map(value => <option key={value}>{value}</option>)}</datalist>
             <div className="sb-study-actions">
               <Button type="button" variant="outline" aria-pressed={editorTab === "text"} onClick={() => setEditorTab("text")}>{t.editText}</Button>
@@ -559,7 +729,6 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
             <Button type="button" variant="ghost" onClick={() => setDraft(null)}>{t.cancel}</Button>
           </div>
         </form>}
-        {notice && <p role={notice === t.saved ? "status" : "alert"}>{notice}</p>}
       </aside>
     </div>
   </section>;
