@@ -118,7 +118,11 @@ check("scholarship cards reserve one heading box so a row lines up", /line-clamp
 check("scholarship sort and group selects have programmatic labels", /htmlFor="scholarship-sort"/.test(source.scholarship) && /id="scholarship-sort"/.test(source.scholarship) && /htmlFor="scholarship-group"/.test(source.scholarship) && /id="scholarship-group"/.test(source.scholarship));
 check("mobile help and dismiss actions retain 44px targets and visible focus",  /min-h-11 min-w-11/.test(source.sectionIntro) && /h-11 w-11/.test(source.sectionIntro));
 check("compact language selector and logout control meet 44px targets", /min-h-11/.test(source.languageSwitcher) && /h-11 w-11/.test(source.navbar));
-check("hash-only shell navigation preserves framework history state instead of queuing a stale Next route restore", !source.homeClient.includes('history.pushState(null') && !source.homeClient.includes('history.replaceState(null') && (source.homeClient.match(/history\.pushState\(window\.history\.state/g)??[]).length===3);
+check("hash-only shell navigation keeps framework state across history entries", /const state = window\.history\.state \?\? shellHistoryState\.current/.test(source.homeClient)
+  && /history\.pushState\(state, "", url\)/.test(source.homeClient)
+  && /history\.replaceState\(state, "", url\)/.test(source.homeClient)
+  && /addEventListener\("popstate", onNav\)/.test(source.homeClient)
+  && /addEventListener\("hashchange", onNav\)/.test(source.homeClient));
 check("application footer links remain tappable and keyboard focused", (source.homeClient.match(/min-h-11 min-w-11/g) ?? []).length >= 5 && /focus-visible:ring-2/.test(source.homeClient));
 check("mobile Applications navigation labels are concise in every locale", mobileAppLabels.en === "Apps" && mobileAppLabels.uz === "Arizalar" && mobileAppLabels.ru === "Заявки");
 check("editing a profile preserves an unanswered financial-aid choice", /needsFinancialAid: boolean \| null/.test(source.profile) && /needsFinancialAid: null/.test(source.profile) && /financialAidUnknown/.test(source.profile));
