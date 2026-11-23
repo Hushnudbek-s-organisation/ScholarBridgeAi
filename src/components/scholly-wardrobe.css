@@ -151,3 +151,79 @@
   .sb-scholly-aura { animation: none !important; }
   .sb-scholly-aura i { display: none; }
 }
+
+.sb-wardrobe-library { min-width: 0; display: grid; gap: .75rem; }
+.sb-scholly-wardrobe[data-studio] { overflow: visible; padding: 0; }
+.sb-wardrobe-companions {
+  display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: .4rem;
+}
+.sb-wardrobe-companions button {
+  display: grid; justify-items: center; align-content: center; min-width: 0;
+  gap: .25rem; padding: .6rem .15rem; border-radius: 12px;
+}
+.sb-wardrobe-companions button svg { color: var(--choice-color); }
+.sb-wardrobe-companions button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--choice-color) 19%, var(--sb-well));
+  border-color: var(--choice-color);
+}
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-preview {
+  position: relative; isolation: isolate; flex-direction: column; gap: .4rem;
+  color: #f1f5ff; overflow: hidden; padding: 1rem .75rem 1.25rem;
+  border-color: color-mix(in srgb, var(--wardrobe-accent) 30%, #283650);
+  border-radius: 18px; background:
+    radial-gradient(ellipse at 50% 44%, color-mix(in srgb, var(--wardrobe-accent) 31%, #101929), transparent 68%),
+    linear-gradient(140deg, #131d31, #080e1c);
+}
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-avatar {
+  position: relative; flex: none; width: min(100%, 290px); height: auto; aspect-ratio: 1;
+}
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-avatar::before {
+  position: absolute; content: ""; inset: auto 15% 5%; height: 10%; border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--wardrobe-accent) 24%, transparent);
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--wardrobe-accent) 28%, transparent), transparent 72%);
+}
+.sb-wardrobe-preview-name { align-self: flex-start; font-size: 1.35rem; }
+.sb-wardrobe-preview-controls { display: flex; gap: .45rem; }
+.sb-scholly-wardrobe[data-studio] .sb-wardrobe-preview-controls button {
+  display: grid; place-items: center; width: 44px;
+  background: #16223a; border-color: #445676; color: #f1f5ff;
+}
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-sample {
+  border-color: var(--wardrobe-accent); background: #162239;
+}
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-tabs {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+}
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-tabs button { padding-inline: 10px; }
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-items {
+  grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem;
+}
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-items li {
+  align-content: start; padding: .65rem; border-radius: 12px;
+  background: var(--sb-well); border-color: var(--sb-border-strong);
+}
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-items li[data-rarity="rare"] { border-top-color: #61c8ff; }
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-items li[data-rarity="epic"] { border-top-color: #b692fe; }
+.sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-items li[data-rarity="legendary"] { border-top-color: #e8b458; }
+.sb-wardrobe-item-art {
+  min-height: 70px; display: grid; place-items: center; border-radius: 9px; margin-bottom: 3px;
+  color: var(--item-color);
+  background: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--item-color) 28%, #16223b), #101828 76%);
+}
+.sb-wardrobe-item-art i {
+  display: block; width: 36px; height: 36px; border-radius: 50%;
+  background: radial-gradient(circle at 30% 22%, color-mix(in srgb, var(--item-color), #fff 63%), var(--item-color) 40%, color-mix(in srgb, var(--item-color), #101528 60%) 94%);
+  box-shadow: 0 5px 12px #050a16a6;
+}
+.sb-wardrobe-hint { color: var(--sb-ink-muted); font-size: .9rem; }
+@media (min-width: 900px) {
+  .sb-scholly-wardrobe[data-studio] {
+    grid-template-columns: minmax(240px, .85fr) minmax(0, 1.35fr);
+    grid-template-areas: "preview companions" "preview catalog";
+    grid-template-rows: auto 1fr; align-items: start;
+  }
+  .sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-preview { grid-area: preview; }
+  .sb-scholly-wardrobe[data-studio] .sb-wardrobe-companions { grid-area: companions; }
+  .sb-scholly-wardrobe[data-studio] .sb-wardrobe-library { grid-area: catalog; }
+  .sb-scholly-wardrobe[data-studio] .sb-scholly-wardrobe-items { grid-template-columns: repeat(3, minmax(0,1fr)); }
+}

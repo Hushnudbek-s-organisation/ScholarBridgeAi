@@ -310,70 +310,6 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
       </section>
     </div>
 
-    <section className="sb-overview-panel sbOverviewMission" aria-labelledby="sb-daily-mission-title">
-      <div className="sbOverviewMissionHeading">
-        <h2 id="sb-daily-mission-title" ref={missionHeading} tabIndex={-1}><Target aria-hidden />{copy.title}</h2>
-        {mission && <span className="sbOverviewMissionPoints">{mission.sizeMin} {copy.minutes} · {mission.points} {copy.points}</span>}
-      </div>
-      {points && <SchollyPointsSummary snapshot={points} locale={missionLocale} />}
-      {!mission && !missionError && <p className="sbOverviewMissionMessage" role="status">{copy.loading}</p>}
-      {missionError && <div><p className="sbOverviewMissionMessage" role="status">{copy.error}</p><Button variant="unstyled" className="sbOverviewMissionRetry" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.retry}</Button></div>}
-      {mission && <>
-        <div className="sbOverviewMissionSource">
-          <Image src="/scholly-front.webp" alt="" width={28} height={28} />
-          <span>{copy.chosen}</span>
-          <span className="sbOverviewMissionTheme">{copy.theme[mission.theme]}</span>
-        </div>
-        <p className="sbOverviewMissionTask">{missionTitle}</p>
-        <p className="sbOverviewMissionStatus" role="status">
-          {mission.status === "done" ? copy.done : mission.status === "skipped" ? copy.skipped : `${copy.progress}: ${mission.progress} / ${mission.target}`}
-        </p>
-        <progress className="sbOverviewMissionProgress" value={mission.status === "done" ? mission.target : mission.progress} max={Math.max(1, mission.target)} aria-label={copy.progress} />
-        {mission.status === "done" && dismissedMission !== mission.id && (
-          <div className="sbOverviewMissionFinish">
-            <div role="status">
-              <h3>{copy.finished}</h3>
-              <p>+{mission.points} {copy.points} · {copy.readiness} {new Intl.NumberFormat(locale, { style: "percent" }).format(readiness / 100)}</p>
-              <p>{copy.tomorrow}</p>
-              {points && <SchollyPointsBreakdown snapshot={points} locale={missionLocale} />}
-            </div>
-            <Button variant="outline" onClick={() => dismissCompletion(mission.id)}>{copy.dismiss}</Button>
-          </div>
-        )}
-        {mission.status === "pending" && mission.exercise && (
-          <SchollyIeltsMission key={`${profileId}-${mission.id}`} locale={missionLocale} exercise={mission.exercise}
-            busy={missionBusy} score={ieltsScore} onSubmit={(answers) => void updateMission("submit_ielts", answers)} />
-        )}
-        {mission.status === "pending" && mission.sprint && (
-          <SchollySprint sprint={mission.sprint} points={mission.points} locale={missionLocale} />
-        )}
-        {mission.status === "pending" && <div className="sbOverviewMissionActions">
-            {(mission.type === "daily_quiz" || mission.type === "weekly_review") && (
-              <Button variant="unstyled" type="button" className="sbOverviewMissionPrimary" onClick={() => openWeekendMission(mission.type as SchollyWeekendMission)}>{copy.open}<ArrowRight aria-hidden /></Button>
-            )}
-            {missionTab[mission.type] && <>
-              <Button variant="unstyled" type="button" className="sbOverviewMissionPrimary" onClick={() => onNavigate(missionTab[mission.type]!)}>{copy.open}<ArrowRight aria-hidden /></Button>
-              <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.check}</Button>
-            </>}
-            {mission.sprint === null && <Button variant="unstyled" type="button" disabled={missionBusy}
-              onClick={() => void updateMission("start_sprint")}>{schollySprintStartLabel(missionLocale)}</Button>}
-            {!mission.anotherUsed && <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("another")}>{copy.another}</Button>}
-            <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("skip")}>{copy.skip}</Button>
-        </div>}
-      </>}
-    </section>
-
-    {dailyGrant && <section className="sb-overview-panel" aria-labelledby="sb-daily-grant-title">
-      <h2 id="sb-daily-grant-title" className="flex items-center gap-2">
-        <Bookmark aria-hidden className="h-5 w-5 shrink-0 text-indigo-500" />{copy.dailyGrant}
-      </h2>
-      <Link href={`/scholarships/${dailyGrant.id}?from=app`} className="mt-2 inline-block font-semibold underline-offset-4 hover:underline">
-        {dailyGrant.title}
-      </Link>
-      <p className="text-sm text-[var(--sb-ink-muted)]">{dailyGrant.provider}</p>
-      <SourceTag url={dailyGrant.sourceUrl} lastVerified={dailyGrant.lastVerifiedAt} verificationStatus={dailyGrant.verificationStatus} />
-    </section>}
-
     <div className="sbOverviewMiddleGrid">
       <section className="sb-overview-panel sbOverviewTasks">
         <h2><ListChecks aria-hidden />{t("overviewTasks")}</h2>
@@ -439,6 +375,70 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
         <strong>{item.title}</strong><small>{item.detail}</small>
       </Button>)}</div> : <p className="sbOverviewEmpty">{t("overviewNoRecommendations")}</p>}
     </section>
+
+    <section className="sb-overview-panel sbOverviewMission" aria-labelledby="sb-daily-mission-title">
+      <div className="sbOverviewMissionHeading">
+        <h2 id="sb-daily-mission-title" ref={missionHeading} tabIndex={-1}><Target aria-hidden />{copy.title}</h2>
+        {mission && <span className="sbOverviewMissionPoints">{mission.sizeMin} {copy.minutes} · {mission.points} {copy.points}</span>}
+      </div>
+      {points && <SchollyPointsSummary snapshot={points} locale={missionLocale} />}
+      {!mission && !missionError && <p className="sbOverviewMissionMessage" role="status">{copy.loading}</p>}
+      {missionError && <div><p className="sbOverviewMissionMessage" role="status">{copy.error}</p><Button variant="unstyled" className="sbOverviewMissionRetry" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.retry}</Button></div>}
+      {mission && <>
+        <div className="sbOverviewMissionSource">
+          <Image src="/scholly-front.webp" alt="" width={28} height={28} />
+          <span>{copy.chosen}</span>
+          <span className="sbOverviewMissionTheme">{copy.theme[mission.theme]}</span>
+        </div>
+        <p className="sbOverviewMissionTask">{missionTitle}</p>
+        <p className="sbOverviewMissionStatus" role="status">
+          {mission.status === "done" ? copy.done : mission.status === "skipped" ? copy.skipped : `${copy.progress}: ${mission.progress} / ${mission.target}`}
+        </p>
+        <progress className="sbOverviewMissionProgress" value={mission.status === "done" ? mission.target : mission.progress} max={Math.max(1, mission.target)} aria-label={copy.progress} />
+        {mission.status === "done" && dismissedMission !== mission.id && (
+          <div className="sbOverviewMissionFinish">
+            <div role="status">
+              <h3>{copy.finished}</h3>
+              <p>+{mission.points} {copy.points} · {copy.readiness} {new Intl.NumberFormat(locale, { style: "percent" }).format(readiness / 100)}</p>
+              <p>{copy.tomorrow}</p>
+              {points && <SchollyPointsBreakdown snapshot={points} locale={missionLocale} />}
+            </div>
+            <Button variant="outline" onClick={() => dismissCompletion(mission.id)}>{copy.dismiss}</Button>
+          </div>
+        )}
+        {mission.status === "pending" && mission.exercise && (
+          <SchollyIeltsMission key={`${profileId}-${mission.id}`} locale={missionLocale} exercise={mission.exercise}
+            busy={missionBusy} score={ieltsScore} onSubmit={(answers) => void updateMission("submit_ielts", answers)} />
+        )}
+        {mission.status === "pending" && mission.sprint && (
+          <SchollySprint sprint={mission.sprint} points={mission.points} locale={missionLocale} />
+        )}
+        {mission.status === "pending" && <div className="sbOverviewMissionActions">
+            {(mission.type === "daily_quiz" || mission.type === "weekly_review") && (
+              <Button variant="unstyled" type="button" className="sbOverviewMissionPrimary" onClick={() => openWeekendMission(mission.type as SchollyWeekendMission)}>{copy.open}<ArrowRight aria-hidden /></Button>
+            )}
+            {missionTab[mission.type] && <>
+              <Button variant="unstyled" type="button" className="sbOverviewMissionPrimary" onClick={() => onNavigate(missionTab[mission.type]!)}>{copy.open}<ArrowRight aria-hidden /></Button>
+              <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("refresh")}>{copy.check}</Button>
+            </>}
+            {mission.sprint === null && <Button variant="unstyled" type="button" disabled={missionBusy}
+              onClick={() => void updateMission("start_sprint")}>{schollySprintStartLabel(missionLocale)}</Button>}
+            {!mission.anotherUsed && <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("another")}>{copy.another}</Button>}
+            <Button variant="unstyled" type="button" disabled={missionBusy} onClick={() => updateMission("skip")}>{copy.skip}</Button>
+        </div>}
+      </>}
+    </section>
+
+    {dailyGrant && <section className="sb-overview-panel" aria-labelledby="sb-daily-grant-title">
+      <h2 id="sb-daily-grant-title" className="flex items-center gap-2">
+        <Bookmark aria-hidden className="h-5 w-5 shrink-0 text-indigo-500" />{copy.dailyGrant}
+      </h2>
+      <Link href={`/scholarships/${dailyGrant.id}?from=app`} className="mt-2 inline-block font-semibold underline-offset-4 hover:underline">
+        {dailyGrant.title}
+      </Link>
+      <p className="text-sm text-[var(--sb-ink-muted)]">{dailyGrant.provider}</p>
+      <SourceTag url={dailyGrant.sourceUrl} lastVerified={dailyGrant.lastVerifiedAt} verificationStatus={dailyGrant.verificationStatus} />
+    </section>}
 
     <SchollyFriends key={profileId} profileId={profileId} locale={missionLocale} />
     <SchollyRanking key={profileId} locale={missionLocale} />

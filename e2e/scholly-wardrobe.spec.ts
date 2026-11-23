@@ -45,7 +45,11 @@ test("Scholly grants a seasonal item once after three qualifying mission days", 
     expect(await owned()).toHaveLength(0);
     await Promise.all([grant("2027-02-28"), grant("2027-02-28")]);
     await grant("2027-03-01");
-    expect(await owned()).toEqual([{ item_key: "aura:snow", source: "achievement", spent_points: 0 }]);
+    expect(await owned()).toEqual(expect.arrayContaining([
+      { item_key: "aura:snow", source: "achievement", spent_points: 0 },
+      { item_key: "hat:winter", source: "achievement", spent_points: 0 },
+    ]));
+    expect(await owned()).toHaveLength(2);
   } finally {
     await pool.end();
     if (previousDatabase === undefined) delete process.env.DATABASE_URL;
@@ -90,11 +94,11 @@ test("Scholly persists purchases once and keeps a temporary preview separate", a
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/#dashboard");
     await page.getByRole("button", { name: "Open Scholly chat", exact: true }).click();
-    await page.getByRole("button", { name: "Scholly wardrobe", exact: true }).click();
+    await page.getByRole("button", { name: "Customize", exact: true }).click();
     const panel = page.locator(".sb-scholly-wardrobe");
     const launcher = page.locator(".sb-scholly-launcher .sb-scholly-model");
     const preview = panel.locator(".sb-scholly-model");
-    await expect(panel.getByText("4/22 owned")).toBeVisible();
+    await expect(panel.getByText("4/48 owned")).toBeVisible();
     await expect(launcher).toHaveAttribute("data-body-style", "purple");
     await page.clock.install();
     await panel.getByRole("listitem").filter({ hasText: "Midnight" }).getByRole("button", { name: "Try on" }).click();
@@ -107,6 +111,16 @@ test("Scholly persists purchases once and keeps a temporary preview separate", a
     await panel.getByRole("listitem").filter({ hasText: "Stars" }).getByRole("button", { name: "Try on" }).click();
     await expect(panel.locator(".sb-scholly-aura[data-aura=stars]")).toBeVisible();
     await expect(panel.locator(".sb-scholly-aura i").first()).toBeHidden();
+
+    await page.goto("/#wardrobe");
+    const studio = page.locator(".sb-scholly-wardrobe[data-studio]");
+    await studio.getByRole("button", { name: "Bars", exact: true }).click();
+    await expect(studio.locator(".sb-scholly-model")).toHaveAttribute("data-companion", "bars");
+    await expect(launcher).toHaveAttribute("data-companion", "bars");
+    const locked = await page.request.post(wardrobe, { data: { action: "apply", outfit: { companion: "karvon", hat: "crown" } } });
+    expect(locked.status()).toBe(409);
+    await page.reload();
+    await expect(studio.locator(".sb-scholly-model")).toHaveAttribute("data-companion", "bars");
   } finally {
     await pool.end();
   }
