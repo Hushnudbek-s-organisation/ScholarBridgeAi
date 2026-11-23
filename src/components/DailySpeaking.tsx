@@ -8,6 +8,7 @@ import { AiOrbFaceAvatar, type AiOrbFaceState } from "@/components/visa/AiOrbFac
 import { SpeakingRoom } from "@/components/visa/SpeakingRoom";
 import { CountryFlag } from "@/components/CountryFlag";
 import { countrySearchMatch } from "@/lib/countryPicker";
+import { needsCalmSpeaking, optedOutOfAnger, retrieveSpeakingReaction } from "@/lib/daily-speaking-rag";
 import { destinations, practicePrompt, speakerProfiles, type SpeakerStyle } from "@/lib/daily-speaking";
 
 function noAudioSubscription() { return () => {}; }
@@ -18,7 +19,7 @@ const copy = {
     title: "Kundalik suhbat", country: "Boradigan mamlakatingizni tanlang", intro: "Mamlakat tilida o‘zingiz xohlagan mavzuda erkin suhbatlashing.",
     search: "Mamlakatni qidirish…", empty: "Mamlakat topilmadi.", more: (n: number) => `Barcha ${n} ta mamlakatni ko‘rsatish`, less: "Kamroq ko‘rsatish",
     speaker: "Suhbatdosh", male: "Erkak", female: "Ayol", style: "Gapirish uslubi",
-    calm: "Sokin", calmDetail: "Bir tekis", fast: "Tez", fastDetail: "Tez va serg‘ayrat", irritated: "Jahldor", irritatedDetail: "Qisqa va keskin",
+    calm: "Sokin", calmDetail: "Bir tekis", fast: "Tez", fastDetail: "Tez va serg‘ayrat", irritated: "Jahldor", irritatedDetail: "Qisqa va keskin", strong: "Inglizcha hazilda so‘kinishga ruxsat berish", softer: "Sokin rejimga o‘tildi.",
     start: "Suhbatni boshlash", exit: "Sozlamalarga qaytish", replay: "Oxirgi gapni tinglash", mic: "Mikrofondan gapirish", stop: "Mikrofonni to‘xtatish",
     stopVoice: "Ovozni to‘xtatish", input: "Istalgan mavzuda yozing", send: "Yuborish", ready: "Sizning navbatingiz", speaking: "Gapiryapti", listening: "Tinglayapti", thinking: "Javob tayyorlanmoqda",
     model: "Brauzer AI", guided: "Oddiy mashq", fallback: "Brauzer AI’i mavjud bo‘lmasa, suhbat umumiy savollar bilan davom etadi.", unavailable: "Mikrofon ishlamadi. Javobingizni yozishingiz mumkin.",
@@ -28,7 +29,7 @@ const copy = {
     title: "Daily Speaking", country: "Choose your destination country", intro: "Chat about whatever interests you in your destination’s practice language.",
     search: "Search country...", empty: "No countries found.", more: (n: number) => `Show all ${n} countries`, less: "Show fewer",
     speaker: "Conversation partner", male: "Male", female: "Female", style: "Speaking style",
-    calm: "Calm", calmDetail: "Steady and relaxed", fast: "Fast", fastDetail: "Quick and energetic", irritated: "Irritated", irritatedDetail: "Short and sharp",
+    calm: "Calm", calmDetail: "Steady and relaxed", fast: "Fast", fastDetail: "Quick and energetic", irritated: "Irritated", irritatedDetail: "Short and sharp", strong: "Allow strong language in playful English banter", softer: "Switched to calm mode.",
     start: "Start conversation", exit: "Back to setup", replay: "Replay last line", mic: "Speak into microphone", stop: "Stop microphone",
     stopVoice: "Stop audio", input: "Type about anything", send: "Send", ready: "Your turn", speaking: "Speaking", listening: "Listening", thinking: "Preparing a reply",
     model: "Browser AI", guided: "Basic practice", fallback: "When browser AI is unavailable, practice continues with general follow-up questions.", unavailable: "The microphone didn’t work. You can type your reply.",
@@ -38,7 +39,7 @@ const copy = {
     title: "Разговорная практика", country: "Выберите страну", intro: "Общайтесь на любые повседневные темы на языке выбранной страны.",
     search: "Поиск страны…", empty: "Страны не найдены.", more: (n: number) => `Показать все страны (${n})`, less: "Показать меньше",
     speaker: "Собеседник", male: "Мужской", female: "Женский", style: "Стиль речи",
-    calm: "Спокойный", calmDetail: "Ровная, спокойная речь", fast: "Быстрый", fastDetail: "Быстро и энергично", irritated: "Раздражённый", irritatedDetail: "Коротко и резко",
+    calm: "Спокойный", calmDetail: "Ровная, спокойная речь", fast: "Быстрый", fastDetail: "Быстро и энергично", irritated: "Раздражённый", irritatedDetail: "Коротко и резко", strong: "Разрешить крепкие выражения в шуточном разговоре на английском", softer: "Включён спокойный режим.",
     start: "Начать разговор", exit: "Вернуться к настройкам", replay: "Повторить последнюю фразу", mic: "Говорить в микрофон", stop: "Выключить микрофон",
     stopVoice: "Остановить звук", input: "Напишите на любую тему", send: "Отправить", ready: "Ваш ход", speaking: "Говорит", listening: "Слушаю", thinking: "Готовлю ответ",
     model: "ИИ в браузере", guided: "Базовая практика", fallback: "Когда ИИ в браузере недоступен, практика продолжается общими вопросами.", unavailable: "Микрофон не сработал. Вы можете написать ответ.",
@@ -51,7 +52,7 @@ type Partner = keyof typeof partners;
 const styles = ["irritated", "fast", "calm"] as const;
 const featureCount = 8;
 
-type Line = { role: "user" | "assistant"; text: string };
+type Line = { role: "user" | "assistant"; text: string; voice?: SpeakerStyle };
 type Session = { prompt: (input: string, options: { signal: AbortSignal }) => Promise<string>; destroy: () => void };
 type Model = {
   availability: () => Promise<string>;
@@ -82,6 +83,8 @@ export function DailySpeaking() {
   const [showAll, setShowAll] = useState(false);
   const [partner, setPartner] = useState<Partner>("John");
   const [style, setStyle] = useState<SpeakerStyle>("calm");
+  const [allowRough, setAllowRough] = useState(false);
+  const [voiceStyle, setVoiceStyle] = useState<SpeakerStyle>("calm");
   const [messages, setMessages] = useState<Line[]>([]);
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState("");
@@ -103,6 +106,7 @@ export function DailySpeaking() {
     return new Intl.DisplayNames([language], { type: "language" }).of(language) ?? language;
   }
   const turn = useRef(0);
+  const lastReaction = useRef(-2);
   const job = useRef<AbortController | null>(null);
   const utterance = useRef<SpeechSynthesisUtterance | null>(null);
   const playbackTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -144,6 +148,7 @@ export function DailySpeaking() {
     record?.abort();
     stopVoice();
     turn.current = 0;
+    lastReaction.current = -2;
     setState("IDLE");
     setUsingAI(null);
     setNotice("");
@@ -151,8 +156,9 @@ export function DailySpeaking() {
     setMessages([]);
   }
 
-  function speak(text: string) {
+  function speak(text: string, delivery = style) {
     stopVoice();
+    setVoiceStyle(delivery);
     const synth = window.speechSynthesis;
     if (!synth || typeof SpeechSynthesisUtterance === "undefined") {
       setState("IDLE");
@@ -163,8 +169,8 @@ export function DailySpeaking() {
     utterance.current = speech;
     setAudioPending(true);
     speech.lang = destination.locale;
-    speech.rate = speakerProfiles[style].rate;
-    speech.pitch = speakerProfiles[style].pitch * (partner === "Rica" ? 1.11 : 0.90);
+    speech.rate = speakerProfiles[delivery].rate;
+    speech.pitch = speakerProfiles[delivery].pitch * (partner === "Rica" ? 1.11 : 0.90);
     function finish(failed: boolean) {
       if (utterance.current !== speech) return;
       utterance.current = null;
@@ -194,7 +200,7 @@ export function DailySpeaking() {
   function start() {
     reset();
     const opening = practicePrompt(destination.locale, style);
-    setMessages([{ role: "assistant", text: opening }]);
+    setMessages([{ role: "assistant", text: opening, voice: style }]);
     speak(opening);
   }
 
@@ -206,10 +212,20 @@ export function DailySpeaking() {
     const history: Line[] = [...messages, { role: "user", text: clean }];
     setMessages(history);
     const step = ++turn.current;
+    if (optedOutOfAnger(clean)) {
+      setStyle("calm");
+      setAllowRough(false);
+      setNotice(t.softer);
+    }
+    const delivery = style === "irritated" && needsCalmSpeaking(clean) ? "calm" : style;
+    const reaction = delivery === "irritated" ? retrieveSpeakingReaction(
+      destination.locale, clean, step, lastReaction.current, allowRough,
+    ) : null;
+    if (reaction) lastReaction.current = step;
     const controller = new AbortController();
     job.current = controller;
     setState("THINKING");
-    let response = practicePrompt(destination.locale, style, step, clean);
+    let response = practicePrompt(destination.locale, delivery, step, clean);
     let session: Session | undefined;
     let generated = false;
     const timeout = setTimeout(() => controller.abort(), 7000);
@@ -218,7 +234,7 @@ export function DailySpeaking() {
       if (model && await model.availability() === "available" && !controller.signal.aborted) {
         session = await model.create({
           signal: controller.signal,
-          initialPrompts: [{ role: "system", content: `You are ${partner}, a conversation practice partner in ${countryName}. Reply in the language of ${destination.locale}, using natural local colloquial phrasing. Follow the learner’s chosen topic and respond directly to what they said. Let them change topics freely. Use a few short sentences and ask a natural follow-up when appropriate. ${speakerProfiles[style].prompt}` }],
+          initialPrompts: [{ role: "system", content: `You are ${partner}, a conversation practice partner in ${countryName}. Reply in the language of ${destination.locale}, using natural local colloquial phrasing. Follow the learner’s chosen topic and respond directly to what they said. Let them change topics freely. Use a few short sentences and ask a natural follow-up when appropriate. ${speakerProfiles[delivery].prompt} Do not use profanity or roast the learner. Keep the reply helpful; a separate style reaction may be added by the app.` }],
         });
         const answer = (await session.prompt(JSON.stringify(history.slice(-10)), { signal: controller.signal })).trim();
         if (answer) {
@@ -235,8 +251,9 @@ export function DailySpeaking() {
     if (job.current !== controller) return;
     job.current = null;
     setUsingAI(generated);
-    setMessages([...history, { role: "assistant", text: response }]);
-    speak(response);
+    const voiced = reaction ? `${reaction.text} ${response}` : response;
+    setMessages([...history, { role: "assistant", text: voiced, voice: delivery }]);
+    speak(voiced, delivery);
   }
 
   function record() {
@@ -306,7 +323,7 @@ export function DailySpeaking() {
             const selected = country === item.country;
             const name = names.of(item.country) ?? item.country;
             return <Button key={item.country} type="button" variant="unstyled" aria-pressed={selected}
-              onClick={() => { if (!selected) { reset(); setCountry(item.country); } }}
+              onClick={() => { if (!selected) { reset(); setAllowRough(false); setCountry(item.country); } }}
               className={`relative flex min-w-0 flex-col items-start gap-1.5 rounded-surface border-2 p-3 text-left transition-colors ${selected ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10" : "border-slate-200 hover:border-blue-400 dark:border-slate-700 dark:hover:border-blue-500"}`}>
               <CountryFlag country={name} flagEmoji={item.flag} size="lg" />
               {selected && <Check className="absolute right-2.5 top-2.5 size-4 text-blue-600 dark:text-blue-300" aria-hidden />}
@@ -335,10 +352,15 @@ export function DailySpeaking() {
           <legend className="mb-2 text-sm font-bold">{t.style}</legend>
           <div className="grid grid-cols-3 gap-2">
             {styles.map(option => <label key={option} className="flex min-h-11 cursor-pointer items-start gap-1.5 rounded-control border border-slate-300 p-2 has-checked:border-blue-500 dark:border-slate-600">
-              <input className="mt-1 shrink-0" type="radio" name="daily-style" checked={style === option} onChange={() => { reset(); setStyle(option); }} />
+              <input className="mt-1 shrink-0" type="radio" name="daily-style" checked={style === option} onChange={() => { reset(); setAllowRough(false); setStyle(option); }} />
               <span className="min-w-0 break-words"><strong className="block">{t[option]}</strong><small className="text-slate-600 dark:text-slate-300">{t[`${option}Detail`]}</small></span>
             </label>)}
           </div>
+          {style === "irritated" && firstLanguage(destination.locale) === "en" &&
+            <label className="mt-3 flex min-h-11 items-center gap-2 text-sm">
+              <input type="checkbox" checked={allowRough} onChange={event => setAllowRough(event.target.checked)} />
+              {t.strong}
+            </label>}
         </fieldset>
       </div>
       <div>
@@ -348,7 +370,7 @@ export function DailySpeaking() {
         <div className="grid gap-4 md:grid-cols-[minmax(200px,1fr)_2fr]">
           <div className="grid place-items-center rounded-overlay border border-slate-200 p-3 dark:border-slate-700">
             <AiOrbFaceAvatar state={state} level={0} statusLabel={status} roleLabel={partner}
-              temperament={style} countryFlag={destination.flag} countryName={countryName} />
+              temperament={voiceStyle} countryFlag={destination.flag} countryName={countryName} />
           </div>
           <div className="flex min-w-0 flex-col gap-2 rounded-overlay border border-slate-200 p-3 dark:border-slate-700">
             <div className="text-xs text-slate-600 dark:text-slate-300">
@@ -369,7 +391,7 @@ export function DailySpeaking() {
               {audioPending ? (
                 <Button variant="ghost" type="button" onClick={() => { stopVoice(); setState("IDLE"); }}><VolumeX size={16} aria-hidden /> {t.stopVoice}</Button>
               ) : (
-                <Button variant="ghost" type="button" disabled={!latest || state !== "IDLE"} onClick={() => { setNotice(""); if (latest) speak(latest.text); }}><Volume2 size={16} aria-hidden /> {t.replay}</Button>
+                <Button variant="ghost" type="button" disabled={!latest || state !== "IDLE"} onClick={() => { setNotice(""); if (latest) speak(latest.text, latest.voice); }}><Volume2 size={16} aria-hidden /> {t.replay}</Button>
               )}
             </div>
             <form onSubmit={submit} className="flex gap-2">

@@ -149,7 +149,22 @@
     "switchToLight": "Yorug‘ rejimga o‘tish",
     "switchToDark": "Qorong‘i rejimga o‘tish"
   },
+  "wardrobePage": {
+    "title": "Yordamchini sozlash",
+    "description": "Yordamchini tanlang va ko‘rinishini o‘zgartiring.",
+    "savedTitle": "Saqlangan ko‘rinishlar",
+    "deviceNote": "Shu qurilmada saqlanadi.",
+    "lookName": "Ko‘rinish nomi",
+    "save": "Saqlash",
+    "wear": "Taqish",
+    "delete": "O‘chirish",
+    "empty": "Hali ko‘rinish saqlanmagan.",
+    "saveFailed": "Ko‘rinishni saqlab bo‘lmadi.",
+    "unavailableItems": "Bu ko‘rinishdagi ayrim bezaklar yopiq.",
+    "equipFailed": "Ko‘rinishni taqib bo‘lmadi."
+  },
   "nav": {
+    "wardrobe": "Sozlash",
     "dashboard": "Boshqaruv paneli",
     "universities": "Universitetlar va dasturlar",
     "scholarships": "Stipendiyalar",

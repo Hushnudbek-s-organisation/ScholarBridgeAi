@@ -10,7 +10,7 @@ import { loadSchollyStreak } from "@/lib/scholly-streak.server";
 import { grantSeasonalSchollyWardrobe } from "@/lib/scholly-wardrobe.server";
 import { readSchollyBalance, syncSchollyPointCache } from "@/lib/scholly-points-balance.server";
 import {
-  sanitizeSchollyOutfit, SCHOLLY_LEVEL_THRESHOLDS, SCHOLLY_WARDROBE,
+  isSchollyCompanion, OPTIONAL_WARDROBE_SLOTS, sanitizeSchollyOutfit, SCHOLLY_LEVEL_THRESHOLDS, SCHOLLY_WARDROBE, WARDROBE_SLOTS,
   STARTER_SCHOLLY_COLORS, wardrobeId, wardrobeItem, type WardrobeSnapshot,
 } from "@/lib/scholly-wardrobe";
 
@@ -25,12 +25,14 @@ function unavailable(error: unknown) {
 async function wardrobe(profileId: number, body?: Record<string, unknown>) {
   const action = body?.action;
   const item = wardrobeItem(body?.slot, body?.key);
-  const removeAura = action === "equip" && body?.slot === "aura" && body.key === null;
+  const removable = OPTIONAL_WARDROBE_SLOTS.find(slot => action === "equip" && body?.slot === slot && body.key === null);
+  const companion = action === "companion" && isSchollyCompanion(body?.key) ? body.key : null;
+  const requestedOutfit = action === "apply" && body?.outfit && typeof body.outfit === "object" && !Array.isArray(body.outfit)
+    ? sanitizeSchollyOutfit(body.outfit) : null;
   const isStarterColor = item?.slot === "body" && STARTER_SCHOLLY_COLORS.some(color => color === item.key);
-  if (body && (
-    (action !== "equip" && action !== "buy" && action !== "starter") || (!item && !removeAura)
-    || (action === "buy" && item?.unlock.type !== "buy") || (action === "starter" && !isStarterColor)
-  )) return reject("invalid_wardrobe_action", 400);
+  const validItemAction = (action === "equip" && (item || removable)) ||
+    (action === "buy" && item?.unlock.type === "buy") || (action === "starter" && isStarterColor);
+  if (body && !validItemAction && !companion && !requestedOutfit) return reject("invalid_wardrobe_action", 400);
 
   if (!(await ensureSchollyProfile(profileId))) return reject("profile_not_found", 404);
   const now = new Date();
@@ -90,7 +92,12 @@ async function wardrobe(profileId: number, body?: Record<string, unknown>) {
     }
     await grantSeasonalSchollyWardrobe(profileId, day, tx, ownedIds);
 
-    if (item) {
+    if (requestedOutfit) {
+      const locked = WARDROBE_SLOTS.some(slot => requestedOutfit[slot] && !ownedIds.has(wardrobeId({ slot, key: requestedOutfit[slot] })));
+      if (locked) return reject("item_locked", 409);
+    }
+
+    if (item && validItemAction) {
       const key = wardrobeId(item);
       if (!ownedIds.has(key)) {
         if (action === "buy" && item.unlock.type === "buy") {
@@ -103,24 +110,24 @@ async function wardrobe(profileId: number, body?: Record<string, unknown>) {
       if (!ownedIds.has(key)) return reject("item_locked", 409);
     }
 
-    if (item || removeAura) {
-      const slot = item?.slot ?? "aura";
-      const key = item?.key;
-      if (outfit[slot] !== key) {
-        if (key) {
-          outfit[slot] = key;
-          storedOutfit[slot] = key;
-        } else {
-          delete outfit[slot];
-          delete storedOutfit[slot];
-        }
-        await tx.update(schollyProfiles).set({ outfit: storedOutfit, updatedAt: now })
-          .where(eq(schollyProfiles.userId, profileId));
+    const next = requestedOutfit ?? { ...outfit };
+    if (companion) next.companion = companion;
+    if (item && validItemAction) next[item.slot] = item.key;
+    if (removable) delete next[removable];
+
+    const changed = ([...WARDROBE_SLOTS, "companion"] as const).filter(slot => outfit[slot] !== next[slot]);
+    if (changed.length) {
+      for (const slot of changed) {
+        const key = next[slot];
+        if (key) storedOutfit[slot] = key;
+        else delete storedOutfit[slot];
         await logSchollyEvent(profileId, "item_equipped", { slot, key: key ?? null }, tx);
       }
+      await tx.update(schollyProfiles).set({ outfit: storedOutfit, updatedAt: now })
+        .where(eq(schollyProfiles.userId, profileId));
     }
 
-    const snapshot: WardrobeSnapshot = { outfit, owned: [...ownedIds], balance, lifetimePoints, starterAvailable };
+    const snapshot: WardrobeSnapshot = { outfit: next, owned: [...ownedIds], balance, lifetimePoints, starterAvailable };
     return privateNoStoreJson(snapshot);
   });
 }

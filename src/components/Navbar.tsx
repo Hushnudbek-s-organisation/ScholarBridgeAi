@@ -26,6 +26,7 @@ import {
   Search,
   Send,
   ShieldCheck,
+  Shirt,
   Target,
   Trophy,
   Users,
@@ -193,6 +194,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   payments: Crown,
   notifications: Send,
   rewards: Gift,
+  wardrobe: Shirt,
   parent: Home,
   admin: ShieldCheck,
   // pane icons (command palette)

@@ -318,6 +318,7 @@ export const NAV_UTILITY_SECTIONS: NavUtilityMeta[] = [
   { id: "payments", label: "Premium", description: "Premium subscription, plans and payment history." },
   { id: "notifications", label: "Telegram & alerts", description: "Connect the Telegram bot, choose your alerts, and review active sign-in sessions.", isNew: true },
   { id: "rewards", label: "Rewards & referrals", description: "Referral program, points and rewards." },
+  { id: "wardrobe", label: "Customize", description: "Customize Scholly and manage saved outfits." },
   { id: "parent", label: "Parents", description: "Share a read-only progress page with your family.", premium: true },
   { id: "admin", label: "Admin panel", description: "Platform administration.", adminOnly: true },
 ];

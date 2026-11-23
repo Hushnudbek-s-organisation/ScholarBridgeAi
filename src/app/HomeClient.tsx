@@ -43,6 +43,7 @@ import {
 } from "@/lib/sessionRestore";
 import { Button } from "@/components/ui/Button";
 import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
+import { sanitizeSchollyOutfit, SCHOLLY_OUTFIT_CHANGED, type SchollyOutfit } from "@/lib/scholly-wardrobe";
 
 /**
  * Every heavy screen is a separate chunk: the admin panel, the payments and
@@ -56,6 +57,7 @@ const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").t
 const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter), { loading: panelLoading });
 const PaymentsSection = dynamic(() => withFeatureMessages(import("@/components/PaymentsSection").then((m) => m.PaymentsSection)), { loading: panelLoading });
 const RewardsSection = dynamic(() => withFeatureMessages(import("@/components/RewardsSection").then((m) => m.RewardsSection)), { loading: panelLoading });
+const SchollyWardrobe = dynamic(() => import("@/components/SchollyWardrobe").then((m) => m.SchollyWardrobe), { loading: panelLoading });
 const ParentDashboard = dynamic(() => withFeatureMessages(import("@/components/ParentDashboard").then((m) => m.ParentDashboard)), { loading: panelLoading });
 const AdminPanel = dynamic(() => withFeatureMessages(import("@/components/AdminPanel").then((m) => m.AdminPanel)), { loading: panelLoading });
 const GuidedJourneyBar = dynamic(() => import("@/components/GuidedJourneyBar").then((m) => m.GuidedJourneyBar), { loading: () => null });
@@ -76,6 +78,90 @@ const PostAdmissionFundingHub = dynamic(() => withFeatureMessages(import("@/comp
 const VisaHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.VisaHub)));
 const GuidanceHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.GuidanceHub)));
 const CommunityHub = dynamic(() => withFeatureMessages(import("@/components/hubs").then((m) => m.CommunityHub)));
+
+type SavedLook = { id: string; name: string; outfit: SchollyOutfit };
+
+function WardrobePage({ profileId }: { profileId: number }) {
+  const { locale } = useLocaleContext();
+  const tw = useTranslations("wardrobePage");
+  const storageKey = `scholarbridge_wardrobe_looks_${profileId}`;
+  const [looks, setLooks] = useState<SavedLook[]>(() => {
+    try {
+      const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
+      if (!Array.isArray(stored)) return [];
+      return stored.filter((item): item is SavedLook =>
+        !!item && typeof item.id === "string" && typeof item.name === "string" && !!item.outfit
+      ).slice(0, 20).map(item => ({ ...item, outfit: sanitizeSchollyOutfit(item.outfit) }));
+    } catch { return []; }
+  });
+  const [outfit, setOutfit] = useState<SchollyOutfit | null>(null);
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+
+  function persist(next: SavedLook[]) {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      setLooks(next);
+      setError("");
+    } catch { setError(tw("saveFailed")); }
+  }
+
+  async function wear(look: SavedLook) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/scholly/wardrobe", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId, action: "apply", outfit: look.outfit }),
+      });
+      if (response.status === 409) {
+        setError(tw("unavailableItems"));
+        return;
+      }
+      if (!response.ok) throw new Error();
+      const result = await response.json() as { outfit: SchollyOutfit };
+      setOutfit(result.outfit);
+      window.dispatchEvent(new CustomEvent(SCHOLLY_OUTFIT_CHANGED, { detail: { profileId, outfit: result.outfit } }));
+      setRefresh(value => value + 1);
+    } catch { setError(tw("equipFailed")); }
+    finally { setBusy(false); }
+  }
+
+  return <section className="mx-auto max-w-5xl space-y-6" aria-labelledby="wardrobe-title">
+    <header>
+      <h1 id="wardrobe-title" className="text-2xl font-bold text-slate-900 dark:text-white">{tw("title")}</h1>
+      <p className="mt-2 text-slate-600 dark:text-slate-300">{tw("description")}</p>
+    </header>
+    <div className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+      <SchollyWardrobe key={`${profileId}:${refresh}`} profileId={profileId} locale={locale} onEquip={setOutfit} studio />
+    </div>
+    <section className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:p-6" aria-labelledby="saved-looks-title">
+      <h2 id="saved-looks-title" className="text-xl font-semibold">{tw("savedTitle")}</h2>
+      <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">{tw("deviceNote")}</p>
+      <form className="flex flex-wrap items-end gap-3" onSubmit={event => {
+        event.preventDefault();
+        if (!outfit || !name.trim() || looks.length >= 20) return;
+        persist([...looks, { id: crypto.randomUUID(), name: name.trim().slice(0, 60), outfit }]);
+        setName("");
+      }}>
+        <label className="flex min-w-48 flex-1 flex-col gap-1 text-sm font-medium">{tw("lookName")}
+          <input className="min-h-11 rounded-surface border border-slate-300 bg-white px-3 text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white" value={name} maxLength={60} onChange={event => setName(event.target.value)} />
+        </label>
+        <Button type="submit" disabled={!outfit || !name.trim() || looks.length >= 20 || busy}>{tw("save")}</Button>
+      </form>
+      {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
+      {looks.length === 0 ? <p className="mt-5 text-sm text-slate-600 dark:text-slate-300">{tw("empty")}</p> :
+        <ul className="mt-5 space-y-2">{looks.map(look => <li key={look.id} className="flex flex-wrap items-center gap-2 rounded-surface border border-slate-200 p-3 dark:border-slate-700">
+          <span className="min-w-0 flex-1 font-medium">{look.name}</span>
+          <Button type="button" disabled={busy} onClick={() => void wear(look)}>{tw("wear")}</Button>
+          <Button type="button" disabled={busy} onClick={() => persist(looks.filter(item => item.id !== look.id))}>{tw("delete")}</Button>
+        </li>)}</ul>}
+    </section>
+  </section>;
+}
 
 /**
  * Any destination, pane, legacy section id or utility screen may appear in the
@@ -340,6 +426,18 @@ export function Home({
     return body.savedScholarships;
   },[savedOwnerId],{initial:[] as SavedScholarshipItem[],enabled:savedOwnerId!=null});
   useEffect(()=>{savedOwnerRef.current=savedOwnerId;},[savedOwnerId]);
+  const shellHistoryState = useRef<History["state"]>(null);
+  const writeShellHash = useCallback((hash: string, replace = false) => {
+    if (window.location.hash === hash) return;
+    // Fragment navigation can create an entry with no framework state. Retain
+    // the last state for this shell so Next does not enqueue a delayed restore
+    // that can overwrite Back or Forward while moving between its panes.
+    const state = window.history.state ?? shellHistoryState.current;
+    shellHistoryState.current = state;
+    const url = `${window.location.pathname}${window.location.search}${hash}`;
+    if (replace) window.history.replaceState(state, "", url);
+    else window.history.pushState(state, "", url);
+  }, []);
   /**
    * The one navigation entry point. It accepts anything the product has ever
    * used as a destination: a section id (`materials`), a pane deep link
@@ -364,15 +462,10 @@ export function Home({
       const want = target.utility || !target.pane
         ? `#${target.section}`
         : `#${target.section}/${target.pane}`;
-      if (window.location.hash !== want) {
-        // Preserve the framework-owned history state for this hash-only SPA
-        // navigation. Passing null makes Next enqueue an unnecessary route
-        // restore; its later canonical-URL commit can clobber a newer hash.
-        window.history.pushState(window.history.state, "", `${window.location.pathname}${window.location.search}${want}`);
-      }
+      writeShellHash(want);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  }, [openProfileModal, prewarmSearch]);
+  }, [openProfileModal, prewarmSearch, writeShellHash]);
 
   const openPane = useCallback(
     (pane: string) => {
@@ -381,12 +474,9 @@ export function Home({
       const linked = targetFromHash();
       if (linked && linked.section !== activeTab) return;
       setActivePane(pane);
-      const hash = `#${activeTab}/${pane}`;
-      if (typeof window !== "undefined" && window.location.hash !== hash) {
-        window.history.pushState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
-      }
+      if (typeof window !== "undefined") writeShellHash(`#${activeTab}/${pane}`);
     },
-    [activeTab]
+    [activeTab, writeShellHash]
   );
 
   // Admin → Navigation can hide a destination or a single tab. The sidebar
@@ -633,11 +723,9 @@ export function Home({
       hashSynced.current = true;
       return;
     }
-    const url = `${window.location.pathname}${window.location.search}${want}`;
-    if (hashSynced.current) window.history.pushState(window.history.state, "", url);
-    else window.history.replaceState(window.history.state, "", url);
+    writeShellHash(want, !hashSynced.current);
     hashSynced.current = true;
-  }, [activeTab, activePane, view]);
+  }, [activeTab, activePane, view, writeShellHash]);
 
   // Global search (spec §34) asks the page to focus a record it found.
   useEffect(() => {
@@ -682,7 +770,9 @@ export function Home({
   }, [handleNavigateTab]);
 
   useEffect(() => {
+    shellHistoryState.current = window.history.state ?? shellHistoryState.current;
     const onNav = () => {
+      shellHistoryState.current = window.history.state ?? shellHistoryState.current;
       const linked = targetFromHash();
       if (!linked) return;
       prewarmSearch(linked);
@@ -1345,6 +1435,8 @@ export function Home({
           {activeTab === "payments" && <PaymentsSection activeProfile={activeProfile} />}
 
           {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
+
+          {activeTab === "wardrobe" && activeProfile && <WardrobePage key={activeProfile.id} profileId={activeProfile.id} />}
 
           {activeTab === "notifications" && (
             <div className="space-y-6">
