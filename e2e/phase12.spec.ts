@@ -41,7 +41,7 @@ async function signIn(page: Page) {
   await dialog.locator('input[type="password"]').fill(fixtures.studentPassword);
   await dialog.locator('form button[type="submit"]').click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByText("Phase 12 E2E Student", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Phase 12 E2E Student/ })).toBeVisible();
 }
 
 async function apiJson<T>(page: Page, path: string) {
