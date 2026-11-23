@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent } from "react";
 import { useLocale } from "next-intl";
 import dynamic from "next/dynamic";
 import { ArrowRight, BookOpen, CalendarDays, Download, Filter, FolderOpen, Layers, LockKeyhole, Maximize2, Minus, Network, Plus, RotateCcw, Search, Star, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { buildStudyGraph, parseStudyNote, serializeStudyNote, studyTags, STUDY_BODY_LIMIT, STUDY_GROUPS, STUDY_LINK_LIMIT,
+import { buildStudyGraph, parseStudyNote, serializeStudyNote, studyTags, STUDY_BODY_LIMIT, STUDY_COLORS, STUDY_GROUPS, STUDY_LINK_LIMIT,
   type StudyEntry, type StudyGroup, type StudyMapSnapshot } from "@/lib/study-map";
 import type { GraphCommand } from "./StudyGraph3D";
 import { StudyMarkdown, StudySketch } from "./StudyNoteContent";
@@ -81,7 +81,6 @@ const localDay = () => {
   const date = new Date();
   return [date.getFullYear(), date.getMonth() + 1, date.getDate()].map(value => String(value).padStart(2, "0")).join("-");
 };
-const colors = ["#b49aff", "#7ed9ee", "#9eb8ff", "#72ddb3", "#ffc38f", "#e9a9eb"];
 const anchors = [[390, 83], [652, 144], [650, 366], [390, 427], [129, 365], [129, 144]] as const;
 
 export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }) {
@@ -351,10 +350,10 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
         {plotted.map(({ group, i, x, y, kids }) => {
           const point = { x, y };
           return <g key={group}>
-            <path d={`M390 255 Q${(point.x + 390) / 2} ${point.y} ${point.x} ${point.y}`} stroke={colors[i]} opacity=".43" fill="none"/>
+            <path d={`M390 255 Q${(point.x + 390) / 2} ${point.y} ${point.x} ${point.y}`} stroke={STUDY_COLORS[i]} opacity=".43" fill="none"/>
             {kids.map(node => {
               const child = points.get(node.id)!;
-              return <line key={node.id} x1={point.x} y1={point.y} x2={child.x} y2={child.y} stroke={colors[i]} opacity=".45"/>;
+              return <line key={node.id} x1={point.x} y1={point.y} x2={child.x} y2={child.y} stroke={STUDY_COLORS[i]} opacity=".45"/>;
             })}
           </g>;
         })}
@@ -367,15 +366,15 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
               const p = points.get(node.id)!;
               return <g key={node.id} role="button" tabIndex={0} aria-label={node.title} className="sb-study-node"
                 onClick={() => selectNode(node.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(node.id); } }}>
-                <circle cx={p.x} cy={p.y} r="13" fill="transparent"/><circle cx={p.x} cy={p.y} r={selected === node.id ? 9 : 5.5} fill={colors[i]}/>
+                <circle cx={p.x} cy={p.y} r="13" fill="transparent"/><circle cx={p.x} cy={p.y} r={selected === node.id ? 9 : 5.5} fill={STUDY_COLORS[i]}/>
                 <title>{node.title}</title>
               </g>;
             })}
             <g role="button" tabIndex={0} aria-label={groupName(group)} className="sb-study-node"
               onClick={() => setTopic(topic === group ? "all" : group)}
               onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setTopic(topic === group ? "all" : group); } }}>
-              <circle cx={point.x} cy={point.y} r="23" fill={colors[i]} opacity=".18"/>
-              <circle cx={point.x} cy={point.y} r="12" fill={colors[i]}/>
+              <circle cx={point.x} cy={point.y} r="23" fill={STUDY_COLORS[i]} opacity=".18"/>
+              <circle cx={point.x} cy={point.y} r="12" fill={STUDY_COLORS[i]}/>
               <text x={point.x} y={point.y + 72} textAnchor="middle">{groupName(group)}</text>
             </g>
           </g>;
@@ -465,7 +464,7 @@ export function StudyMap({ onNavigate }: { onNavigate: (route: string) => void }
         {view === 1 && <div className="sb-study-mind"><div className="sb-study-mind-root">{t.title}</div>
           {STUDY_GROUPS.map((group, i) => {
             const items = filtered.filter(node => node.group === group);
-            return items.length ? <details key={group} open style={{ borderColor: colors[i] }}>
+            return items.length ? <details key={group} open className="sb-study-mind-topic" style={{ "--node-color": STUDY_COLORS[i] } as CSSProperties}>
               <summary>{groupName(group)} <small>{items.length}</small></summary>
               <div>{items.map(node => {
                 const related = edges.flatMap(({ from, to }) => from === node.id ? [to] : to === node.id ? [from] : []);

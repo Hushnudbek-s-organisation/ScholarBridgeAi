@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Eraser, PenLine, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { studyWikiTokens, type StudyStroke } from "@/lib/study-map";
+import { STUDY_COLORS, studyWikiTokens, type StudyStroke } from "@/lib/study-map";
 
 const markdownInline = /(`[^`\n]+`|!?\[[^\]\n]+\]\([^)\n]+\)|\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g;
 
@@ -12,7 +12,7 @@ function inline(text: string, resolve: (target: string) => string | undefined, o
     const wiki = studyWikiTokens(part)[0];
     if (wiki?.raw === part) {
       const id = resolve(wiki.target);
-      return [id ? <button key={index} type="button" className="sb-study-wiki" onClick={() => open(id)}>{wiki.label}</button>
+      return [id ? <Button key={index} variant="unstyled" className="sb-study-wiki" onClick={() => open(id)}>{wiki.label}</Button>
         : <span className="sb-study-wiki-missing" key={index}>{part}</span>];
     }
     return part.split(markdownInline).map((token, i) => {
@@ -25,7 +25,7 @@ function inline(text: string, resolve: (target: string) => string | undefined, o
         const [, name, href] = markdownLink;
         if (/^https?:\/\//i.test(href)) return <a key={key} href={href} target="_blank" rel="noopener noreferrer">{name}</a>;
         const id = href.endsWith(".md") && resolve(href.slice(0, -3).replace(/%20/g, " "));
-        if (id) return <button key={key} type="button" className="sb-study-wiki" onClick={() => open(id)}>{name}</button>;
+        if (id) return <Button key={key} variant="unstyled" className="sb-study-wiki" onClick={() => open(id)}>{name}</Button>;
       }
       return token;
     });
@@ -70,8 +70,8 @@ export function StudyMarkdown({ body, resolve, open, toggleTask, taskLabel }: {
         const task = /^\[([ xX])\] (.+)$/.exec(match[1]);
         const index = i;
         items.push(<li key={index}>{task
-          ? <label><input type="checkbox" aria-label={task[2] || taskLabel} checked={task[1].toLowerCase() === "x"}
-              disabled={!toggleTask} onChange={() => toggleTask?.(index)} />{inline(task[2], resolve, open)}</label>
+          ? <span className="sb-study-task"><input type="checkbox" aria-label={task[2] || taskLabel} checked={task[1].toLowerCase() === "x"}
+              disabled={!toggleTask} onChange={() => toggleTask?.(index)} />{inline(task[2], resolve, open)}</span>
           : inline(match[1], resolve, open)}</li>);
         match = pattern.exec(lines[i + 1] ?? "");
         if (!match) break;
@@ -93,7 +93,7 @@ export function StudySketch({ strokes, labels, change }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const current = useRef<{ id: number; stroke: StudyStroke } | null>(null);
   const state = useRef(strokes);
-  const [ink, setInk] = useState("#a991ff");
+  const [ink, setInk] = useState<string>(STUDY_COLORS[0]);
   const [width, setWidth] = useState(4);
   const [eraser, setEraser] = useState(false);
   const [undo, setUndo] = useState<StudyStroke[][]>([]);

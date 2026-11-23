@@ -48,10 +48,10 @@ function glowTexture() {
   image.width = image.height = 64;
   const context = image.getContext("2d")!;
   const glow = context.createRadialGradient(32, 32, 1, 32, 32, 32);
-  glow.addColorStop(0, "#fff");
-  glow.addColorStop(.22, "#fff9");
-  glow.addColorStop(.53, "#fff2");
-  glow.addColorStop(1, "#fff0");
+  glow.addColorStop(0, "white");
+  glow.addColorStop(.22, "rgb(255 255 255 / 60%)");
+  glow.addColorStop(.53, "rgb(255 255 255 / 13%)");
+  glow.addColorStop(1, "rgb(255 255 255 / 0%)");
   context.fillStyle = glow;
   context.fillRect(0, 0, 64, 64);
   return new T.CanvasTexture(image);
