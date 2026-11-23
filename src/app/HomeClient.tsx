@@ -426,6 +426,18 @@ export function Home({
     return body.savedScholarships;
   },[savedOwnerId],{initial:[] as SavedScholarshipItem[],enabled:savedOwnerId!=null});
   useEffect(()=>{savedOwnerRef.current=savedOwnerId;},[savedOwnerId]);
+  const shellHistoryState = useRef<History["state"]>(null);
+  const writeShellHash = useCallback((hash: string, replace = false) => {
+    if (window.location.hash === hash) return;
+    // Fragment navigation can create an entry with no framework state. Retain
+    // the last state for this shell so Next does not enqueue a delayed restore
+    // that can overwrite Back or Forward while moving between its panes.
+    const state = window.history.state ?? shellHistoryState.current;
+    shellHistoryState.current = state;
+    const url = `${window.location.pathname}${window.location.search}${hash}`;
+    if (replace) window.history.replaceState(state, "", url);
+    else window.history.pushState(state, "", url);
+  }, []);
   /**
    * The one navigation entry point. It accepts anything the product has ever
    * used as a destination: a section id (`materials`), a pane deep link
@@ -450,15 +462,10 @@ export function Home({
       const want = target.utility || !target.pane
         ? `#${target.section}`
         : `#${target.section}/${target.pane}`;
-      if (window.location.hash !== want) {
-        // Preserve the framework-owned history state for this hash-only SPA
-        // navigation. Passing null makes Next enqueue an unnecessary route
-        // restore; its later canonical-URL commit can clobber a newer hash.
-        window.history.pushState(window.history.state, "", `${window.location.pathname}${window.location.search}${want}`);
-      }
+      writeShellHash(want);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  }, [openProfileModal, prewarmSearch]);
+  }, [openProfileModal, prewarmSearch, writeShellHash]);
 
   const openPane = useCallback(
     (pane: string) => {
@@ -467,12 +474,9 @@ export function Home({
       const linked = targetFromHash();
       if (linked && linked.section !== activeTab) return;
       setActivePane(pane);
-      const hash = `#${activeTab}/${pane}`;
-      if (typeof window !== "undefined" && window.location.hash !== hash) {
-        window.history.pushState(window.history.state, "", `${window.location.pathname}${window.location.search}${hash}`);
-      }
+      if (typeof window !== "undefined") writeShellHash(`#${activeTab}/${pane}`);
     },
-    [activeTab]
+    [activeTab, writeShellHash]
   );
 
   // Admin → Navigation can hide a destination or a single tab. The sidebar
@@ -719,11 +723,9 @@ export function Home({
       hashSynced.current = true;
       return;
     }
-    const url = `${window.location.pathname}${window.location.search}${want}`;
-    if (hashSynced.current) window.history.pushState(window.history.state, "", url);
-    else window.history.replaceState(window.history.state, "", url);
+    writeShellHash(want, !hashSynced.current);
     hashSynced.current = true;
-  }, [activeTab, activePane, view]);
+  }, [activeTab, activePane, view, writeShellHash]);
 
   // Global search (spec §34) asks the page to focus a record it found.
   useEffect(() => {
@@ -768,7 +770,9 @@ export function Home({
   }, [handleNavigateTab]);
 
   useEffect(() => {
+    shellHistoryState.current = window.history.state ?? shellHistoryState.current;
     const onNav = () => {
+      shellHistoryState.current = window.history.state ?? shellHistoryState.current;
       const linked = targetFromHash();
       if (!linked) return;
       prewarmSearch(linked);

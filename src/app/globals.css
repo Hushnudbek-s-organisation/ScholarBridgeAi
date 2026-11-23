@@ -1565,6 +1565,72 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
 @media (max-width: 1023px) { .sb-overview-grid { grid-template-columns: minmax(0,1fr); } .sb-overview-quick-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 639px) { .sb-overview-panel { padding: 24px; } .sb-overview-cap { width: 64px; height: 64px; } .sb-overview-hero { gap: 12px; align-items: flex-start; } .sb-overview-actions { gap: 8px; } .sb-overview-quick-grid { grid-template-columns: minmax(0,1fr); } .sb-dock-trigger { font-size: .8125rem; } }
 
+
+/* Dashboard cards share a desktop grid and stack in reading order on phones. */
+.sbOverviewTopGrid, .sbOverviewMiddleGrid { display: grid; gap: 16px; margin-block: 16px; }
+.sbOverviewTopGrid { grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); }
+.sbOverviewMiddleGrid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.sbOverviewDetail, .sbOverviewEmpty { color: var(--sb-ink-muted); }
+.sbOverviewStudyPlan, .sbOverviewMoreLink, .sbOverviewOpenCalendar, .sbOverviewRecommendationHeading > button {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; font-weight: 600; color: var(--sb-ink-heading);
+}
+:is(.sbOverviewPlan,.sbOverviewTasks,.sbOverviewCalendar,.sbOverviewApplications,.sbOverviewRecommendations) h2 {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+}
+:is(.sbOverviewPlan,.sbOverviewTasks,.sbOverviewCalendar,.sbOverviewApplications,.sbOverviewRecommendations) h2 svg { flex: none; width: 23px; height: 23px; }
+:is(.sbOverviewStudyPlan,.sbOverviewMoreLink,.sbOverviewOpenCalendar,.sbOverviewRecommendationHeading > button) svg { width: 16px; height: 16px; }
+:is(.sbOverviewPlan,.sbOverviewTasks) :is(ol,ul) { margin-top: 8px; }
+:is(.sbOverviewPlan,.sbOverviewTasks) li {
+  display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--sb-border);
+}
+:is(.sbOverviewPlan,.sbOverviewTasks) li:last-child { border-bottom: 0; }
+:is(.sbOverviewPlan,.sbOverviewTasks) li button { min-width: 0; padding: 7px 0; text-align: start; overflow-wrap: anywhere; }
+.sbOverviewTasks li :is(strong,small) { display: block; }
+.sbOverviewTasks li small { color: var(--sb-ink-muted); }
+.sbOverviewDone, .sbOverviewTaskDot { color: var(--color-emerald-500); }
+.sbOverviewStageCircle, .sbOverviewChevron { color: var(--sb-ink-muted); }
+.sbOverviewMoreLink { display: flex; margin-inline-start: auto; }
+.sbOverviewCalendarBody { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 16px; margin-top: 8px; }
+.sbOverviewMonthTitle { display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 4px; text-align: center; }
+.sbOverviewMonthTitle button { display: grid; place-items: center; min-width: 30px; min-height: 32px; }
+.sbOverviewMonthTitle button svg { width: 17px; height: 17px; }
+.sbOverviewCalendarDays { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); text-align: center; font-size: .825rem; }
+.sbOverviewCalendarDays > * { min-width: 0; min-height: 28px; line-height: 28px; border-radius: 8px; }
+.sbOverviewWeekday { color: var(--sb-ink-muted); font-weight: 650; }
+.sbOverviewCalendarDays button[data-deadline] { box-shadow: inset 0 0 0 1px var(--sb-border-strong); font-weight: 700; }
+.sbOverviewCalendarDays button[data-selected] { color: white; background: var(--color-indigo-600); }
+.sbOverviewDeadlineDetail { display: flex; flex-direction: column; justify-content: space-between; gap: 6px; min-width: 0; padding-inline-start: 14px; border-inline-start: 1px solid var(--sb-border); overflow-wrap: anywhere; }
+.sbOverviewDeadlineDetail > button:not(.sbOverviewOpenCalendar) { display: grid; gap: 6px; text-align: start; }
+.sbOverviewApplications { display: grid; grid-template-columns: auto minmax(0,1.4fr) minmax(0,1fr) auto; align-items: center; gap: 16px; }
+.sbOverviewAppStats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; text-align: center; overflow-wrap: anywhere; }
+.sbOverviewAppStats :is(strong,small) { display: block; }
+.sbOverviewAppStats strong { font-size: 1.15rem; }
+.sbOverviewAppStats small { color: var(--sb-ink-muted); }
+.sbOverviewProgress { display: flex; min-width: 0; height: 16px; overflow: hidden; border-radius: 10px; background: var(--sb-well); }
+.sbOverviewPreparing { background: var(--color-indigo-600); }
+.sbOverviewSubmitted { background: var(--color-sky-600); }
+.sbOverviewDecision { background: var(--color-emerald-600); }
+.sbOverviewRecommendations { margin-top: 16px; }
+.sbOverviewRecommendationHeading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.sbOverviewTabs { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 10px; }
+.sbOverviewTabs button { min-height: 36px; padding: 6px 16px; border-radius: 10px; }
+.sbOverviewTabs button[aria-selected="true"] { color: white; background: var(--color-indigo-600); }
+.sbOverviewRecommendationGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.sbOverviewRecommendationGrid > button { display: grid; min-width: 0; padding: 10px; text-align: start; border: 1px solid var(--sb-border); border-radius: var(--radius-surface); overflow-wrap: anywhere; }
+.sbOverviewRecommendationGrid small { color: var(--sb-ink-muted); }
+.sbOverviewRecommendationFallback { display: grid; place-items: center; min-height: 90px; margin-bottom: 8px; background: var(--sb-well); border-radius: 10px; color: var(--sb-ink-heading); }
+@media (max-width: 1100px) {
+  .sbOverviewApplications { grid-template-columns: minmax(0,1fr) auto; }
+}
+@media (max-width: 900px) {
+  .sbOverviewTopGrid, .sbOverviewMiddleGrid { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 540px) {
+  .sbOverviewApplications, .sbOverviewCalendarBody, .sbOverviewRecommendationGrid { grid-template-columns: minmax(0,1fr); }
+  .sbOverviewDeadlineDetail { padding-inline-start: 0; border-inline-start: 0; }
+}
+
 /* The dock and companion share the same reserved space on every dashboard view. */
 :root {
   --scholly-size: 64px;
