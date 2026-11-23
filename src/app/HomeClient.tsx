@@ -57,6 +57,7 @@ const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").t
 const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter), { loading: panelLoading });
 const PaymentsSection = dynamic(() => withFeatureMessages(import("@/components/PaymentsSection").then((m) => m.PaymentsSection)), { loading: panelLoading });
 const RewardsSection = dynamic(() => withFeatureMessages(import("@/components/RewardsSection").then((m) => m.RewardsSection)), { loading: panelLoading });
+const StudyMap = dynamic(() => import("@/components/StudyMap").then(m => m.StudyMap), { loading: panelLoading });
 const SchollyWardrobe = dynamic(() => import("@/components/SchollyWardrobe").then((m) => m.SchollyWardrobe), { loading: panelLoading });
 const ParentDashboard = dynamic(() => withFeatureMessages(import("@/components/ParentDashboard").then((m) => m.ParentDashboard)), { loading: panelLoading });
 const AdminPanel = dynamic(() => withFeatureMessages(import("@/components/AdminPanel").then((m) => m.AdminPanel)), { loading: panelLoading });
@@ -1435,6 +1436,8 @@ export function Home({
           {activeTab === "payments" && <PaymentsSection activeProfile={activeProfile} />}
 
           {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
+
+          {activeTab === "study-map" && activeProfile && <StudyMap key={activeProfile.id} onNavigate={handleNavigateTab} />}
 
           {activeTab === "wardrobe" && activeProfile && <WardrobePage key={activeProfile.id} profileId={activeProfile.id} />}
 
