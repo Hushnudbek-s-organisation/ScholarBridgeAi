@@ -6,7 +6,8 @@ import {
   savedPrograms, studentActivities, studyMapEntries, studyPlans, testPlans, universities, universityPrograms,
 } from "@/db/schema";
 import { privateNoStoreJson as json } from "@/lib/apiResponse";
-import { requireProSession } from "@/lib/pro-access.server";
+import { requireSession } from "@/lib/auth";
+import { findActiveSubscription, subscriptionIsActive } from "@/lib/payments";
 import { readJsonBody } from "@/lib/request";
 import { isStudyDate, nextStudyReview, serializeStudyNote, STUDY_BODY_LIMIT, STUDY_DAILY_FOLDER, STUDY_LINK_LIMIT, type StudyNode } from "@/lib/study-map";
 
@@ -19,9 +20,10 @@ function dailyEntryId(profileId: number, day: string) {
 
 export async function GET(req: Request) {
   try {
-    const auth = await requireProSession(req);
-    if (!auth.ok) return auth.response;
-    const { id } = auth;
+    const auth = await requireSession(req);
+    if (!auth.ok) return json({ code: auth.code }, { status: auth.status });
+    const { id } = auth.session.profile;
+    if (!subscriptionIsActive(await findActiveSubscription(id))) return json({ code: "premium_required" }, { status: 403 });
     const [profiles, schools, programs, awards, apps, exams, plans, activities, todos, entries] = await Promise.all([
       db.select({
         major: studentProfiles.targetMajor, countries: studentProfiles.preferredCountries,
@@ -89,14 +91,16 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireProSession(req);
-    if (!auth.ok) return auth.response;
+    const auth = await requireSession(req);
+    if (!auth.ok) return json({ code: auth.code }, { status: auth.status });
+    const profileId = auth.session.profile.id;
+    if (!subscriptionIsActive(await findActiveSubscription(profileId))) return json({ code: "premium_required" }, { status: 403 });
     const parsed = await readJsonBody<Record<string, unknown>>(req, 80_000);
     if (!parsed.ok) return json({ code: parsed.code }, { status: parsed.status });
     const { id, kind, title, text, action, remembered, links, day } = parsed.body;
     const validId = typeof id === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(id) ? id : null;
     if (id !== undefined && !validId) return json({ code: "invalid_entry" }, { status: 400 });
-    const where = and(eq(studyMapEntries.profileId, auth.id), eq(studyMapEntries.id, validId ?? ""));
+    const where = and(eq(studyMapEntries.profileId, profileId), eq(studyMapEntries.id, validId ?? ""));
     if (action === "delete" && validId) {
       const [deleted] = await db.delete(studyMapEntries).where(where).returning({ id: studyMapEntries.id });
       return deleted ? json({ ok: true }) : json({ code: "missing_entry" }, { status: 404 });
@@ -111,7 +115,7 @@ export async function POST(req: Request) {
         return json({ ok: true });
       });
     }
-    const dailyId = action === "daily" && isStudyDate(day) ? dailyEntryId(auth.id, day) : null;
+    const dailyId = action === "daily" && isStudyDate(day) ? dailyEntryId(profileId, day) : null;
     const values = dailyId && typeof day === "string"
       ? { kind: "note", title: day, text: serializeStudyNote({ body: `# ${day}`, folder: STUDY_DAILY_FOLDER, pinned: false, date: day, strokes: [] }), links: [], updatedAt: new Date() }
       : action === "save" && (kind === "note" || kind === "card") && typeof title === "string" && title.trim() && title.length <= 120 &&
@@ -126,15 +130,15 @@ export async function POST(req: Request) {
       return updated ? json(updated) : json({ code: "missing_entry" }, { status: 404 });
     }
     return db.transaction(async tx => {
-      await tx.select({ id: studentProfiles.id }).from(studentProfiles).where(eq(studentProfiles.id, auth.id)).for("no key update");
+      await tx.select({ id: studentProfiles.id }).from(studentProfiles).where(eq(studentProfiles.id, profileId)).for("no key update");
       if (dailyId) {
         const [existing] = await tx.select({ id: studyMapEntries.id }).from(studyMapEntries)
-          .where(and(eq(studyMapEntries.id, dailyId), eq(studyMapEntries.profileId, auth.id))).limit(1);
+          .where(and(eq(studyMapEntries.id, dailyId), eq(studyMapEntries.profileId, profileId))).limit(1);
         if (existing) return json(existing);
       }
-      const [total] = await tx.select({ value: count() }).from(studyMapEntries).where(eq(studyMapEntries.profileId, auth.id));
+      const [total] = await tx.select({ value: count() }).from(studyMapEntries).where(eq(studyMapEntries.profileId, profileId));
       if (total.value >= maxEntries) return json({ code: "entry_limit" }, { status: 409 });
-      const [inserted] = await tx.insert(studyMapEntries).values({ ...values, id: dailyId ?? randomUUID(), profileId: auth.id })
+      const [inserted] = await tx.insert(studyMapEntries).values({ ...values, id: dailyId ?? randomUUID(), profileId: profileId })
         .returning({ id: studyMapEntries.id });
       return json(inserted, { status: 201 });
     });
