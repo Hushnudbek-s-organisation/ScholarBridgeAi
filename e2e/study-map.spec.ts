@@ -187,7 +187,7 @@ test("PRO study map provides a private WebGL graph and linked Markdown workspace
     await page.getByRole("button", { name: "Today", exact: true }).click();
     await expect(month).toHaveText(currentMonth!);
     await page.locator(".sb-study-main").getByRole("button", { name: "Daily note", exact: true }).click();
-    await expect(detail.getByRole("heading", { name: /^\d{4}-\d{2}-\d{2}$/ })).toBeVisible();
+    await expect(detail.getByRole("heading", { level: 2, name: /^\d{4}-\d{2}-\d{2}$/ })).toBeVisible();
     await page.getByRole("button", { name: "Start focus timer" }).click();
     await expect(page.getByRole("timer")).not.toHaveText("25:00");
     await page.getByRole("button", { name: "Pause focus timer" }).click();
