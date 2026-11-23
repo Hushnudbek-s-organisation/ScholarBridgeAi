@@ -108,12 +108,18 @@ test("PRO study map provides a private WebGL graph and linked Markdown workspace
     await detail.getByRole("button", { name: "Edit", exact: true }).click();
     await detail.getByRole("button", { name: "Drawing", exact: true }).click();
     const editable = detail.locator("canvas[data-editable]");
-    await editable.scrollIntoViewIfNeeded();
-    const sketch = (await editable.boundingBox())!;
-    await page.mouse.move(sketch.x + 12, sketch.y + 10);
-    await page.mouse.down();
-    await page.mouse.move(sketch.x + 80, sketch.y + 40, { steps: 6 });
-    await page.mouse.up();
+    const stroke = async () => {
+      await editable.scrollIntoViewIfNeeded();
+      const sketch = (await editable.boundingBox())!;
+      await page.mouse.move(sketch.x + 12, sketch.y + 10);
+      await page.mouse.down();
+      await page.mouse.move(sketch.x + 80, sketch.y + 40, { steps: 6 });
+      await page.mouse.up();
+    };
+    await stroke();
+    await detail.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(detail.getByRole("button", { name: "Clear", exact: true })).toBeDisabled();
+    await stroke();
     await detail.getByRole("button", { name: "Save", exact: true }).click();
     await expect(detail.locator("canvas:not([data-editable])")).toBeVisible();
     const own = await (await page.request.get(map)).json();

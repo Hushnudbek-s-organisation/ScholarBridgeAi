@@ -35,7 +35,7 @@ const words = {
     folders: "Papkalar", allFolders: "Barcha papkalar", tags: "Teglar", allTags: "Barcha teglar", bookmarks: "Xatcho‘plar",
     pin: "Mahkamlash", unpin: "Ajratish", daily: "Kundalik qayd", import: "Markdown import", export: "Markdown eksport",
     editText: "Matnni yozish", preview: "Ko‘rinishi", drawing: "Chizma", pen: "Qalam", eraser: "O‘chirg‘ich",
-    color: "Rang", width: "Qalinlik", undo: "Bekor qilish", clear: "Tozalash", backlinks: "Kiruvchi havolalar",
+    color: "Rang", width: "Qalinlik", undo: "Orqaga qaytarish", clear: "Tozalash", backlinks: "Kiruvchi havolalar",
     outgoing: "Chiquvchi havolalar", createLinked: "Bog‘langan qayd yaratish", local: "Mahalliy graf", global: "To‘liq graf", linkDepth: "Havola chuqurligi",
     labels: "Yorliqlar", focusNode: "Tugunga yaqinlashish", expand: "Grafni kengaytirish", close: "Grafni yopish", webgl: "WebGL ishlamadi. 2D graf tayyor.",
     gesture: "Sudrab buring · Aylantirib yoki chimchilab yaqinlashing · Tugunni bosib oching", tooLong: "Matn va chizma qayd hajmidan oshdi.", markdown: "Markdown [[qayd]], #teglar va vazifalar ro‘yxatini qo‘llaydi.", saved: "Saqlandi", folder: "Tanlangan papka",

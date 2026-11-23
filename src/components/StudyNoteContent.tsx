@@ -124,7 +124,8 @@ export function StudySketch({ strokes, labels, change }: Props) {
     return [scale(event.clientX - box.left, box.width), scale(event.clientY - box.top, box.height)];
   }
   function commit(next: StudyStroke[]) {
-    setUndo(history => [...history.slice(-19), state.current]);
+    const previous = state.current;
+    setUndo(history => [...history.slice(-19), previous]);
     state.current = next;
     render(next);
     change?.(next);
