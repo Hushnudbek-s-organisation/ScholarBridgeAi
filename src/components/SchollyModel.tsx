@@ -1,13 +1,14 @@
 "use client";
 
 import { COMPANION_PAINT } from "@/lib/companion-paint";
+import { scheduleWhenIdle } from "@/lib/idle";
 import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { DEFAULT_SCHOLLY_OUTFIT, schollyPalette, SCHOLLY_COMPANIONS, SCHOLLY_RAINBOW, type SchollyOutfit } from "@/lib/scholly-wardrobe";
 import { SchollyAura, SchollyRecoloredPortrait } from "./SchollyLook";
 import type * as Three from "three";
 import type { SchollyMotion } from "./useSchollyMotion";
 
-export function SchollyModel({ trackPointer = false, held = false, paused = false, motion = "idle", outfit = DEFAULT_SCHOLLY_OUTFIT, staticPreview = false, studio = false, angle = 0, gesture = "" }: {
+export function SchollyModel({ trackPointer = false, held = false, paused = false, motion = "idle", outfit = DEFAULT_SCHOLLY_OUTFIT, staticPreview = false, studio = false, floating = false, angle = 0, gesture = "" }: {
   trackPointer?: boolean;
   held?: boolean;
   paused?: boolean;
@@ -15,6 +16,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
   outfit?: SchollyOutfit;
   staticPreview?: boolean;
   studio?: boolean;
+  floating?: boolean;
   angle?: number;
   gesture?: string;
 }) {
@@ -67,13 +69,14 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
     if (!element || staticPreview) return;
     let disposed = false;
     let cleanup: (() => void) | undefined;
-    void Promise.all([
-      import("three"), import("./SchollyMeshes"), import("three/addons/environments/RoomEnvironment.js"),
-    ]).then(([T, { mountSchollyDetails }, { RoomEnvironment }]) => {
+    async function mount(element: HTMLSpanElement) {
+      const [T, { mountSchollyDetails }, { RoomEnvironment }] = await Promise.all([
+        import("three"), import("./SchollyMeshes"), import("three/addons/environments/RoomEnvironment.js"),
+      ]);
       if (disposed) return;
       let renderer: Three.WebGLRenderer;
       try {
-        renderer = new T.WebGLRenderer({ alpha: true, antialias: true });
+        renderer = new T.WebGLRenderer({ alpha: true, antialias: true, powerPreference: floating ? "low-power" : "default" });
       } catch {
         return;
       }
@@ -83,7 +86,7 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
       renderer.toneMappingExposure = 1.02;
       const environment = new RoomEnvironment();
       const generator = new T.PMREMGenerator(renderer);
-      const reflection = generator.fromScene(environment, .06);
+      const reflection = generator.fromScene(environment, .06, .1, 100, { size: floating ? 64 : 256 });
       scene.environment = reflection.texture;
       scene.environmentIntensity = .52;
       environment.dispose();
@@ -316,9 +319,14 @@ export function SchollyModel({ trackPointer = false, held = false, paused = fals
         renderer.domElement.remove();
         delete element.dataset.rendering;
       };
-    }).catch(() => {});
-    return () => { disposed = true; cleanup?.(); };
-  }, [staticPreview, trackPointer, studio, companion, hat, antenna, back, hand, signature]);
+    }
+    const start = () => { void mount(element).catch(() => {}); };
+    // Give the active page a chance to paint before the small launcher compiles
+    // shaders. Its existing portrait already keeps the chat button usable.
+    const cancelStart = floating ? scheduleWhenIdle(start, 1600, 600) : undefined;
+    if (!floating) start();
+    return () => { disposed = true; cancelStart?.(); cleanup?.(); };
+  }, [staticPreview, trackPointer, studio, floating, companion, hat, antenna, back, hand, signature]);
 
   const dragging = motion === "drag";
   const dizzy = motion === "shake";

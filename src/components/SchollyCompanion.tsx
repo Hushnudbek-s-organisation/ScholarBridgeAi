@@ -542,7 +542,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         onPointerUp={event => pointerEnd(event)} onPointerCancel={event => pointerEnd(event, true)}
         onLostPointerCapture={event => pointerEnd(event, true)} onContextMenu={event => event.preventDefault()}
         onClick={activateLauncher}>
-        <SchollyModel outfit={outfit} trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} />
+        <SchollyModel floating outfit={outfit} trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} />
         {earnedPoints !== null && <span className="sb-scholly-points-pop" aria-hidden="true">+{earnedPoints}</span>}
         {animation === "shake" && <span className="sb-scholly-dizzy-stars" aria-hidden="true">
           <span data-index="0">★</span><span data-index="1">★</span><span data-index="2">★</span>
