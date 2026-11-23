@@ -13,7 +13,7 @@ import {AwardCoverageNote} from "@/components/AwardCoverageNote";
  *   5. Where am I weak?    → profile readiness, weakest first
  *   6. What should I look at? → recommendations based on the real profile
  */
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { DashboardOverview } from "./DashboardOverview";
 import { selectDashboardActions } from "@/lib/dashboardActions";
 import { CountryFlag } from "@/components/CountryFlag";
@@ -624,6 +624,7 @@ export function DashboardFirstSteps({
 export function JourneyControlCenter({
   profileId,
   profileVersion,
+  onResolved,
   onNavigateTab,
   onOpenWorkspace,
   afterOverview,
@@ -631,6 +632,7 @@ export function JourneyControlCenter({
   profileId: number | null;
   /** Changes on every score-relevant profile edit; forces a fresh dashboard. */
   profileVersion?: string | null;
+  onResolved?: (profileId: number) => void;
   onNavigateTab: (tab: string) => void;
   onOpenWorkspace: (applicationId: number) => void;
   afterOverview?: React.ReactNode;
@@ -658,6 +660,9 @@ export function JourneyControlCenter({
   const { error, reload: refresh } = resource;
   const data = resource.data;
   const loading = resource.loading || (!error && !!profileId && data?.profile.id !== profileId);
+  useEffect(() => {
+    if (profileId && !loading && (data || error)) onResolved?.(profileId);
+  }, [data, error, loading, onResolved, profileId]);
 
   if (!profileId) {
     return (
