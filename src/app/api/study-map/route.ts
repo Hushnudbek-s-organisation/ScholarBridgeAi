@@ -146,7 +146,10 @@ export async function POST(req: Request) {
     }
     if (action === "import" && !validId) {
       if (!Array.isArray(items) || !items.length || items.length > STUDY_IMPORT_LIMIT) return json({ code: "invalid_entry" }, { status: 400 });
-      const values = items.map(validateEntry).filter(item => item !== null && item.kind === "note");
+      const values = items.flatMap(item => {
+        const entry = validateEntry(item);
+        return entry?.kind === "note" ? [entry] : [];
+      });
       if (values.length !== items.length) return json({ code: "invalid_entry" }, { status: 400 });
       return await db.transaction(async tx => {
         await tx.select({ id: studentProfiles.id }).from(studentProfiles).where(eq(studentProfiles.id, profileId)).for("no key update");
