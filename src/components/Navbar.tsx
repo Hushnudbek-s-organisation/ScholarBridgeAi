@@ -19,6 +19,7 @@ import {
   LogOut,
   Menu,
   MessagesSquare,
+  Network,
   Pencil,
   Plane,
   Plus,
@@ -147,6 +148,7 @@ interface NavbarProps {
   setActiveTab: (tab: string) => void;
   activeProfile: StudentProfile | null;
   activeProfileId?: number | null;
+  deferCompanionModel?: boolean;
   onOpenProfileModal: (isNew?: boolean) => void;
   onSwitchProfile?: () => void;
   onStartOnboarding?: () => void;
@@ -195,6 +197,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   notifications: Send,
   rewards: Gift,
   wardrobe: Shirt,
+  "study-map": Network,
   parent: Home,
   admin: ShieldCheck,
   // pane icons (command palette)
@@ -366,6 +369,7 @@ export function Navbar({
   setActiveTab,
   activeProfile,
   activeProfileId,
+  deferCompanionModel,
   onOpenProfileModal,
   onSwitchProfile,
   onStartOnboarding,
@@ -528,6 +532,7 @@ export function Navbar({
 
   const hintFor = useCallback(
     (id: string): string | undefined => {
+      if (id === "study-map") return NAV_UTILITY_SECTIONS.find(u => u.id === id)?.description;
       const hintKey = NAV_HINT_KEYS[id];
       return hintKey && th.has?.(hintKey) ? th(hintKey as never) : undefined;
     },
@@ -870,14 +875,18 @@ export function Navbar({
 
       <GroupedDock dashboardShortLabel={t("tabHome")} dashboardLabel={labelFor("dashboard")} dashboardActive={activeTab === "dashboard"} onDashboard={() => go("dashboard")} moreLabel={t("tabMore")} onMore={() => setDrawerOpen(true)} groups={[
         ...NAV_GROUPS.filter(g=>g!=="home").map(g=>{
-          const items=visibleDestinations.filter(i=>i.group===g); const Icon=GROUP_ICONS_LUCIDE[g];
-          return {id:g,label:t(NAV_GROUP_I18N[g]),shortLabel:t(`dockShort.${g}` as never),icon:<Icon aria-hidden className="h-5 w-5"/>,active:activeGroup===g,count:items.length,content:items.map(i=>renderItem(i,`dock-${g}`))};
+          const items = visibleDestinations.filter(i => i.group === g);
+          const studyMap = utilityItems.find(i => i.id === "study-map");
+          if (g === "plan" && studyMap) items.unshift(studyMap);
+          const Icon = GROUP_ICONS_LUCIDE[g];
+          return {id:g,label:t(NAV_GROUP_I18N[g]),shortLabel:t(`dockShort.${g}` as never),icon:<Icon aria-hidden className="h-5 w-5"/>,active:activeGroup===g || (g === "plan" && activeTab === "study-map"),count:items.length,content:items.map(i=>renderItem(i,`dock-${g}`))};
         }).filter(g=>g.count>0),
-        {id:"account",label:t("dockAccount"),shortLabel:t("dockShort.account"),icon:<Users aria-hidden className="h-5 w-5"/>,active:utilityItems.some(i=>isDestinationActive(i.id)),count:utilityItems.length,content:<div className="space-y-3">{utilityItems.map(i=>renderItem(i,"dock-account"))}{renderProfileCard()}{SettingsRow}</div>}
+        {id:"account",label:t("dockAccount"),shortLabel:t("dockShort.account"),icon:<Users aria-hidden className="h-5 w-5"/>,active:utilityItems.some(i=>i.id !== "study-map" && isDestinationActive(i.id)),count:utilityItems.filter(i => i.id !== "study-map").length,content:<div className="space-y-3">{utilityItems.filter(i => i.id !== "study-map").map(i=>renderItem(i,"dock-account"))}{renderProfileCard()}{SettingsRow}</div>}
       ]}/>
 
       <SchollyCompanion
         activeTab={activeTab}
+        deferModel={deferCompanionModel}
         activePane={activePane}
         locale={locale}
         profileId={activeProfileId ?? activeProfile?.id ?? null}

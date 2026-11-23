@@ -57,6 +57,7 @@ const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").t
 const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter), { loading: panelLoading });
 const PaymentsSection = dynamic(() => withFeatureMessages(import("@/components/PaymentsSection").then((m) => m.PaymentsSection)), { loading: panelLoading });
 const RewardsSection = dynamic(() => withFeatureMessages(import("@/components/RewardsSection").then((m) => m.RewardsSection)), { loading: panelLoading });
+const StudyMap = dynamic(() => import("@/components/StudyMap").then(m => m.StudyMap), { loading: panelLoading });
 const SchollyWardrobe = dynamic(() => import("@/components/SchollyWardrobe").then((m) => m.SchollyWardrobe), { loading: panelLoading });
 const ParentDashboard = dynamic(() => withFeatureMessages(import("@/components/ParentDashboard").then((m) => m.ParentDashboard)), { loading: panelLoading });
 const AdminPanel = dynamic(() => withFeatureMessages(import("@/components/AdminPanel").then((m) => m.AdminPanel)), { loading: panelLoading });
@@ -370,6 +371,7 @@ export function Home({
   // `profiles` is used by the picker to show this device's saved accounts.
   const [profiles, setProfiles] = useState<StudentProfile[]>([]);
   const [activeProfile, setActiveProfile] = useState<StudentProfile | null>(null);
+  const [dashboardReadyFor, setDashboardReadyFor] = useState<number | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -820,6 +822,7 @@ export function Home({
    * Device-history selections must use handlePickProfile below instead. */
   const commitAuthenticatedProfile = (p:StudentProfile) => {
     pickerRequest.current++;
+    setDashboardReadyFor(null);
     setActiveProfile(p);
     setProfiles((prev) => (prev.some((profile) => profile.id === p.id) ? prev : [...prev, p]));
     rememberProfile(p.id);
@@ -1175,6 +1178,7 @@ export function Home({
         setActiveTab={setActiveTab}
         activeProfile={activeProfile}
         activeProfileId={activeProfile?.id ?? null}
+        deferCompanionModel={activeTab === "dashboard" && Boolean(activeProfile?.onboardingCompleted) && dashboardReadyFor !== activeProfile?.id}
         onOpenProfileModal={openProfileModal}
         onSwitchProfile={openProfilePicker}
         onStartOnboarding={startOnboarding}
@@ -1249,6 +1253,7 @@ export function Home({
               <JourneyControlCenter
                 afterOverview={<DailyStreakCard profileId={activeProfile?.id ?? null} compact />}
                 profileId={activeProfile?.id ?? null}
+                onResolved={setDashboardReadyFor}
                 profileVersion={activeProfile ? profileMatchFingerprint(activeProfile) : null}
                 onNavigateTab={handleNavigateTab}
                 onOpenWorkspace={(applicationId) => {
@@ -1435,6 +1440,8 @@ export function Home({
           {activeTab === "payments" && <PaymentsSection activeProfile={activeProfile} />}
 
           {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
+
+          {activeTab === "study-map" && activeProfile && <StudyMap key={activeProfile.id} onNavigate={handleNavigateTab} />}
 
           {activeTab === "wardrobe" && activeProfile && <WardrobePage key={activeProfile.id} profileId={activeProfile.id} />}
 

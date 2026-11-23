@@ -1307,6 +1307,22 @@ and the migration is safely retried.
 | `sort_order` | integer |  | yes |  |
 | `created_at` | timestamp |  | yes |  |
 
+### `study_map_entries`
+
+PRO o‘quv xaritasi uchun foydalanuvchining bog‘langan qaydlari va yodlash kartalari. Xarita profil va ariza ma’lumotlarini manba jadvallaridan o‘qiydi. `supabase/add_study_map.sql` ushbu jadvalni yaratadi va RLS’ni yoqadi.
+
+| column | type | null | default | notes |
+|---|---|---|---|---|
+| `id` | text |  | — | PK, server yaratgan UUID |
+| `profile_id` | integer |  | — | FK → student_profiles(id) on delete cascade |
+| `kind` | text |  | — | `note` yoki `card` |
+| `title` | text |  | — | Qayd sarlavhasi yoki karta savoli |
+| `body` | text |  | — | Qayd matni yoki karta javobi |
+| `links` | jsonb |  | `[]` | Bog‘langan xarita yozuvlari identifikatorlari |
+| `due_at` | timestamptz |  | `now()` | Navbatdagi takrorlash vaqti |
+| `interval_days` | integer |  | `0` | Takrorlash oralig‘i |
+| `updated_at` | timestamptz |  | `now()` | Oxirgi o‘zgarish |
+
 ### `study_plans`
 
 | column | type | null | default | notes |

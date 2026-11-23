@@ -2467,3 +2467,15 @@ export const arrivalChecklistItems = pgTable(
     uniqueIndex("uq_arrival_items_key").on(table.profileId, table.itemKey),
   ]
 );
+
+export const studyMapEntries = pgTable("study_map_entries", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").references(() => studentProfiles.id, { onDelete: "cascade" }).notNull(),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  text: text("body").notNull(),
+  links: jsonb("links").$type<string[]>().notNull().default([]),
+  dueAt: timestamp("due_at", { withTimezone: true }).defaultNow().notNull(),
+  interval: integer("interval_days").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [index("idx_study_map_entries_profile").on(table.profileId)]);

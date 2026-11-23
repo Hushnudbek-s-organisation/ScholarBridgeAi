@@ -164,6 +164,7 @@
     "equipFailed": "Could not equip the look."
   },
   "nav": {
+    "study-map": "Study map",
     "wardrobe": "Customize",
     "dashboard": "Dashboard",
     "universities": "Universities & Programs",
