@@ -399,6 +399,13 @@ export function AnalyticsDashboard({ adminProfileId }: AnalyticsDashboardProps) 
                 value={formatNumber(scholly.onboarding.find((entry) => entry.step === step)?.users)} />
             ))}
           </div>
+          <h4 className="mb-2 mt-4 text-sm font-semibold text-slate-800">Scholly yordam mavzulari</h4>
+          {scholly.helpTopics?.length ? (
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+              {scholly.helpTopics.map(topic => <MiniStat key={topic.topic} label={topic.topic.replaceAll("/", " / ").replaceAll("-", " ")}
+                value={formatNumber(topic.visits)} hint={`${topic.helpful} foydali · ${topic.needsWork} yaxshilash kerak`} />)}
+            </div>
+          ) : <p className="text-sm text-ink-muted">Mavzu bo‘yicha natija kamida besh ishtirokchidan keyin ko‘rinadi.</p>}
           <h4 className="mb-2 mt-4 text-sm font-semibold text-slate-800">Missiya eslatmasi A/B sinovi</h4>
           <div className="grid grid-cols-2 gap-2">
             {(["A", "B"] as const).map(variant => {

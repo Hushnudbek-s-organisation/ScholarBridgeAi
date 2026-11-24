@@ -2094,33 +2094,33 @@ html[data-scholly-inspecting] body :where(*:not(.sb-scholly-inspector-bar, .sb-s
   position: absolute;
   inset: 3.7%;
   border-radius: 50%;
-  background: radial-gradient(circle at 36% 25%, #fff 0%, #fff 38%, #ecedf0 68%, #c3c8d2 100%);
+  background: radial-gradient(circle at 35% 26%, #fff 0%, #fff 41%, #eff3fa 73%, #cbd7ee 100%);
   box-shadow: inset 0 -2px 4px #939aaa24, 0 6px 15px #151d351a;
 }
 .sb-speaking-orb[data-rendering="3d"] .sb-speaking-face-shell { visibility: hidden; }
 .sb-speaking-face-eye {
   position: absolute;
-  top: 40%;
-  width: 5%;
-  height: 8%;
+  top: 41%;
+  width: 7%;
+  height: 9%;
   border-radius: 50%;
-  background: #252833;
+  background: radial-gradient(ellipse at 30% 28%, #fff 0 13%, transparent 18%), #39445d;
 }
 .sb-speaking-face-eye[data-eye="left"] { left: 36%; }
 .sb-speaking-face-eye[data-eye="right"] { right: 36%; }
 .sb-speaking-face-mouth {
   position: absolute;
   top: 55%;
-  left: 43%;
-  width: 14%;
+  left: 41.5%;
+  width: 17%;
   height: 7%;
-  border: 0 solid #252833;
+  border: 0 solid #39445d;
   border-bottom-width: clamp(2px, 0.45vw, 4px);
   border-radius: 50%;
 }
 .sb-speaking-face-mouth[data-speaking] {
-  height: calc(2% + var(--sb-mouth-level, 0) * 8%);
-  background: #252833;
+  height: calc(2% + var(--sb-mouth-level, 0) * 6%);
+  background: #39445d;
   border: 0;
 }
 .sb-speaking-preview {
@@ -2132,3 +2132,21 @@ html[data-scholly-inspecting] body :where(*:not(.sb-scholly-inspector-bar, .sb-s
   font-weight: 650;
 }
 .sb-speaking-preview .sb-speaking-orb { width: 99px; }
+
+.sb-scholly-chat-header button:disabled { opacity: .45; }
+.sb-scholly-learning {
+  padding: 5px 10px;
+  border: 1px solid var(--sb-border);
+  border-radius: 12px;
+  background: var(--sb-well);
+}
+.sb-scholly-learning summary, .sb-scholly-learning label {
+  min-height: 44px;
+  cursor: pointer;
+}
+.sb-scholly-learning summary { align-content: center; font-weight: 650; }
+.sb-scholly-learning label { display: flex; align-items: center; gap: 8px; }
+.sb-scholly-learning p { margin-bottom: 8px; color: var(--sb-ink-muted); }
+.sb-scholly-shortcuts, .sb-scholly-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sb-scholly-shortcuts small { flex-basis: 100%; }
+.sb-scholly-shortcuts button, .sb-scholly-feedback button { padding-inline: 9px; }

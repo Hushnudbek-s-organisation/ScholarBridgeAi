@@ -20,7 +20,7 @@ test("presentation journey connects an authenticated profile to programme, fundi
       [fixture.fixtureProgramId, deadline, "Round 2"],
     ] as const) {
       const cycle = await db.query(
-        "INSERT INTO application_cycles (university_id,program_id,academic_year,cycle_year,intake,application_type,deadline,verification_status,is_verified,source_url) VALUES ($1,$2,$3,$4,'Fall',$5,$6,'verified',true,$7) RETURNING id",
+        "INSERT INTO application_cycles (university_id,program_id,academic_year,cycle_year,intake,application_type,deadline,verification_status,is_verified,is_estimated,source_url,last_verified_at) VALUES ($1,$2,$3,$4,'Fall',$5,$6,'verified',true,false,$7,now() AT TIME ZONE 'UTC') RETURNING id",
         [fixture.verifiedUniversityId, programId, String(year), year, round, date, fixture.fixturePublisherUrl]
       );
       cycleIds.push(cycle.rows[0].id);
@@ -44,6 +44,16 @@ test("presentation journey connects an authenticated profile to programme, fundi
     );
     expect(selected?.nextCycle?.deadline).toBe(deadline);
     expect(selected.assessment.admissionProbability.value).toBeNull();
+
+    const explorer = await request.get(`/api/universities?search=${encodeURIComponent(fixture.verifiedUniversityName)}&sort=rank_asc`);
+    expect(explorer.status()).toBe(200);
+    const card = (await explorer.json()).universities.find((row: { id: number }) => row.id === fixture.verifiedUniversityId);
+    expect(card?.cardSummary).toEqual(expect.objectContaining({
+      programme: expect.objectContaining({ id: fixture.fixtureProgramId, sourceUrl: fixture.fixturePublisherUrl, tuition: null }),
+      deadline: expect.objectContaining({ date: deadline, programmeId: fixture.fixtureProgramId, category: "Round 2" }),
+      admissionsUrl: expect.stringMatching(/^https:\/\//),
+    }));
+    expect(card?.estimatedChance.percentage).toBeNull();
 
     const detail = `/api/universities/${fixture.verifiedUniversityId}`;
     expect((await (await request.get(detail)).json()).applicationCycles).toEqual(

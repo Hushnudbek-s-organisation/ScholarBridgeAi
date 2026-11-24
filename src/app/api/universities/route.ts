@@ -15,6 +15,7 @@ import { memoizeMatch } from "@/lib/matchMemo";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
+import { selectUniversityCardSummary } from "@/lib/universityCardSummary";
 import { universityProgrammeDiscovery } from "@/lib/universityProgrammeDiscovery";
 import { matchesUniversityType } from "@/lib/universityType";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
@@ -337,7 +338,13 @@ export async function GET(req: Request) {
     // numbers are KEPT but never promoted to a verified official minimum by
     // the entity-level `verified` flag. Clients/UI/Telegram consume the same
     // shape instead of re-interpreting raw columns.
-    payload.universities = rows.map((u) => localizeUniversityRow(u, locale));
+    payload.universities = rows.map((u) => ({
+      ...localizeUniversityRow(u, locale),
+      cardSummary: selectUniversityCardSummary(u, bundle.cardEvidence.programmes.get(u.id) ?? [], bundle.cardEvidence.deadlines.get(u.id) ?? [], {
+        degreeLevel: degreeLevel && degreeLevel !== "All" ? degreeLevel : profileData?.degreeLevel,
+        targetMajor: majorFilter && majorFilter !== "All" ? majorFilter : profileData?.targetMajor,
+      }),
+    }));
     payload.universities = (payload.universities as typeof rows).map((u) => {
       const localized = u;
       const raw = u as unknown as Record<string, unknown>;

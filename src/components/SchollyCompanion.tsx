@@ -3,15 +3,16 @@
 import { Button } from "@/components/ui/Button";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowUp, GraduationCap, PanelBottom, RotateCcw, Scan, X } from "lucide-react";
+import { ArrowUp, GraduationCap, Hand, PanelBottom, RotateCcw, RotateCw, Scan, X } from "lucide-react";
 import { useSchollyActivityCues } from "./useSchollyActivityCues";
 import { SCHOLLY_POINTS_CHANGED, type SchollyPointsChange } from "@/lib/scholly-points-client";
 import { SchollyModel } from "./SchollyModel";
 import { SchollyInspector } from "./SchollyInspector";
 import { SchollyReminderPermission } from "./SchollyReminderPermission";
 import { explainPageElement } from "@/lib/scholly-page-guide";
-import { useSchollyMotion, type SchollyMotion } from "./useSchollyMotion";
+import { SCHOLLY_MOTION_PRIORITY, useSchollyMotion, type SchollyMotion } from "./useSchollyMotion";
 import { createSchollyShakeDetector } from "@/lib/scholly-shake";
+import { isSchollyTopic, type SchollyLearning } from "@/lib/scholly-learning";
 import { schollyMessageText, type SchollyReminderMode } from "@/lib/scholly-messages";
 
 type Position = { x: number; y: number };
@@ -32,6 +33,7 @@ type SchollyOnboardingProfile = {
   onboardingAnswers: Record<string, unknown>;
   onboardedAt: string | null;
   stageKnown: boolean;
+  learning?: SchollyLearning;
 };
 
 type BrowserModel = {
@@ -51,6 +53,10 @@ const strings = {
     dizzy: "Boshim aylanib ketdi!", navigate: "Kerakli bo‘limni shu yerdan oching.", locale: "Uzbek",
     hello: "Salom!", easter: "Menga qara, men ham qiziqarliman!",
     quietToday: "Bugun jim bo‘l",
+    wave: "Scholly bilan salomlashish", turn: "Scholly’ni aylantirish",
+    learning: "Yordamni moslashtirish", saveLearning: "Mavzularimni eslab qol",
+    learningHint: "Scholly mavzular va baholarni eslab qoladi. Umumiy natijalar yordamni yaxshilashga xizmat qiladi. Suhbat matni saqlanmaydi. O‘chirganingizda tarix tozalanadi.",
+    shortcuts: "Ko‘p so‘ralgan yordam", helpful: "Foydali", needsWork: "Yetarli emas", feedbackSaved: "Fikringiz saqlandi",
     inspect: "Joyni belgilash", pick: "Tushuntirish uchun sahifadagi joyni bosing yoki Tab va Enter’dan foydalaning.", cancel: "Bekor qilish", selected: "Belgilangan joy", clear: "Belgini olib tashlash", explain: (label: string) => label ? `«${label}» nima?` : "Bu joy nima?",
   },
   en: {
@@ -61,6 +67,10 @@ const strings = {
     dizzy: "I’m dizzy!", navigate: "Open the relevant section below.", locale: "English",
     hello: "Hi!", easter: "Hey, look at me! I can be fun too!",
     quietToday: "Quiet today",
+    wave: "Wave to Scholly", turn: "Turn Scholly around",
+    learning: "Personalise help", saveLearning: "Remember my help topics",
+    learningHint: "Scholly remembers topics and ratings. Totals help improve the site. Chat text is never stored. Turning this off clears this history.",
+    shortcuts: "Your frequent help topics", helpful: "Helpful", needsWork: "Needs work", feedbackSaved: "Feedback saved",
     inspect: "Select an element", pick: "Click a part of the page for help, or use Tab and Enter.", cancel: "Cancel", selected: "Selected element", clear: "Clear selection", explain: (label: string) => label ? `What is “${label}”?` : "What is this?",
   },
   ru: {
@@ -71,6 +81,10 @@ const strings = {
     dizzy: "Голова кружится!", navigate: "Откройте нужный раздел ниже.", locale: "Russian",
     hello: "Привет!", easter: "Посмотри на меня — я тоже умею веселиться!",
     quietToday: "Без подсказок сегодня",
+    wave: "Помахать Scholly", turn: "Повернуть Scholly",
+    learning: "Настроить подсказки", saveLearning: "Запоминать мои темы",
+    learningHint: "Scholly запоминает темы и оценки. Общие результаты помогают улучшать сайт. Текст чата не сохраняется. При отключении история удаляется.",
+    shortcuts: "Ваши частые темы", helpful: "Полезно", needsWork: "Нужно улучшить", feedbackSaved: "Оценка сохранена",
     inspect: "Выбрать элемент", pick: "Нажмите на элемент страницы или воспользуйтесь Tab и Enter.", cancel: "Отмена", selected: "Выбранный элемент", clear: "Снять выделение", explain: (label: string) => label ? `Что такое «${label}»?` : "Что это?",
   },
 };
@@ -84,6 +98,7 @@ const related: Record<string, string> = {
   materials: "documents essay sop materials hujjat insho xat документ эссе",
   "materials/documents": "upload document yukla fayl hujjat загрузи файл документ",
   "visa/speaking": "speaking mock interview john rica suhbat gapirish интервью собеседован",
+  "visa/daily-speaking": "daily speaking daily conversation kundalik suhbat har kuni разговор ежедневный",
   visa: "visa departure viza виза виз",
   profile: "profile profil профиль",
 };
@@ -130,6 +145,11 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   const st = useTranslations("scholly");
   const [placement, setPlacement] = useState<Placement>("corner");
   const [held, setHeld] = useState(false);
+  const [turn, setTurn] = useState(0);
+  const [learningBusy, setLearningBusy] = useState(false);
+  const learningLock = useRef(false);
+  const [learningError, setLearningError] = useState(false);
+  const [ratedMessage, setRatedMessage] = useState<Message | null>(null);
   const [dizzy, setDizzy] = useState(false);
   const dizzyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [drag, setDrag] = useState<Position | null>(null);
@@ -419,6 +439,31 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
     setHeld(false);
   }
 
+  async function saveLearning(signal: { action: "preference"; enabled: boolean } | {
+    action: "visits" | "helpful" | "needsWork"; topic: string;
+  }) {
+    if (!profileId || (signal.action !== "preference" && (!schollyProfile?.learning?.enabled || !isSchollyTopic(signal.topic)))) return false;
+    if (learningLock.current) return false;
+    learningLock.current = true;
+    setLearningBusy(true);
+    setLearningError(false);
+    try {
+      const response = await fetch("/api/scholly/learning", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(signal),
+      });
+      if (!response.ok) throw new Error("Update failed");
+      const { learning } = await response.json() as { learning: SchollyLearning };
+      setSchollyProfile(current => current?.userId === profileId ? { ...current, learning } : current);
+      return true;
+    } catch {
+      if (signal.action !== "visits") setLearningError(true);
+      return false;
+    } finally {
+      learningLock.current = false;
+      setLearningBusy(false);
+    }
+  }
+
   async function ask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const question = draft.trim();
@@ -465,6 +510,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
       }
     }
     setMessages(previous => [...previous, { role: "assistant", text: answer, target, ai }]);
+    if (target) void saveLearning({ action: "visits", topic: target.id });
     if (model) requestAnimationFrame(() => playMotion("talk"));
     else playMotion("talk");
   }
@@ -496,6 +542,12 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
       : undefined;
 
   const animation = keyboardOpen ? "idle" : motion;
+  const learning = schollyProfile?.learning;
+  const recentAnswer = messages.findLast(message => message.role === "assistant");
+  const frequentTopics = learning?.enabled ? topics.flatMap(topic => {
+    const count = isSchollyTopic(topic.id) ? learning.topics[topic.id]?.visits ?? 0 : 0;
+    return count ? [{ topic, count }] : [];
+  }).sort((a, b) => b.count - a.count).slice(0, 3) : [];
   const messageCue = !activityCue || activityCue.kind === "submission" ? null
     : activityCue.kind === "deadline" ? st("deadlineNear", { days: activityCue.daysRemaining })
       : schollyMessageText(activityCue, language, schollyProfile?.tone, audience);
@@ -518,8 +570,14 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         data-held={held || undefined} data-dizzy={dizzy || undefined} onPointerDown={pointerDown} onPointerMove={pointerMove}
         onPointerUp={event => pointerEnd(event)} onPointerCancel={event => pointerEnd(event, true)}
         onLostPointerCapture={event => pointerEnd(event, true)} onContextMenu={event => event.preventDefault()}
-        onClick={activateLauncher}>
-        <SchollyModel trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} />
+        onPointerEnter={event => { if (event.pointerType === "mouse") playMotion("notice"); }}
+        onKeyDown={event => {
+          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            event.preventDefault();
+            setTurn(value => value + (event.key === "ArrowRight" ? 1 : -1) * Math.PI / 4);
+          }
+        }} onClick={activateLauncher}>
+        <SchollyModel trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} turn={turn} />
         {earnedPoints !== null && <span className="sb-scholly-points-pop" aria-hidden="true">+{earnedPoints}</span>}
         {animation === "shake" && <span className="sb-scholly-dizzy-stars" aria-hidden="true">
           <span data-index="0">★</span><span data-index="1">★</span><span data-index="2">★</span>
@@ -568,6 +626,8 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
       {chatOpen && <section className="sb-scholly-chat" id="scholly-chat" aria-label="Scholly">
         <header className="sb-scholly-chat-header">
           <div><strong>Scholly</strong><small>{aiReady ? t.ai : t.guide}</small></div>
+          <Button variant="unstyled" type="button" onClick={() => { setTurn(0); playMotion("wave", { priority: SCHOLLY_MOTION_PRIORITY.notice + 1 }); }} aria-label={t.wave} title={t.wave} disabled={quiet}><Hand size={17} /></Button>
+          <Button variant="unstyled" type="button" onClick={() => setTurn(value => value + Math.PI / 2)} aria-label={t.turn} title={t.turn}><RotateCw size={17} /></Button>
           {hasDock && <Button variant="unstyled" type="button" onClick={() => place(placement === "dock" ? "corner" : "dock")} title={placement === "dock" ? t.reset : t.dock} aria-label={placement === "dock" ? t.reset : t.dock}>
             {placement === "dock" ? <RotateCcw size={17} /> : <PanelBottom size={17} />}
           </Button>}
@@ -576,6 +636,22 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         </header>
         <div className="sb-scholly-feed" role="log" ref={feed}>
           {messages.length === 0 && <p>{t.intro}</p>}
+          {schollyProfile && <details className="sb-scholly-learning">
+            <summary>{t.learning}</summary>
+            <label><input type="checkbox" checked={learning?.enabled ?? false} disabled={learningBusy}
+              onChange={event => { void saveLearning({ action: "preference", enabled: event.target.checked }); }} />
+              {t.saveLearning}
+            </label>
+            <p>{t.learningHint}</p>
+          </details>}
+          {learningError && <p role="alert">{st("saveFailed")}</p>}
+          {messages.length === 0 && navigate && frequentTopics.length > 0 && <section className="sb-scholly-shortcuts" aria-label={t.shortcuts}>
+            <small>{t.shortcuts}</small>
+            {frequentTopics.map(({ topic }) => <Button variant="unstyled" key={topic.id} type="button"
+              onClick={() => { void saveLearning({ action: "visits", topic: topic.id }); close(); navigate(topic.id); }}>
+              {topic.title} →
+            </Button>)}
+          </section>}
           {schollyProfile && schollyProfile.onboardingState !== "completed" && <section ref={onboardingCard} tabIndex={-1} className="sb-scholly-onboarding" aria-labelledby="scholly-onboarding-title" aria-live="polite">
             <h3 id="scholly-onboarding-title">{st("onboardingTitle")}</h3>
             {schollyProfile.onboardingState === "not_started" && <>
@@ -633,6 +709,18 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
               <p>{message.text}</p>
               {message.role === "assistant" && !message.ai && <small>{t.guide}</small>}
               {message.target && navigate && <Button variant="unstyled" type="button" onClick={() => { close(); navigate(message.target!.id); }}>{message.target.title} →</Button>}
+              {learning?.enabled && message === recentAnswer && (
+                ratedMessage === message ? <small role="status">{t.feedbackSaved}</small> :
+                  <div className="sb-scholly-feedback">
+                    {(["helpful", "needsWork"] as const).map(action => (
+                      <Button variant="unstyled" key={action} type="button" disabled={learningBusy}
+                        onClick={async () => {
+                          const topic = message.target?.id;
+                          if (await saveLearning({ action, topic: isSchollyTopic(topic) ? topic : "general" })) setRatedMessage(message);
+                        }}>{t[action]}</Button>
+                    ))}
+                  </div>
+              )}
             </div>
           ))}
           {pending && <p>{t.wait}</p>}
