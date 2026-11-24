@@ -442,7 +442,8 @@ export function UniversityDetail({
     setMatch(data.match ?? null);
     // Older cached payloads carry the same object under `chance`.
     setAssessment(data.assessment ?? (data as { chance?: UniversityDetailData["assessment"] }).chance ?? null);
-  }, [setUni,setPrograms,setCycles,setUniversityRequirements,setRequirementContexts,setMoney,setScholarships,setSources,setMatch,setAssessment]);
+  }, [setUni, setPrograms, setCycles, setUniversityRequirements, setRequirementContexts, setMoney, setScholarships,
+    setSources, setCampuses, setCampusImages, setMatch, setAssessment]);
 
   /**
    * Create the application row for this university and hand the workspace to the
