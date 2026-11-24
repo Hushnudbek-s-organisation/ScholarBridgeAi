@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { db, pool } from "@/db";
-import { appConfig, savedScholarships, scholarships, studentProfiles, universities, userDocuments, courses, courseModules, lessons, auditLogs,universityPrograms,sources } from "@/db/schema";
+import { appConfig, savedScholarships, scholarships, studentProfiles, universities, userDocuments, courses, courseModules, lessons, auditLogs, universityPrograms, sources, universityRankings } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
 
 async function main() {
@@ -58,6 +58,19 @@ async function main() {
     lastVerifiedAt: new Date("2026-10-22T00:00:00.000Z"),
     isActive: true,
   }).returning();
+  const [rankingSource] = await db.insert(sources).values({
+    url: "https://verified-e2e.example.test/rankings",
+    title: "FICTIONAL disposable QS ranking fixture",
+    domain: "verified-e2e.example.test",
+    sourceType: "official_ranking",
+    isOfficial: true,
+    isVerified: true,
+  }).returning({ id: sources.id });
+  await db.insert(universityRankings).values({
+    universityId: verifiedUniversity.id, rankingProvider: "QS Quacquarelli Symonds",
+    rankingName: "QS World University Rankings", rankingYear: 2027, rank: 2, rankLabel: "#2",
+    sourceId: rankingSource.id, verifiedAt: new Date(), verificationStatus: "verified",
+  });
   const [unverifiedUniversity] = await db.insert(universities).values({
     name: "Phase12 E2E Unverified University",
     country: "Netherlands",

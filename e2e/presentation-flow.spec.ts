@@ -100,6 +100,10 @@ test("speaking rooms use the plain orb independently of Scholly", async ({ page 
   await expect(face.locator("[data-speaking-orb]")).toBeVisible();
   await expect(face.locator(".sb-scholly-model, .sb-speaking-face-flag")).toHaveCount(0);
   await expect(face.locator("[data-eye]")).toHaveCount(2);
+  const supportsWebGL = await page.evaluate(() => Boolean(document.createElement("canvas").getContext("webgl2")));
+  if (supportsWebGL) {
+    await expect(face.locator("[data-speaking-orb]")).toHaveAttribute("data-rendering", "3d");
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   await face.screenshot({ path: testInfo.outputPath("daily-speaking-orb.png"), animations: "disabled" });
 
