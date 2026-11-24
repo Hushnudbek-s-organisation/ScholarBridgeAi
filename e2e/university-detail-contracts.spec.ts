@@ -13,6 +13,8 @@ test("detail shares exact scope, native units, conflict/unknown and real-program
  test.setTimeout(120_000);
  const url=new URL(process.env.E2E_DATABASE_URL!);expect(url.hostname).toBe("127.0.0.1");expect(url.pathname).toMatch(/^\/sb_e2e_\d+$/);
  const db=new Client({connectionString:url.toString()});await db.connect();
+ // Verification timestamps are stored without an offset, in UTC.
+ await db.query("SET TIME ZONE 'UTC'");
  const ids=[randomUUID(),randomUUID(),randomUUID(),randomUUID(),randomUUID()];
  const adminContext=await browser.newContext();
  try{
@@ -33,7 +35,7 @@ test("detail shares exact scope, native units, conflict/unknown and real-program
   const ordinary=await read();expect(ordinary.chance).toEqual(ordinary.assessment);expect(ordinary.assessment.admissionProbability).toEqual({value:null,reason:"no_validated_model",scoringVersion:ordinary.assessment.scoringVersion});expect(ordinary).not.toHaveProperty("chanceScore");expect(ordinary.universityRequirements.toefl).toBeNull();expect(ordinary.programs.find((p:{id:number})=>p.id===f.fixtureProgramId).minToefl).toBeNull();
   const scope=`&programId=${f.fixtureProgramId}&admissionCycle=2027&applicantScope=international`;
   const scoped=await read(scope),row=scoped.programs.find((p:{id:number})=>p.id===f.fixtureProgramId);
-  expect(row.minToefl).toBe(5.5);expect(row.minToeflScale).toBe("6");expect(row.minGpa).toBe(85);expect(row.minGpaScale).toBe("100");expect(scoped.universityRequirements.toefl.single).toBe(5.5);expect(scoped.universityRequirements.toefl.unit).toBe("6");expect(row.requirementGroup.value).toBe(JSON.stringify(group));
+  expect(row.minToefl, JSON.stringify(row.requirementEvidence?.toefl)).toBe(5.5);expect(row.minToeflScale).toBe("6");expect(row.minGpa).toBe(85);expect(row.minGpaScale).toBe("100");expect(scoped.universityRequirements.toefl.single).toBe(5.5);expect(scoped.universityRequirements.toefl.unit).toBe("6");expect(row.requirementGroup.value).toBe(JSON.stringify(group));
   expect(scoped.university.minGpa).toBeNull();expect(scoped.evidence.minGpa.trust).toMatch(/unknown/);expect(Array.isArray(row.recordedRequirements)).toBe(true);expect(row.recordedRequirements.every((r:{evidence:{isOfficialMinimum:boolean}})=>!r.evidence.isOfficialMinimum)).toBe(true);
   const unknown=await read(scope.replace("2027","Fall%202027"));expect(unknown.universityRequirements.toefl).toBeNull();expect(unknown.programs.find((p:{id:number})=>p.id===f.fixtureProgramId).requirementGroup).toBeNull();
   const absent=await read(`&programId=${f.fixtureProgramId}&admissionCycle=2027`);expect(absent.universityRequirements.toefl).toBeNull();

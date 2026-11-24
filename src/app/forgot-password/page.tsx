@@ -5,6 +5,8 @@ import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
+import { configuredAppUrl } from "@/lib/appUrl";
+import { mailConfigured } from "@/lib/mail";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 /**
@@ -29,6 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ForgotPasswordPage() {
   const locale = await getPageLocale();
   const copy = dictionaries[locale].passwordReset;
+  const emailRecoveryAvailable = Boolean(configuredAppUrl()) && mailConfigured();
 
   return (
     <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
@@ -37,11 +40,17 @@ export default async function ForgotPasswordPage() {
         <main className="mx-auto max-w-lg px-4 py-10 sm:px-6 sm:py-14">
           <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">{copy.forgotEyebrow}</p>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{copy.forgotTitle}</h1>
-          <p className="mt-3 text-sm leading-relaxed text-slate-700">{copy.forgotBody}</p>
-
-          <div className="mt-6">
-            <ForgotPasswordForm />
-          </div>
+          {emailRecoveryAvailable ? (
+            <>
+              <p className="mt-3 text-sm leading-relaxed text-slate-700">{copy.forgotBody}</p>
+              <div className="mt-6"><ForgotPasswordForm /></div>
+            </>
+          ) : (
+            <p className="mt-4 rounded-overlay border border-slate-200 bg-white p-5 text-sm leading-relaxed text-slate-700" role="status">
+              {copy.emailRecoveryUnavailable}
+            </p>
+          )}
+          <p className="mt-4 text-sm text-slate-700">{copy.manualRecoveryHint}</p>
 
           <p className="mt-6 text-center text-sm leading-relaxed text-slate-500">
             <Link href="/privacy" className="font-semibold text-indigo-700 hover:text-indigo-900">

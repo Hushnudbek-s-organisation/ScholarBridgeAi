@@ -8083,6 +8083,8 @@
     "resetMetaDescription": "Pochtaga kelgan havola orqali ScholarBridge hisobingiz uchun yangi parol tanlang.",
     "forgotEyebrow": "Hisobni tiklash",
     "forgotTitle": "Parolni unutdingizmi?",
+    "emailRecoveryUnavailable": "Email orqali parolni tiklash hozir mavjud emas.",
+    "manualRecoveryHint": "Emailga kira olmasangiz, hisob egasini tasdiqlash va bir martalik havola olish uchun ScholarBridge administratoriga murojaat qiling.",
     "forgotBody": "ScholarBridge uchun ishlatadigan elektron pochta manzilingizni kiriting. Bu manzilga hisob bogʻlangan boʻlsa, yangi parol qoʻyish havolasini yuboramiz.",
     "resetEyebrow": "Hisobni tiklash",
     "resetTitle": "Yangi parol qoʻying",

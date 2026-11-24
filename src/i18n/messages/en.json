@@ -8083,6 +8083,8 @@
     "resetMetaDescription": "Choose a new password for your ScholarBridge account from an emailed reset link.",
     "forgotEyebrow": "Account recovery",
     "forgotTitle": "Forgot your password?",
+    "emailRecoveryUnavailable": "Password recovery by email is currently unavailable.",
+    "manualRecoveryHint": "If you cannot access your email, contact your ScholarBridge administrator to verify account ownership and request a one-time link.",
     "forgotBody": "Enter the email address you use for ScholarBridge. If an account exists for it, we will send a link that lets you set a new password.",
     "resetEyebrow": "Account recovery",
     "resetTitle": "Set a new password",
