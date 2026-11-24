@@ -1255,13 +1255,13 @@ export function UniversityExplorer({
                         afford / qualify" and nothing else; every secondary
                         diagnostic lives in the details drawer below. */}
                     {uni.programmeDiscovery?.selectedProgrammeName && (
-                      <p className="mb-2 line-clamp-2 text-xs text-ink-body">
+                      <p className="mb-2 line-clamp-2 text-sm text-ink-body">
                         <strong>{t("exProgrammeFocus")}</strong> · {uni.programmeDiscovery.selectedProgrammeName}
                       </p>
                     )}
                     <div className="mb-3 rounded-surface border border-slate-200 px-3 py-2 dark:border-slate-700">
-                      <p className="text-xs font-bold text-ink-heading">{t("exEstimatedChance")}</p>
-                      <p className="mt-0.5 text-xs leading-normal text-ink-body">
+                      <p className="text-sm font-bold text-ink-heading">{t("exEstimatedChance")}</p>
+                      <p className="mt-0.5 text-sm leading-normal text-ink-body">
                         {uni.estimatedChance?.reason === "profile_required" && !activeProfile
                           ? t("exChanceSignIn") : t("exChanceInsufficientEvidence")}
                       </p>
