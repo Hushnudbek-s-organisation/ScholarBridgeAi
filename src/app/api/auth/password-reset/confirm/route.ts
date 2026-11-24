@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { passwordResetTokens, studentProfiles } from "@/db/schema";
+import { passwordResetTokens, studentProfiles, userSessions } from "@/db/schema";
 import { hashPassword, passwordPolicyError } from "@/lib/password";
 import { hashResetToken, isWellFormedResetToken, resetTokenState } from "@/lib/passwordReset";
 import { LIMITS, clientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { checkSharedRateLimit } from "@/lib/rate-limit-shared";
 import { readJsonBody } from "@/lib/request";
-import { revokeAllSessionsForProfile } from "@/lib/auth";
+import { invalidateAuthCacheForProfile } from "@/lib/auth";
+import { retireLiveResetTokens } from "@/lib/adminAccounts";
 import { ensureCoreSchema } from "@/lib/core/db";
 
 export const dynamic = "force-dynamic";
@@ -93,50 +94,31 @@ export async function POST(req: Request) {
       );
     }
 
-    const [profile] = await db
-      .select({ id: studentProfiles.id, email: studentProfiles.email })
-      .from(studentProfiles)
-      .where(eq(studentProfiles.id, row.profileId))
-      .limit(1);
-    if (!profile) {
-      return NextResponse.json(
-        { error: "This reset link is not valid", code: "invalid_token" },
-        { status: 400, headers: { "Cache-Control": "no-store" } }
-      );
-    }
-
     const now = new Date();
-    // Consume the link FIRST: the guarded `used_at IS NULL` update is what makes
-    // a double-submit (two tabs, a retry) unable to set the password twice.
-    const consumed = await db
-      .update(passwordResetTokens)
-      .set({ usedAt: now })
-      .where(and(eq(passwordResetTokens.id, row.id), isNull(passwordResetTokens.usedAt)))
-      .returning({ id: passwordResetTokens.id });
-
-    if (!consumed.length) {
+    const passwordHash = hashPassword(password);
+    const result = await db.transaction(async (tx) => {
+      const [profile] = await tx.select({ id: studentProfiles.id, email: studentProfiles.email })
+        .from(studentProfiles).where(eq(studentProfiles.id, row.profileId)).for("update");
+      if (!profile) return null;
+      const consumed = await tx.update(passwordResetTokens).set({ usedAt: now })
+        .where(and(eq(passwordResetTokens.id, row.id), isNull(passwordResetTokens.usedAt), gt(passwordResetTokens.expiresAt, new Date())))
+        .returning({ id: passwordResetTokens.id });
+      if (!consumed.length) return null;
+      await tx.update(studentProfiles).set({ passwordHash, passwordChangedAt: now, updatedAt: now })
+        .where(eq(studentProfiles.id, profile.id));
+      await retireLiveResetTokens(profile.id, now, tx);
+      await tx.update(userSessions).set({ revokedAt: now })
+        .where(and(eq(userSessions.profileId, profile.id), isNull(userSessions.revokedAt)));
+      return profile;
+    });
+    if (!result) {
       return NextResponse.json(
-        { error: "This reset link has already been used. Request a new one.", code: "token_used" },
+        { error: "This reset link has already been used or has expired.", code: "token_used" },
         { status: 410, headers: { "Cache-Control": "no-store" } }
       );
     }
-
-    await db
-      .update(studentProfiles)
-      .set({ passwordHash: hashPassword(password), passwordChangedAt: now, updatedAt: now })
-      .where(eq(studentProfiles.id, profile.id));
-
-    // Every other outstanding link for this account dies with the reset.
-    await db
-      .update(passwordResetTokens)
-      .set({ usedAt: now })
-      .where(and(eq(passwordResetTokens.profileId, profile.id), isNull(passwordResetTokens.usedAt)));
-
-    // Sessions are fingerprint-bound to the password hash, so they are already
-    // invalid; revoking the rows too keeps audit/`user_sessions` truthful.
-    await revokeAllSessionsForProfile(profile.id).catch((error) => {
-      console.warn("[auth] password reset could not revoke stored sessions:", (error as Error)?.message);
-    });
+    const profile = result;
+    invalidateAuthCacheForProfile(profile.id);
 
     console.info(`[auth] password reset completed for profile ${profile.id} from ${ip}`);
 

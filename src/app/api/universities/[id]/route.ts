@@ -27,7 +27,7 @@ import { assessCatalogueProgramme } from "@/lib/assessment/adapters";
 import type { ProgrammeAssessment } from "@/lib/assessment";
 import type { AssessmentProfileRow, AssessmentProgrammeRow } from "@/lib/assessment/adapters";
 import { parseUniversitySort } from "@/lib/universitySort";
-import { verifiedQsRankNumber } from "@/lib/universityRank";
+import { loadVerifiedQsRankings } from "@/lib/universityRankings.server";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { countriesMatch } from "@/lib/countries";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
@@ -252,6 +252,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         .select({
           id: universities.id,
           name: universities.name,
+          isActive: universities.isActive,
           country: universities.country,
           city: universities.city,
           flagEmoji: universities.flagEmoji,
@@ -288,24 +289,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         .where(eq(universities.id, uniId));
       uni = row;
     }
-    if (!uni) {
+    if (!uni || uni.isActive === false) {
       return privateNoStoreJson({ error: "University not found" }, { status: 404 });
     }
-    // Phase AD: only a rank whose edition is recorded counts as a position.
-    // `null` here means "publish no rank" — never "fall back to another one".
-    const qsRank = verifiedQsRankNumber(uni);
-    // The stored prose was generated before the QS 2026 rank correction and
-    // still states the old sequence — 178 of the 194 rows that name a position
-    // disagree with `world_ranking`. Correcting the figure here keeps the API
-    // (and the hub cards that read it) from contradicting the profile page.
-    // Applied before the row is cached, so no response can serve the old number.
-    // A row with no verified position is left verbatim instead of being
-    // corrected to a number the edition does not publish.
+    const rankings = await loadVerifiedQsRankings([uniId]).catch(() => null);
+    const qsRanking = rankings?.get(uniId) ?? null;
+    const exactRank = qsRanking?.rank === qsRanking?.upperRank ? qsRanking?.rank ?? null : null;
     uni = {
       ...withResolvedUsdCosts(uni),
-      worldRanking: qsRank,
-      description: localizeUniversityDescription(uni.description, "en", qsRank),
-      highlights: localizeHighlights(uni.highlights, "en", qsRank),
+      worldRanking: qsRanking?.rank ?? null,
+      qsRankYear: qsRanking?.year ?? null,
+      description: localizeUniversityDescription(uni.description, "en", exactRank),
+      highlights: localizeHighlights(uni.highlights, "en", exactRank),
     } as typeof uni;
     // §4 field-level adaptation: keep the ORIGINAL legacy numbers in an
     // evidence envelope before the response-local copy is sanitized below.
@@ -320,14 +315,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     };
     const legacyFactVerified = uni.verificationStatus === "verified";
     const legacyFactSource = (uni as { website?: string | null }).website ?? null;
-    const legacyFactCycle = (uni as { qsRankYear?: number | null }).qsRankYear != null
-      ? String((uni as { qsRankYear?: number | null }).qsRankYear) : null;
+
 
     // Do not return or use unverified institutional figures as factual data.
     // This is a response-local copy; persisted catalogue/user data is untouched.
     if (uni.verificationStatus !== "verified") {
       uni = {
         ...uni,
+        description: "",
+        highlights: "[]",
         annualTuitionUsd: null,
         annualLivingEstUsd: null,
         accommodationCostUsd: null,
@@ -460,7 +456,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // ---------- Programs, application cycles & source links in parallel ----------
     // Three independent reads: running them together turns a 3-round-trip
     // page into a single round trip instead of three sequential waits.
-    const [programs, cycleRows, universitySourceLinks] = await Promise.all([
+    const [programs, cycleRows, universitySourceLinks, campusRows, imageRows] = await Promise.all([
       db
         .select()
         .from(universityPrograms)
@@ -483,6 +479,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         // A missing table must not 500 the page — the sources block below
         // simply renders nothing.
         .catch(() => [] as { id: number; universityId: number; sourceId: number | null; sourceType: string }[]),
+      db.execute<{ id: number; name: string; city: string | null; address: string | null; websiteUrl: string | null }>(
+        sql`SELECT id, name, city, address, website_url as "websiteUrl" FROM public.campuses
+            WHERE university_id = ${uniId} ORDER BY is_main_campus DESC NULLS LAST, id`
+      ).catch(() =>({ rows: [] })),
+      db.execute<{ id: number; imageUrl: string; altText: string | null; caption: string | null; sourceUrl: string }>(
+        sql`SELECT id, image_url as "imageUrl", alt_text as "altText", caption, source_url as "sourceUrl"
+            FROM public.university_images WHERE university_id = ${uniId}
+            AND verification_status = 'verified' AND image_url LIKE 'https://%' AND source_url LIKE 'https://%'
+            ORDER BY is_primary DESC NULLS LAST, display_order ASC NULLS LAST, id LIMIT 12`
+      ).catch(() =>({ rows: [] })),
     ]);
 
     // ---------- Program → source links (provenance, spec §19) ----------
@@ -1043,7 +1049,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       applicationFee: uni.applicationFee != null ? Number(uni.applicationFee) : null,
       applicationFeeCurrency: uni.applicationFeeCurrency ?? "USD",
     };
-    const university = { ...uni, ...resolvedUsdUniversityCosts(uni) };
+    const university = { ...uni, ...resolvedUsdUniversityCosts(uni), qsRanking };
 
     const basePayload = {
       university,
@@ -1054,14 +1060,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       applicationCycles: cycles,
       sources: uniSources,
       scholarships: uniScholarships,
-      campuses: [],
-      images: [],
+      campuses: campusRows.rows.filter((campus) => campus.name?.trim()),
+      images: imageRows.rows,
       // §4: the same field-level evidence envelope as the catalog API. The UI,
       // comparison, finance plan and Telegram text all read this one shape.
       evidence: legacyEvidence({
         entityVerified: legacyFactVerified,
         sourceUrl: legacyFactSource,
-        admissionCycle: legacyFactCycle,
+        admissionCycle: null,
         fields: legacyFactValues,
       }),
     };

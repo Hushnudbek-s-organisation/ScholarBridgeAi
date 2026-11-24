@@ -472,7 +472,7 @@ async function main() {
   check("a failed or unconfigured mail path never leaks to the caller", () => {
     assert.match(requestRoute, /if \(!mailConfigured\(\)\)/, "an unconfigured SMTP must be handled explicitly");
     assert.ok(
-      requestRoute.indexOf("if (!mailConfigured())") < requestRoute.indexOf("db.insert(passwordResetTokens)"),
+      requestRoute.indexOf("if (!mailConfigured())") < requestRoute.indexOf("tx.insert(passwordResetTokens)"),
       "an unconfigured mail server must be detected BEFORE a token row is created"
     );
     assert.match(requestRoute, /if \(!sent\.ok\)/, "a send failure must be handled explicitly");
@@ -496,12 +496,12 @@ async function main() {
 
   check("the confirm endpoint consumes the link before it changes the password", () => {
     const consumeAt = confirmRoute.indexOf("isNull(passwordResetTokens.usedAt)");
-    const hashAt = confirmRoute.indexOf("hashPassword(password)");
+    const passwordWriteAt = confirmRoute.indexOf("tx.update(studentProfiles)");
     assert.ok(consumeAt > 0, "the used_at guard disappeared");
-    assert.ok(hashAt > consumeAt, "the password is written before the link is spent — a double submit could reuse it");
+    assert.ok(passwordWriteAt > consumeAt, "the password is written before the link is spent — a double submit could reuse it");
     assert.match(confirmRoute, /resetTokenState\(row\)/, "the expiry/used state machine is not consulted");
     assert.match(confirmRoute, /passwordPolicyError\(password\)/, "the password policy is not enforced");
-    assert.match(confirmRoute, /revokeAllSessionsForProfile\(profile\.id\)/, "sessions survive a reset");
+    assert.match(confirmRoute, /tx\.update\(userSessions\)/, "sessions survive a reset");
     assert.match(confirmRoute, /isWellFormedResetToken\(token\)/, "the token shape is not checked before the query");
   });
 

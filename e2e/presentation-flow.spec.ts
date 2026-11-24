@@ -84,3 +84,68 @@ test("presentation journey connects an authenticated profile to programme, fundi
     await db.end();
   }
 });
+
+
+test("speaking rooms use the plain orb independently of Scholly", async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const fixture = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"));
+  await page.context().addCookies([{name: "scholarbridge_locale", value: "en", url: process.env.E2E_BASE_URL!}]);
+  expect((await page.request.post("/api/auth/sign-in", { data: {
+    email: fixture.studentEmail, password: fixture.studentPassword,
+  } })).status()).toBe(200);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/#visa/daily-speaking");
+  await page.getByRole("button", { name: "Start conversation", exact: true }).click();
+  const face = page.locator("[data-speaking-avatar]:visible");
+  await expect(face.locator("[data-speaking-orb]")).toBeVisible();
+  await expect(face.locator(".sb-scholly-model, .sb-speaking-face-flag")).toHaveCount(0);
+  await expect(face.locator("[data-eye]")).toHaveCount(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await face.screenshot({ path: testInfo.outputPath("daily-speaking-orb.png"), animations: "disabled" });
+
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto("/#visa/speaking");
+  await page.getByRole("button", { name: /United States/ }).first().click();
+  await page.getByRole("button", { name: /Start interview/ }).click();
+  await page.getByRole("button", { name: "John", exact: true }).click();
+  await expect(face.locator("[data-speaking-orb]")).toBeVisible();
+  await expect(face.locator(".sb-scholly-model, .sb-speaking-face-flag")).toHaveCount(0);
+});
+
+test("an administrator can publish sourced ranks and restore archived universities", async ({ request }) => {
+  const fixture = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"));
+  expect((await request.post("/api/auth/sign-in", { data: {
+    email: fixture.adminEmail, password: fixture.adminPassword,
+  } })).status()).toBe(200);
+  const sourceUrl = "https://www.topuniversities.com/world-university-rankings/2027";
+  const name = "Disposable presentation catalogue fixture";
+  const created = await request.post("/api/admin/universities", { data: {
+    university: { name, country: "Canada", websiteUrl: fixture.fixturePublisherUrl },
+    qsRanking: { label: "801–850", year: 2027, sourceUrl },
+  } });
+  expect(created.status()).toBe(200);
+  const { university: { id } } = await created.json();
+  try {
+    const params = new URLSearchParams({ search: name, sort: "rank_asc", minRank: "830", maxRank: "850" });
+    const list = () => request.get("/api/universities?" + params);
+    const published = await list();
+    expect((await published.json()).universities).toEqual([
+      expect.objectContaining({ id, qsRanking: { rank: 801, upperRank: 850, year: 2027, label: "#801–850", sourceUrl } }),
+    ]);
+    const archived = await request.delete("/api/admin/universities?id=" + id);
+    expect(archived.status()).toBe(200);
+    expect((await (await list()).json()).universities).toEqual([]);
+    expect((await request.get("/api/universities/" + id)).status()).toBe(404);
+    const restored = await request.patch("/api/admin/universities", { data: { id, university: { isActive: true } } });
+    expect(restored.status()).toBe(200);
+    expect((await (await list()).json()).universities).toHaveLength(1);
+  } finally {
+    const db = new Client({ connectionString: process.env.E2E_DATABASE_URL });
+    await db.connect();
+    try {
+      await db.query("DELETE FROM universities WHERE id = $1 AND name = $2", [id, name]);
+    } finally {
+      await db.end();
+    }
+  }
+});

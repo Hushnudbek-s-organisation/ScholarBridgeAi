@@ -239,8 +239,8 @@ check("the two actions are mutually exclusive in one request", () => {
 
 check("changing a password revokes the target's sessions and retires old links", () => {
   const body = code("src/app/api/admin/accounts/[id]/password/route.ts");
-  assert.match(body, /revokeAllSessionsForProfile\(target\.id\)/, "open sessions survive a reset");
-  assert.match(body, /retireLiveResetTokens\(target\.id, now\)/, "an older reset link survives the reset");
+  assert.match(body, /tx\.update\(userSessions\)/, "open sessions survive a reset");
+  assert.match(body, /retireLiveResetTokens\(target\.id, now, tx\)/, "an older reset link survives the reset");
   assert.match(body, /passwordChangedAt: now/, "the change is not recorded on the account");
 });
 
@@ -256,7 +256,7 @@ check("an admin-changed password no longer hands the admin the student's session
   assert.ok(marker > 0, "the ownership check for the session cookie disappeared");
   const cookieBlock = body.slice(body.indexOf('if (newPasswordHash && updatedProfile'));
   assert.match(cookieBlock.slice(0, 260), /actorIsTarget/, "the cookie is still issued for any target");
-  assert.match(body, /revokeAllSessionsForProfile\(profileId\)/, "an admin reset does not revoke the student's sessions");
+  assert.match(body, /code: "recovery_required"/, "other-account credentials bypass recovery");
 });
 
 /* ------------------------ 5. the link uses the one reset implementation */
@@ -281,7 +281,7 @@ check("the link needs no mail server — that is the point of the endpoint", () 
 check("an unconfigured APP_URL is refused rather than producing a relative link", () => {
   const body = code("src/app/api/admin/accounts/[id]/reset-link/route.ts");
   assert.match(body, /configuredAppUrl\(\)/, "the link origin is not the canonical app URL");
-  assert.match(body, /code: "app_url_missing"/);
+  assert.match(body, /"app_url_missing"/);
 });
 
 check("the issued token has the same shape and lifetime as any other", () => {
@@ -358,7 +358,7 @@ check("every password action is audited with the administrator's name", () => {
     "src/app/api/admin/accounts/[id]/password/route.ts",
     "src/app/api/admin/accounts/[id]/reset-link/route.ts",
   ]) {
-    assert.match(code(route), /auditPasswordAction\(/, `${route} does not audit the action`);
+    assert.match(code(route), /tx\.insert\(auditLogs\)/, `${route} does not audit the action`);
   }
 });
 

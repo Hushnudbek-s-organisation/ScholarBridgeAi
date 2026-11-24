@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { passwordResetTokens, studentProfiles } from "@/db/schema";
 import { configuredAppUrl } from "@/lib/appUrl";
@@ -104,18 +104,19 @@ export async function POST(req: Request) {
       return NextResponse.json(generic, { headers: { "Cache-Control": "no-store" } });
     }
 
-    // One live link per account: a leaked older link dies here.
-    await db
-      .update(passwordResetTokens)
-      .set({ usedAt: now })
-      .where(and(eq(passwordResetTokens.profileId, profile.id), isNull(passwordResetTokens.usedAt)));
-
-    await db.insert(passwordResetTokens).values({
-      profileId: profile.id,
-      tokenHash,
-      expiresAt,
-      requestedIp: ip,
+    const issued = await db.transaction(async (tx) => {
+      const [current] = await tx.select({ email: studentProfiles.email })
+        .from(studentProfiles).where(eq(studentProfiles.id, profile.id)).for("update");
+      if (!current || current.email.toLowerCase() !== email) return false;
+      await tx.update(passwordResetTokens).set({ usedAt: now }).where(and(
+        eq(passwordResetTokens.profileId, profile.id),
+        isNull(passwordResetTokens.usedAt),
+        ne(passwordResetTokens.requestedIp, "admin"),
+      ));
+      await tx.insert(passwordResetTokens).values({ profileId: profile.id, tokenHash, expiresAt, requestedIp: ip });
+      return true;
     });
+    if (!issued) return NextResponse.json(generic, { headers: { "Cache-Control": "no-store" } });
 
     const { subject, text } = buildResetEmail({ link, appName: "ScholarBridge", locale });
     const sent = await sendMail({ to: profile.email, subject, text });

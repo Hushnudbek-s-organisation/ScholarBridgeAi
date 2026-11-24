@@ -114,7 +114,7 @@ function savedPlacement(hasDock: boolean): Placement {
   return hasDock && window.matchMedia("(max-width: 767px)").matches ? "dock" : "corner";
 }
 
-export function SchollyCompanion({ activeTab, activePane, topics = [], navigate, locale = "uz", hasDock = true, profileId = null, profileName = "", profileFacts = [], deferModel = false }: {
+export function SchollyCompanion({ activeTab, activePane, topics = [], navigate, locale = "uz", hasDock = true, profileId = null, profileName = "", profileFacts = [] }: {
   activeTab: string;
   activePane?: string | null;
   topics?: Topic[];
@@ -124,7 +124,6 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   profileId?: number | null;
   profileName?: string;
   profileFacts?: string[];
-  deferModel?: boolean;
 }) {
   const language = locale === "en" || locale === "ru" ? locale : "uz";
   const t = strings[language];
@@ -520,7 +519,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
         onPointerUp={event => pointerEnd(event)} onPointerCancel={event => pointerEnd(event, true)}
         onLostPointerCapture={event => pointerEnd(event, true)} onContextMenu={event => event.preventDefault()}
         onClick={activateLauncher}>
-        <SchollyModel floating staticPreview={deferModel} trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} />
+        <SchollyModel trackPointer={!quiet} paused={quiet || keyboardOpen || hidden} held={held} motion={animation} />
         {earnedPoints !== null && <span className="sb-scholly-points-pop" aria-hidden="true">+{earnedPoints}</span>}
         {animation === "shake" && <span className="sb-scholly-dizzy-stars" aria-hidden="true">
           <span data-index="0">★</span><span data-index="1">★</span><span data-index="2">★</span>

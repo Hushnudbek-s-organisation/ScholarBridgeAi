@@ -41,7 +41,6 @@ import {
 import { formatMoney, formatNumber } from "@/lib/format";
 import { SourceLanguageProse } from "@/components/SourceLanguageProse";
 import { reconcileEmbeddedRank } from "@/lib/universityProse";
-import { verifiedQsRank } from "@/lib/universityRank";
 
 /**
  * Public university profile — /universities/[id].
@@ -96,7 +95,7 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
   const academic=resolveAcademicRequirements(bundle?.facts?.get(university.id)??[],{});
   // Phase AD: a rank with no recorded edition is not a QS position, so the
   // <meta> description states "unknown" rather than an unsupported number.
-  const qsPosition = verifiedQsRank(university);
+  const qsPosition = bundle?.qsRankings.get(university.id) ?? null;
   return {
     title: formatMessage(t.metaTitle, { name: university.name, country }),
     description: formatMessage(t.metaDescription, {
@@ -108,8 +107,8 @@ export async function generateMetadata({ params }: DetailPageProps): Promise<Met
       ielts: academic.summary.ielts != null
         ? formatNumber(academic.summary.ielts.single, { decimals: 1 })
         : t.metaUnknown,
-      rank: verified && qsPosition
-        ? `#${formatNumber(qsPosition.rank)}`
+      rank: qsPosition
+        ? qsPosition.label
         : t.metaUnknown,
     }),
   };
@@ -141,7 +140,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // Phase AD — the one QS position this page may state: `null` when the row
   // records no edition (`qs_rank_year`), when the number is broken, or when the
   // row is unverified. Every rank below, and the prose reconciliation, reads it.
-  const qsPosition = verified ? verifiedQsRank(u) : null;
+  const qsPosition = bundle?.qsRankings.get(u.id) ?? null;
   const number = (value: number | null, decimals = 0) =>
     value == null ? null : formatNumber(value, { decimals });
   const verifiedValue = (value: number | null, decimals = 0) =>
@@ -159,15 +158,15 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // the stored prose and the ranking chip were generated before that correction
   // and still state the old sequence — 178 of 194 disagree. Passing the rank in
   // makes the page state one QS number, not two.
-  const description = u.description ? universityDescriptionState(u.description, locale, qsPosition?.rank ?? null) : null;
+  const description = verified && u.description ? universityDescriptionState(u.description, locale, qsPosition?.rank ?? null) : null;
   // `highlights` is a JSON-array column; localize the array, then flatten it to
   // the labels the page lists.
   // Compared against the same corrected numbers the localized chips carry, so a
   // rank fix alone never counts as "translated" when the chip is still English.
-  const storedHighlights = u.highlights
+  const storedHighlights = verified && u.highlights
     ? listValues(u.highlights).map((item) => reconcileEmbeddedRank(item, qsPosition?.rank ?? null))
     : [];
-  const highlights = u.highlights
+  const highlights = verified && u.highlights
     ? listValues(localizeHighlights(u.highlights, locale, qsPosition?.rank ?? null))
     : [];
   // Badges fall under the same rule: a badge that could not be rendered cleanly
@@ -182,14 +181,14 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // Costs show the stored currency first and the USD comparison second; when
   // only the USD mirror exists, it is labelled as such.
   const tuitionLocal =
-    u.annualTuition != null && u.tuitionCurrency
+    verified && u.annualTuition != null && u.tuitionCurrency
       ? formatMoney(u.annualTuition, u.tuitionCurrency, {
           suffix: u.tuitionPeriod === "month" ? ` ${t.monthly}` : ` ${t.yearly}`,
         })
       : null;
   const tuitionUsd = verified && u.annualTuitionUsd != null ? formatMoney(u.annualTuitionUsd, "USD") : null;
   const livingLocal =
-    u.annualLivingEst != null && u.livingCostCurrency
+    verified && u.annualLivingEst != null && u.livingCostCurrency
       ? formatMoney(u.annualLivingEst, u.livingCostCurrency, {
           suffix: u.livingCostPeriod === "month" ? ` ${t.monthly}` : ` ${t.yearly}`,
         })
@@ -230,7 +229,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
 
   const facts: { icon: React.ReactNode; label: string; value: string | null }[] = [
     { icon: <Building2 className="h-3.5 w-3.5" aria-hidden />, label: t.typeLabel, value: type ?? degree },
-    { icon: <Trophy className="h-3.5 w-3.5" aria-hidden />, label: t.rankLabel, value: verifiedValue(qsPosition?.rank ?? null) },
+    { icon: <Trophy className="h-3.5 w-3.5" aria-hidden />, label: t.rankLabel, value: qsPosition?.label ?? null },
     { icon: <Wallet className="h-3.5 w-3.5" aria-hidden />, label: t.tuitionLabel, value: tuitionLocal ?? tuitionUsd },
     { icon: <Banknote className="h-3.5 w-3.5" aria-hidden />, label: t.livingLabel, value: livingLocal ?? livingUsd },
     { icon: <CalendarDays className="h-3.5 w-3.5" aria-hidden />, label: t.foundedLabel, value: verifiedValue(u.foundedYear) },
@@ -256,7 +255,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
     {
       icon: <CalendarDays className="h-3.5 w-3.5" aria-hidden />,
       label: t.qsYearLabel,
-      value: verifiedValue(u.qsRankYear),
+      value: number(qsPosition?.year ?? null),
     },
   ];
 
@@ -304,11 +303,12 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           {/* The three numbers a student decides with, as badges — three, not
               the eight the card used to stack. */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {verifiedValue(qsPosition?.rank ?? null) && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800 ring-1 ring-inset ring-blue-200">
+            {qsPosition && (
+              <a href={qsPosition.sourceUrl} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800 ring-1 ring-inset ring-blue-200 hover:underline">
                 <Trophy className="h-3 w-3" aria-hidden />
-                {t.rankLabel}: #{verifiedValue(qsPosition?.rank ?? null)}
-              </span>
+                QS {qsPosition.year} {qsPosition.label}
+              </a>
             )}
             {(tuitionLocal ?? tuitionUsd) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-inset ring-slate-200">

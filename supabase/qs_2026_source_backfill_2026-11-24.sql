@@ -1,0 +1,151 @@
+begin;
+
+-- Identity matches checked against the provider's QS 2026 CSV in data/ and
+-- the explicit alias list in src/lib/qsRankAudit.ts.
+insert into public.sources (url, title, domain, source_type, accessed_at, is_official, is_verified)
+values ('https://www.topuniversities.com/world-university-rankings/2026', 'QS World University Rankings 2026',
+        'www.topuniversities.com', 'official_ranking', now(), true, true)
+on conflict (url) do nothing;
+
+with audited (id, name, rank, rank_label) as (values
+  (202, 'Koç University', 323, '323'),
+  (203, 'Boğaziçi University', 371, '=371'),
+  (204, 'Sabancı University', 404, '=404'),
+  (205, 'Eötvös Loránd University (ELTE)', 584, '=584'),
+  (206, 'Budapest University of Technology and Economics (BME)', 711, '711-720'),
+  (207, 'University of Debrecen', 563, '=563'),
+  (211, 'Jagiellonian University', 303, '=303'),
+  (213, 'Czech Technical University in Prague (CTU)', 416, '=416'),
+  (232, 'Deakin University', 207, '=207'),
+  (233, 'Autonomous University of Madrid', 206, '206'),
+  (234, 'American University of Sharjah', 272, '=272'),
+  (235, 'University of Minnesota Twin Cities', 210, '210'),
+  (239, 'University of Freiburg', 201, '201'),
+  (241, 'University of Florida', 212, '=212'),
+  (242, 'La Trobe University', 233, '=233'),
+  (243, 'University of Erlangen-Nürnberg', 232, '232'),
+  (244, 'University of Bonn', 207, '=207'),
+  (245, 'Maastricht University', 239, '239'),
+  (246, 'University of Campinas', 233, '=233'),
+  (247, 'University of Waikato', 281, '=281'),
+  (248, 'University of Padua', 233, '=233'),
+  (249, 'University of Rochester', 236, '236'),
+  (250, 'Gadjah Mada University', 224, '224'),
+  (251, 'Massey University', 230, '=230'),
+  (252, 'Dartmouth College', 247, '=247'),
+  (253, 'Victoria University of Wellington', 240, '=240'),
+  (254, 'University of Macau', 285, '=285'),
+  (255, 'University of Sussex', 278, '278'),
+  (256, 'Griffith University', 268, '268'),
+  (257, 'Bandung Institute of Technology', 255, '255'),
+  (258, 'Heriot-Watt University', 287, '=287'),
+  (259, 'University of Lisbon', 230, '=230'),
+  (260, 'Canadian University Dubai', 604, '=604'),
+  (261, 'University of Canterbury', 261, '261'),
+  (262, 'Norwegian University of Science and Technology', 267, '267'),
+  (263, 'UCSI University', 269, '=269'),
+  (264, 'University of the Witwatersrand', 291, '291'),
+  (265, 'Tianjin University', 257, '=257'),
+  (266, 'Beijing Normal University', 247, '=247'),
+  (267, 'Universidad Carlos III de Madrid', 301, '301'),
+  (268, 'University of Leicester', 326, '326'),
+  (269, 'University of Milan', 276, '=276'),
+  (270, 'University of Surrey', 262, '=262'),
+  (271, 'Swinburne University of Technology', 294, '=294'),
+  (272, 'University of Bergen', 287, '=287'),
+  (273, 'University of Maryland, College Park', 207, '=207'),
+  (275, 'University of Tübingen', 215, '=215'),
+  (276, 'Vanderbilt University', 250, '250'),
+  (277, 'University of Navarra', 262, '=262'),
+  (278, 'American University of Beirut', 237, '=237'),
+  (279, 'Taylor’s University', 253, '=253'),
+  (281, 'Radboud University', 279, '279'),
+  (282, 'University College Cork', 246, '246'),
+  (283, 'University of Galway', 284, '284'),
+  (284, 'Dalhousie University', 283, '283'),
+  (285, 'University of Porto', 237, '=237'),
+  (286, 'Ulsan National Institute of Science and Technology', 310, '=310'),
+  (288, 'University of Strathclyde', 251, '=251'),
+  (289, 'The University of Arizona', 287, '=287'),
+  (290, 'University of Tasmania', 314, '=314'),
+  (291, 'Xi’an Jiaotong University', 305, '305'),
+  (292, 'Stellenbosch University', 302, '302'),
+  (293, 'University of Virginia', 275, '275'),
+  (294, 'Swansea University', 292, '292'),
+  (295, 'Huazhong University of Science and Technology', 319, '319'),
+  (296, 'Hamad Bin Khalifa University', 244, '=244'),
+  (297, 'École Normale Supérieure de Lyon', 205, '205'),
+  (299, 'Case Western Reserve University', 294, '=294'),
+  (300, 'Vrije Universiteit Brussel', 294, '=294'),
+  (301, 'Southern University of Science and Technology', 343, '=343'),
+  (310, 'University of Newcastle (Australia)', 227, '=227'),
+  (314, 'The Ohio State University', 190, '190'),
+  (315, 'Indian Institute of Science', 219, '=219'),
+  (316, 'Indian Institute of Technology Kharagpur', 215, '=215'),
+  (318, 'Université libre de Bruxelles', 227, '=227'),
+  (319, 'Politecnico di Torino', 242, '242'),
+  (320, 'Technical University of Darmstadt', 253, '=253'),
+  (321, 'Hong Kong Baptist University', 244, '=244'),
+  (322, 'Indian Institute of Technology Kanpur', 222, '222'),
+  (323, 'Universiti Teknologi PETRONAS', 251, '=251'),
+  (324, 'Université Paris 1 Panthéon-Sorbonne', 257, '=257'),
+  (325, 'Bauman Moscow State Technical University', 320, '320'),
+  (326, 'Queensland University of Technology', 226, '226'),
+  (327, 'Kyung Hee University', 331, '=331'),
+  (328, 'Gwangju Institute of Science and Technology (GIST)', 385, '=385'),
+  (329, 'Istanbul Technical University (İTÜ)', 298, '298'),
+  (330, 'Bilkent University', 415, '415'),
+  (331, 'Hacettepe University', 571, '=571'),
+  (332, 'Istanbul University', 628, '=628'),
+  (333, 'Yıldız Technical University (YTÜ)', 731, '731-740'),
+  (334, 'Ankara University', 697, '=697'),
+  (335, 'University of Naples Federico II', 379, '=379'),
+  (336, 'University of Pisa (UNIPI)', 343, '=343'),
+  (337, 'University of Florence (UNIFI)', 404, '=404'),
+  (338, 'University of Turin (UniTo)', 408, '408'),
+  (339, 'University of Szeged (SZTE)', 597, '=597'),
+  (340, 'University of Pécs', 741, '741-750'),
+  (343, 'Hungarian University of Agriculture and Life Sciences (MATE)', 1001, '1001-1200'),
+  (344, 'Óbuda University', 1001, '1001-1200'),
+  (345, 'Széchenyi István University', 1001, '1001-1200'),
+  (346, 'RUDN University (Peoples'' Friendship University)', 367, '=367'),
+  (347, 'Saint Petersburg State University (SPbU)', 375, '=375'),
+  (348, 'HSE University (Higher School of Economics)', 440, '=440'),
+  (349, 'Moscow Institute of Physics and Technology (MIPT / Phystech)', 477, '=477'),
+  (350, 'Novosibirsk State University (NSU)', 461, '=461'),
+  (351, 'Tomsk State University (TSU)', 499, '=499'),
+  (352, 'National Research Nuclear University MEPhI', 591, '=591'),
+  (353, 'Kazan Federal University (KFU)', 450, '=450'),
+  (354, 'Sunway University', 410, '=410'),
+  (355, 'International Islamic University Malaysia (IIUM)', 613, '=613'),
+  (356, 'Warsaw University of Technology (WUT)', 487, '=487'),
+  (357, 'AGH University of Krakow', 801, '801-850'),
+  (358, 'Adam Mickiewicz University, Poznań', 741, '741-750'),
+  (359, 'Gdańsk University of Technology (Gdańsk Tech)', 801, '801-850'),
+  (360, 'Wrocław University of Science and Technology', 851, '851-900'),
+  (361, 'University of Wrocław', 801, '801-850'),
+  (362, 'Poznań University of Technology (PUT)', 1001, '1001-1200'),
+  (363, 'Lodz University of Technology (TUL)', 1001, '1001-1200'),
+  (364, 'United Arab Emirates University (UAEU)', 229, '229')
+)
+insert into public.university_rankings (
+  university_id, ranking_provider, ranking_name, ranking_year, rank, rank_label,
+  source_id, verified_at, verification_status
+)
+select u.id, 'QS Quacquarelli Symonds', 'QS World University Rankings', 2026,
+       a.rank, a.rank_label, s.id, now(), 'verified'
+from audited a
+join public.universities u on u.id = a.id and u.name = a.name and u.is_active
+join public.sources s on s.url = 'https://www.topuniversities.com/world-university-rankings/2026'
+where s.is_official and s.is_verified
+on conflict (university_id, ranking_provider, ranking_name, ranking_year) do update
+set rank = excluded.rank, rank_label = excluded.rank_label, source_id = excluded.source_id,
+    verified_at = excluded.verified_at, verification_status = excluded.verification_status
+where university_rankings.verification_status <> 'verified';
+
+insert into public.cache_revisions (scope, revision, reason, updated_at)
+values ('catalogue', 2, 'Linked audited QS 2026 positions to their source', now())
+on conflict (scope) do update
+set revision = public.cache_revisions.revision + 1, reason = excluded.reason, updated_at = now();
+
+commit;

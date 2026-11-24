@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { Gift, Settings2, Loader2, RefreshCw, Save, Upload, Download, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { DEFAULT_FEATURE_PLAN, type FeatureKey, type Plan } from "@/lib/featurePlans";
 import { REFERRAL_POINTS_REFERRER } from "@/lib/referral-point-rules";
 
 interface ConfigManagerProps {
@@ -18,6 +19,7 @@ interface ConfigRow {
 }
 
 export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
+  const t = useTranslations("admin");
   const [rows, setRows] = useState<ConfigRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState("");
@@ -60,7 +62,9 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
       setMessage({ ok: true, text: `${key} updated` });
-      setRows((prev) => prev.map((r) => (r.key === key ? { ...r, value } : r)));
+      setRows((prev) => prev.some((row) => row.key === key)
+        ? prev.map((row) => row.key === key ? { ...row, value } : row)
+        : [...prev, { key, value, description: null }]);
     } catch (err: any) {
       setMessage({ ok: false, text: err.message || "Failed to save" });
     } finally {
@@ -150,10 +154,36 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
 
       <ReferralRewardsCard rows={rows} savingKey={savingKey} onSave={save} />
 
+      <details className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs">
+        <summary className="cursor-pointer rounded-control text-sm font-bold text-ink-heading">
+          {t("featureAccessHeading")}
+        </summary>
+        <p className="mb-3 mt-2 text-sm text-ink-body">{t("featureAccessHint")}</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {(Object.entries(DEFAULT_FEATURE_PLAN) as [FeatureKey, Plan][]).map(([feature, defaultPlan]) => {
+            const key = "feature_" + feature;
+            const stored = rows.find((row) => row.key === key)?.value;
+            const value = stored === "free" || stored === "premium" || stored === "admin" ? stored : defaultPlan;
+            return (
+              <label key={feature} className="grid gap-1 rounded-control border border-slate-200 p-2 text-sm font-medium text-ink-body">
+                <span className="capitalize">{feature.replaceAll("_", " ").replace(/^ai /, "AI ")}</span>
+                <select value={value} disabled={loading || !!savingKey}
+                  className="min-h-11 rounded-control border border-slate-300 bg-canvas px-2 text-ink-heading"
+                  onChange={(event) => void save(key, event.target.value)}>
+                  <option value="free">{t("featureAccessFree")}</option>
+                  <option value="premium">{t("featureAccessPremium")}</option>
+                  <option value="admin">{t("featureAccessAdmin")}</option>
+                </select>
+              </label>
+            );
+          })}
+        </div>
+      </details>
+
       <ConfigTransferCard onApplied={load} />
 
       {message && (
-        <div className={`rounded-surface px-4 py-3 text-xs font-semibold ${message.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"}`}>
+        <div role={message.ok ? "status" : "alert"} className={`rounded-surface px-4 py-3 text-xs font-semibold ${message.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"}`}>
           {message.text}
         </div>
       )}
@@ -175,7 +205,7 @@ export function ConfigManager({ adminProfileId }: ConfigManagerProps) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {rows.filter((row) => !row.key.startsWith("feature_")).map((r) => (
                   <tr key={r.key} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
                     <td className="px-4 py-2.5 font-mono font-bold text-slate-700">{r.key}</td>
                     <td className="px-4 py-2.5">

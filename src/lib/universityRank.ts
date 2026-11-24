@@ -72,3 +72,32 @@ export function verifiedQsRankNumber(row: QsRankRow): number | null {
 export function verifiedRankWithEdition(rank: number | null | undefined, year: number | null | undefined): number | null {
   return verifiedQsRank({ worldRanking: rank, qsRankYear: year })?.rank ?? null;
 }
+
+export interface SourcedQsRanking extends VerifiedQsRank {
+  label: string;
+  sourceUrl: string;
+  /** Upper end of the published rank band, or the same rank for an exact position. */
+  upperRank: number;
+}
+
+/** QS labels preserve ties and rank bands. The lower bound is used for sorting. */
+export function sourcedQsRanking(row: {
+  rank: number | null;
+  rankLabel: string | null;
+  year: number;
+  sourceUrl: string;
+}): SourcedQsRanking | null {
+  const rankMatch = /^#?(=?)([1-9]\d*)(?:\s*[-–]\s*([1-9]\d*))?$/.exec(row.rankLabel?.trim() ?? "");
+  if (row.rankLabel?.trim() && !rankMatch) return null;
+  const rank = rankMatch ? Number(rankMatch[2]) : row.rank;
+  const position = verifiedQsRank({ worldRanking: rank, qsRankYear: row.year });
+  if (!position || !Number.isSafeInteger(position.rank) || !/^https:\/\//i.test(row.sourceUrl)) return null;
+  const upperRank = rankMatch?.[3] ? Number(rankMatch[3]) : position.rank;
+  if (!Number.isSafeInteger(upperRank) || upperRank < position.rank) return null;
+  if (row.rank != null && row.rank !== position.rank) return null;
+  if (upperRank !== position.rank && rankMatch?.[1]) return null;
+  const label = upperRank === position.rank
+    ? `#${rankMatch?.[1] ?? ""}${position.rank}`
+    : `#${position.rank}–${upperRank}`;
+  return { ...position, upperRank, label, sourceUrl: row.sourceUrl };
+}

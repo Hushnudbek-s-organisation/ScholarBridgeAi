@@ -1,10 +1,13 @@
 import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { universities } from "@/db/schema";
+import { auditLogs, sources, universities, universityRankings } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { auditRowChanges, writeAudit } from "@/lib/audit";
+import { loadVerifiedQsRankings } from "@/lib/universityRankings.server";
+import { sourcedQsRanking, type SourcedQsRanking } from "@/lib/universityRank";
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { invalidateCatalogCache } from "@/lib/catalogCache";
 
 type Input = Record<string, unknown>;
@@ -183,6 +186,62 @@ function normalizeValues(input: Input, creating: boolean): UniversityValues {
   return values;
 }
 
+function publishedRanking(input: unknown): SourcedQsRanking | null {
+  if (input == null) return null;
+  if (typeof input !== "object") throw new Error("QS ranking must be an object");
+  const value = input as Input;
+  const sourceUrl = typeof value.sourceUrl === "string" ? value.sourceUrl.trim() : "";
+  const rankLabel = typeof value.label === "string" ? value.label.trim() : "";
+  if (!/^https:\/\/(?:www\.)?topuniversities\.com\/(?:universities\/[^/?#]+|world-university-rankings(?:\/\d{4})?|qs-top-uni-wur)\/?(?:[?#].*)?$/i.test(sourceUrl)) {
+    throw new Error("A valid official QS source URL is required");
+  }
+  const ranking = sourcedQsRanking({ rank: null, rankLabel, year: Number(value.year), sourceUrl });
+  if (!ranking) throw new Error("A valid QS edition and published position or band are required");
+  return ranking;
+}
+
+async function storeRanking(
+  tx: Pick<typeof db, "insert">, universityId: number, ranking: SourcedQsRanking, actor: string,
+) {
+  const now = new Date();
+  const [source] = await tx.insert(sources).values({
+    url: ranking.sourceUrl, title: "QS World University Rankings",
+    domain: new URL(ranking.sourceUrl).hostname, sourceType: "official_ranking",
+    isOfficial: true, isVerified: true, accessedAt: now,
+  }).onConflictDoUpdate({
+    target: sources.url, set: { isOfficial: true, isVerified: true, accessedAt: now },
+  }).returning({ id: sources.id });
+  const values = {
+    rank: ranking.rank, rankLabel: ranking.label, sourceId: source.id,
+    verifiedAt: now, verificationStatus: "verified",
+  };
+  await tx.insert(universityRankings).values({
+    universityId, rankingName: "QS World University Rankings", rankingProvider: "QS Quacquarelli Symonds",
+    rankingYear: ranking.year, ...values,
+  }).onConflictDoUpdate({
+    target: [universityRankings.universityId, universityRankings.rankingProvider, universityRankings.rankingName, universityRankings.rankingYear],
+    set: values,
+  });
+  await tx.insert(auditLogs).values({
+    entityType: "university", entityId: universityId, fieldChanged: "qsRanking",
+    newValue: String(ranking.year) + " " + ranking.label, source: ranking.sourceUrl,
+    actor, verificationStatus: "verified",
+  });
+}
+
+export async function GET(req: Request) {
+  try {
+    const access = await requireAdmin(req);
+    if (!access.ok) return privateNoStoreJson({ error: access.error, code: access.code }, { status: access.status });
+    const rows = await db.select().from(universities).orderBy(universities.name, universities.id);
+    const rankings = await loadVerifiedQsRankings(rows.map((row) => row.id));
+    return privateNoStoreJson({ universities: rows.map((row) => ({ ...row, qsRanking: rankings.get(row.id) ?? null })) });
+  } catch (error) {
+    console.error("Admin catalogue could not be loaded:", (error as Error)?.name);
+    return privateNoStoreJson({ error: "Catalogue unavailable" }, { status: 503 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const access = await requireAdmin(req);
@@ -193,7 +252,12 @@ export async function POST(req: Request) {
     if (!boundedJson.ok) return Response.json({ error: boundedJson.error, code: boundedJson.code }, { status: boundedJson.status });
     const body = boundedJson.body;
     const values = normalizeValues((body.university || {}) as Input, true);
-    const [university] = await db.insert(universities).values(values as typeof universities.$inferInsert).returning();
+    const ranking = publishedRanking(body.qsRanking);
+    const university = await db.transaction(async (tx) => {
+      const [row] = await tx.insert(universities).values(values as typeof universities.$inferInsert).returning();
+      if (ranking) await storeRanking(tx, row.id, ranking, access.session.profile.email);
+      return row;
+    });
     await writeAudit({
       entityType: "university",
       entityId: university.id,
@@ -230,11 +294,18 @@ export async function PATCH(req: Request) {
     if (!existing) return NextResponse.json({ error: "University not found" }, { status: 404 });
 
     const values = normalizeValues((body.university || {}) as Input, false);
-    if (Object.keys(values).length === 0) {
+    const ranking = publishedRanking(body.qsRanking);
+    if (!ranking && Object.keys(values).length === 0) {
       return NextResponse.json({ error: "No university fields supplied" }, { status: 400 });
     }
-    const [university] = await db.update(universities).set(values as Partial<typeof universities.$inferInsert>)
-      .where(eq(universities.id, id)).returning();
+    const university = await db.transaction(async (tx) => {
+      const [row] = Object.keys(values).length
+        ? await tx.update(universities).set(values as Partial<typeof universities.$inferInsert>)
+            .where(eq(universities.id, id)).returning()
+        : [existing];
+      if (ranking) await storeRanking(tx, id, ranking, access.session.profile.email);
+      return row;
+    });
     await auditRowChanges("university", id, existing, { ...existing, ...values }, { actor: "ADMIN" });
     await invalidateCatalogCache("universities");
     return NextResponse.json({ university });
@@ -257,11 +328,15 @@ export async function DELETE(req: Request) {
     if (!Number.isInteger(id) || id < 1) {
       return NextResponse.json({ error: "University id is required" }, { status: 400 });
     }
-    await db.delete(universities).where(eq(universities.id, id));
+    const [archived] = await db.update(universities).set({ isActive: false })
+      .where(eq(universities.id, id)).returning({ id: universities.id });
+    if (!archived) return NextResponse.json({ error: "University not found" }, { status: 404 });
+    await writeAudit({ entityType: "university", entityId: id, fieldChanged: "isActive",
+      newValue: "false", actor: "ADMIN", source: "admin:" + String(access.session.profile.id) });
     await invalidateCatalogCache("universities");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/admin/universities error:", error);
-    return NextResponse.json({ error: "Failed to delete university" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to archive university" }, { status: 500 });
   }
 }

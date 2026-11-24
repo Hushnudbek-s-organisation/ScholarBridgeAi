@@ -717,7 +717,7 @@ export function VisaSpeakingAssistant({
   const [ttsSupported] = useState(() => getSafeSpeechSynthesis() !== null);
   const [micBlocked, setMicBlocked] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [loadedModelAnswer, setLoadedModelAnswer] = useState(false);
+  const [modelAnswerExample, setModelAnswerExample] = useState<{ text: string; question: string | null; turn: number } | null>(null);
   const [loadingModelAnswer, setLoadingModelAnswer] = useState(false);
   /**
    * A page embedded in someone else's frame needs the PARENT to grant
@@ -1057,6 +1057,8 @@ export function VisaSpeakingAssistant({
   // Whether this destination has an authored model answer at all. The samples
   // themselves stay in a lazy chunk and are only fetched when the student taps.
   const hasModelAnswer = visaSampleCountryFor(countryCode) !== null;
+  const visibleModelAnswer = modelAnswerExample?.question === (lastOfficer?.text ?? null) &&
+    modelAnswerExample?.turn === userTurns ? modelAnswerExample.text : null;
 
   async function loadModelAnswer(): Promise<void> {
     if (!hasModelAnswer) return;
@@ -1070,9 +1072,7 @@ export function VisaSpeakingAssistant({
         userTurns,
       );
       if (!answer) return;
-      setTextAnswer(answer);
-      setLoadedModelAnswer(true);
-      setNotice(t("modelAnswerLoaded"));
+      setModelAnswerExample({ text: answer, question: lastOfficer?.text ?? null, turn: userTurns });
     } catch (err) {
       console.warn("Visa model answer failed to load:", err);
     } finally {
@@ -2843,7 +2843,6 @@ export function VisaSpeakingAssistant({
                   state={reactorStatus}
                   level={reactorLevel}
                   measuredAudio={measuredSpeech || engineMode === "gemini-live"}
-                  countryFlag={country.flag}
                   countryName={localizedCountryName(country.name)}
                   statusLabel={
                     reactorStatus === "SPEAKING"
@@ -3102,9 +3101,7 @@ export function VisaSpeakingAssistant({
                   </Button>
                 </div>
 
-                {/* 1-click model answer: fills the box with the authored
-                    answer for THIS question so the student can see the level
-                    of detail expected, then edit it into their own words. */}
+
                 {hasModelAnswer && (
                   <div className="flex flex-wrap items-center gap-2">
                     <Button variant="unstyled"
@@ -3121,8 +3118,13 @@ export function VisaSpeakingAssistant({
                       {t("loadModelAnswer")}
                     </Button>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {loadedModelAnswer ? t("modelAnswerTip") : t("modelAnswerHint")}
+                      {t("modelAnswerHint")}
                     </span>
+                    {visibleModelAnswer && (
+                      <blockquote className="basis-full rounded-control border-s-2 border-indigo-400 bg-canvas p-3 text-sm text-ink-body">
+                        {visibleModelAnswer}
+                      </blockquote>
+                    )}
                   </div>
                 )}
               </div>

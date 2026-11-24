@@ -29,6 +29,7 @@ import { MatchBreakdownStrip } from "./MatchBreakdownStrip";
 import { DecisionPillStrip } from "./DecisionPillStrip";
 import { MatchEvidenceBadge } from "./MatchEvidenceBadge";
 import type { MatchBreakdown } from "@/lib/matching";
+import type { SourcedQsRanking } from "@/lib/universityRank";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { Pagination } from "./Pagination";
 import { useResponsivePerPage } from "@/hooks/useResponsivePerPage";
@@ -73,6 +74,8 @@ export interface University {
   city: string;
   flagEmoji: string;
   worldRanking: number | null;
+  qsRanking?: SourcedQsRanking | null;
+  estimatedChance?: { percentage: null; reason: "profile_required" | "insufficient_validated_outcomes" };
   degreeLevel: string | null;
   programMajor: string;
   annualTuitionUsd: number | null;
@@ -127,6 +130,7 @@ const UNIVERSITY_FILTER_COUNTRIES = withQsTop200Countries([
   "Switzerland",
   "Netherlands",
   "Japan",
+  "Israel",
 ]);
 
 interface UniversityExplorerProps {
@@ -1093,29 +1097,19 @@ export function UniversityExplorer({
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
 
                   {/* Match Score Badge */}
-                  <div className="absolute left-3 right-24 top-3 flex flex-wrap items-center gap-1.5">
+                  <div className="absolute left-3 right-[8rem] top-3 flex flex-wrap items-center gap-1.5">
                     <span data-scholly-help="fit" className={`px-2.5 py-1 rounded-full text-xs font-bold border shadow-xs ${matchBadgeColor}`}>
                       {uni.matchScore != null ? t("exMatchPct", { score: uni.matchScore }) : t("exMatchUnavailable")}
                     </span>
-                    {/* The retired composite index is NOT rendered. A card shows
-                        the profile fit (a comparison) and, when a real programme
-                        is recorded, which one the detail page focuses on. No
-                        Safety/Likely/Target/Reach label, no chance percentage. */}
-                    {uni.programmeDiscovery?.selectedProgrammeName && (
-                      <span className="inline-flex items-center gap-1 rounded-control bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                        {t("exProgrammeFocus")}: {uni.programmeDiscovery.selectedProgrammeName}
-                      </span>
-                    )}
                   </div>
 
-                  {/* World Rank Badge — only when the API published a position
-                      (Phase AD: a rank with no recorded edition is dropped
-                      upstream, so the card shows no badge at all). */}
-                  {uni.worldRanking != null && (
-                    <div className="absolute top-3 right-3 bg-slate-900/90 text-amber-300 text-xs font-bold px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1">
-                      <Star className="h-3 w-3 fill-amber-300" />
-                      {t("exWorldRank", { rank: formatNumber(uni.worldRanking, { placeholder: "—" }) })}
-                    </div>
+                  {uni.qsRanking && (
+                    <a href={uni.qsRanking.sourceUrl} target="_blank" rel="noopener noreferrer"
+                      aria-label={t("exQsRank", { year: uni.qsRanking.year, rank: uni.qsRanking.label })}
+                      className="absolute top-3 right-3 flex items-center gap-1 rounded-full border border-white/10 bg-slate-900/90 px-2.5 py-1 text-xs font-bold text-amber-300 hover:underline focus-visible:outline-2 focus-visible:outline-white">
+                      <Star className="h-3 w-3 fill-amber-300" aria-hidden />
+                      {t("exQsRank", { year: uni.qsRanking.year, rank: uni.qsRanking.label })}
+                    </a>
                   )}
 
                   {/* Title & Country Overlay */}
@@ -1177,7 +1171,7 @@ export function UniversityExplorer({
                       // El-Yurt Umidi funds applicants admitted to top-ranked
                       // universities; ≤300 on the catalogue's QS-based ranking
                       // is a CRITERION MATCH, never a promise of an award.
-                      if (uni.worldRanking != null && uni.worldRanking <= 300) {
+                      if (uni.qsRanking && uni.qsRanking.upperRank <= 300) {
                         const top300Label = t("exTop300Badge").replace(/^🇺🇿\s*/, "");
                         metaChips.push({
                           key: "top300",
@@ -1260,6 +1254,19 @@ export function UniversityExplorer({
                         The card shows the four numbers that decide "can I
                         afford / qualify" and nothing else; every secondary
                         diagnostic lives in the details drawer below. */}
+                    {uni.programmeDiscovery?.selectedProgrammeName && (
+                      <p className="mb-2 line-clamp-2 text-xs text-ink-body">
+                        <strong>{t("exProgrammeFocus")}</strong> · {uni.programmeDiscovery.selectedProgrammeName}
+                      </p>
+                    )}
+                    <div className="mb-3 rounded-surface border border-slate-200 px-3 py-2 dark:border-slate-700">
+                      <p className="text-xs font-bold text-ink-heading">{t("exEstimatedChance")}</p>
+                      <p className="mt-0.5 text-xs leading-normal text-ink-body">
+                        {uni.estimatedChance?.reason === "profile_required" && !activeProfile
+                          ? t("exChanceSignIn") : t("exChanceInsufficientEvidence")}
+                      </p>
+                    </div>
+
                     <div className="mb-3 mt-auto grid grid-cols-2 gap-2 rounded-surface border border-slate-200/80 bg-slate-50 p-3 text-xs dark:border-slate-700/80 dark:bg-slate-800/60">
                       <div>
                         <span className="block text-slate-500 dark:text-slate-400">{t("exAnnualTuition")}</span>
@@ -1544,7 +1551,7 @@ export function UniversityExplorer({
                   <tr>
                     <td className="sticky left-0 z-10 bg-white py-2.5 px-4 font-semibold text-slate-500 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">{t("exMWorldRanking")}</td>
                     {comparedUniversities.map((u) => (
-                      <td key={u.id} className="py-2.5 px-4 font-bold text-indigo-600">#{formatNumber(u.worldRanking, { placeholder: "—" })}</td>
+                      <td key={u.id} className="py-2.5 px-4 font-bold text-indigo-600">{u.qsRanking ? t("exQsRank", { year: u.qsRanking.year, rank: u.qsRanking.label }) : t("notSpecified")}</td>
                     ))}
                   </tr>
                   <tr><td className="sticky left-0 z-10 bg-white px-4 py-3 font-semibold text-slate-500">{t("academicReqs")}</td>{comparedUniversities.map(u=><td key={u.id} className="px-4 py-3"><DecisionPillStrip university={u} profile={activeProfile} compact/></td>)}</tr>

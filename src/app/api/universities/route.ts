@@ -17,7 +17,6 @@ import { toUniversityData } from "@/lib/profileMapping";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 import { universityProgrammeDiscovery } from "@/lib/universityProgrammeDiscovery";
 import { matchesUniversityType } from "@/lib/universityType";
-import { verifiedQsRank } from "@/lib/universityRank";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
 import { parseUniversitySort, semanticRerankAllowed, sortUniversities } from "@/lib/universitySort";
@@ -60,22 +59,19 @@ export async function GET(req: Request) {
     // ordering, or chancing inputs. Preserve the database row; sanitize only
     // this response-local copy. Institution type is handled separately and
     // remains unknown unless its own evidence says otherwise.
-    let allUnis = bundle.unis.map((uni) => {
-      if (uni.verificationStatus === "verified") {
-        // Phase AD: a rank whose edition was never recorded is not a QS
-        // position, so it is not published, filtered or sorted on either.
-        // Phase AF: publish one figure per cost — the resolved USD value, not
-        // the raw legacy mirror that disagreed with the canonical amount on 160
-        // rows. The card and the profile page must not quote two prices.
-        const resolved = withResolvedUsdCosts(uni);
-        if (resolved.worldRanking != null && verifiedQsRank(resolved) == null) {
-          return { ...resolved, worldRanking: null };
-        }
-        return resolved;
-      }
+    let allUnis = bundle.unis.filter((uni) => uni.isActive !== false).map((uni) => {
+      const qsRanking = bundle.qsRankings.get(uni.id) ?? null;
+      const ranking = {
+        qsRanking,
+        worldRanking: qsRanking?.rank ?? null,
+        qsRankYear: qsRanking?.year ?? null,
+      };
+      if (uni.verificationStatus === "verified") return { ...withResolvedUsdCosts(uni), ...ranking };
       return {
         ...uni,
-        worldRanking: null,
+        ...ranking,
+        description: "",
+        highlights: "[]",
         annualTuitionUsd: null,
         annualLivingEstUsd: null,
         accommodationCostUsd: null,
@@ -181,7 +177,7 @@ export async function GET(req: Request) {
       }
     }
 
-    if (minRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking >= minRank);
+    if (minRank) allUnis = allUnis.filter(u => u.worldRanking != null && (u.qsRanking?.upperRank ?? u.worldRanking) >= minRank);
     if (maxRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking <= maxRank);
 
     // Program search: universities offering a program in the searched field (exact).
@@ -267,6 +263,10 @@ export async function GET(req: Request) {
         ...uni,
         programFields: progFields,
         programmeDiscovery,
+        estimatedChance: {
+          percentage: null,
+          reason: profileData ? "insufficient_validated_outcomes" : "profile_required",
+        },
         matchScore: matchInfo.matchScore,
         matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
         matchIssues: translateReasons(locale, "university", matchInfo.issueDetails, matchInfo.potentialIssues),
@@ -347,8 +347,8 @@ export async function GET(req: Request) {
         resolvedFacts: presentedCatalogueFacts(bundle.facts?.get(u.id) ?? []),
         evidence: legacyEvidence({
           entityVerified: raw.verificationStatus === "verified",
-          sourceUrl: typeof raw.website === "string" ? raw.website : null,
-          admissionCycle: typeof raw.qsRankYear === "number" ? String(raw.qsRankYear) : null,
+          sourceUrl: typeof raw.officialWebsiteUrl === "string" ? raw.officialWebsiteUrl : null,
+          admissionCycle: null,
           fields: {
             minGpa: raw.minGpa as number | null,
             minIelts: raw.minIelts as number | null,

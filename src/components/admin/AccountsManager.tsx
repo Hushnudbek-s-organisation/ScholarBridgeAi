@@ -99,6 +99,8 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
   const [selected, setSelected] = useState<Account | null>(null);
   const [adminPassword, setAdminPassword] = useState("");
   const [typedPassword, setTypedPassword] = useState("");
+  const [ownershipVerified, setOwnershipVerified] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result>(null);
@@ -197,6 +199,10 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
           return t("errWeakPassword");
         case "ambiguous_request":
           return t("errAmbiguousRequest");
+        case "ownership_required":
+          return t("verifyOwner");
+        case "protected_account":
+          return t("protectedRecovery");
         case "not_found":
           return t("errNotFound");
         default:
@@ -213,7 +219,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
     setErrorCode("");
     setResult(null);
     try {
-      const json = await post(`/api/admin/accounts/${selected.id}/reset-link`, { adminPassword });
+      const json = await post(`/api/admin/accounts/${selected.id}/reset-link`, { adminPassword, ownershipVerified, newEmail });
       setResult({ kind: "link", link: String(json.link), expiresAt: String(json.expiresAt) });
       setAdminPassword("");
       await load(q.trim());
@@ -234,6 +240,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
     try {
       const json = await post(`/api/admin/accounts/${selected.id}/password`, {
         adminPassword,
+        ownershipVerified,
         ...(generate ? { generate: true } : { password: typedPassword }),
       });
       setResult({
@@ -466,6 +473,8 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                     setErrorCode("");
                     setAdminPassword("");
                     setTypedPassword("");
+                    setOwnershipVerified(false);
+                    setNewEmail("");
                   }}
                   className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-control px-2 py-2.5 text-left text-sm transition-colors hover:bg-slate-50 ${
                     selected?.id === a.id ? "bg-indigo-50/60" : ""
@@ -583,16 +592,31 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
             )}
           </div>
 
-          {/* 1. reset link — the path that works with email down */}
+          {selected.isAdmin ? (
+            <p className="text-sm font-medium text-ink-body">{t("protectedRecovery")}</p>
+          ) : (
+            <label className="flex items-start gap-2 text-sm text-ink-body">
+              <input type="checkbox" className="mt-1 size-4" checked={ownershipVerified}
+                onChange={(event) => setOwnershipVerified(event.target.checked)} />
+              <span>{t("verifyOwner")}</span>
+            </label>
+          )}
+
+          {/* A manually verified owner receives a one-time recovery link. */}
           <div className="rounded-control border border-indigo-100 bg-indigo-50/50 p-3">
             <div className="flex items-start gap-2">
               <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-slate-800">{t("linkTitle")}</p>
                 <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{t("linkBody")}</p>
+                <label className="mt-2 block text-sm font-medium text-ink-body">
+                  {t("replacementEmail")}
+                  <input type="email" autoComplete="off" className={inputCls} value={newEmail}
+                    onChange={(event) => setNewEmail(event.target.value)} disabled={selected.isAdmin} />
+                </label>
                 <Button variant="unstyled"
                   type="button"
-                  disabled={!!busy || !adminPassword}
+                  disabled={!!busy || !adminPassword || !ownershipVerified || selected.isAdmin}
                   onClick={() => void createLink()}
                   className={`${btnDark} mt-2`}
                 >
@@ -622,7 +646,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                   />
                   <Button variant="unstyled"
                     type="button"
-                    disabled={!!busy || !adminPassword || typedPassword.length < 8}
+                    disabled={!!busy || !adminPassword || !ownershipVerified || selected.isAdmin || !!newEmail.trim() || typedPassword.length < 8}
                     onClick={() => void setPassword(false)}
                     className={btnLight}
                   >
@@ -631,7 +655,7 @@ export function AccountsManager({ onOpenProfileEditor }: AccountsManagerProps = 
                   </Button>
                   <Button variant="unstyled"
                     type="button"
-                    disabled={!!busy || !adminPassword}
+                    disabled={!!busy || !adminPassword || !ownershipVerified || selected.isAdmin || !!newEmail.trim()}
                     onClick={() => void setPassword(true)}
                     className={btnDark}
                   >

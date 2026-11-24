@@ -371,7 +371,7 @@ export function DailySpeaking() {
         <div className="grid gap-4 md:grid-cols-[minmax(200px,1fr)_2fr]">
           <div className="grid place-items-center rounded-overlay border border-slate-200 p-3 dark:border-slate-700">
             <AiOrbFaceAvatar state={state} level={0} statusLabel={status} roleLabel={partner}
-              temperament={voiceStyle} countryFlag={destination.flag} countryName={countryName} />
+              temperament={voiceStyle} countryName={countryName} />
           </div>
           <div className="flex min-w-0 flex-col gap-2 rounded-overlay border border-slate-200 p-3 dark:border-slate-700">
             <div className="text-xs text-slate-600 dark:text-slate-300">
