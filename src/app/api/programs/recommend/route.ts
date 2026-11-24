@@ -280,12 +280,12 @@ export async function POST(req: Request) {
   let catalog: RecommendationCatalog;
   let totalPrograms = 0;
   try {
-    const [programRows, uniRows, reqRows, cycleRows, scholarshipRows] = await Promise.all([
+    const [allProgramRows, uniRows, reqRows, cycleRows, scholarshipRows] = await Promise.all([
       db
         .select()
         .from(universityPrograms)
         .where(eq(universityPrograms.isActive, true)),
-      db.select().from(universities),
+      db.select().from(universities).where(eq(universities.isActive, true)),
       db.select().from(programRequirements),
       db.select().from(applicationCycles).where(eq(applicationCycles.isActive, true)),
       db
@@ -307,6 +307,8 @@ export async function POST(req: Request) {
         livingCostPeriod: u.livingCostPeriod || "year",
       });
     }
+
+    const programRows = allProgramRows.filter((programme) => unis.has(programme.universityId));
 
     // Program → source links (provenance), batched.
     const programIds = programRows.map((p) => p.id);

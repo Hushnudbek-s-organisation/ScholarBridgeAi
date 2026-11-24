@@ -2,6 +2,7 @@
 import {originalAcademicRequirementInput,type ResolvedAcademicDecisionInput} from "@/lib/academicDecision";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import { ShowMoreToggle } from "@/components/ui/hubs";
 import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 import { useTranslations } from "next-intl";
@@ -13,6 +14,7 @@ import { presentRaw, type PresentedFact } from "@/lib/factPresentation";
 import { fitTier } from "@/lib/fitBadge";
 import { DegreeLevelLabel } from "./DegreeLevelLabel";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
+import type { SourcedQsRanking } from "@/lib/universityRank";
 import {
   ArrowLeft,
   ExternalLink,
@@ -62,6 +64,7 @@ interface UniversityDetailData {
   worldRanking: number | null;
   /** Edition of `worldRanking` as stored (`universities.qs_rank_year`). */
   qsRankYear?: number | null;
+  qsRanking?: SourcedQsRanking | null;
   /** Set by the API when the description could not be translated. */
   descriptionSourceLanguage?: "en" | null;
   universityType: string | null;
@@ -265,6 +268,22 @@ const NOT_AVAILABLE = "Not available";
  * The `/api/universities/[id]` payload. Cached client-side so "Back" renders
  * the page again in 0ms instead of a loading spinner.
  */
+interface CampusData {
+  id: number;
+  name: string;
+  city: string | null;
+  address: string | null;
+  websiteUrl: string | null;
+}
+
+interface CampusImageData {
+  id: number;
+  imageUrl: string;
+  altText: string | null;
+  caption: string | null;
+  sourceUrl: string;
+}
+
 interface UniversityDetailPayload {
   university: UniversityDetailData;
   programs?: ProgramData[];
@@ -275,6 +294,8 @@ interface UniversityDetailPayload {
   money?: any;
   scholarships?: ScholarshipData[];
   sources?: SourceData[];
+  campuses?: CampusData[];
+  images?: CampusImageData[];
   match?: UniversityDetailData["match"] | null;
   /** Canonical assessment; `chance` is a deprecated alias of the same object. */
   assessment?: UniversityDetailData["assessment"] | null;
@@ -378,6 +399,8 @@ export function UniversityDetail({
   const [money, setMoney] = useState<any>(null);
   const [scholarships, setScholarships] = useState<ScholarshipData[]>([]);
   const [sources, setSources] = useState<SourceData[]>([]);
+  const [campuses, setCampuses] = useState<CampusData[]>([]);
+  const [campusImages, setCampusImages] = useState<CampusImageData[]>([]);
   const [match, setMatch] = useState<UniversityDetailData["match"]>(null);
   const [assessment, setAssessment] = useState<UniversityDetailData["assessment"]>(null);
   const [loading, setLoading] = useState(true);
@@ -414,10 +437,13 @@ export function UniversityDetail({
     setMoney(data.money || null);
     setScholarships(data.scholarships || []);
     setSources(data.sources || []);
+    setCampuses(data.campuses || []);
+    setCampusImages(data.images || []);
     setMatch(data.match ?? null);
     // Older cached payloads carry the same object under `chance`.
     setAssessment(data.assessment ?? (data as { chance?: UniversityDetailData["assessment"] }).chance ?? null);
-  }, [setUni,setPrograms,setCycles,setUniversityRequirements,setRequirementContexts,setMoney,setScholarships,setSources,setMatch,setAssessment]);
+  }, [setUni, setPrograms, setCycles, setUniversityRequirements, setRequirementContexts, setMoney, setScholarships,
+    setSources, setCampuses, setCampusImages, setMatch, setAssessment]);
 
   /**
    * Create the application row for this university and hand the workspace to the
@@ -705,24 +731,17 @@ export function UniversityDetail({
                   )}
                 </div>
               )}
-              {/* Phase AD: a rank whose edition was never recorded is not a QS
-                  position, and the list API already drops it — so the block is
-                  omitted rather than rendered as "QS Ranking —". */}
-              {uni.worldRanking != null && (
-                <div className="mt-3 inline-flex items-center gap-2 rounded-surface bg-white/15 backdrop-blur-md border border-white/20 px-3 py-1.5">
-                  <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
-                  <span className="text-xs font-bold">
-                    {t("qsRanking")}
-                    {/* The edition is data, not copy: the label used to hardcode
-                        "2027" while every stored rank is the 2026 edition. */}
-                    {uni.qsRankYear ? ` ${formatYear(uni.qsRankYear)}` : ""}
-                  </span>
-                  <span className="text-sm font-extrabold text-amber-300">#{formatNumber(uni.worldRanking, { placeholder: "—" })}</span>
-                </div>
+              {uni.qsRanking && (
+                <a href={uni.qsRanking.sourceUrl} target="_blank" rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 rounded-surface border border-white/20 bg-white/15 px-3 py-1.5 backdrop-blur-md hover:underline">
+                  <Star className="h-4 w-4 fill-amber-300 text-amber-300" aria-hidden />
+                  <span className="text-xs font-bold">{t("qsRanking")} {formatYear(uni.qsRanking.year)}</span>
+                  <span className="text-sm font-extrabold text-amber-300">{uni.qsRanking.label}</span>
+                </a>
               )}
               {/* Pillar 5.1 — rank-verified state-scholarship eligibility. Stated
                   as a criterion match, never as an award promise. */}
-              {uni.worldRanking != null && uni.worldRanking <= 300 && (
+              {uni.qsRanking && uni.qsRanking.upperRank <= 300 && (
                 <p className="mt-2 inline-flex max-w-full items-center rounded-surface bg-amber-300/15 px-2.5 py-1 text-sm font-bold leading-snug text-amber-100 ring-1 ring-inset ring-amber-300/40">
                   <span className="min-w-0 break-words">{t("exTop300Badge")}</span>
                 </p>
@@ -1005,6 +1024,46 @@ export function UniversityDetail({
           {uni.description && uni.description !== "" ? uni.description : t("descriptionUnavailable")}
         </p>
       </div>
+
+      {(campuses.length > 0 || campusImages.length > 0) && (
+        <section className="min-w-0 rounded-overlay border border-slate-200 bg-white p-5 shadow-xs">
+          <h2 className="flex items-center gap-2 text-base font-extrabold text-ink-heading">
+            <MapPin className="h-4 w-4 text-indigo-600" aria-hidden />
+            {t("campusHeading")}
+          </h2>
+          {campuses.length > 0 && (
+            <ul className="mt-3 space-y-2 text-sm text-ink-body">
+              {campuses.map((campus) => (
+                <li key={campus.id}>
+                  <span className="font-semibold">{campus.name}</span>
+                  {(campus.address || campus.city) && <span className="block">{campus.address || campus.city}</span>}
+                  {campus.websiteUrl?.startsWith("https://") && (
+                    <a href={campus.websiteUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex underline">
+                      {t("campusWebsite")}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {campusImages.length > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {campusImages.map((image) => (
+                <figure key={image.id}>
+                  <Image src={image.imageUrl} alt={image.altText ?? image.caption ?? uni.name}
+                    width={320} height={200} unoptimized className="aspect-[8/5] w-full rounded-control object-cover" />
+                  <figcaption className="mt-1 text-xs text-ink-body">
+                    {image.caption && <span className="block">{image.caption}</span>}
+                    <a href={image.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                      {t("sourceLink")}
+                    </a>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ===== ACADEMIC REQUIREMENTS (spec §5) — compact, collapsible ===== */}
       <div className="rounded-overlay border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">

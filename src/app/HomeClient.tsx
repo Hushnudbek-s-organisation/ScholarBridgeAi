@@ -288,7 +288,6 @@ export function Home({
   // `profiles` is used by the picker to show this device's saved accounts.
   const [profiles, setProfiles] = useState<StudentProfile[]>([]);
   const [activeProfile, setActiveProfile] = useState<StudentProfile | null>(null);
-  const [dashboardReadyFor, setDashboardReadyFor] = useState<number | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -739,7 +738,6 @@ export function Home({
    * Device-history selections must use handlePickProfile below instead. */
   const commitAuthenticatedProfile = (p:StudentProfile) => {
     pickerRequest.current++;
-    setDashboardReadyFor(null);
     setActiveProfile(p);
     setProfiles((prev) => (prev.some((profile) => profile.id === p.id) ? prev : [...prev, p]));
     rememberProfile(p.id);
@@ -1089,7 +1087,6 @@ export function Home({
         setActiveTab={setActiveTab}
         activeProfile={activeProfile}
         activeProfileId={activeProfile?.id ?? null}
-        deferCompanionModel={activeTab === "dashboard" && Boolean(activeProfile?.onboardingCompleted) && dashboardReadyFor !== activeProfile?.id}
         onOpenProfileModal={openProfileModal}
         onSwitchProfile={openProfilePicker}
         onStartOnboarding={startOnboarding}
@@ -1164,7 +1161,6 @@ export function Home({
               <JourneyControlCenter
                 afterOverview={<DailyStreakCard profileId={activeProfile?.id ?? null} compact />}
                 profileId={activeProfile?.id ?? null}
-                onResolved={setDashboardReadyFor}
                 profileVersion={activeProfile ? profileMatchFingerprint(activeProfile) : null}
                 onNavigateTab={handleNavigateTab}
                 onOpenWorkspace={(applicationId) => {

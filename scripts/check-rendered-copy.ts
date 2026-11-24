@@ -50,7 +50,7 @@ check("calendar years are never grouped as 2,026 / 1,861", () => {
 
 check("UniversityDetail uses formatYear for QS edition and founding year", () => {
   const source = read("src/components/UniversityDetail.tsx");
-  assert.match(source, /formatYear\(uni\.qsRankYear\)/);
+  assert.match(source, /formatYear\(uni\.qsRanking\.year\)/);
   assert.match(source, /formatYear\(uni\.foundedYear/);
   assert.doesNotMatch(source, /foundedYear\)\.toLocaleString|foundedYear.*Intl\.NumberFormat/);
 });

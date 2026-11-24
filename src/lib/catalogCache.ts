@@ -1,3 +1,5 @@
+import { loadVerifiedQsRankings } from "./universityRankings.server";
+import type { SourcedQsRanking } from "./universityRank";
 import {revisionFencedCache} from "./revisionFencedCache";
 import { loadCatalogueFacts } from "./catalogueFacts.server";
 import type { CatalogueFact } from "./evidencePolicy";
@@ -88,6 +90,7 @@ export type UniversityProgrammeIdentity = {id:number;universityId:number;name:st
 export type UniversitiesBundle = {
   programsByUni?: Map<number,UniversityProgrammeIdentity[]>;
   facts: Map<number,CatalogueFact[]>;
+  qsRankings: Map<number, SourcedQsRanking>;
   /** Every university, with the compatibility USD cost mirrors resolved. */
   unis: (UniRow & ResolvedUsdUniversityCosts)[];
   /** universityId → list of program `field` labels (2,423 rows). */
@@ -194,7 +197,7 @@ async function buildUniversitiesBundle(): Promise<UniversitiesBundle> {
   // `selectUniversities()` degrades to a core column subset on very old
   // schemas; the annotation keeps the full row shape for readers, exactly as
   // the routes assumed before this cache existed.
-  const rows = (await selectUniversities()) as UniRow[];
+  const rows = ((await selectUniversities()) as UniRow[]).filter((uni) => uni.isActive !== false);
   const unis: (UniRow & ResolvedUsdUniversityCosts)[] = rows.map((uni) => ({
     ...uni,
     // Compatibility USD fields are derived from the canonical currency and
@@ -270,7 +273,15 @@ async function buildUniversitiesBundle(): Promise<UniversitiesBundle> {
     }
   }
 
-  return { unis, programsByUni,programFieldsByUni, sourceMap, facts: await loadCatalogueFacts("university", unis.map(u=>u.id)) };
+  const universityIds = unis.map((uni) => uni.id);
+  const [facts, qsRankings] = await Promise.all([
+    loadCatalogueFacts("university", universityIds),
+    loadVerifiedQsRankings(universityIds).catch((error) => {
+      console.warn("University QS rankings unavailable:", (error as Error)?.name);
+      return new Map<number, SourcedQsRanking>();
+    }),
+  ]);
+  return { unis, programsByUni, programFieldsByUni, sourceMap, facts, qsRankings };
 }
 
 /**

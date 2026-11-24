@@ -580,7 +580,7 @@ export async function authenticate(req: Request): Promise<AuthResult> {
   }
 
   const tokenForCache = readSessionToken(req);
-  if (tokenForCache) {
+  if (tokenForCache && (req.method === "GET" || req.method === "HEAD")) {
     const cached = successfulAuthCache.get(sessionTokenHash(tokenForCache));
     if (cached && cached.expiresAt > Date.now()) return cached.result;
     if (cached) successfulAuthCache.delete(sessionTokenHash(tokenForCache));

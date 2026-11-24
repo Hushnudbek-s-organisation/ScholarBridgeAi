@@ -8,7 +8,7 @@ import { studentProfiles } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { hashPassword, passwordPolicyProblem, sanitizeProfile } from "@/lib/password";
 import { completeReferralIfDue, activateReferralReward } from "@/lib/referrals";
-import { requireAdmin, requireProfileAccess, sessionCookieHeader, invalidateAuthCacheForProfile, revokeAllSessionsForProfile } from "@/lib/auth";
+import { requireAdmin, requireProfileAccess, sessionCookieHeader, invalidateAuthCacheForProfile } from "@/lib/auth";
 import { clampString, optionalNumber, readJsonBody } from "@/lib/request";
 import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { currentOwnerId } from "@/lib/ownership/service";
@@ -219,6 +219,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       countriesStr = clampString(body.preferredCountries, 4000);
     }
 
+    const actorIsTarget = access.session.profile.id === profileId;
+    if (!actorIsTarget && (body.password !== undefined || body.email !== undefined)) {
+      return privateNoStoreJson({ error: "Use Accounts recovery to update a student's credentials.", code: "recovery_required" }, { status: 403 });
+    }
+
     // Email change: it must not collide with another account's email
     // (one account per email — that's what makes sign-in work).
     const [current] = await db
@@ -267,11 +272,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
     const newPasswordHash = newPasswordPlain ? hashPassword(newPasswordPlain) : undefined;
-    // Changing a password rotates the session fingerprint, so every OPEN session
-    // for that account stops verifying. That is the point when an admin resets
-    // someone else's password — and the reason the cookie below is only for the
-    // owner changing their OWN password.
-    const actorIsTarget = access.targetId === profileId && access.session.profile.id === profileId;
+
 
     const updateProfile = (connection: Pick<typeof db, "update">) => connection.update(studentProfiles)
       .set({
@@ -400,12 +401,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (updatedProfile) {
       invalidateAuthCacheForProfile(profileId);
       await invalidateDashboardRecommendationsForProfile(profileId);
-    }
-    // An admin-changed password must also close the account's open sessions in
-    // `user_sessions`, not only invalidate them by fingerprint: the student may
-    // be signed in on a phone that will never present a new cookie again.
-    if (newPasswordHash && !actorIsTarget) {
-      await revokeAllSessionsForProfile(profileId);
     }
     const response = privateNoStoreJson({ profile: sanitizeProfile(updatedProfile), schollyPointsAwarded });
     /**

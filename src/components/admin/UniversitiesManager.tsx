@@ -11,8 +11,9 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
+import { formatMoney, formatPercent } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
+import type { SourcedQsRanking } from "@/lib/universityRank";
 
 interface UniversitiesManagerProps {
   adminProfileId: number;
@@ -24,7 +25,8 @@ interface UniversityRow {
   country: string;
   city: string;
   flagEmoji: string;
-  worldRanking: number | null;
+  qsRanking?: SourcedQsRanking | null;
+  isActive: boolean;
   degreeLevel: string;
   programMajor: string;
   annualTuitionUsd: number | null;
@@ -45,7 +47,9 @@ interface UniversityForm {
   country: string;
   city: string;
   flagEmoji: string;
-  worldRanking: string;
+  qsLabel: string;
+  qsEdition: string;
+  qsSource: string;
   degreeLevel: string;
   programMajor: string;
   annualTuitionUsd: string;
@@ -66,16 +70,18 @@ const emptyForm: UniversityForm = {
   country: "",
   city: "",
   flagEmoji: "🌐",
-  worldRanking: "",
+  qsLabel: "",
+  qsEdition: "",
+  qsSource: "",
   degreeLevel: "All",
   programMajor: "",
   annualTuitionUsd: "",
   annualLivingEstUsd: "",
-  minGpa: "3.0",
-  minIelts: "6.5",
+  minGpa: "",
+  minIelts: "",
   minSat: "",
   acceptanceRate: "",
-  postStudyWorkVisaYears: "2.0",
+  postStudyWorkVisaYears: "",
   description: "",
   highlights: "[]",
   websiteUrl: "",
@@ -96,7 +102,7 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
 
   const fetchUniversities = useCallback(async () => {
     try {
-      const res = await fetch("/api/universities");
+      const res = await fetch("/api/admin/universities", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch universities");
       setUniversities(data.universities || []);
@@ -120,11 +126,13 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
     setForm({
       name: u.name,
       country: u.country,
-      city: u.city,
+      city: u.city ?? "",
       flagEmoji: u.flagEmoji,
-      worldRanking: u.worldRanking == null ? "" : String(u.worldRanking),
+      qsLabel: u.qsRanking?.label ?? "",
+      qsEdition: u.qsRanking ? String(u.qsRanking.year) : "",
+      qsSource: u.qsRanking?.sourceUrl ?? "",
       degreeLevel: u.degreeLevel,
-      programMajor: u.programMajor,
+      programMajor: u.programMajor ?? "",
       annualTuitionUsd: u.annualTuitionUsd == null ? "" : String(u.annualTuitionUsd),
       annualLivingEstUsd: u.annualLivingEstUsd == null ? "" : String(u.annualLivingEstUsd),
       minGpa: u.minGpa == null ? "" : String(u.minGpa),
@@ -135,7 +143,7 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
       description: u.description,
       highlights: u.highlights,
       websiteUrl: u.websiteUrl,
-      imageUrl: u.imageUrl,
+      imageUrl: u.imageUrl ?? "",
     });
     setError("");
     setSuccess("");
@@ -154,7 +162,12 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
     setError("");
     setSuccess("");
     try {
-      const payload = { adminProfileId, university: form };
+      const { qsLabel, qsEdition, qsSource, ...university } = form;
+      const previous = universities.find((row) => row.id === editingId)?.qsRanking;
+      const editedRanking = Boolean(qsLabel || qsEdition || qsSource) &&
+        (qsLabel !== previous?.label || qsEdition !== String(previous?.year) || qsSource !== previous?.sourceUrl);
+      const qsRanking = editedRanking ? { label: qsLabel, year: qsEdition, sourceUrl: qsSource } : undefined;
+      const payload = { adminProfileId, university, qsRanking };
       const res = editingId
         ? await fetch("/api/admin/universities", {
             method: "PATCH",
@@ -178,20 +191,22 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
     }
   };
 
-  const handleDelete = async (u: UniversityRow) => {
-    if (!window.confirm(`Delete "${u.name}"? This cannot be undone.`)) return;
+  const handlePublication = async (u: UniversityRow) => {
+    if (u.isActive && !window.confirm("Archive " + u.name + "? It can be restored from this list.")) return;
     setError("");
     try {
-      const res = await fetch(
-        `/api/admin/universities?id=${u.id}&adminProfileId=${adminProfileId}`,
-        { method: "DELETE" }
-      );
+      const res = u.isActive
+        ? await fetch("/api/admin/universities?id=" + u.id, { method: "DELETE" })
+        : await fetch("/api/admin/universities", {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: u.id, university: { isActive: true } }),
+          });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete university");
-      setSuccess("University deleted.");
+      if (!res.ok) throw new Error(data.error || "Failed to update catalogue visibility");
+      setSuccess(u.isActive ? "University archived." : "University restored.");
       await fetchUniversities();
     } catch (err: any) {
-      setError(err.message || "Failed to delete university");
+      setError(err.message || "Failed to update catalogue visibility");
     }
   };
 
@@ -200,7 +215,9 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
     { key: "country", label: "Country" },
     { key: "city", label: "City" },
     { key: "flagEmoji", label: "Flag Emoji", placeholder: "🇺🇸" },
-    { key: "worldRanking", label: "World Ranking", type: "number" },
+    { key: "qsLabel", label: "Published QS rank", placeholder: "#=120 or 801–850" },
+    { key: "qsEdition", label: "QS edition", type: "number" },
+    { key: "qsSource", label: "Official QS source", type: "url", full: true },
     { key: "degreeLevel", label: "Degree Level", placeholder: "All / Bachelor / Master / PhD" },
     { key: "programMajor", label: "Program / Major", full: true },
     { key: "annualTuitionUsd", label: "Annual Tuition (USD)", type: "number" },
@@ -266,11 +283,12 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {fields.map((f) => (
             <div key={f.key} className={f.full ? "sm:col-span-2 lg:col-span-3" : ""}>
-              <label className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
+              <label htmlFor={"university-" + f.key} className="block text-sm font-bold text-slate-500 uppercase tracking-wide mb-1">
                 {f.label}
               </label>
               <input
                 type={f.type || "text"}
+                id={"university-" + f.key}
                 value={form[f.key]}
                 placeholder={f.placeholder}
                 onChange={(e) => setField(f.key, e.target.value)}
@@ -340,12 +358,12 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
                   <tr key={u.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
                     <td className="px-4 py-3">
                       <div className="font-bold text-slate-800">
-                        {u.flagEmoji} {u.name}
+                        {u.flagEmoji} {u.name}{!u.isActive && <span className="ml-2 text-xs text-ink-muted">Archived</span>}
                       </div>
                       <div className="text-xs text-slate-500">{u.city} · {u.programMajor}</div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{u.country}</td>
-                    <td className="px-4 py-3 text-slate-600">#{formatNumber(u.worldRanking, { placeholder: "—" })}</td>
+                    <td className="px-4 py-3 text-slate-600">{u.qsRanking ? u.qsRanking.year + " " + u.qsRanking.label : "—"}</td>
                     <td className="px-4 py-3 text-slate-600">{formatMoney(u.annualTuitionUsd, "USD")}</td>
                     <td className="px-4 py-3 text-slate-600">{formatPercent(u.acceptanceRate)}</td>
                     <td className="px-4 py-3">
@@ -357,10 +375,10 @@ export function UniversitiesManager({ adminProfileId }: UniversitiesManagerProps
                           <Pencil className="h-3 w-3" /> Edit
                         </Button>
                         <Button variant="unstyled"
-                          onClick={() => handleDelete(u)}
+                          onClick={() => handlePublication(u)}
                           className="flex items-center gap-1 rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50"
                         >
-                          <Trash2 className="h-3 w-3" /> Delete
+                          <Trash2 className="h-3 w-3" /> {u.isActive ? "Archive" : "Restore"}
                         </Button>
                       </div>
                     </td>

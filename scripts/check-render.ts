@@ -1079,7 +1079,6 @@ const orbProps = (state: typeof ORB_STATES[number]) => ({
   measuredAudio: state === "SPEAKING",
   statusLabel: `status ${state}`,
   roleLabel: "Consular officer",
-  countryFlag: "\u{1F1E9}\u{1F1EA}",
   countryName: "Germany",
 });
 const orbRenders = ORB_STATES.map((state) =>
@@ -1091,12 +1090,12 @@ for (const [i, state] of ORB_STATES.entries()) {
   check(`avatar marks its ${state} state and accessible role`, r.html.includes(`data-state="${state}"`) && r.html.includes('aria-label="Consular officer — Germany"'));
   check(`avatar ${state} carries the localized status pill`, r.html.includes(`status ${state}`) && r.html.includes('role="status"'));
   check(`avatar ${state} names no AI vendor`, !/(Gemini|Groq|OpenAI|Anthropic|Claude|GPT|gemini|groq|openai)/.test(r.html));
-  check(`avatar ${state} renders the face layers`, r.html.includes("sb-speaking-face-stage") && r.html.includes("sb-speaking-face-visor") && r.html.includes('data-eye="left"') && r.html.includes('data-eye="right"'));
+  check(`avatar ${state} renders the face layers`, r.html.includes("sb-speaking-face-stage") && r.html.includes("sb-speaking-face-shell") && !r.html.includes("sb-scholly-model") && r.html.includes('data-eye="left"') && r.html.includes('data-eye="right"'));
 }
 const speakingFaceCss = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
 check("speaking face is circular and uses responsive sizing", /\.sb-speaking-face-stage[\s\S]*?width: min\(100%, 244px\)[\s\S]*?aspect-ratio: 1/.test(speakingFaceCss) && /\.sb-speaking-face-shell[\s\S]*?border-radius: 50%/.test(speakingFaceCss));
-const mouthScale = (html: string) => Number(html.match(/class="sb-speaking-face-mouth" style="transform:scaleY\(([^)]+)\)"/)?.[1]);
-check("speaking mouth follows measured audio", mouthScale(orbRenders[3].html) > mouthScale(orbRenders[0].html) && mouthScale(orbRenders[0].html) === 1);
+const mouthLevel = (html: string) => Number(html.match(/--sb-mouth-level:([0-9.]+)/)?.[1]);
+check("speaking mouth follows measured audio", mouthLevel(orbRenders[3].html) > mouthLevel(orbRenders[0].html) && mouthLevel(orbRenders[0].html) === 0);
 const pairedOrbs = renderLocalized("en", React.createElement(React.Fragment, null,
   React.createElement(AiOrbFaceAvatar, orbProps("IDLE")),
   React.createElement(AiOrbFaceAvatar, orbProps("LISTENING")),

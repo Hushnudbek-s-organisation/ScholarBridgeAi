@@ -1534,7 +1534,7 @@ async function main() {
   });
 
   check("an admin reset revokes the target's sessions and old links", () => {
-    assert.match(adminPasswordRoute, /revokeAllSessionsForProfile\(target\.id\)/, "sessions survive an admin reset");
+    assert.match(adminPasswordRoute, /tx\.update\(userSessions\)/, "sessions survive an admin reset");
     assert.match(adminPasswordRoute, /retireLiveResetTokens\(target\.id/, "an older link survives an admin reset");
   });
 
@@ -1544,7 +1544,7 @@ async function main() {
     const cookieBranch = profiles.slice(profiles.indexOf('if (newPasswordHash && updatedProfile'));
     assert.match(cookieBranch.slice(0, 220), /actorIsTarget/, "a session cookie is issued for any target");
     // And the other direction: an admin reset closes the student's sessions.
-    assert.match(profiles, /revokeAllSessionsForProfile\(profileId\)/);
+    assert.match(profiles, /code: "recovery_required"/);
   });
 
   check("the recovery panel never offers to reveal a password", () => {

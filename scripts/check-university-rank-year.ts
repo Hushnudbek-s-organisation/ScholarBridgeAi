@@ -26,6 +26,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   qsRankEdition,
+  sourcedQsRanking,
   verifiedQsRank,
   verifiedQsRankNumber,
   verifiedRankWithEdition,
@@ -102,36 +103,35 @@ check("the rule is a pure module — no database, no React, no environment", () 
 
 /* --------------------------------------------------------- the read paths */
 
-check("the catalogue list drops an undated rank before it is published", () => {
-  const text = source("src/app/api/universities/route.ts");
-  assert.match(text, /import \{ verifiedQsRank \} from "@\/lib\/universityRank";/);
-  // Phase AF wrapped the row in `withResolvedUsdCosts` first, so the guard now
-  // reads the published copy; the rule itself is unchanged.
-  assert.match(
-    text,
-    /if \(resolved\.worldRanking != null && verifiedQsRank\(resolved\) == null\) \{\s*return \{ \.\.\.resolved, worldRanking: null \};/,
-    "the list endpoint publishes an undated rank again"
-  );
+check("the catalogue and detail routes publish verified source-linked QS editions", () => {
+  const list = source("src/app/api/universities/route.ts");
+  const detail = source("src/app/api/universities/[id]/route.ts");
+  const loader = source("src/lib/universityRankings.server.ts");
+  assert.match(list, /bundle\.qsRankings\.get\(uni\.id\)/);
+  assert.match(detail, /loadVerifiedQsRankings\(\[uniId\]\)/);
+  for (const body of [list, detail]) {
+    assert.match(body, /worldRanking: qsRanking\?\.rank \?\? null/);
+    assert.match(body, /qsRankYear: qsRanking\?\.year \?\? null/);
+  }
+  assert.match(loader, /eq\(sources\.isVerified, true\)/);
+  assert.match(loader, /desc\(universityRankings\.rankingYear\)/);
 });
 
-check("the detail endpoint publishes only the verified position", () => {
-  const text = source("src/app/api/universities/[id]/route.ts");
-  assert.match(text, /import \{ verifiedQsRankNumber \} from "@\/lib\/universityRank";/);
-  assert.match(text, /const qsRank = verifiedQsRankNumber\(uni\);/, "the detail endpoint stopped checking the edition");
-  assert.match(text, /worldRanking: qsRank,/, "the detail payload still carries the raw column");
-  assert.match(text, /localizeUniversityDescription\(uni\.description, "en", qsRank\)/);
-  assert.match(text, /qsRankYear: universities\.qsRankYear,/, "the fallback select cannot see the edition");
+check("source-linked ranks preserve ties and bands and reject contradictory values", () => {
+  const url = "https://www.topuniversities.com/world-university-rankings";
+  assert.deepEqual(sourcedQsRanking({ rank: 218, rankLabel: "#=218", year: 2027, sourceUrl: url }),
+    { rank: 218, upperRank: 218, label: "#=218", year: 2027, sourceUrl: url });
+  assert.deepEqual(sourcedQsRanking({ rank: null, rankLabel: "801-850", year: 2026, sourceUrl: url }),
+    { rank: 801, upperRank: 850, label: "#801–850", year: 2026, sourceUrl: url });
+  assert.equal(sourcedQsRanking({ rank: 7, rankLabel: "#8", year: 2027, sourceUrl: url }), null);
+  assert.equal(sourcedQsRanking({ rank: 7, rankLabel: null, year: 2027, sourceUrl: "javascript:1" }), null);
 });
 
-check("the profile page states one verified position, or none", () => {
+check("the public profile links its displayed QS rank to the source", () => {
   const text = source("src/app/universities/[id]/page.tsx");
-  assert.match(text, /import \{ verifiedQsRank \} from "@\/lib\/universityRank";/);
-  assert.match(text, /const qsPosition = verified \? verifiedQsRank\(u\) : null;/, "the page stopped checking the edition");
-  assert.match(text, /value: verifiedValue\(qsPosition\?\.rank \?\? null\)/, "the rank fact reads the raw column");
-  assert.match(text, /\{t\.rankLabel\}: #\{verifiedValue\(qsPosition\?\.rank \?\? null\)\}/, "the hero badge reads the raw column");
-  assert.match(text, /universityDescriptionState\(u\.description, locale, qsPosition\?\.rank \?\? null\)/, "the prose is reconciled to an unverified number");
-  assert.match(text, /rank: verified && qsPosition/, "the meta description states an unverified rank");
-  assert.doesNotMatch(text, /verifiedValue\(u\.worldRanking\)/, "a badge still reads the raw column");
+  assert.match(text, /bundle\?\.qsRankings\.get\(u\.id\)/);
+  assert.match(text, /href=\{qsPosition\.sourceUrl\}/);
+  assert.match(text, /QS \{qsPosition\.year\} \{qsPosition\.label\}/);
 });
 
 check("the chancing screens cannot fall back to an undated stored rank", () => {
@@ -143,11 +143,6 @@ check("the chancing screens cannot fall back to an undated stored rank", () => {
 });
 
 check("the programme recommendations, planner and dashboard follow the same rule", () => {
-  assert.match(
-    source("src/app/api/programs/recommend/route.ts"),
-    /verifiedRankByUniId\.set\(u\.id, verifiedQsRankNumber\(u\)\)/,
-    "recommendations take the raw column"
-  );
   assert.match(
     source("src/app/api/planning/route.ts"),
     /worldRanking: verifiedQsRankNumber\(u\)/,
@@ -178,11 +173,12 @@ check("no public endpoint hands the raw column to a client", () => {
   }
 });
 
-check("the cards omit the badge instead of printing a dash", () => {
+check("catalogue cards display the sourced QS edition and label", () => {
   const explorer = source("src/components/UniversityExplorer.tsx");
-  assert.match(explorer, /\{uni\.worldRanking != null && \(\s*<div className="absolute top-3 right-3/, "the explorer badge renders without a rank");
+  assert.match(explorer, /href=\{uni\.qsRanking\.sourceUrl\}/);
+  assert.match(explorer, /year: uni\.qsRanking\.year, rank: uni\.qsRanking\.label/);
   const modal = source("src/components/UniversityDetail.tsx");
-  assert.match(modal, /\{uni\.worldRanking != null && \(\s*<div className="mt-3 inline-flex items-center gap-2 rounded-surface/, "the detail modal renders a rank block without a rank");
+  assert.match(modal, /href=\{uni\.qsRanking\.sourceUrl\}/);
 });
 
 /* ------------------------------------------------------- the data contract */

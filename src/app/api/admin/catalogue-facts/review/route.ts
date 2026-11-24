@@ -19,7 +19,7 @@ export async function POST(req:Request){
    let expected:Record<string,unknown>;try{expected=catalogueFactInput(expectedFact as Record<string,unknown>);}catch{throw new Error("conflict");}
    for(const [key,value] of Object.entries(expected)){if(key==="verification_status"||key==="verified_at")continue;if(JSON.stringify(key==="value_numeric"&&row[key]!=null?Number(row[key]):row[key])!==JSON.stringify(value))throw new Error("conflict");}
    await tx.execute(sql`INSERT INTO public.catalogue_fact_reviews(fact_id,reviewed_version,reviewer_profile_id,reviewed_snapshot,source_quote) VALUES(${id}::uuid,${String(expectedVersion)}::bigint,${access.session.profile.id},${JSON.stringify(row)}::jsonb,${sourceQuote.trim()})`);
-   const result=await tx.execute(sql`UPDATE public.catalogue_facts SET verification_status='verified',verified_at=now() WHERE id=${id}::uuid RETURNING *`);
+   const result=await tx.execute(sql`UPDATE public.catalogue_facts SET verification_status='verified',verified_at=timezone('UTC', now()) WHERE id=${id}::uuid RETURNING *`);
    await tx.execute(sql`INSERT INTO public.cache_revisions(scope,revision,reason,updated_at) VALUES('catalogue',2,'manual exact group review',now()) ON CONFLICT(scope) DO UPDATE SET revision=cache_revisions.revision+1,reason=EXCLUDED.reason,updated_at=now()`);
    return result.rows[0];
   });

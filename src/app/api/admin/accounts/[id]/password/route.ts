@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { studentProfiles } from "@/db/schema";
-import { requireAdmin, revokeAllSessionsForProfile } from "@/lib/auth";
-import { auditPasswordAction, generateTemporaryPassword, verifyAdminReauth } from "@/lib/adminAccounts";
+import { auditLogs, studentProfiles, userSessions } from "@/db/schema";
+import { invalidateAuthCacheForProfile, requireAdmin } from "@/lib/auth";
+import { generateTemporaryPassword, verifyAdminReauth } from "@/lib/adminAccounts";
 import { hashPassword, passwordPolicyProblem } from "@/lib/password";
 import { clampString, readJsonBody } from "@/lib/request";
 import { retireLiveResetTokens } from "@/lib/adminAccounts";
@@ -56,6 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       adminPassword?: unknown;
       password?: unknown;
       generate?: unknown;
+      ownershipVerified?: unknown;
     }>(req);
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: parsed.status });
@@ -66,13 +67,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: reauth.error, code: reauth.code }, { status: reauth.status });
     }
 
-    const [target] = await db
-      .select({ id: studentProfiles.id, email: studentProfiles.email })
-      .from(studentProfiles)
-      .where(eq(studentProfiles.id, targetId))
-      .limit(1);
-    if (!target) {
-      return NextResponse.json({ error: "Account not found", code: "not_found" }, { status: 404 });
+    if (parsed.body.ownershipVerified !== true) {
+      return NextResponse.json({ error: "Verify the account owner first.", code: "ownership_required" }, { status: 400 });
     }
 
     // Either the server generates one, or the admin typed one. Never both.
@@ -101,26 +97,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const now = new Date();
-    await db
-      .update(studentProfiles)
-      .set({ passwordHash: hashPassword(newPassword), passwordChangedAt: now, updatedAt: now })
-      .where(eq(studentProfiles.id, target.id));
+    const replacementHash = hashPassword(newPassword);
+    const result = await db.transaction(async (tx) => {
+      const [target] = await tx
+        .select({ id: studentProfiles.id, email: studentProfiles.email, isAdmin: studentProfiles.isAdmin })
+        .from(studentProfiles)
+        .where(eq(studentProfiles.id, targetId)).for("update");
+      if (!target) return { code: "not_found" } as const;
+      if (target.isAdmin) return { code: "protected_account" } as const;
 
-    // One password, one way in: the sessions that were open before the reset
-    // must not survive it, and neither must a link issued for the old password.
-    await revokeAllSessionsForProfile(target.id);
-    const retiredLinks = await retireLiveResetTokens(target.id, now);
-
-    await auditPasswordAction({
-      actorEmail: access.session.profile.email,
-      targetId: target.id,
-      action: "admin_set_password",
+      await tx.update(studentProfiles).set({ passwordHash: replacementHash, passwordChangedAt: now, updatedAt: now })
+        .where(eq(studentProfiles.id, target.id));
+      await tx.update(userSessions).set({ revokedAt: now })
+        .where(and(eq(userSessions.profileId, target.id), isNull(userSessions.revokedAt)));
+      const retiredLinks = await retireLiveResetTokens(target.id, now, tx);
+      await tx.insert(auditLogs).values({
+        entityType: "profile", entityId: target.id, fieldChanged: "password_hash",
+        newValue: "Account owner verified manually, temporary password issued",
+        source: "admin_panel", actor: access.session.profile.email, verificationStatus: "verified",
+      });
+      return { code: "ok", target, retiredLinks } as const;
     });
-
-    console.info(
-      `[admin] ${access.session.profile.email} replaced the password of profile ${target.id} ` +
-        `(${retiredLinks} reset link(s) retired)`
-    );
+    if (result.code === "not_found") {
+      return NextResponse.json({ error: "Account not found.", code: result.code }, { status: 404 });
+    }
+    if (result.code === "protected_account") {
+      return NextResponse.json({ error: "This recovery action is for student accounts.", code: result.code }, { status: 403 });
+    }
+    const { target, retiredLinks } = result;
+    invalidateAuthCacheForProfile(target.id);
 
     return NextResponse.json(
       {

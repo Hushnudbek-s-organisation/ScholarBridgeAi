@@ -151,8 +151,8 @@ export async function adminAccountById(id: number): Promise<AdminAccountRow | nu
  * `/reset-password?token=…` a student would receive by email, so there is one
  * reset implementation, not two.
  */
-export async function retireLiveResetTokens(profileId: number, now: Date = new Date()): Promise<number> {
-  const retired = await db
+export async function retireLiveResetTokens(profileId: number, now: Date = new Date(), writer: Pick<typeof db, "update"> = db): Promise<number> {
+  const retired = await writer
     .update(passwordResetTokens)
     .set({ usedAt: now })
     .where(and(eq(passwordResetTokens.profileId, profileId), isNull(passwordResetTokens.usedAt)))

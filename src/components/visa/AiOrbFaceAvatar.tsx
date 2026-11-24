@@ -1,10 +1,9 @@
 "use client";
 
-import { SchollyModel } from "@/components/SchollyModel";
 import type { SpeakerStyle } from "@/lib/daily-speaking";
-import { SpeakingEffects } from "./SpeakingEffects";
+import { WhiteSpeakingOrb } from "./WhiteSpeakingOrb";
 
-import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 export type AiOrbFaceState = "LISTENING" | "THINKING" | "SPEAKING" | "IDLE";
 
@@ -153,14 +152,12 @@ export interface AiOrbFaceAvatarProps {
   /** Localized status pill copy, so this component stays translation-free. */
   statusLabel: string;
   roleLabel: string;
-  /** Optional country context: a small flag badge on the rim. */
-  countryFlag?: string;
   countryName?: string;
 }
 
 export function SpeakingAvatarPreview({ name, style = "calm" }: { name: string; style?: SpeakerStyle }) {
   return <div className="sb-speaking-preview" data-style={style} aria-hidden="true">
-    <SchollyModel studio paused angle={name === "Rica" ? -.25 : .25} />
+    <WhiteSpeakingOrb preview />
     <span>{name}</span>
   </div>;
 }
@@ -172,7 +169,6 @@ export function AiOrbFaceAvatar({
   measuredAudio = false,
   temperament = "calm",
   roleLabel,
-  countryFlag,
   countryName,
 }: AiOrbFaceAvatarProps) {
   const reduced = usePrefersReducedMotion();
@@ -184,21 +180,9 @@ export function AiOrbFaceAvatar({
 
   return (
     <div className="flex w-full flex-col items-center gap-4">
-      <div className={"sb-speaking-face-stage"} data-speaking-avatar data-state={state}
-        data-temperament={temperament}
-        style={{ "--sb-mouth-level": mouthOpen } as CSSProperties}
+      <div className="sb-speaking-face-stage" data-speaking-avatar data-state={state}
         role="img" aria-label={countryName ? `${roleLabel} — ${countryName}` : roleLabel}>
-        <div className={"sb-speaking-face-halo"} aria-hidden="true" />
-        {speaking && temperament !== "calm" && (
-          <SpeakingEffects effect={temperament} reduced={reduced}
-            className={temperament === "fast" ? "sb-speaking-face-electric" : "sb-speaking-face-fire"} />
-        )}
-        <div className="sb-speaking-robot" aria-hidden="true">
-          <SchollyModel studio
-            motion={state === "SPEAKING" ? "talk" : state === "THINKING" ? "think" : state === "LISTENING" ? "look" : "idle"}
-            speechLevel={mouthOpen} />
-        </div>
-        {countryFlag && <span className={"sb-speaking-face-flag"} title={countryName} aria-hidden="true">{countryFlag}</span>}
+        <WhiteSpeakingOrb mouthOpen={mouthOpen} speaking={speaking} />
       </div>
 
       <HudWave level={speaking ? mouthOpen : level} state={state} />

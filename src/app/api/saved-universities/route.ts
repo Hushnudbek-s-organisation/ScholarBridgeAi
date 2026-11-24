@@ -140,7 +140,7 @@ export async function POST(req: Request) {
     if (!profile) {
       return NextResponse.json({ error: "Profile not found", code: "not_found" }, { status: 404 });
     }
-    const [uni] = await db.select().from(universities).where(eq(universities.id, universityId));
+    const [uni] = await db.select().from(universities).where(and(eq(universities.id, universityId), eq(universities.isActive, true)));
     if (!uni) {
       return NextResponse.json({ error: "University not found", code: "not_found" }, { status: 404 });
     }

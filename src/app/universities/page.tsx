@@ -19,7 +19,7 @@ import { db } from "@/db";
 import { universities as universitiesTable } from "@/db/schema";
 import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
-import { verifiedQsRank } from "@/lib/universityRank";
+import type { SourcedQsRanking } from "@/lib/universityRank";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { localizeCity, localizeCountry, localizeMajorOrField, localizeUniversityType } from "@/lib/catalogLocalizer";
 
@@ -43,7 +43,7 @@ interface UniversityRow {
   country: string;
   city: string | null;
   flag_emoji: string | null;
-  world_ranking: number | null;
+  qs_ranking: SourcedQsRanking | null;
   program_major: string | null;
   university_type: string | null;
   annual_tuition_usd: number | null;
@@ -79,8 +79,8 @@ export default async function UniversitiesPage({
       const activeUnis = bundle.unis
         .filter((u) => u.isActive !== false)
         .sort((a, b) => {
-          const ar = a.verificationStatus === "verified" ? a.worldRanking ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
-          const br = b.verificationStatus === "verified" ? b.worldRanking ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+          const ar = bundle.qsRankings.get(a.id)?.rank ?? Number.MAX_SAFE_INTEGER;
+          const br = bundle.qsRankings.get(b.id)?.rank ?? Number.MAX_SAFE_INTEGER;
           return ar !== br ? ar - br : a.id - b.id;
         });
       totalItems = activeUnis.length;
@@ -98,7 +98,7 @@ export default async function UniversitiesPage({
           country: university.country,
           city: university.city,
           flag_emoji: university.flagEmoji,
-          world_ranking: verifiedQsRank(university)?.rank ?? null,
+          qs_ranking: bundle.qsRankings.get(university.id) ?? null,
           program_major: university.programMajor,
           university_type: university.universityType,
           annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
@@ -169,7 +169,7 @@ export default async function UniversitiesPage({
           country: university.country,
           city: university.city,
           flag_emoji: university.flagEmoji,
-          world_ranking: verifiedQsRank(university)?.rank ?? null,
+          qs_ranking: null,
           program_major: university.programMajor,
           university_type: university.universityType,
           annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
@@ -237,8 +237,8 @@ export default async function UniversitiesPage({
               // tries to say everything says nothing — the profile page is one
               // click away and holds the rest.
               const badges: CatalogBadge[] = ([
-                university.world_ranking != null
-                  ? { key: "rank", icon: <Trophy className="h-3 w-3" aria-hidden />, label: `#${number.format(university.world_ranking)}`, strong: true }
+                university.qs_ranking != null
+                  ? { key: "rank", icon: <Trophy className="h-3 w-3" aria-hidden />, label: `QS ${university.qs_ranking.year} ${university.qs_ranking.label}`, strong: true }
                   : null,
                 university.university_type
                   ? { key: "type", icon: <Building2 className="h-3 w-3" aria-hidden />, label: localizeUniversityType(university.university_type, locale), strong: false }

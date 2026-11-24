@@ -194,6 +194,16 @@ async function main() {
     })
     .returning();
 
+  const [qsSource] = await db.insert(schema.sources).values({
+    url: "https://rankings.example/2026", title: "Integration fixture rankings",
+    sourceType: "official_ranking", isOfficial: true, isVerified: true,
+  }).returning();
+  await db.insert(schema.universityRankings).values({
+    universityId: uniB.id, rankingProvider: "QS Quacquarelli Symonds",
+    rankingName: "QS World University Rankings", rankingYear: 2026,
+    rank: 60, rankLabel: "#=60", sourceId: qsSource.id, verifiedAt: new Date(), verificationStatus: "verified",
+  });
+
   const [sch] = await db
     .insert(schema.scholarships)
     .values({
@@ -3559,6 +3569,7 @@ async function main() {
     // --- a weak password is refused by the same policy as everywhere else
     const weak = await post(`/api/admin/accounts/${student.id}/password`, {
       adminPassword: ADMIN_PASSWORD,
+      ownershipVerified: true,
       password: "12345678",
     });
     check(
@@ -3567,10 +3578,17 @@ async function main() {
       `status=${weak.status} code=${weak.body?.code}`
     );
 
-    // --- the reset link: the path that needs no email at all
+    // A reauthenticated administrator must also confirm manual owner verification.
+    const missingProof = await post(`/api/admin/accounts/${student.id}/reset-link`, { adminPassword: ADMIN_PASSWORD });
+    check("a manual reset requires owner verification", missingProof.status === 400 && missingProof.body?.code === "ownership_required");
     const linkResponse = await post(`/api/admin/accounts/${student.id}/reset-link`, {
-      adminPassword: ADMIN_PASSWORD,
+      adminPassword: ADMIN_PASSWORD, ownershipVerified: true,
     });
+    const { GET: authSessionGet } = await import("../src/app/api/auth/session/route");
+    const invalidatedSession = await authSessionGet(new Request("http://localhost/api/auth/session", {
+      headers: { cookie: `sb_session=${studentToken}` },
+    }));
+    check("admin recovery revokes the active student session at issuance", invalidatedSession.status === 401);
     const issuedLink = String(linkResponse.body?.link ?? "");
     check(
       "an admin can issue a reset link with SMTP completely unconfigured",
@@ -3614,7 +3632,7 @@ async function main() {
     check("the student's own password now verifies", verifyPassword(chosen, afterLink?.hash));
 
     // --- issuing a second link retires the first
-    const second = await post(`/api/admin/accounts/${student.id}/reset-link`, { adminPassword: ADMIN_PASSWORD });
+    const second = await post(`/api/admin/accounts/${student.id}/reset-link`, { adminPassword: ADMIN_PASSWORD, ownershipVerified: true });
     check(
       "issuing a new link retires the older ones",
       second.status === 200 && Number(second.body?.retiredLinks) >= 0,
@@ -3624,6 +3642,7 @@ async function main() {
     // --- the temporary password path
     const generated = await post(`/api/admin/accounts/${student.id}/password`, {
       adminPassword: ADMIN_PASSWORD,
+      ownershipVerified: true,
       generate: true,
     });
     const temporary = String(generated.body?.temporaryPassword ?? "");

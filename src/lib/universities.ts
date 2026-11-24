@@ -18,6 +18,7 @@ export async function selectUniversities() {
       .select({
         id: universities.id,
         name: universities.name,
+        isActive: universities.isActive,
         country: universities.country,
         city: universities.city,
         flagEmoji: universities.flagEmoji,
