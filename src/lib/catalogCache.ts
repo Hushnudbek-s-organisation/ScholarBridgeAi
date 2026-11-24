@@ -48,6 +48,7 @@ import {
 import { inArray, eq, and } from "drizzle-orm";
 import { selectUniversities } from "@/lib/universities";
 import { pickBestSource } from "@/lib/sourcePick";
+import { loadUniversityCardEvidence } from "@/lib/universityCardSummary.server";
 import { chancingProfileWithActivities, invalidateSavedActivities, toMatchProfileWithActivities } from "@/lib/profileMapping";
 import {
   resolvedUsdUniversityCosts,
@@ -91,6 +92,7 @@ export type UniversitiesBundle = {
   programsByUni?: Map<number,UniversityProgrammeIdentity[]>;
   facts: Map<number,CatalogueFact[]>;
   qsRankings: Map<number, SourcedQsRanking>;
+  cardEvidence: Awaited<ReturnType<typeof loadUniversityCardEvidence>>;
   /** Every university, with the compatibility USD cost mirrors resolved. */
   unis: (UniRow & ResolvedUsdUniversityCosts)[];
   /** universityId → list of program `field` labels (2,423 rows). */
@@ -274,14 +276,18 @@ async function buildUniversitiesBundle(): Promise<UniversitiesBundle> {
   }
 
   const universityIds = unis.map((uni) => uni.id);
-  const [facts, qsRankings] = await Promise.all([
+  const [facts, qsRankings, cardEvidence] = await Promise.all([
     loadCatalogueFacts("university", universityIds),
     loadVerifiedQsRankings(universityIds).catch((error) => {
       console.warn("University QS rankings unavailable:", (error as Error)?.name);
       return new Map<number, SourcedQsRanking>();
     }),
+    loadUniversityCardEvidence(universityIds).catch((error) => {
+      console.warn("University card evidence unavailable:", (error as Error)?.name);
+      return { programmes: new Map(), deadlines: new Map() };
+    }),
   ]);
-  return { unis, programsByUni, programFieldsByUni, sourceMap, facts, qsRankings };
+  return { unis, programsByUni, programFieldsByUni, sourceMap, facts, qsRankings, cardEvidence };
 }
 
 /**

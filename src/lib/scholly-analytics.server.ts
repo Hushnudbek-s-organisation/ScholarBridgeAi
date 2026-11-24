@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
-import { dailyMissions, schollyEvents, schollyNotificationLog } from "@/db/schema";
+import { dailyMissions, schollyEvents, schollyNotificationLog, schollyProfiles } from "@/db/schema";
+
+import { SCHOLLY_TOPICS, type SchollyTopic } from "./scholly-learning";
 
 const timeZone = "Asia/Tashkent";
 const activityTypes = sql`('dashboard_open', 'mission_shown', 'mission_done')`;
@@ -21,13 +23,14 @@ export type SchollyAnalytics = {
   retention1: Cohort;
   retention7: Cohort;
   onboarding: { step: string; users: number }[];
+  helpTopics: { topic: SchollyTopic; visits: number; helpful: number; needsWork: number }[];
   reminderExperiment: { variant: string; sent: number; opened: number; completed: number }[];
 };
 
 export async function getSchollyAnalytics(days: number, now: Date): Promise<SchollyAnalytics> {
   const boundary = sql`(${now.toISOString()}::timestamptz AT TIME ZONE ${timeZone})::date`;
   const localDate = sql`(${schollyEvents.createdAt} AT TIME ZONE ${timeZone})::date`;
-  const [activity, overview, onboarding, reminderExperiment] = await Promise.all([
+  const [activity, overview, onboarding, reminderExperiment, helpTopics] = await Promise.all([
     db.execute<DailyActivity>(sql`
       WITH bounds AS (SELECT ${boundary} AS today),
       activity AS (
@@ -120,6 +123,24 @@ export async function getSchollyAnalytics(days: number, now: Date): Promise<Scho
           AND ${now.toISOString()}::timestamptz
       GROUP BY variant ORDER BY variant
     `),
+    db.execute<SchollyAnalytics["helpTopics"][number]>(sql`
+      with preferences as (
+        select notif_prefs->'companionLearning'->'topics' as topics
+        from ${schollyProfiles}
+        where notif_prefs->'companionLearning'->'enabled' = 'true'::jsonb
+      ), signals as (
+        select key as topic,
+          case when value->>'visits' ~ '^[0-9]{1,2}$' then least(30, (value->>'visits')::int) else 0 end as visits,
+          case when value->>'helpful' ~ '^[0-9]{1,2}$' then least(30, (value->>'helpful')::int) else 0 end as helpful,
+          case when value->>'needsWork' ~ '^[0-9]{1,2}$' then least(30, (value->>'needsWork')::int) else 0 end as needs_work
+        from preferences, lateral jsonb_each(case when jsonb_typeof(topics) = 'object' then topics else '{}'::jsonb end)
+        where key in (${sql.join(SCHOLLY_TOPICS.map(topic => sql`${topic}`), sql`,`)})
+      )
+      select topic, sum(visits)::int as visits, sum(helpful)::int as helpful, sum(needs_work)::int as "needsWork"
+      from signals where visits + helpful + needs_work > 0
+      group by topic having count(*) >= 5
+      order by sum(needs_work) desc, sum(visits) desc, topic
+    `),
   ]);
 
   const totals = overview.rows[0];
@@ -132,5 +153,6 @@ export async function getSchollyAnalytics(days: number, now: Date): Promise<Scho
     retention7: { eligible: totals.eligible7, returned: totals.returned7 },
     onboarding: onboarding.rows,
     reminderExperiment: reminderExperiment.rows,
+    helpTopics: helpTopics.rows,
   };
 }

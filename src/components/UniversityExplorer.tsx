@@ -29,6 +29,7 @@ import { MatchBreakdownStrip } from "./MatchBreakdownStrip";
 import { DecisionPillStrip } from "./DecisionPillStrip";
 import { MatchEvidenceBadge } from "./MatchEvidenceBadge";
 import type { MatchBreakdown } from "@/lib/matching";
+import type { UniversityCardSummary } from "@/lib/universityCardSummary";
 import type { SourcedQsRanking } from "@/lib/universityRank";
 import { normalizeDegreeLevel } from "@/lib/degreeLevels";
 import { Pagination } from "./Pagination";
@@ -57,6 +58,7 @@ import {
   Languages,
   X,
   CheckCircle2,
+  CalendarDays,
   AlertCircle,
   Eye,
   RefreshCw,
@@ -75,6 +77,7 @@ export interface University {
   flagEmoji: string;
   worldRanking: number | null;
   qsRanking?: SourcedQsRanking | null;
+  cardSummary?: UniversityCardSummary;
   estimatedChance?: { percentage: null; reason: "profile_required" | "insufficient_validated_outcomes" };
   degreeLevel: string | null;
   programMajor: string;
@@ -1103,13 +1106,15 @@ export function UniversityExplorer({
                     </span>
                   </div>
 
-                  {uni.qsRanking && (
+                  {uni.qsRanking ? (
                     <a href={uni.qsRanking.sourceUrl} target="_blank" rel="noopener noreferrer"
                       aria-label={t("exQsRank", { year: uni.qsRanking.year, rank: uni.qsRanking.label })}
                       className="absolute top-3 right-3 flex items-center gap-1 rounded-full border border-white/10 bg-slate-900/90 px-2.5 py-1 text-xs font-bold text-amber-300 hover:underline focus-visible:outline-2 focus-visible:outline-white">
                       <Star className="h-3 w-3 fill-amber-300" aria-hidden />
                       {t("exQsRank", { year: uni.qsRanking.year, rank: uni.qsRanking.label })}
                     </a>
+                  ) : (
+                    <span className="absolute right-3 top-3 max-w-[9rem] rounded-full bg-slate-900/90 px-2.5 py-1 text-right text-xs font-medium text-slate-200">{t("exQsUnavailable")}</span>
                   )}
 
                   {/* Title & Country Overlay */}
@@ -1250,40 +1255,57 @@ export function UniversityExplorer({
                       className="mb-2.5"
                     />
 
-                    {/* Key Requirements Grid — NULL = Not specified (spec §19).
-                        The card shows the four numbers that decide "can I
-                        afford / qualify" and nothing else; every secondary
-                        diagnostic lives in the details drawer below. */}
-                    {uni.programmeDiscovery?.selectedProgrammeName && (
-                      <p className="mb-2 line-clamp-2 text-sm text-ink-body">
-                        <strong>{t("exProgrammeFocus")}</strong> · {uni.programmeDiscovery.selectedProgrammeName}
-                      </p>
-                    )}
-                    <div className="mb-3 rounded-surface border border-slate-200 px-3 py-2 dark:border-slate-700">
-                      <p className="text-sm font-bold text-ink-heading">{t("exEstimatedChance")}</p>
-                      <p className="mt-0.5 text-sm leading-normal text-ink-body">
-                        {uni.estimatedChance?.reason === "profile_required" && !activeProfile
-                          ? t("exChanceSignIn") : t("exChanceInsufficientEvidence")}
-                      </p>
+                    <div className="mt-auto grid gap-2 rounded-surface border border-indigo-200/70 bg-indigo-50/60 px-3 py-2.5 text-sm text-ink-body dark:border-slate-700 dark:bg-slate-900">
+                      {uni.cardSummary?.programme && (
+                        <div className="flex items-start gap-2">
+                          <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden />
+                          <div className="min-w-0">
+                            <small className="block text-xs font-medium">{t("exVerifiedProgramme")}</small>
+                            <a href={uni.cardSummary.programme.sourceUrl} target="_blank" rel="noopener noreferrer"
+                              className="line-clamp-2 break-words font-bold text-ink-heading hover:underline">{uni.cardSummary.programme.name}</a>
+                            {uni.cardSummary.programme.degreeLevel && <small className="block text-xs">
+                              {formatDegreeLevel(uni.cardSummary.programme.degreeLevel, tDegrees)}
+                            </small>}
+                          </div>
+                        </div>
+                      )}
+                      {uni.cardSummary?.deadline && (
+                        <div className="flex items-start gap-2">
+                          <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden />
+                          <div className="min-w-0">
+                            <small className="block text-xs font-medium">{t("exPublishedDeadline")}</small>
+                            <a href={uni.cardSummary.deadline.sourceUrl} target="_blank" rel="noopener noreferrer" className="block break-words font-bold text-ink-heading hover:underline">
+                              {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(uni.cardSummary.deadline.date + "T12:00:00Z"))}
+                            </a>
+                            <small className="line-clamp-2 break-words text-xs">{uni.cardSummary.deadline.category}{uni.cardSummary.deadline.programmeName
+                              ? " · " + uni.cardSummary.deadline.programmeName : ""}</small>
+                          </div>
+                        </div>
+                      )}
+                      {uni.cardSummary?.programme?.tuition && (
+                        <div className="flex items-start gap-2">
+                          <DollarSign className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden />
+                          <div className="min-w-0">
+                            <small className="block text-xs font-medium">{t("exProgrammeTuition")}</small>
+                            <a href={uni.cardSummary.programme.tuition.sourceUrl} target="_blank" rel="noopener noreferrer" className="break-words font-bold text-ink-heading hover:underline">
+                              {t("exFeeValue", { amount: formatMoney(uni.cardSummary.programme.tuition.amount, uni.cardSummary.programme.tuition.currency),
+                                period: t(uni.cardSummary.programme.tuition.period === "year" ? "exFeeYear" : uni.cardSummary.programme.tuition.period === "semester" ? "exFeeSemester" : "exFeeTotal") })}
+                            </a>
+                            <small className="block text-xs">{uni.cardSummary.programme.tuition.sourceTitle || t("exFeeScope")}</small>
+                          </div>
+                        </div>
+                      )}
+                      {uni.cardSummary?.admissionsUrl && (
+                        <a href={uni.cardSummary.admissionsUrl} target="_blank" rel="noopener noreferrer"
+                          className="flex min-h-9 items-center justify-between gap-2 rounded-control font-bold text-indigo-700 hover:underline dark:text-indigo-200">
+                          {t("exOfficialAdmissions")} <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        </a>
+                      )}
                     </div>
-
-                    <div className="mb-3 mt-auto grid grid-cols-2 gap-2 rounded-surface border border-slate-200/80 bg-slate-50 p-3 text-xs dark:border-slate-700/80 dark:bg-slate-800/60">
-                      <div>
-                        <span className="block text-slate-500 dark:text-slate-400">{t("exAnnualTuition")}</span>
-                        <strong className="font-bold text-slate-900 dark:text-white">{formatMoney(uni.annualTuitionUsd, "USD")}</strong>
-                      </div>
-                      <div>
-                        <span className="block text-slate-500 dark:text-slate-400">{t("exLivingEst")}</span>
-                        <strong className="font-bold text-slate-900 dark:text-white">{formatMoney(uni.annualLivingEstUsd, "USD")}</strong>
-                      </div>
-                      <div>
-                        <span className="block text-slate-500 dark:text-slate-400">{t("exMinGpa")}</span>
-                        <strong className="font-bold text-slate-900 dark:text-white">{uni.academicRequirements?.summary.gpa?`${uni.academicRequirements.summary.gpa.single} / ${uni.academicRequirements.summary.gpa.unit}`:t("notSpecified")}</strong>
-                      </div>
-                      <div>
-                        <span className="block text-slate-500 dark:text-slate-400">{t("exMinIelts")}</span>
-                        <strong className="font-bold text-slate-900 dark:text-white">{uni.academicRequirements?.summary.ielts?.single??t("notSpecified")}</strong>
-                      </div>
+                    <div className="mt-2 mb-3 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded-control px-1 text-sm text-ink-body">
+                      <strong className="text-ink-heading">{t("exEstimatedChance")}</strong>
+                      <span>{uni.estimatedChance?.reason === "profile_required" && !activeProfile
+                        ? t("exChanceSignIn") : t("exChanceInsufficientEvidence")}</span>
                     </div>
 
                     {/* Secondary diagnostics, collapsed by default. A NATIVE
@@ -1297,6 +1319,10 @@ export function UniversityExplorer({
                         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
                       </summary>
                       <div className="mt-2 space-y-2 border-t border-slate-200/70 pt-2 text-slate-600 dark:border-slate-800/60">
+                        <dl className="grid grid-cols-2 gap-2 text-sm">
+                          <div><dt>{t("exAnnualTuition")}</dt><dd className="font-semibold">{formatMoney(uni.annualTuitionUsd, "USD", { placeholder: t("notSpecified") })}</dd></div>
+                          <div><dt>{t("exLivingEst")}</dt><dd className="font-semibold">{formatMoney(uni.annualLivingEstUsd, "USD", { placeholder: t("notSpecified") })}</dd></div>
+                        </dl>
                         <div className="text-sm"><EvidenceNote compact label="GPA" fact={uni.academicRequirements?.evidence.gpa??null}/><EvidenceNote compact label="IELTS" fact={uni.academicRequirements?.evidence.ielts??null}/>
                           {(uni.minGpa!=null||uni.minIelts!=null)&&<p className="mt-2 text-sm text-slate-500">{t("recordedCatalogueValue")}: {uni.minGpa!=null?`GPA ${uni.minGpa} (${t("scoreScaleNotRecorded")})`:""}{uni.minIelts!=null?` · IELTS ${uni.minIelts}`:""}</p>}
                         </div>

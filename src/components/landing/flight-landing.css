@@ -1312,6 +1312,7 @@
     }
 
     .sb-flight-landing .scholly-avatar-orb {
+      position: relative;
       width: 54px;
       height: 54px;
       border-radius: 18px;
@@ -1551,3 +1552,14 @@
   .sb-flight-landing .flight-theme, .sb-flight-landing .flight-mobile-menu { min-height:36px; min-width:36px; }
   .sb-flight-landing .nav-right-cluster { gap:3px; }
 }
+
+.sb-flight-landing .flight-scholly-wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+.sb-flight-landing .flight-scholly-wave:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.sb-flight-landing .scholly-avatar-orb .sb-scholly-portrait { visibility: hidden; }
+.sb-flight-landing .scholly-avatar-orb:has([data-rendering="3d"]) > img { visibility: hidden; }

@@ -33,40 +33,50 @@ export function WhiteSpeakingOrb({ mouthOpen = 0, speaking = false, preview = fa
       const camera = new T.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.1, 10);
       camera.position.z = 4;
       const scene = new T.Scene();
-      scene.add(new T.HemisphereLight(0xffffff, 0x9199af, 2.25));
-      const lamp = new T.DirectionalLight(0xffffff, 1.35);
+      scene.add(new T.HemisphereLight(0xffffff, 0xb4c5ea, 2.7));
+      const lamp = new T.DirectionalLight(0xfff7ec, 1.65);
       lamp.position.set(-3, 5, 4);
       scene.add(lamp);
       const sphere = new T.SphereGeometry(1, 48, 32);
-      const porcelain = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.64 });
-      const graphite = new T.MeshBasicMaterial({ color: 0x252833 });
-      scene.add(new T.Mesh(sphere, porcelain));
+      const porcelain = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+      const graphite = new T.MeshBasicMaterial({ color: 0x39445d });
+      const face = new T.Group();
+      scene.add(face);
+      face.add(new T.Mesh(sphere, porcelain));
+      const highlights = new T.MeshBasicMaterial({ color: 0xffffff });
 
       for (const side of [-1, 1]) {
         const eye = new T.Mesh(sphere, graphite);
-        eye.position.set(side * 0.23, 0.12, 0.97);
-        eye.scale.set(0.047, 0.075, 0.028);
-        scene.add(eye);
+        eye.position.set(side * 0.235, 0.085, 0.968);
+        eye.scale.set(0.072, 0.09, 0.04);
+        eye.rotation.y = side * 0.16;
+        face.add(eye);
+        const shine = new T.Mesh(sphere, highlights);
+        shine.position.set(eye.position.x - 0.021, 0.12, 1.003);
+        shine.scale.set(0.018, 0.02, 0.007);
+        face.add(shine);
       }
 
       const smilePath = new T.QuadraticBezierCurve3(
-        new T.Vector3(-0.127, -0.15, 0.985),
-        new T.Vector3(0, -0.28, 0.99),
-        new T.Vector3(0.127, -0.15, 0.985),
+        new T.Vector3(-0.154, -0.156, 0.982),
+        new T.Vector3(0, -0.275, 0.997),
+        new T.Vector3(0.154, -0.156, 0.982),
       );
-      const smileGeometry = new T.TubeGeometry(smilePath, 24, 0.018, 8);
+      const smileGeometry = new T.TubeGeometry(smilePath, 24, 0.021, 8);
       const smile = new T.Mesh(smileGeometry, graphite);
-      scene.add(smile);
+      face.add(smile);
       const mouth = new T.Mesh(sphere, graphite);
-      mouth.position.set(0, -0.19, 0.99);
-      scene.add(mouth);
+      mouth.position.set(0, -0.195, 0.99);
+      face.add(mouth);
 
       const render = () => {
         if (renderer.getContext().isContextLost()) return;
         const { mouthOpen, speaking } = pose.current;
-        smile.visible = !speaking;
-        mouth.visible = speaking;
-        mouth.scale.set(0.13 - 0.035 * mouthOpen, 0.022 + 0.083 * mouthOpen, 0.025);
+        const amplitude = speaking && Number.isFinite(mouthOpen) ? Math.max(0, Math.min(1, mouthOpen)) : 0;
+        smile.visible = amplitude < 0.1;
+        mouth.visible = !smile.visible;
+        mouth.scale.set(0.135 - 0.032 * amplitude, 0.021 + 0.058 * amplitude, 0.025);
+        face.rotation.z = -0.025 + amplitude * 0.033;
         renderer.render(scene, camera);
       };
       const resize = new ResizeObserver(([entry]) => {
@@ -102,6 +112,7 @@ export function WhiteSpeakingOrb({ mouthOpen = 0, speaking = false, preview = fa
         smileGeometry.dispose();
         porcelain.dispose();
         graphite.dispose();
+        highlights.dispose();
         delete target.dataset.rendering;
       };
     }
@@ -118,7 +129,7 @@ export function WhiteSpeakingOrb({ mouthOpen = 0, speaking = false, preview = fa
       <span className="sb-speaking-face-shell">
         <span className="sb-speaking-face-eye" data-eye="left" />
         <span className="sb-speaking-face-eye" data-eye="right" />
-        <span className="sb-speaking-face-mouth" data-speaking={speaking || undefined}
+        <span className="sb-speaking-face-mouth" data-speaking={speaking && mouthOpen >= 0.1 || undefined}
           style={{ "--sb-mouth-level": mouthOpen } as CSSProperties} />
       </span>
     </span>

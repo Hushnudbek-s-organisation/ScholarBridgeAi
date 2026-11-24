@@ -7,9 +7,10 @@ import { readJsonBody } from "@/lib/request";
 import { logSchollyEvent } from "@/lib/scholly-events";
 import { transitionSchollyOnboarding, type SchollyOnboardingSnapshot } from "@/lib/scholly-onboarding";
 import { isSchollyLocale, isSupportedTimeZone } from "@/lib/scholly-profile";
+import { readSchollyLearning } from "@/lib/scholly-learning";
 import { parseSchollyReminderPreferences } from "@/lib/scholly-reminders";
 
-function publicProfile(row: typeof schollyProfiles.$inferSelect, stageKnown: boolean) {
+function publicProfile(row: typeof schollyProfiles.$inferSelect, stageKnown: boolean, ownProfile: boolean) {
   return {
     userId: row.userId,
     namePref: row.namePref,
@@ -17,6 +18,7 @@ function publicProfile(row: typeof schollyProfiles.$inferSelect, stageKnown: boo
     lang: row.lang,
     tone: row.tone,
     mode: parseSchollyReminderPreferences(row).mode,
+    ...(ownProfile ? { learning: readSchollyLearning(row.notifPrefs) } : {}),
     tz: row.tz,
     reminderWindow: row.reminderWindow,
     onboardingState: row.onboardingState,
@@ -68,7 +70,7 @@ export async function GET(req: Request) {
     if (access.targetId == null) return privateNoStoreJson({ error: "Profile not found" }, { status: 404 });
     const profile = await ensureProfile(access.targetId);
     if (!profile) return privateNoStoreJson({ error: "Profile not found" }, { status: 404 });
-    return privateNoStoreJson({ profile: publicProfile(profile.row, profile.stageKnown) });
+    return privateNoStoreJson({ profile: publicProfile(profile.row, profile.stageKnown, access.session.profile.id === access.targetId) });
   } catch (error) {
     console.error("GET /api/scholly/profile error:", error);
     return privateNoStoreJson({ error: "Scholly profile is unavailable" }, { status: 500 });
@@ -118,7 +120,7 @@ export async function POST(req: Request) {
         await logSchollyEvent(access.targetId!, "onboarding_step", { step: "tone", value: updated.tone }, tx);
       }
       await logSchollyEvent(access.targetId!, transition.event, transition.payload, tx);
-      return { profile: publicProfile(updated, initial.stageKnown) };
+      return { profile: publicProfile(updated, initial.stageKnown, access.session.profile.id === access.targetId) };
     });
 
     if ("error" in outcome) return privateNoStoreJson({ error: outcome.error, code: "invalid_onboarding_transition" }, { status: outcome.status });
@@ -153,7 +155,7 @@ export async function PUT(req: Request) {
       updatedAt: new Date(),
     }).where(eq(schollyProfiles.userId, access.targetId)).returning();
     if (!updated) return privateNoStoreJson({ error: "Scholly preferences could not be saved" }, { status: 500 });
-    return privateNoStoreJson({ profile: publicProfile(updated, existing.stageKnown) });
+    return privateNoStoreJson({ profile: publicProfile(updated, existing.stageKnown, access.session.profile.id === access.targetId) });
   } catch (error) {
     console.error("PUT /api/scholly/profile error:", error);
     return privateNoStoreJson({ error: "Scholly preferences could not be saved" }, { status: 500 });

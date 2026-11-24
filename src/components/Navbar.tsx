@@ -881,6 +881,7 @@ export function Navbar({
       ]}/>
 
       <SchollyCompanion
+        key={activeProfileId ?? activeProfile?.id ?? "guest"}
         activeTab={activeTab}
         activePane={activePane}
         locale={locale}
