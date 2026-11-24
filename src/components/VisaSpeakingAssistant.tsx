@@ -2719,7 +2719,7 @@ export function VisaSpeakingAssistant({
                     className={`rounded-surface border px-3 py-2.5 text-left transition-all ${
                       selected
                         ? "border-indigo-500 bg-indigo-50 text-indigo-950 shadow-xs dark:bg-indigo-500/20 dark:text-indigo-100"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-400 dark:border-slate-600 dark:bg-canvas dark:text-slate-200"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-200"
                     }`}
                   >
                     <span className="flex items-center gap-2 text-sm font-bold">

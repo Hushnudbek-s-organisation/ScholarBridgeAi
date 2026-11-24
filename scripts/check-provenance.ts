@@ -155,7 +155,7 @@ async function seedFixtures(): Promise<{ uniId: number; p1: number; p2: number; 
   // recorded exact original field can populate an official scoped minimum.
   await pool.query(
     `INSERT INTO catalogue_facts(entity_type,entity_id,field_key,value_numeric,unit,program_name,degree_level,admission_cycle,applicant_scope,source_url,verification_status,value_type,verified_at,is_active)
-     VALUES('program',$1,'min_ielts',6.5,'9',$2,'Bachelor','2026/2027','international',$3,'verified','official_requirement',now(),true)`,
+     VALUES('program',$1,'min_ielts',6.5,'9',$2,'Bachelor','2026/2027','international',$3,'verified','official_requirement',now() AT TIME ZONE 'UTC',true)`,
     [p1, `${MARKER} BSc Computer Science`, s1.url]
   );
 
