@@ -239,6 +239,15 @@ check("a half-configured credential is named for the admin, never silently used"
   assert.deepEqual(missingMailEnv({ SMTP_HOST: "h", MAIL_FROM: "f@x.test" }), []);
   assert.deepEqual(missingMailEnv({ SMTP_HOST: "h", MAIL_FROM: "f@x.test", SMTP_USER: "u" }), ["SMTP_PASS"]);
   assert.deepEqual(missingMailEnv({ SMTP_HOST: "h", MAIL_FROM: "f@x.test", SMTP_PASS: "p" }), ["SMTP_USER"]);
+  assert.equal(mailConfigured({ SMTP_HOST: "h", MAIL_FROM: "f@x.test", SMTP_USER: "u" }), false);
+});
+
+check("the Gmail provider requires OAuth credentials and a valid sender", () => {
+  const env = { MAIL_PROVIDER: "gmail", GMAIL_OAUTH_CLIENT_ID: "test-client", GMAIL_OAUTH_CLIENT_SECRET: "test-secret", GMAIL_OAUTH_REFRESH_TOKEN: "test-refresh", MAIL_FROM: "ScholarBridge <sender@example.test>" };
+  assert.equal(mailConfigured(env), true);
+  assert.deepEqual(missingMailEnv({ ...env, GMAIL_OAUTH_REFRESH_TOKEN: "" }), ["GMAIL_OAUTH_REFRESH_TOKEN"]);
+  assert.equal(mailConfigured({ ...env, MAIL_FROM: "not-an-address" }), false);
+  assert.deepEqual(missingMailEnv({ ...env, MAIL_PROVIDER: "invalid" }), ["MAIL_PROVIDER"]);
 });
 
 check("an unconfigured or unreachable server never throws — it returns a reason", async () => {
@@ -360,6 +369,50 @@ async function startFakeSmtp(
 }
 
 async function main() {
+  const gmail = { provider: "gmail" as const, clientId: "test-client", clientSecret: "test-secret", refreshToken: "test-refresh", from: "ScholarBridge <sender@example.test>" };
+
+  await checkAsync("Gmail sends the OAuth-authorized MIME message over HTTPS", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: { url: string; options: RequestInit }[] = [];
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url: String(url), options: options ?? {} });
+      return Response.json(calls.length === 1 ? { access_token: "test-access" } : { id: "test-message" });
+    };
+    try {
+      const result = await sendMail({ to: "student@example.test", subject: "Tiklash xati", text: "Salom\nhttps://x.test/reset-password?token=fixture" }, gmail);
+      assert.deepEqual(result, { ok: true });
+      assert.equal(calls.length, 2);
+      assert.equal(calls[0].url, "https://oauth2.googleapis.com/token");
+      assert.equal((calls[0].options.body as URLSearchParams).get("grant_type"), "refresh_token");
+      assert.equal((calls[0].options.body as URLSearchParams).get("refresh_token"), "test-refresh");
+      assert.equal(calls[1].url, "https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
+      assert.equal(new Headers(calls[1].options.headers).get("Authorization"), "Bearer test-access");
+      assert.ok(calls.every(({ options }) => options.redirect === "error"));
+      const { raw } = JSON.parse(String(calls[1].options.body));
+      const mime = Buffer.from(raw, "base64url").toString("utf8");
+      assert.match(mime, /From: ScholarBridge <sender@example\.test>\r\nTo: student@example\.test\r\n/);
+      assert.match(mime, /\r\n\r\nSalom\r\nhttps:\/\/x\.test\/reset-password\?token=fixture\r\n$/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  await checkAsync("Gmail errors omit provider response bodies and recipient validation precedes Google requests", async () => {
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls++;
+      return new Response("private-provider-detail", { status: 400 });
+    };
+    try {
+      assert.deepEqual(await sendMail({ to: "bad,other@example.test", subject: "s", text: "t" }, gmail), { ok: false, reason: "bad_recipient" });
+      assert.deepEqual(await sendMail({ to: "student@example.test", subject: "s", text: "t" }, gmail), { ok: false, reason: "gmail_error", detail: "Google authorization HTTP 400" });
+      assert.equal(calls, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   await checkAsync("a full SMTP conversation delivers the message (EHLO, MAIL, RCPT, DATA, QUIT)", async () => {
     const fake = await startFakeSmtp();
     try {

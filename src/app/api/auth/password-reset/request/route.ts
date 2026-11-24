@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     // from the last time mail did work.
     if (!mailConfigured()) {
       console.error(
-        `[auth] password reset skipped: SMTP is not configured (missing ${missingMailEnv().join(", ") || "SMTP_HOST/MAIL_FROM"}) — no link was created`
+        `[auth] password reset skipped: email is not configured (check ${missingMailEnv().join(", ") || "MAIL_PROVIDER"}) — no link was created`
       );
       return NextResponse.json(generic, { headers: { "Cache-Control": "no-store" } });
     }

@@ -1,5 +1,5 @@
 /**
- * Outbound email — a small SMTP client with no third-party dependency.
+ * Outbound password-reset email via SMTP or the Gmail API.
  *
  * Why hand-written: the rest of the server stack is dependency-light on purpose
  * (`scrypt` for passwords, `crypto` for sessions), and the only email the
@@ -7,15 +7,7 @@
  * Pulling in a mail library for that would add a transitive tree to every
  * deploy for ~150 lines of protocol.
  *
- * Configuration is entirely by environment — no host, brand or credential is
- * in the source:
- *
- *   SMTP_HOST      required to send at all
- *   SMTP_PORT      default 587 (submission)
- *   SMTP_SECURE    "1"/"true" → implicit TLS; port 465 implies it; otherwise STARTTLS
- *   SMTP_USER      optional; when set, AUTH LOGIN is used
- *   SMTP_PASS      optional, required with SMTP_USER
- *   MAIL_FROM      required, e.g. "no-reply@your-domain" or "Name <addr>"
+ * See .env.example for the credentials needed by each mail provider.
  *
  * Behaviour when it is not configured: `sendMail` returns
  * `{ ok: false, reason: "not_configured" }` and the caller decides what to tell
@@ -38,11 +30,22 @@ export interface MailConfig {
   from: string;
 }
 
+interface GmailConfig {
+  provider: "gmail";
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+  from: string;
+}
+
+type MailMessage = { to: string; subject: string; text: string };
+
 export type MailFailureReason =
   | "not_configured"
   | "connect_failed"
   | "timeout"
   | "smtp_error"
+  | "gmail_error"
   | "tls_required"
   | "bad_recipient";
 
@@ -62,18 +65,43 @@ export function mailConfigFromEnv(env: Record<string, string | undefined> = proc
   const secure = port === 465 || ["1", "true", "yes"].includes((env.SMTP_SECURE ?? "").trim().toLowerCase());
   const user = (env.SMTP_USER ?? "").trim() || null;
   const pass = (env.SMTP_PASS ?? "").trim() || null;
+  if ((user === null) !== (pass === null)) return null;
   return { host, port, secure, user, pass, from };
 }
 
+function mailProvider(env: Record<string, string | undefined>): string {
+  return env.MAIL_PROVIDER?.trim().toLowerCase() || "smtp";
+}
+
+function transportFromEnv(env: Record<string, string | undefined>): MailConfig | GmailConfig | null {
+  const provider = mailProvider(env);
+  if (provider === "smtp") return mailConfigFromEnv(env);
+  if (provider !== "gmail") return null;
+
+  const clientId = env.GMAIL_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.GMAIL_OAUTH_CLIENT_SECRET?.trim();
+  const refreshToken = env.GMAIL_OAUTH_REFRESH_TOKEN?.trim();
+  const from = env.MAIL_FROM?.trim();
+  if (!clientId || !clientSecret || !refreshToken || !from || !isMailAddress(bareAddress(from))) return null;
+  return { provider, clientId, clientSecret, refreshToken, from };
+}
+
 export function mailConfigured(env: Record<string, string | undefined> = process.env): boolean {
-  return mailConfigFromEnv(env) !== null;
+  return transportFromEnv(env) !== null;
 }
 
 /** Where the deployment should be read from — used by admin diagnostics. */
 export const MAIL_ENV_VARS = ["SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_USER", "SMTP_PASS", "MAIL_FROM"] as const;
+const GMAIL_ENV_VARS = ["GMAIL_OAUTH_CLIENT_ID", "GMAIL_OAUTH_CLIENT_SECRET", "GMAIL_OAUTH_REFRESH_TOKEN", "MAIL_FROM"] as const;
 
 /** Which required variable is missing (for the admin panel, never for users). */
 export function missingMailEnv(env: Record<string, string | undefined> = process.env): string[] {
+  const provider = mailProvider(env);
+  if (provider === "gmail") {
+    return GMAIL_ENV_VARS.filter((key) => !env[key]?.trim() || (key === "MAIL_FROM" && !isMailAddress(bareAddress(env[key] ?? ""))));
+  }
+  if (provider !== "smtp") return ["MAIL_PROVIDER"];
+
   const missing: string[] = [];
   if (!(env.SMTP_HOST ?? "").trim()) missing.push("SMTP_HOST");
   if (!(env.MAIL_FROM ?? "").trim()) missing.push("MAIL_FROM");
@@ -98,6 +126,10 @@ function encodeHeader(value: string): string {
 export function bareAddress(value: string): string {
   const match = /<([^>]+)>/.exec(value);
   return (match ? match[1] : value).trim();
+}
+
+function isMailAddress(value: string): boolean {
+  return /^[a-z0-9.!#$%&'*+/=?^_\x60{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(value);
 }
 
 const COMMAND_TIMEOUT_MS = 10_000;
@@ -203,18 +235,67 @@ function waitForConnect(socket: Socket, ms: number): Promise<void> {
   });
 }
 
+function mailHeaders(from: string, to: string, subject: string): string[] {
+  return [
+    `From: ${headerSafe(from)}`,
+    `To: ${to}`,
+    `Subject: ${encodeHeader(headerSafe(subject))}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="utf-8"',
+    "Content-Transfer-Encoding: 8bit",
+    `Date: ${new Date().toUTCString()}`,
+    "Auto-Submitted: auto-generated",
+  ];
+}
+
+async function sendGmail(config: GmailConfig, message: MailMessage, to: string): Promise<MailResult> {
+  const signal = AbortSignal.timeout(COMMAND_TIMEOUT_MS);
+  try {
+    const oauth = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      redirect: "error",
+      signal,
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        refresh_token: config.refreshToken,
+        grant_type: "refresh_token",
+      }),
+    });
+    if (!oauth.ok) return { ok: false, reason: "gmail_error", detail: `Google authorization HTTP ${oauth.status}` };
+    const token = (await oauth.json() as { access_token?: unknown }).access_token;
+    if (typeof token !== "string" || !/^[\x21-\x7e]+$/.test(token)) return { ok: false, reason: "gmail_error", detail: "Missing Google access token" };
+
+    const headers = mailHeaders(config.from, to, message.subject);
+    const text = message.text.replace(/\r?\n/g, "\r\n");
+    const raw = Buffer.from(`${headers.join("\r\n")}\r\n\r\n${text}\r\n`, "utf8").toString("base64url");
+    const sent = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+      method: "POST",
+      redirect: "error",
+      signal,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ raw }),
+    });
+    if (!sent.ok) return { ok: false, reason: "gmail_error", detail: `Gmail delivery HTTP ${sent.status}` };
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: signal.aborted ? "timeout" : "connect_failed" };
+  }
+}
+
 /**
  * Send one plain-text message. Never throws: every failure is a return value,
  * because a password-reset request must not 500 when the mail server is down —
  * it must answer the same generic sentence it answers for an unknown address.
  */
 export async function sendMail(
-  message: { to: string; subject: string; text: string },
-  config: MailConfig | null = mailConfigFromEnv()
+  message: MailMessage,
+  config: MailConfig | GmailConfig | null = transportFromEnv(process.env)
 ): Promise<MailResult> {
   if (!config) return { ok: false, reason: "not_configured" };
   const to = bareAddress(message.to);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return { ok: false, reason: "bad_recipient" };
+  if (!isMailAddress(to)) return { ok: false, reason: "bad_recipient" };
+  if ("provider" in config) return sendGmail(config, message, to);
 
   let socket: Socket | TLSSocket | null = null;
   let session: SmtpSession | null = null;
@@ -265,16 +346,7 @@ export async function sendMail(
     await session.command(`RCPT TO:<${to}>`, ["250", "251"], "RCPT TO");
     await session.command("DATA", ["354"], "DATA");
 
-    const headers = [
-      `From: ${headerSafe(config.from)}`,
-      `To: ${headerSafe(to)}`,
-      `Subject: ${encodeHeader(headerSafe(message.subject))}`,
-      "MIME-Version: 1.0",
-      'Content-Type: text/plain; charset="utf-8"',
-      "Content-Transfer-Encoding: 8bit",
-      `Date: ${new Date().toUTCString()}`,
-      "Auto-Submitted: auto-generated",
-    ];
+    const headers = mailHeaders(config.from, to, message.subject);
     // Dot-stuffing: a line starting with "." would end the message early.
     const body = message.text.replace(/\r?\n/g, "\r\n").replace(/^\./gm, "..");
     session.write(headers.join("\r\n") + "\r\n\r\n" + body + "\r\n.");

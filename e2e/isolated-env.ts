@@ -14,7 +14,7 @@ export function isolatedServiceEnvironment(source: NodeJS.ProcessEnv, root: stri
     for (const match of readFileSync(path, "utf8").matchAll(/^\s*(?:#\s*)?(?:export\s+)?([A-Za-z_]\w*)\s*=/gm)) keys.add(match[1]);
   }
   for (const key of keys) {
-    if (/(^DATABASE_URL$|^POSTGRES.*URL$|API_KEY|APIKEY|TOKEN|SECRET|PASSWORD|PASS$|SMTP_|MAIL_FROM|SUPABASE_|TELEGRAM_|PAYME|CLICK_|STRIPE_)/.test(key)) env[key] = "";
+    if (/(^DATABASE_URL$|^POSTGRES.*URL$|API_KEY|APIKEY|TOKEN|SECRET|PASSWORD|PASS$|SMTP_|MAIL_FROM|MAIL_PROVIDER|GMAIL_OAUTH_|SUPABASE_|TELEGRAM_|PAYME|CLICK_|STRIPE_)/.test(key)) env[key] = "";
   }
   return env;
 }
