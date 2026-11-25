@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { Client } from "pg";
+import { hashPassword } from "../src/lib/password";
 
 test("presentation journey connects an authenticated profile to programme, funding, deadline and SOP", async ({ request }) => {
   const fixture = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"));
@@ -114,6 +115,7 @@ test("speaking rooms use the plain orb independently of Scholly", async ({ page 
   if (supportsWebGL) {
     await expect(face.locator("[data-speaking-orb]")).toHaveAttribute("data-rendering", "3d");
   }
+  await expect(page.getByRole("button", { name: "Open Scholly chat" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   await face.screenshot({ path: testInfo.outputPath("daily-speaking-orb.png"), animations: "disabled" });
 
@@ -124,6 +126,8 @@ test("speaking rooms use the plain orb independently of Scholly", async ({ page 
   await page.getByRole("button", { name: "John", exact: true }).click();
   await expect(face.locator("[data-speaking-orb]")).toBeVisible();
   await expect(face.locator(".sb-scholly-model, .sb-speaking-face-flag")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Open Scholly chat" })).toHaveCount(0);
+  if (supportsWebGL) await expect(face.locator("[data-speaking-orb]")).toHaveAttribute("data-rendering", "3d");
 });
 
 test("an administrator can publish sourced ranks and restore archived universities", async ({ request }) => {
@@ -161,5 +165,72 @@ test("an administrator can publish sourced ranks and restore archived universiti
     } finally {
       await db.end();
     }
+  }
+});
+
+test("Admin can hide and show Study map under My Plan", async ({ page }) => {
+  const fixture = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"));
+  await page.context().addCookies([{name: "scholarbridge_locale", value: "en", url: process.env.E2E_BASE_URL!}]);
+  expect((await page.request.post("/api/auth/sign-in", { data: {
+    email: fixture.adminEmail, password: fixture.adminPassword,
+  } })).status()).toBe(200);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/#admin");
+  await page.getByRole("button", { name: "Sidebar sections", exact: true }).click();
+  const studyMap = page.locator("li").filter({ has: page.locator("code").getByText("study-map", { exact: true }) });
+  await expect(studyMap.getByText("Study map", { exact: true })).toBeVisible();
+  await studyMap.getByRole("button", { name: "Visible", exact: true }).click();
+  await expect(studyMap.getByRole("button", { name: "Hidden", exact: true })).toBeVisible();
+  expect((await (await page.request.get("/api/config/boot")).json()).nav.hidden).toContain("study-map");
+  await studyMap.getByRole("button", { name: "Hidden", exact: true }).click();
+  await expect(studyMap.getByRole("button", { name: "Visible", exact: true })).toBeVisible();
+  expect((await (await page.request.get("/api/config/boot")).json()).nav.hidden).not.toContain("study-map");
+});
+
+test("support recovery invalidates the old session and the replacement link is single-use", async ({ request, playwright }) => {
+  const fixture = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"));
+  const db = new Client({ connectionString: process.env.E2E_DATABASE_URL });
+  const student = await playwright.request.newContext({ baseURL: process.env.E2E_BASE_URL });
+  try {
+    await db.connect();
+    const email = "recovery-audit@example.test";
+    const replacementEmail = "owner-recovered@example.test";
+    const oldPassword = "Isolated-Old-Passphrase-2026!";
+    const newPassword = "Isolated-New-Passphrase-2026!";
+    const { rows: [profile] } = await db.query<{ id: number }>(`
+      INSERT INTO student_profiles (name, email, password_hash, onboarding_completed)
+      VALUES ('Recovery audit', $1, $2, true) RETURNING id
+    `, [email, hashPassword(oldPassword)]);
+
+    expect((await student.post("/api/auth/sign-in", { data: { email, password: oldPassword } })).status()).toBe(200);
+    expect((await student.get("/api/auth/session")).status()).toBe(200);
+    expect((await request.post("/api/auth/sign-in", { data: {
+      email: fixture.adminEmail, password: fixture.adminPassword,
+    } })).status()).toBe(200);
+
+    const endpoint = `/api/admin/accounts/${profile.id}/reset-link`;
+    const adminPassword = fixture.adminPassword;
+    expect((await student.post(endpoint, { data: { adminPassword, ownershipVerified: true } })).status()).toBe(403);
+    expect((await request.post(endpoint, { data: { adminPassword, ownershipVerified: false } })).status()).toBe(400);
+    const issued = await request.post(endpoint, { data: { adminPassword, ownershipVerified: true, newEmail: replacementEmail } });
+    expect(issued.status()).toBe(200);
+    expect(issued.headers()["cache-control"]).toContain("no-store");
+    const body = await issued.json();
+    expect(body.sessionsRevoked).toBeGreaterThanOrEqual(1);
+    expect((await student.get("/api/auth/session")).status()).toBe(401);
+    expect((await student.post("/api/auth/sign-in", { data: { email: replacementEmail, password: oldPassword } })).status()).toBe(401);
+
+    const token = new URL(body.link).searchParams.get("token");
+    expect(token).toBeTruthy();
+    const data = { token, password: newPassword, passwordConfirm: newPassword };
+    expect((await student.post("/api/auth/password-reset/confirm", { data })).status()).toBe(200);
+    expect((await student.post("/api/auth/password-reset/confirm", { data })).ok()).toBe(false);
+    expect((await student.post("/api/auth/sign-in", { data: { email: replacementEmail, password: newPassword } })).status()).toBe(200);
+    const audit = await db.query("SELECT new_value FROM audit_logs WHERE entity_type='profile' AND entity_id=$1 AND field_changed='password_reset_token'", [profile.id]);
+    expect(audit.rowCount).toBe(1);
+    expect(JSON.stringify(audit.rows)).not.toContain(token);
+  } finally {
+    await student.dispose();
+    await db.end();
   }
 });

@@ -223,19 +223,17 @@ check("the profile page compares chips against the corrected strings", () => {
 });
 
 check("the detail API corrects before it caches or localizes", () => {
-  // Phase AD moved the figure from `uni.worldRanking` to `qsRank`, the value
-  // `verifiedQsRankNumber` returns (null when the row records no edition). The
-  // property this gate protects is unchanged: the correction runs on the raw
-  // row, before anything is cached or localized.
-  const correction = route.indexOf('localizeUniversityDescription(uni.description, "en", qsRank)');
+  // Reconcile embedded exact positions before creating a shared base payload.
+  const correction = route.indexOf('localizeUniversityDescription(uni.description, "en", exactRank)');
   const cacheWrite = route.indexOf("setCachedUniversityDetailBase(uniId, basePayload, detailGeneration)");
   const cacheRead = route.indexOf("getCachedUniversityDetailBase(uniId)");
   assert.ok(correction > 0, "the API does not correct the description");
   assert.ok(cacheWrite > correction, "the cache is written before the correction");
   assert.ok(cacheRead > correction, "the cache is read before the correction");
-  assert.match(route, /localizeHighlights\(uni\.highlights, "en", qsRank\)/);
+  assert.match(route, /localizeHighlights\(uni\.highlights, "en", exactRank\)/);
   assert.ok(
-    route.indexOf("const qsRank = verifiedQsRankNumber(uni);") < correction,
+    route.indexOf("const exactRank = qsRanking?.rank === qsRanking?.upperRank") > 0 &&
+    route.indexOf("const exactRank = qsRanking?.rank === qsRanking?.upperRank") < correction,
     "the corrected figure does not come from the verified rank"
   );
 });

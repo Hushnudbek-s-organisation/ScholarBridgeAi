@@ -83,7 +83,14 @@ test("Scholly docks on mobile, keeps a dragged position, and yields to the keybo
   await expect(launcher).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-scholly-docked", "");
 
-  for (const route of ["visa/speaking", "visa/daily-speaking", "payments", "materials/documents"]) {
+  // Speaking studios use their own plain 3D orb, never a second floating
+  // Scholly. Returning to another page must restore the same docked size.
+  for (const route of ["visa/speaking", "visa/daily-speaking"]) {
+    await page.evaluate(hash => { window.location.hash = hash; }, route);
+    await expect(launcher).toHaveCount(0);
+    await expect(page.locator("html")).not.toHaveAttribute("data-scholly-docked");
+  }
+  for (const route of ["payments", "materials/documents"]) {
     await page.evaluate(hash => { window.location.hash = hash; }, route);
     await expect(launcher).toHaveCSS("width", "112px");
     await expect(launcher).toHaveCSS("height", "112px");
