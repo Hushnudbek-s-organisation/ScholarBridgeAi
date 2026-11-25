@@ -12,4 +12,5 @@ assert.equal(institutionScholarshipMatch({ provider: "Kazakhstan Ministry of Sci
 assert.equal(institutionScholarshipMatch({ provider: "University of Oxford", country: "United Kingdom" }, lse), false);
 assert.equal(institutionScholarshipMatch({ provider: "UK Government", country: "United Kingdom" }, lse), false);
 assert.equal(resolvedUsdScholarshipAmount({ awardAmount: 24960, awardCurrency: "GBP", amountUsdValue: 24960 }), null);
-console.log("9 institution scope and currency regression checks passed");
+assert.equal(resolvedUsdScholarshipAmount({ awardAmount: null, awardCurrency: "GBP", awardBasis: "variable", amountUsdValue: 24960 }), null);
+console.log("10 institution scope and currency regression checks passed");

@@ -26,9 +26,9 @@ async function main(): Promise<number> {
   try {
     const url = process.env.E2E_DATABASE_URL;
     if (!url || new URL(url).hostname !== "127.0.0.1") throw new Error("Disposable local DB is required");
-    for (const name of ["test:provenance", "test:channel-e2e"]) {
+    for (const name of ["scripts/check-provenance.ts", "scripts/rehearse-channel.ts"]) {
       const env = { ...isolatedServiceEnvironment(process.env, process.cwd()), DATABASE_URL: url, PROVENANCE_APP_URL: `http://127.0.0.1:${appPort}` };
-      const result = spawnSync("npm", ["run", name], { env, stdio: "inherit", timeout: 180_000 });
+      const result = spawnSync(process.execPath, ["--import", "tsx", name], { env, stdio: "inherit", timeout: 180_000 });
       if (result.error) throw result.error;
       if (result.status !== 0) return result.status ?? 1;
     }

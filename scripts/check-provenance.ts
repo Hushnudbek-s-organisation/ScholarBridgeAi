@@ -162,10 +162,10 @@ async function seedFixtures(): Promise<{ uniId: number; p1: number; p2: number; 
   await pool.query(
     `INSERT INTO application_cycles (university_id, program_id, intake, academic_year,
                                      opening_date, deadline, deadline_timezone, application_fee, application_fee_currency,
-                                     application_url, source_url, last_verified_at, verification_status)
+                                     application_url, source_url, last_verified_at, verification_status, is_verified, is_estimated)
      VALUES
-       ($1, $2, 'Autumn', '2026/2027', '2025-10-01', '2026-03-01', 'Europe/Amsterdam', 50, 'EUR', $3, $3, '2026-09-15 12:00:00', 'verified'),
-       ($1, $4, 'Spring', '2026/2027', '2025-08-01', '2026-01-15', NULL, NULL, 'EUR', NULL, NULL, NULL, 'unverified')`,
+       ($1, $2, 'Autumn', '2026/2027', '2025-10-01', '2026-03-01', 'Europe/Amsterdam', 50, 'EUR', $3, $3, '2026-09-15 12:00:00', 'verified', true, false),
+       ($1, $4, 'Spring', '2026/2027', '2025-08-01', '2026-01-15', NULL, NULL, 'EUR', NULL, NULL, NULL, 'unverified', false, true)`,
     [uniId, p1, s1.url, p2]
   );
 

@@ -156,7 +156,9 @@ check("scholarship amounts are only comparable when their canonical currency is 
   const usd = resolvedUsdScholarshipAmount({ awardAmount: 5000, awardCurrency: "USD", amountUsdValue: 4000 });
   const nonUsd = resolvedUsdScholarshipAmount({ awardAmount: 5000, awardCurrency: "EUR", amountUsdValue: 4000 });
   const legacy = resolvedUsdScholarshipAmount({ awardAmount: null, amountUsdValue: 4000 });
-  return usd === 5000 && nonUsd === null && legacy === 4000;
+  const conflictingLegacy = resolvedUsdScholarshipAmount({ awardAmount: null, awardCurrency: "GBP", amountUsdValue: 24960 });
+  const variableLegacy = resolvedUsdScholarshipAmount({ awardAmount: null, awardCurrency: "USD", awardBasis: "variable", amountUsdValue: 24960 });
+  return usd === 5000 && nonUsd === null && legacy === 4000 && conflictingLegacy === null && variableLegacy === null;
 })());
 check("research persistence preserves native awards without fabricating USD conversions", (() => {
   const usd = normalizedScholarshipAmounts({ amountUsd: 5000, currency: "USD" });
