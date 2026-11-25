@@ -182,8 +182,8 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
         className="inline-flex items-center gap-1.5 text-sm font-bold text-indigo-700 hover:underline">
         {localizeProgramName(p.name, locale)} <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
       </a>
-      {p.degreeLevel && <p className="mt-1 text-xs text-slate-500">{localizeDegreeLevel(p.degreeLevel, locale)}</p>}
-      {p.tuition && <div className="mt-2 text-xs text-slate-600">
+      {p.degreeLevel && <p className="mt-1 text-sm text-slate-500">{localizeDegreeLevel(p.degreeLevel, locale)}</p>}
+      {p.tuition && <div className="mt-2 text-sm text-slate-600">
         <span className="font-semibold">{formatMoney(p.tuition.amount, p.tuition.currency)} · {
           p.tuition.period === "year" ? copy.university.exFeeYear
             : p.tuition.period === "semester" ? copy.university.exFeeSemester : copy.university.exFeeTotal
@@ -416,7 +416,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
             <Section id="fields" title={t.fields} icon={<BookOpen className="h-4 w-4" aria-hidden />}>
               {publishedProgrammes.length > 0 ? (
                 <>
-                  <p className="mb-2 text-xs font-semibold text-emerald-700">{copy.university.exVerifiedProgramme} · {publishedProgrammes.length}</p>
+                  <p className="mb-2 text-sm font-semibold text-emerald-700">{copy.university.exVerifiedProgramme} · {publishedProgrammes.length}</p>
                   <ul className="grid gap-2 sm:grid-cols-2">{publishedProgrammes.slice(0, 6).map(programmeCard)}</ul>
                   {publishedProgrammes.length > 6 && (
                     <details className="mt-3">
