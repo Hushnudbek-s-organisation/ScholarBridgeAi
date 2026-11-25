@@ -29,8 +29,9 @@ import type { AssessmentProfileRow, AssessmentProgrammeRow } from "@/lib/assessm
 import { parseUniversitySort } from "@/lib/universitySort";
 import { loadVerifiedQsRankings } from "@/lib/universityRankings.server";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
-import { countriesMatch } from "@/lib/countries";
-import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
+import { institutionScholarshipMatch } from "@/lib/institutionScholarship";
+import { loadUniversityCardEvidence } from "@/lib/universityCardSummary.server";
+import { resolvedUsdUniversityCosts, resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 import {
   getCachedProfileForMatching,
   getCachedScholarshipsBundle,
@@ -93,100 +94,6 @@ function parseOtherRequirements(texts: string[]) {
  * Missing data stays null — the UI shows "Not available" / "Not specified".
  * No verification flags are invented: they come from the DB columns only.
  */
-
-/**
- * Does this database have the optional `programs.application_deadline` column?
- *
- * The canonical schema does not define it; enriched deployments (see
- * data/supabase_enrichment.sql) add it. The old code just ran the SELECT and
- * relied on the catch, which meant *every* university page load fired a query
- * that was guaranteed to fail on a stock database — visible as a steady stream
- * of `column "application_deadline" does not exist` in the Postgres log, plus one
- * wasted round-trip per request.
- *
- * The answer cannot change while the process lives, so it is probed once and
- * memoised. `null` means "not yet known"; the promise is cached so concurrent
- * first requests share the single probe instead of racing.
- */
-let programDeadlineColumnProbe: Promise<boolean> | null = null;
-
-function hasProgramDeadlineColumn(): Promise<boolean> {
-  if (!programDeadlineColumnProbe) {
-    programDeadlineColumnProbe = db
-      .execute(sql`
-        SELECT 1 AS present
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name = 'programs'
-          AND column_name = 'application_deadline'
-        LIMIT 1
-      `)
-      .then((res) => (res.rows as unknown[]).length > 0)
-      .catch(() => {
-        // The probe could not run (database not ready, transient error). Answer
-        // "no column" for THIS request so the page still renders, but clear the
-        // memo so the next request asks again — a momentary outage must not
-        // disable program deadlines until the process restarts.
-        programDeadlineColumnProbe = null;
-        return false;
-      });
-  }
-  return programDeadlineColumnProbe;
-}
-
-/** Words that never identify an institution on their own. */
-const INSTITUTION_STOPWORDS = new Set([
-  "university",
-  "universities",
-  "universite",
-  "universitat",
-  "universidad",
-  "univ",
-  "college",
-  "school",
-  "institute",
-  "institut",
-  "academy",
-  "polytechnic",
-  "polytechnique",
-  "fachhochschule",
-]);
-
-/** "Harvard University" → "harvard university" (letters and digits only). */
-function normalizeInstitutionName(value: string | null | undefined): string {
-  return (value ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-/** The significant words of an institution name ("toronto", "stanford", …). */
-function institutionTokens(value: string | null | undefined): string[] {
-  return normalizeInstitutionName(value)
-    .split(" ")
-    .filter((word) => word.length >= 5 && !INSTITUTION_STOPWORDS.has(word));
-}
-
-/**
- * Does this scholarship provider name the university itself?
- *
- * "Harvard University" matches "Harvard University" and "Harvard University —
- * [scholarship]", and so does a provider carrying the university's distinctive
- * name ("Stanford" for "Stanford University"). Generic words such as
- * "University" or "College" never match on their own.
- */
-function providerMatchesInstitution(
-  provider: string | null | undefined,
-  universityName: string | null | undefined,
-): boolean {
-  const p = normalizeInstitutionName(provider);
-  const u = normalizeInstitutionName(universityName);
-  if (!p || !u) return false;
-  if (p === u) return true;
-  if (p.includes(u) || u.includes(p)) return true;
-  return institutionTokens(universityName).some((token) => p.includes(token));
-}
-
 
 /**
  * Canonical assessment for the programme a university-detail request focuses
@@ -507,7 +414,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       }[]
     >();
     const progIds = programs.map((p) => p.id);
-    const [allReqRows, , programDeadlineRows] = await Promise.all([
+    const [allReqRows, , verifiedCardEvidence] = await Promise.all([
       progIds.length
         ? db
             .select()
@@ -567,38 +474,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           // program_sources / sources unavailable — program sources simply not shown.
         }
       })(),
-      // ---------- Program deadlines ----------
-      // The canonical schema has no `programs.application_deadline` column, but
-      // enriched deployments add one (see data/supabase_enrichment.sql). Probe
-      // the column once (memoised) instead of running a query that is known to
-      // fail on a stock database — see hasProgramDeadlineColumn(). A published
-      // date is never invented here: it is either in the column or nowhere.
-      (async () => {
-        if (!(await hasProgramDeadlineColumn())) {
-          return [] as { id: number; application_deadline: string | null }[];
-        }
-        try {
-          const res = await db.execute(sql`
-            SELECT id, application_deadline
-            FROM programs
-            WHERE university_id = ${uniId}
-              AND application_deadline IS NOT NULL
-          `);
-          return (res.rows as { id: number; application_deadline: string | null }[]);
-        } catch {
-          return [] as { id: number; application_deadline: string | null }[];
-        }
-      })(),
+      // Reuse the explicit fee and cycle provenance used by Explore.
+      loadUniversityCardEvidence([uniId]),
     ]);
 
-    // programId → published deadline (YYYY-MM-DD), read once for the page.
-    const programDeadlineByProgramId = new Map<number, string>();
-    for (const row of programDeadlineRows) {
-      if (row?.application_deadline == null) continue;
-      programDeadlineByProgramId.set(
-        row.id,
-        String(row.application_deadline).slice(0, 10),
-      );
+    const feeByProgramId = new Map(
+      (verifiedCardEvidence.programmes.get(uniId) ?? []).map(p => [p.id, p.tuition]),
+    );
+    const verifiedDeadlineByProgram = new Map<number, string>();
+    for (const cycle of verifiedCardEvidence.deadlines.get(uniId) ?? []) {
+      if (cycle.programmeId != null && cycle.date >= new Date().toISOString().slice(0, 10) &&
+          !verifiedDeadlineByProgram.has(cycle.programmeId)) {
+        verifiedDeadlineByProgram.set(cycle.programmeId, cycle.date);
+      }
     }
 
     const reqsByProgramId = new Map<number, typeof allReqRows>();
@@ -685,14 +573,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         durationUnit: p.durationUnit ?? "years",
         studyMode: p.studyMode,
         language: p.language,
-        tuitionAmount: programVerified && p.tuitionAmount != null ? Number(p.tuitionAmount) : null,
+        tuitionAmount: programVerified ? feeByProgramId.get(p.id)?.amount ?? null : null,
         tuitionCurrency: p.tuitionCurrency,
         tuitionPeriod: p.tuitionPeriod,
         description: p.description,
-        // The published programme deadline (from `programs.application_deadline`).
-        // NULL means the catalogue has no date for this programme — the UI
-        // says "not announced" instead of showing a made-up one.
-        applicationDeadline: programVerified ? programDeadlineByProgramId.get(p.id) ?? null : null,
+        // An exact, upcoming programme-specific cycle with official evidence.
+        applicationDeadline: programVerified ? verifiedDeadlineByProgram.get(p.id) ?? null : null,
         minIelts: programMinIelts,
         minToefl: programMinToefl,
         minDuolingo: programMinDet,
@@ -796,25 +682,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       subject: uniReqs.subject?.texts ?? [],
     };
 
-    // ---------- Application cycles (no cycle_year in DB — derive from academic_year) ----------
-    const verifiedDeadlineByProgram = new Map<number, string>();
-    for (const c of cycleRows) {
-      if (
-        c.programId != null &&
-        c.verificationStatus === "verified" &&
-        c.deadline &&
-        !verifiedDeadlineByProgram.has(c.programId)
-      ) {
-        verifiedDeadlineByProgram.set(c.programId, c.deadline);
-      }
-    }
-    for (const p of programsWithReqs) {
-      const dl = verifiedDeadlineByProgram.get(p.id);
-      if (dl && p.isVerified) {
-        p.applicationDeadline = dl;
-      }
-    }
-
     /*
      * One card per distinct deadline.
      *
@@ -851,11 +718,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           applicationFee: c.applicationFee != null ? Number(c.applicationFee) : null,
           applicationFeeCurrency: c.applicationFeeCurrency,
           applicationUrl: c.applicationUrl,
-          isVerified: c.verificationStatus === "verified",
+          isVerified: c.isVerified && !c.isEstimated && c.verificationStatus === "verified",
           // A deadline only counts as "confirmed" when the DB row is verified.
           // Anything else is surfaced as "estimated / not confirmed" so a
           // student never mistakes an unverified date for an official one.
-          isEstimated: c.verificationStatus !== "verified",
+          isEstimated: !c.isVerified || c.isEstimated || c.verificationStatus !== "verified",
           sourceUrl: c.sourceUrl ?? null,
           lastVerifiedAt: c.lastVerifiedAt ? new Date(c.lastVerifiedAt).toISOString() : null,
         };
@@ -933,15 +800,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       // university_sources table shape differs — sources are simply not shown.
     }
 
-    // ---------- Scholarships relevant to this university ----------
-    // The catalogue bundle already holds every ACTIVE scholarship, so this
-    // section costs no extra query. Three signals decide relevance:
-    //   1. the scholarship is linked to this university (`university_id`);
-    //   2. its provider IS this university ("Harvard University" awards);
-    //   3. it is offered in the same country.
-    // Exact provider links come first, then verified awards by amount, and the
-    // list is capped so the page stays scannable. Nothing is invented: an
-    // award without a published amount stays "amount unknown".
+    // Only explicitly linked or exact provider-matched institution awards.
+    // Country/global opportunities have their own dedicated discovery link.
     let uniScholarships: {
       id: number;
       title: string;
@@ -965,14 +825,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }[] = [];
     try {
       const schBundle = await getCachedScholarshipsBundle();
-      const uniName = uni.name ?? "";
-      const uniCountry = uni.country ?? "";
       const scored = schBundle.entries
         .map((s) => {
           const linked = s.universityId === uniId;
-          const providerMatch = providerMatchesInstitution(s.provider, uniName);
-          const sameCountry = countriesMatch(s.country, uniCountry);
-          if (!linked && !providerMatch && !sameCountry) return null;
+          if (!institutionScholarshipMatch(s, uni)) return null;
           const source = schBundle.sourceMap.get(s.id);
           // A stored 0 means "no fixed amount is published" (the column is NOT
           // NULL, so programme-wide and merit scholarships use 0 as the
@@ -983,10 +839,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             const n = Number(value);
             return Number.isFinite(n) && n > 0 ? n : null;
           };
-          const amountUsdValue = positive(s.amountUsdValue) ?? positive(s.awardAmount);
+          const amountUsdValue = positive(resolvedUsdScholarshipAmount(s));
           return {
             linked,
-            providerMatch,
             verified: s.verificationStatus === "verified",
             amountUsdValue,
             row: {
@@ -997,16 +852,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
               degreeLevels: s.degreeLevels ?? null,
               coverageType: s.coverageType ?? null,
               amountUsdValue,
-              awardAmount: positive(s.awardAmount) ?? positive(s.amountUsdValue),
-              awardCurrency: s.awardCurrency ?? "USD",
-              awardPeriod: s.awardPeriod ?? "year",
+              awardAmount: s.awardAmount != null ? positive(s.awardAmount) : amountUsdValue,
+              awardCurrency: s.awardAmount != null ? s.awardCurrency ?? null : "USD",
+              awardPeriod: s.awardPeriod ?? null,
               deadline: s.deadline ?? s.deadlineDate ?? null,
               deadlineDate: s.deadlineDate ?? s.deadline ?? null,
               applicationUrl: s.applicationUrl ?? s.websiteUrl ?? null,
               websiteUrl: s.websiteUrl ?? s.applicationUrl ?? null,
               isVerified: s.verificationStatus === "verified",
               eligibilityText: s.requirements ?? null,
-              sourceUrl: source?.sourceUrl ?? s.sourceUrl ?? null,
+              sourceUrl: s.sourceUrl ?? source?.sourceUrl ?? null,
               lastVerifiedAt: source?.lastVerifiedAt ?? null,
               verificationStatus: s.verificationStatus,
             },
@@ -1015,10 +870,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         .filter((x): x is NonNullable<typeof x> => x !== null);
 
       scored.sort((a, b) => {
-        // A scholarship linked to THIS university outranks a country-wide one.
+        // An explicit institution link outranks a provider-name match.
         if (a.linked !== b.linked) return a.linked ? -1 : 1;
-        // Then the ones this institution actually awards.
-        if (a.providerMatch !== b.providerMatch) return a.providerMatch ? -1 : 1;
         // Then verified rows, then the biggest published award.
         if (a.verified !== b.verified) return a.verified ? -1 : 1;
         const am = a.amountUsdValue ?? -1;

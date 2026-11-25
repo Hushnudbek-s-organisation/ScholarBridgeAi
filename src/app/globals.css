@@ -1680,7 +1680,6 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
   bottom: calc(var(--scholly-dock-bottom) + max(0px, (var(--sb-dock-height) - var(--scholly-size)) / 2));
 }
 .sb-scholly-model { display: block; position: relative; width: 100%; height: 100%; pointer-events: none; }
-.sb-scholly-model canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .sb-scholly-portrait {
   position: absolute;
   inset: 0;
@@ -1699,7 +1698,7 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
   }
   .sb-scholly-model[data-held] .sb-scholly-portrait img { scale: .94; }
   .sb-scholly-model[data-paused] .sb-scholly-portrait { animation-play-state: paused !important; }
-  .sb-scholly [data-motion="wave"] .sb-scholly-portrait { animation: sb-scholly-portrait-wave .55s ease-in-out 2; }
+  .sb-scholly-model[data-motion="wave"] .sb-scholly-portrait { animation: sb-scholly-portrait-wave .55s ease-in-out 2; }
   .sb-scholly [data-motion="happy"] .sb-scholly-portrait { animation: sb-scholly-portrait-wave .5s ease-in-out; }
   .sb-scholly [data-motion="point"] .sb-scholly-portrait { rotate: -8deg; }
 }
@@ -1732,9 +1731,8 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
 }
 @keyframes sb-scholly-flap { from { rotate: -22deg; } to { rotate: 22deg; } }
 @media (prefers-reduced-motion: reduce) { .sb-scholly-portrait-arm { animation: none; } }
-.sb-scholly-model canvas { visibility: hidden; }
 .sb-scholly-launcher .sb-scholly-portrait {
-  transform: perspective(120px) rotateX(var(--scholly-look-x, 0deg)) rotateY(var(--scholly-look-y, 0deg)) scale(var(--scholly-press, 1));
+  transform: scale(var(--scholly-press, 1));
   transition: transform .15s ease-out;
 }
 .sb-scholly:not([data-quiet]) .sb-scholly-launcher:hover { --scholly-press: 1.06; }
@@ -1742,8 +1740,6 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
 @media (prefers-reduced-motion: reduce) {
   .sb-scholly-launcher .sb-scholly-portrait { transform: scale(var(--scholly-press, 1)); transition: none; }
 }
-.sb-scholly-model[data-rendering="3d"] canvas { visibility: visible; }
-.sb-scholly-model[data-rendering="3d"] .sb-scholly-portrait { visibility: hidden; }
 .sb-scholly-chat {
   position: absolute;
   bottom: var(--scholly-above);

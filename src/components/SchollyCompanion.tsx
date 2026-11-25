@@ -53,7 +53,7 @@ const strings = {
     dizzy: "Boshim aylanib ketdi!", navigate: "Kerakli bo‘limni shu yerdan oching.", locale: "Uzbek",
     hello: "Salom!", easter: "Menga qara, men ham qiziqarliman!",
     quietToday: "Bugun jim bo‘l",
-    wave: "Scholly bilan salomlashish", turn: "Scholly’ni aylantirish",
+    wave: "Scholly bilan salomlashish", turn: "Scholly’ni qiyshaytirish",
     learning: "Yordamni moslashtirish", saveLearning: "Mavzularimni eslab qol",
     learningHint: "Scholly mavzular va baholarni eslab qoladi. Umumiy natijalar yordamni yaxshilashga xizmat qiladi. Suhbat matni saqlanmaydi. O‘chirganingizda tarix tozalanadi.",
     shortcuts: "Ko‘p so‘ralgan yordam", helpful: "Foydali", needsWork: "Yetarli emas", feedbackSaved: "Fikringiz saqlandi",
@@ -67,7 +67,7 @@ const strings = {
     dizzy: "I’m dizzy!", navigate: "Open the relevant section below.", locale: "English",
     hello: "Hi!", easter: "Hey, look at me! I can be fun too!",
     quietToday: "Quiet today",
-    wave: "Wave to Scholly", turn: "Turn Scholly around",
+    wave: "Wave to Scholly", turn: "Tilt Scholly",
     learning: "Personalise help", saveLearning: "Remember my help topics",
     learningHint: "Scholly remembers topics and ratings. Totals help improve the site. Chat text is never stored. Turning this off clears this history.",
     shortcuts: "Your frequent help topics", helpful: "Helpful", needsWork: "Needs work", feedbackSaved: "Feedback saved",
@@ -81,7 +81,7 @@ const strings = {
     dizzy: "Голова кружится!", navigate: "Откройте нужный раздел ниже.", locale: "Russian",
     hello: "Привет!", easter: "Посмотри на меня — я тоже умею веселиться!",
     quietToday: "Без подсказок сегодня",
-    wave: "Помахать Scholly", turn: "Повернуть Scholly",
+    wave: "Помахать Scholly", turn: "Наклонить Scholly",
     learning: "Настроить подсказки", saveLearning: "Запоминать мои темы",
     learningHint: "Scholly запоминает темы и оценки. Общие результаты помогают улучшать сайт. Текст чата не сохраняется. При отключении история удаляется.",
     shortcuts: "Ваши частые темы", helpful: "Полезно", needsWork: "Нужно улучшить", feedbackSaved: "Оценка сохранена",
@@ -178,8 +178,9 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   const [pending, setPending] = useState(false);
   const [aiReady, setAiReady] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const speakingStudio = activeTab === "visa" && (activePane === "speaking" || activePane === "daily-speaking");
   const quiet = activeTab === "payments"
-    || (activeTab === "visa" && (!activePane || activePane === "speaking" || activePane === "daily-speaking"))
+    || speakingStudio || (activeTab === "visa" && !activePane)
     || (activeTab === "materials" && activePane === "documents");
   const live: SchollyMotion = drag ? "drag" : dizzy ? "shake" : selecting ? "point" : pending ? "think" : "idle";
   const { state: motion, setState: playMotion, hidden } = useSchollyMotion(live, quiet, hasDock && placement === "dock");
@@ -299,7 +300,7 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
     return () => clearTimeout(greeting);
   }, [quiet, playMotion]);
 
-  const reserveDockSlot = hasDock && !keyboardOpen && (dockPreview || (placement === "dock" && !drag));
+  const reserveDockSlot = hasDock && !speakingStudio && !keyboardOpen && (dockPreview || (placement === "dock" && !drag));
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.toggleAttribute("data-scholly-docked", reserveDockSlot);
@@ -561,6 +562,8 @@ export function SchollyCompanion({ activeTab, activePane, topics = [], navigate,
   const onboardingQuestion = schollyProfile?.onboardingStep === "reminder" ? 1
     : schollyProfile?.onboardingStep === "tone" ? 2
       : schollyProfile?.onboardingStep === "challenge" ? 3 : 0;
+
+  if (speakingStudio) return null;
 
   return (
     <div className="sb-scholly print:hidden" data-no-dock={!hasDock || undefined} data-paused={hidden || undefined} data-quiet={quiet || undefined} data-keyboard={keyboardOpen || undefined} onKeyDown={event => { if (event.key === "Escape" && open) { event.stopPropagation(); close(); } }}>

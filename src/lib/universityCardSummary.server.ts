@@ -23,6 +23,7 @@ export async function loadUniversityCardEvidence(ids: number[]) {
           ps.program_id, ps.source_type = 'tuition' as is_fee, s.url, s.title
         from public.program_sources ps join public.sources s on s.id = ps.source_id
         where s.is_official and s.is_verified and ps.source_type <> 'admission_requirement'
+          and s.url ~ '^https://[^/]+/[^/?#]'
         order by ps.program_id, (ps.source_type = 'tuition'), s.accessed_at desc nulls last, s.id
       )
       select p.id, p.university_id as "universityId", p.name, p.field, p.degree_level as "degreeLevel",
@@ -30,6 +31,7 @@ export async function loadUniversityCardEvidence(ids: number[]) {
         p.tuition_currency as currency, p.tuition_period as period, fees.url as "tuitionUrl", fees.title as "tuitionTitle"
       from public.programs p
       left join public.sources official on official.url = p.source_url and official.is_official and official.is_verified
+        and official.url ~ '^https://[^/]+/[^/?#]'
       left join linked programme_source on programme_source.program_id = p.id and not programme_source.is_fee
       left join linked fees on fees.program_id = p.id and fees.is_fee and p.annual_tuition is not null
       where p.university_id in (${universityIds}) and p.is_active and p.is_verified

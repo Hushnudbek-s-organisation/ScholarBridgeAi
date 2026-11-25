@@ -98,11 +98,18 @@ export default async function globalSetup(_config: FullConfig) {
       password: "e2e-only",
       port: dbPort,
       persistent: false,
+      // The isolated suite connects over TCP loopback only. Some managed
+      // runners cannot create Unix-domain sockets, even in /tmp.
+      postgresFlags: ["-h", "127.0.0.1", "-c", "unix_socket_directories="],
       onLog: () => {},
       onError: (error) => { serverOutput += `[embedded-postgres] ${String(error)}\n`; },
     });
     await pg.initialise();
-    await pg.start();
+    try {
+      await pg.start();
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("Disposable PostgreSQL failed to start on loopback");
+    }
     await pg.createDatabase(databaseName);
     console.log(`E2E database: disposable embedded PostgreSQL on 127.0.0.1:${dbPort}/${databaseName}`);
 
@@ -112,7 +119,7 @@ export default async function globalSetup(_config: FullConfig) {
       stdio: "inherit",
       timeout: 240_000,
     });
-    execFileSync(process.execPath, [join(root, "node_modules/tsx/dist/cli.mjs"), "scripts/e2e/seed-fixtures.ts"], {
+    execFileSync(process.execPath, ["--import", "tsx", "scripts/e2e/seed-fixtures.ts"], {
       cwd: root,
       env: env as NodeJS.ProcessEnv,
       stdio: "inherit",

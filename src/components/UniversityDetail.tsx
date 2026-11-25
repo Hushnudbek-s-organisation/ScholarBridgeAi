@@ -219,6 +219,9 @@ interface ScholarshipData {
   degreeLevels: string | null;
   coverageType: string | null;
   amountUsdValue: number | null;
+  awardAmount?: number | null;
+  awardCurrency?: string | null;
+  awardPeriod?: string | null;
   deadline: string | null;
   deadlineDate: string | null;
   applicationUrl: string | null;
@@ -1241,7 +1244,7 @@ export function UniversityDetail({
                       </div>
                     </div>
                     <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                      <span><b>{t("tuitionLabel")}</b> {tVal(fmtMoney(p.tuitionAmount, p.tuitionCurrency))}</span>
+                      <span><b>{t("tuitionLabel")}</b> {tVal(fmtMoney(p.tuitionAmount, p.tuitionCurrency, p.tuitionPeriod))}</span>
                       <span><b>{t("ieltsLabel")}</b> {p.minIelts != null ? p.minIelts : t("notSpecified")}</span>
                       {p.language && <span><b>{t("languageLabel")}</b> {p.language}</span>}
                       {p.applicationDeadline && <span><b>{t("deadlineLabel")}</b> {p.applicationDeadline}</span>}
@@ -1407,15 +1410,24 @@ export function UniversityDetail({
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(showAllScholarships ? scholarships : scholarships.slice(0, 3)).map((sch) => {
               const schName = sch.name || sch.title;
-              const deadline = sch.deadlineDate || sch.deadline || null;
+              const deadline = sch.deadlineDate || null;
+              const deadlineLabel = deadline && /^\d{4}-\d{2}-\d{2}$/.test(deadline)
+                ? new Date(deadline + "T00:00:00Z").toLocaleDateString(locale, {timeZone: "UTC"})
+                : sch.deadline || t("notAnnounced");
+              const period = sch.awardPeriod === "year" ? t("exFeeYear") : sch.awardPeriod === "semester" ? t("exFeeSemester")
+                : sch.awardPeriod === "total" ? t("exFeeTotal") : sch.awardPeriod === "month"
+                  ? ({ en: "per month", uz: "oyiga", ru: "в месяц" }[locale]) : "";
+              const award = sch.isVerified && sch.awardAmount != null && sch.awardAmount > 0 && sch.awardCurrency
+                ? formatMoney(sch.awardAmount, sch.awardCurrency, {suffix: period ? " · " + period : ""})
+                : t("notSpecified");
               const url = sch.applicationUrl || sch.websiteUrl || null;
               return (
                 <div key={sch.id} className="rounded-surface border border-slate-200 p-4 hover:border-amber-300 transition-colors">
                   <p className="text-sm font-extrabold text-slate-800">{schName}</p>
                   <p className="text-sm text-slate-500 mt-0.5">{sch.coverageType ? localizeCoverageType(sch.coverageType, locale) : t("coverageNotSpecified")}</p>
                   <div className="mt-2 space-y-1 text-xs text-slate-600">
-                    <p><b>{t("amountLabel")}</b> {formatMoney(sch.amountUsdValue, "USD")}</p>
-                    <p><b>{t("deadlineLabel")}</b> {deadline ? new Date(deadline + (deadline.length === 10 ? "T00:00:00" : "")).toLocaleDateString(locale) : t("notAnnounced")}</p>
+                    <p><b>{t("amountLabel")}</b> {award}</p>
+                    <p><b>{t("deadlineLabel")}</b> {deadlineLabel}</p>
                     <p><b>{t("eligibilityLabel")}</b> {sch.eligibilityText || t("notSpecified")}</p>
                   </div>
                   {url && (

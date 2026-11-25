@@ -12,6 +12,7 @@ import {
   parseHiddenNav,
 } from "@/lib/navSections";
 import { Button } from "@/components/ui/Button";
+import { invalidateBootConfig } from "@/lib/bootConfig";
 
 const GROUP_KEY: Record<string, string> = {
   home: "groupHome",
@@ -21,6 +22,12 @@ const GROUP_KEY: Record<string, string> = {
   after: "groupAfter",
   help: "groupHelp",
 };
+
+const studyMap = NAV_UTILITY_SECTIONS.find(section => section.id === "study-map");
+const sidebarSettings = studyMap
+  ? [...NAV_SECTIONS, { ...studyMap, group: "plan" as const, locked: false }]
+  : NAV_SECTIONS;
+const accountSettings = NAV_UTILITY_SECTIONS.filter(section => !section.adminOnly && section.id !== "study-map");
 
 interface NavManagerProps {
   adminProfileId: number;
@@ -90,6 +97,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
       if (!res.ok) throw new Error(data.error || "Failed to save");
       setHidden(next);
       // The open sidebar re-reads the config on this event — no reload needed.
+      invalidateBootConfig();
       window.dispatchEvent(new Event("scholarbridge:nav-updated"));
       setMessage({ ok: true, text: "Sidebar navigation updated — applied immediately." });
     } catch (err) {
@@ -109,7 +117,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
     void persist(next, id);
   };
 
-  const visibleCount = NAV_SECTIONS.filter((s) => !hidden.includes(s.id)).length;
+  const visibleCount = sidebarSettings.filter((s) => !hidden.includes(s.id)).length;
 
   return (
     <div className="space-y-4">
@@ -120,7 +128,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Sidebar navigation</h2>
           <p className="text-sm text-slate-500">
-            {visibleCount} of {NAV_SECTIONS.length} sections visible to users. Changes apply
+            {visibleCount} of {sidebarSettings.length} sections visible to users. Changes apply
             immediately — no deploy needed.
           </p>
         </div>
@@ -157,7 +165,7 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
             {tn(GROUP_KEY[group])}
           </p>
           <ul className="divide-y divide-slate-100">
-            {NAV_SECTIONS.filter((section) => section.group === group).map((section) => {
+            {sidebarSettings.filter((section) => section.group === group).map((section) => {
               const visible = !hidden.includes(section.id);
               const saving = savingId === section.id;
               return (
@@ -225,14 +233,14 @@ export function NavManager({ adminProfileId }: NavManagerProps) {
       {!loading && (
         <details className="rounded-overlay border border-slate-200 bg-white shadow-xs">
           <summary className="cursor-pointer px-4 py-3 text-xs font-extrabold text-slate-700">
-            Tabs and account screens ({NAV_SECTIONS.reduce((n, s) => n + s.panes.length, 0) + NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).length})
+            Tabs and account screens ({NAV_SECTIONS.reduce((n, s) => n + s.panes.length, 0) + accountSettings.length})
           </summary>
           <ul className="divide-y divide-slate-100 border-t border-slate-100">
             {NAV_SECTIONS.flatMap((section) =>
               section.panes.map((pane) => ({ id: pane.id, label: `${tn(navLabelKey(section.id))} → ${tp(pane.id as never)}`, description: pane.description }))
             )
               .concat(
-                NAV_UTILITY_SECTIONS.filter((u) => !u.adminOnly).map((u) => ({
+                accountSettings.map((u) => ({
                   id: u.id,
                   label: `${tn(navLabelKey(u.id))}`,
                   description: u.description,

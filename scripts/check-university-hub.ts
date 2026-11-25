@@ -124,7 +124,7 @@ check("the ranking label carries no year of its own", () => {
 
 check("the edition is shown from the row, not from the copy", () => {
   const source = stripComments(readFileSync(join(ROOT, "src/components/UniversityDetail.tsx"), "utf8"));
-  assert.match(source, /uni\.qsRankYear/, "the panel does not read the stored edition");
+  assert.match(source, /formatYear\(uni\.qsRanking\.year\)/, "the panel must read the sourced ranking edition without thousands grouping");
   assert.doesNotMatch(source, /\b20\d{2}\b/, "a year is hardcoded in the panel");
 });
 
@@ -145,7 +145,8 @@ check("the panel's data shape knows both new fields", () => {
 
 check("the detail API ships the whole row, so the edition reaches the panel", () => {
   const route = readFileSync(join(ROOT, "src/app/api/universities/[id]/route.ts"), "utf8");
-  assert.match(route, /const university = \{ \.\.\.uni, \.\.\.resolvedUsdUniversityCosts\(uni\) \}/);
+  assert.match(route, /loadVerifiedQsRankings\(\[uniId\]\)/);
+  assert.match(route, /const university = \{ \.\.\.uni, \.\.\.resolvedUsdUniversityCosts\(uni\), qsRanking \}/);
 });
 
 check("the API attaches the flag through the same localizer the profile uses", () => {

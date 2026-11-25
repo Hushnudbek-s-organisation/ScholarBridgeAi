@@ -29,12 +29,13 @@ import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
+import { loadUniversityCardEvidence } from "@/lib/universityCardSummary.server";
 import {
   localizeCity,
   localizeCountry,
   localizeDegreeLevel,
   localizeHighlights,
-  localizeMajorOrField,
+  localizeProgramName,
   localizeUniversityType,
   universityDescriptionState,
 } from "@/lib/catalogLocalizer";
@@ -173,9 +174,25 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // stays in English, and the list says so once instead of labelling each chip.
   const highlightsInSource =
     locale !== "en" && highlights.some((item, index) => item === storedHighlights[index]);
-  const fields = (bundle?.programFieldsByUni.get(u.id) ?? [])
-    .slice(0, 16)
-    .map((field) => localizeMajorOrField(field, locale));
+  const programmeEvidence = await loadUniversityCardEvidence([u.id]);
+  const publishedProgrammes = programmeEvidence.programmes.get(u.id) ?? [];
+  const programmeCard = (p: (typeof publishedProgrammes)[number]) => (
+    <li key={p.id} className="rounded-surface border border-slate-200 p-3">
+      <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-indigo-700 hover:underline">
+        {localizeProgramName(p.name, locale)} <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+      </a>
+      {p.degreeLevel && <p className="mt-1 text-xs text-slate-500">{localizeDegreeLevel(p.degreeLevel, locale)}</p>}
+      {p.tuition && <div className="mt-2 text-xs text-slate-600">
+        <span className="font-semibold">{formatMoney(p.tuition.amount, p.tuition.currency)} · {
+          p.tuition.period === "year" ? copy.university.exFeeYear
+            : p.tuition.period === "semester" ? copy.university.exFeeSemester : copy.university.exFeeTotal
+        }</span>
+        <a className="mt-1 block text-indigo-700 hover:underline" href={p.tuition.sourceUrl}
+          target="_blank" rel="noopener noreferrer">{p.tuition.sourceTitle || copy.university.exFeeScope}</a>
+      </div>}
+    </li>
+  );
   const source = bundle?.sourceMap.get(u.id) ?? null;
 
   // Costs show the stored currency first and the USD comparison second; when
@@ -255,7 +272,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
     {
       icon: <CalendarDays className="h-3.5 w-3.5" aria-hidden />,
       label: t.qsYearLabel,
-      value: number(qsPosition?.year ?? null),
+      value: qsPosition ? String(qsPosition.year) : null,
     },
   ];
 
@@ -397,14 +414,19 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
             </Section>
 
             <Section id="fields" title={t.fields} icon={<BookOpen className="h-4 w-4" aria-hidden />}>
-              {fields.length > 0 ? (
-                <ul className="flex flex-wrap gap-1.5">
-                  {fields.map((field) => (
-                    <li key={field} className="rounded-control border border-indigo-200 bg-indigo-50 px-2 py-1 text-sm font-bold text-indigo-800">
-                      {field}
-                    </li>
-                  ))}
-                </ul>
+              {publishedProgrammes.length > 0 ? (
+                <>
+                  <p className="mb-2 text-xs font-semibold text-emerald-700">{copy.university.exVerifiedProgramme} · {publishedProgrammes.length}</p>
+                  <ul className="grid gap-2 sm:grid-cols-2">{publishedProgrammes.slice(0, 6).map(programmeCard)}</ul>
+                  {publishedProgrammes.length > 6 && (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-indigo-700">
+                        {formatMessage(copy.university.viewAllPrograms, {count: publishedProgrammes.length})}
+                      </summary>
+                      <ul className="mt-2 grid gap-2 sm:grid-cols-2">{publishedProgrammes.slice(6).map(programmeCard)}</ul>
+                    </details>
+                  )}
+                </>
               ) : (
                 <p className="text-sm text-slate-600">{t.fieldsNotPublished}</p>
               )}

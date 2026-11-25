@@ -6,7 +6,7 @@ const fixtures = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"))
   studentId: number; studentEmail: string; studentPassword: string;
 };
 
-test("Scholly keeps its own 3D appearance even with a saved legacy outfit", async ({ page }, testInfo) => {
+test("Scholly keeps its reference appearance even with a saved legacy outfit", async ({ page }, testInfo) => {
   const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL });
   const endpoint = "/api/scholly/wardrobe";
   try {
@@ -23,8 +23,8 @@ test("Scholly keeps its own 3D appearance even with a saved legacy outfit", asyn
     const launcher = page.getByRole("button", {name:"Open Scholly chat"});
     const model = launcher.locator('.sb-scholly-model[data-companion="scholly"]');
     await expect(model).toBeVisible();
-    const webgl = await page.evaluate(() => Boolean(document.createElement("canvas").getContext("webgl2")));
-    if (webgl) await expect(model).toHaveAttribute("data-rendering", "3d");
+    await expect(model.locator('img[src="/scholly.webp"]')).toBeVisible();
+    await expect(model.locator("canvas")).toHaveCount(0);
     await expect(launcher).toHaveCSS("width","128px");
     await launcher.screenshot({ path: testInfo.outputPath("scholly-companion.png"), animations: "disabled" });
     const dock = page.getByTestId("grouped-dock");
@@ -33,7 +33,7 @@ test("Scholly keeps its own 3D appearance even with a saved legacy outfit", asyn
     const chat = page.getByRole("region",{name:"Scholly"});
     await expect(chat).toBeVisible();
     await expect(chat.getByRole("button",{name:"Customize",exact:true})).toHaveCount(0);
-    await chat.getByRole("button", { name: "Turn Scholly around" }).click();
+    await chat.getByRole("button", { name: "Tilt Scholly" }).click();
     await chat.getByRole("button", { name: "Wave to Scholly" }).click();
     await expect(launcher).toHaveAttribute("data-motion", "wave");
     await chat.getByRole("button",{name:"Close chat"}).click();
