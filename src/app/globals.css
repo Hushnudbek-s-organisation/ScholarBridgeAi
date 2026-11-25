@@ -1680,6 +1680,10 @@ html { scroll-padding-top: calc(var(--sb-header-height,56px) + 12px); scroll-pad
   bottom: calc(var(--scholly-dock-bottom) + max(0px, (var(--sb-dock-height) - var(--scholly-size)) / 2));
 }
 .sb-scholly-model { display: block; position: relative; width: 100%; height: 100%; pointer-events: none; }
+.sb-scholly-model canvas { position: absolute; inset: 0; width: 100%; height: 100%; visibility: hidden; }
+.sb-scholly-model[data-rendering="3d"] canvas { visibility: visible; }
+.sb-scholly-model[data-rendering="3d"] .sb-scholly-portrait { visibility: hidden; }
+
 .sb-scholly-portrait {
   position: absolute;
   inset: 0;
