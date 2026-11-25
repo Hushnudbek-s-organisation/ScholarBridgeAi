@@ -108,6 +108,19 @@ export function createScholly(scene: T.Scene) {
   torso.position.set(0, -0.83, -0.018);
   robot.add(torso, helmet);
   scene.add(robot);
+  scene.add(new T.HemisphereLight('#becdff', '#243ba0', 1.13));
+  const lights: Array<[string, number, Point]> = [
+    ['#d8e8ff', 3.3, [3.4, 5, 4.1]],
+    ['#40cfff', 4, [-3, 2, -4]],
+    ['#205bff', 2.4, [1.8, 2, -4]],
+    ['#9fccff', 0.67, [-2, 1, 5]],
+    ['#30afff', 1.7, [0, -4, 1.2]],
+  ];
+  for (const [color, strength, position] of lights) {
+    const light = new T.DirectionalLight(color, strength);
+    light.position.set(...position);
+    scene.add(light);
+  }
 
   const shell = new T.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.26, metalness: 0.15,
     clearcoat: 0.76, clearcoatRoughness: 0.23, envMapIntensity: 0.65 });

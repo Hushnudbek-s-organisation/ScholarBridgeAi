@@ -93,19 +93,6 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
       camera.lookAt(0, -0.169, 0);
       const model = createScholly(scene);
       const { robot, helmet, arms, faces, eyes, neutralMouth, shadow, voice } = model;
-      scene.add(new T.HemisphereLight("#becdff", "#243ba0", 1.13));
-      for (const [color, strength, position] of [
-        ["#d8e8ff", 3.3, [3.4, 5, 4.1]],
-        ["#40cfff", 4, [-3, 2, -4]],
-        ["#205bff", 2.4, [1.8, 2, -4]],
-        ["#9fccff", 0.67, [-2, 1, 5]],
-        ["#30afff", 1.7, [0, -4, 1.2]],
-      ] as const) {
-        const light = new T.DirectionalLight(color, strength);
-        light.position.set(position[0], position[1], position[2]);
-        scene.add(light);
-      }
-
       let reflections: ReturnType<typeof makeSchollyEnvironment> | undefined;
       function refreshReflections() {
         reflections?.dispose();
