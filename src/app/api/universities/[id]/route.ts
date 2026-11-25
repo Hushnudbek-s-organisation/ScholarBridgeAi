@@ -853,7 +853,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
               coverageType: s.coverageType ?? null,
               amountUsdValue,
               awardAmount: s.awardAmount != null ? positive(s.awardAmount) : amountUsdValue,
-              awardCurrency: s.awardAmount != null ? s.awardCurrency ?? null : "USD",
+              awardCurrency: s.awardAmount == null && amountUsdValue != null ? "USD" : s.awardCurrency ?? null,
               awardPeriod: s.awardPeriod ?? null,
               deadline: s.deadline ?? s.deadlineDate ?? null,
               deadlineDate: s.deadlineDate ?? s.deadline ?? null,

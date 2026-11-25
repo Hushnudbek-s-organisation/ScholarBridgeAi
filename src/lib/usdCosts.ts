@@ -130,9 +130,15 @@ export function withResolvedUsdCosts<T extends UniversityCostFields>(row: T): T 
 export function resolvedUsdScholarshipAmount(row: {
   awardAmount?: MaybeNumber;
   awardCurrency?: string | null;
+  awardBasis?: string | null;
   amountUsdValue?: MaybeNumber;
 }): number | null {
   if (row.awardAmount != null) return usdAmount(row.awardAmount, row.awardCurrency);
+  // A legacy mirror can contain an obsolete native-currency or variable
+  // figure. Never present it as a fixed USD award if its own scope conflicts.
+  const currency = normalizeCurrency(row.awardCurrency);
+  if (currency && currency !== "USD") return null;
+  if (["variable", "range", "need_based", "full_tuition"].includes(row.awardBasis ?? "")) return null;
   return usdAmount(row.amountUsdValue, "USD");
 }
 
