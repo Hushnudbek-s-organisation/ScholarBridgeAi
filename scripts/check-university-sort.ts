@@ -15,9 +15,11 @@ import {
   parseUniversitySort,
   semanticRerankAllowed,
   sortUniversities,
+  toAdmissionComparison,
   type SortableUniversity,
 } from "../src/lib/universitySort";
 import { profileMatchFingerprint } from "../src/lib/profileMatchFingerprint";
+import { evaluateApplicantRequirementGroup, evaluateRequirementGroup } from "../src/lib/requirementGroups";
 import { paginateArray } from "../src/lib/pagination";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -38,11 +40,11 @@ function check(name: string, fn: () => void) {
 
 /** MIT #1 has a LOW fit; #247 has a HIGH fit — the exact audit scenario. */
 const rows: SortableUniversity[] = [
-  { id: 1, name: "MIT", worldRanking: 1, annualTuitionUsd: 60000, matchScore: 31, chanceScore: 20 },
-  { id: 2, name: "Imperial College London", worldRanking: 2, annualTuitionUsd: 45000, matchScore: 70, chanceScore: 55 },
-  { id: 3, name: "University #247", worldRanking: 247, annualTuitionUsd: 3000, matchScore: 96, chanceScore: 88 },
-  { id: 4, name: "Unknown-rank College", worldRanking: null, annualTuitionUsd: null, matchScore: null, chanceScore: null },
-  { id: 5, name: "Aalto University", worldRanking: 116, annualTuitionUsd: 15000, matchScore: 60, chanceScore: 44 },
+  { id: 1, name: "MIT", worldRanking: 1, annualTuitionUsd: 60000, matchScore: 31, admissionComparison: { state: "met", margin: 0.25 } },
+  { id: 2, name: "Imperial College London", worldRanking: 2, annualTuitionUsd: 45000, matchScore: 70, admissionComparison: { state: "met", margin: 0.08 } },
+  { id: 3, name: "University #247", worldRanking: 247, annualTuitionUsd: 3000, matchScore: 96, admissionComparison: { state: "unmet", margin: -0.07 } },
+  { id: 4, name: "Unknown-rank College", worldRanking: null, annualTuitionUsd: null, matchScore: null, admissionComparison: null },
+  { id: 5, name: "Aalto University", worldRanking: 116, annualTuitionUsd: 15000, matchScore: 60, admissionComparison: null },
 ];
 const ids = (list: SortableUniversity[]) => list.map((r) => r.id).join(",");
 const order = (raw: string | null, hasProfile: boolean) =>
@@ -83,32 +85,65 @@ check("match sort is available explicitly and never becomes the QS default", () 
   assert.notEqual(ids(order("rank_asc", true).rows), ids(order("match_desc", true).rows));
 });
 
-check("the retired chance sort degrades to the fit order, never to a chance percentage", () => {
-  // The composite chance index no longer exists. An old deep link that still
-  // asks for it gets the published fit order and an honest `applied` value.
-  const legacy = order("chance_desc", true);
-  assert.equal(ids(legacy.rows), ids(order("match_desc", true).rows));
-  assert.equal(legacy.applied, "match_desc");
-  // …and the rows' own chanceScore is never consulted, so a fabricated index
-  // cannot influence the order even when a stale payload carries one.
-  const shuffled = [
+check("fit, admission and best sort prioritize different candidates", () => {
+  assert.equal(ids(order("match_desc", true).rows), "3,2,5,1,4");
+  assert.equal(ids(order("chance_desc", true).rows), "1,2,3,5,4");
+  assert.equal(ids(order("best_desc", true).rows), "2,1,3,5,4");
+  assert.equal(order("chance_desc", true).applied, "chance_desc");
+  assert.equal(order("best_desc", true).applied, "best_desc");
+});
+
+check("unknown data falls back to fit and never reads the retired chance index", () => {
+  const legacy = [
     { id: 1, name: "MIT", worldRanking: 1, matchScore: 31, chanceScore: 99 },
     { id: 3, name: "University #247", worldRanking: 247, matchScore: 96, chanceScore: 1 },
   ];
-  const sorted = sortUniversities(shuffled, parseUniversitySort("chance_desc"), true);
-  assert.equal(sorted.rows.map((row) => row.id).join(","), "3,1");
+  for (const sort of ["chance_desc", "best_desc"]) {
+    const sorted = sortUniversities(legacy, parseUniversitySort(sort), true);
+    assert.equal(ids(sorted.rows), "3,1");
+    assert.equal(sorted.applied, "match_desc");
+    assert.equal(sorted.admissionDataUnavailable, true);
+  }
 });
 
-check("a personal sort without a verified profile falls back to QS, honestly", () => {
-  const result = order("match_desc", false);
-  assert.equal(result.fellBackToRank, true);
-  assert.equal(result.applied, "rank_asc");
-  assert.equal(ids(result.rows), "1,2,5,3,4");
+check("admission comparison respects alternatives, mandatory checks and missing scores", () => {
+  const alternatives = { id: "english", operator: "anyOf", children: [
+    { id: "ielts", field: "ielts", kind: "minimum", unit: "9", value: 7.5 },
+    { id: "det", field: "duolingo", kind: "minimum", unit: "160", value: 120 },
+  ] };
+  const date = "2026-11-26";
+  const profile = { ielts: 7, duolingo: 130 };
+  assert.deepEqual(toAdmissionComparison(evaluateApplicantRequirementGroup(alternatives, profile, date)), {
+    state: "met", margin: (130 - 120) / 120,
+  });
+  const mandatory = { id: "all", operator: "allOf", children: [
+    alternatives, { id: "sat", field: "sat", kind: "minimum", unit: "1600", value: 1350 },
+  ] };
+  assert.equal(toAdmissionComparison(evaluateApplicantRequirementGroup(mandatory, profile, date)), null);
+  assert.deepEqual(toAdmissionComparison(evaluateApplicantRequirementGroup(mandatory, { ...profile, sat: 1250 }, date)), {
+    state: "unmet", margin: (1250 - 1350) / 1350,
+  });
+  const mandatoryRecord = { id: "requires-record", operator: "allOf", children: [
+    alternatives, { id: "documents", kind: "record", field: "documents" },
+  ] };
+  const withMissingDocument = evaluateRequirementGroup(mandatoryRecord, {
+    ielts: { value: 8, unit: "9" }, documents: { value: false },
+  }, date);
+  assert.deepEqual(toAdmissionComparison(withMissingDocument), { state: "unmet", margin: null });
+});
+
+check("every personal sort without an authorized profile falls back to QS", () => {
+  for (const sort of ["match_desc", "chance_desc", "best_desc"]) {
+    const result = order(sort, false);
+    assert.equal(result.fellBackToRank, true);
+    assert.equal(result.applied, "rank_asc");
+    assert.equal(ids(result.rows), "1,2,5,3,4");
+  }
 });
 
 check("relevance is the only mode semantic reranking may touch", () => {
   assert.equal(semanticRerankAllowed(parseUniversitySort("relevance")), true);
-  for (const raw of ["rank_asc", "tuition_asc", "name_asc", "match_desc", "chance_desc"]) {
+  for (const raw of ["rank_asc", "tuition_asc", "name_asc", "match_desc", "chance_desc", "best_desc"]) {
     assert.equal(semanticRerankAllowed(parseUniversitySort(raw)), false, raw);
   }
   assert.equal(ids(order("relevance", true).rows), "3,2,5,1,4");
@@ -147,7 +182,7 @@ check("the explorer refetches on a fingerprint change, not only on profileId", (
   const explorer = read("src/components/UniversityExplorer.tsx");
   assert.match(explorer, /profileFingerprint,\s*\]\)/, "the fetch effect must depend on the fingerprint");
   assert.match(explorer, /invalidateCatalogSwr\(\)/, "cached slices from an old profile are dropped");
-  assert.match(explorer, /params\.set\("sort", sortBy\)/, "the UI always sends the selected sort");
+  assert.match(explorer, /params\.set\("sort", activeProfile \? sortBy : "rank_asc"\)/, "the UI always sends the selected sort");
 });
 
 check("the dashboard cache is invalidated by profile writes", () => {

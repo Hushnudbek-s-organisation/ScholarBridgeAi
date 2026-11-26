@@ -1,3 +1,4 @@
+import { evaluateResolvedAcademicCriteria, originalAcademicRequirementInput } from "@/lib/academicDecision";
 import { catalogueTuition } from "@/lib/catalogueTuition";
 import { findCatalogueMatches } from "@/lib/catalogueSearch";
 import {reportReadFailure} from "@/lib/readFailure.server";
@@ -22,7 +23,7 @@ import { universityProgrammeDiscovery } from "@/lib/universityProgrammeDiscovery
 import { matchesUniversityType } from "@/lib/universityType";
 import { withResolvedUsdCosts } from "@/lib/usdCosts";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
-import { parseUniversitySort, semanticRerankAllowed, sortUniversities } from "@/lib/universitySort";
+import { parseUniversitySort, semanticRerankAllowed, sortUniversities, toAdmissionComparison } from "@/lib/universitySort";
 import { legacyEvidence } from "@/lib/factPresentation";
 
 /**
@@ -40,7 +41,7 @@ export async function GET(req: Request) {
     const country = searchParams.get("country")?.trim().slice(0, 100);
     const degreeLevel = (searchParams.get("degreeLevel") ?? searchParams.get("degree"))?.trim().slice(0, 50);
     const maxTuition = searchParams.get("maxTuition")?.slice(0, 24);
-    const sort = searchParams.get("sort")?.slice(0, 24);
+    const parsedSort = parseUniversitySort(searchParams.get("sort")?.slice(0, 24));
     const uniType = searchParams.get("type")?.trim().slice(0, 24); // Public | Private
     const contextText=(key:string,max:number)=>{const value=searchParams.get(key);if(value==null||value==="")return null;if(value.length>max||/[\u0000-\u001f]/.test(value))throw new Error("invalid_requirement_context");return value.trim()||null;};
     const academicContext={programName:null,degreeLevel:degreeLevel??null,admissionCycle:contextText("admissionCycle",100),applicantScope:contextText("applicantScope",200)};
@@ -98,7 +99,7 @@ export async function GET(req: Request) {
     // activity portfolio and every financial flag.
     let profileData = null;
     let matchProfile = null;
-    /** Same student read through the 5-layer positioning engine (chance). */
+    // The academic checks use the original score units and exam records.
     let chancingProfile = null;
     if (profileIdStr) {
       const pId = Number(profileIdStr);
@@ -119,8 +120,7 @@ export async function GET(req: Request) {
     }
 
     // One fingerprint for the whole response: it changes the moment the student
-    // edits a score-relevant field, which is exactly when every memoized fit and
-    // chance score must be recomputed.
+    // edits a score-relevant field, which invalidates memoized fit.
     const profileFingerprint = profileData ? profileMatchFingerprint(profileData) : "anonymous";
 
     // ---------- Program fields per university (from the cached bundle) ----------
@@ -180,10 +180,23 @@ export async function GET(req: Request) {
       allUnis = allUnis.filter((university) => { const tuition = tuitionFor(university); return tuition != null && tuition.amount <= maxT; });
     }
 
+    const compareAdmission = chancingProfile !== null && (parsedSort.sort === "chance_desc" || parsedSort.sort === "best_desc");
+    const academicProfile = compareAdmission ? originalAcademicRequirementInput(chancingProfile) : null;
+    const asOfDate = new Date().toISOString().slice(0, 10);
+    // Resolve scoped evidence once when filtering, sorting and rendering reuse it.
+    const academicById = new Map<number, ReturnType<typeof resolveAcademicRequirements>>();
+    const academicFor = (id: number) => {
+      const cached = academicById.get(id);
+      if (cached) return cached;
+      const resolved = resolveAcademicRequirements(bundle.facts?.get(id) ?? [], academicContext);
+      academicById.set(id, resolved);
+      return resolved;
+    };
+
     if (ieltsFilter != null && ieltsFilter !== "") {
       const minI = Number(ieltsFilter);
       if (Number.isFinite(minI) && minI >= 0 && minI <= 9) {
-        allUnis = allUnis.filter(u => {const value=resolveAcademicRequirements(bundle.facts?.get(u.id)??[],academicContext).summary.ielts?.single;return value!=null&&value<=minI;});
+        allUnis = allUnis.filter(u => {const value=academicFor(u.id).summary.ielts?.single;return value!=null&&value<=minI;});
       }
     }
 
@@ -245,7 +258,7 @@ export async function GET(req: Request) {
     // with the university's own lastVerifiedAt only used as a date fallback.
     const sourceMap = bundle.sourceMap;
 
-    // ---------- Map match scores + source signals ----------
+    // ---------- Map fit, scoped admission comparisons and source signals ----------
     const results = allUnis.map((uni) => {
       let matchInfo: {
         matchScore: number | null;
@@ -256,36 +269,52 @@ export async function GET(req: Request) {
         rawScore?: number;
         breakdown?: MatchBreakdown;
       } = { matchScore: null, reasons: [], potentialIssues: [] };
+      const academic = matchProfile && bundle.facts?.get(uni.id)?.length ? academicFor(uni.id) : null;
       if (matchProfile) {
-        // Memoized per (profile fingerprint, university): the explorer scores the
-        // whole filtered catalogue on every keystroke, and neither side changed.
-        const uniData = toUniversityData(uni);
+        // Grouped tests and exemptions are evaluated by the admission comparison.
+        // A legacy scalar cannot count as a verified minimum in profile fit.
+        const summary = academic?.requirementGroup ? null : academic?.summary;
+        const gpa = summary?.gpa;
+        const uniData = {
+          ...toUniversityData(uni),
+          minGpa: gpa && ["4", "4.0", "GPA 4.0"].includes(gpa.unit ?? "") ? gpa.single : null,
+          minIelts: summary?.ielts?.single ?? null,
+          minSat: summary?.sat?.single ?? null,
+        };
+        // Memoized per profile and university inputs for repeated searches.
         matchInfo = memoizeMatch("fit", profileFingerprint, uni.id, uniData as unknown as Record<string, unknown>, () =>
           calculateUniversityMatch(matchProfile!, uniData)
         );
       }
       const src = sourceMap.get(uni.id) || null;
       const progFields = programFieldsByUni.get(uni.id) ?? [];
-      // Discovery never synthesizes a programme from the student's major, and
-      // the retired composite "chance" index is never computed: the list keeps
-      // the university fit plus the programme the page would focus on.
+      // Only the field-level evidence shown on the card can influence the
+      // order based on published academic requirements.
+      const admissionComparison = academicProfile && academic
+        ? toAdmissionComparison(evaluateResolvedAcademicCriteria(academic, academicProfile, asOfDate))
+        : null;
+      const hasFitEvidence = matchInfo.breakdown?.components.some((part) =>
+        part.compared && part.key !== "base" && part.key !== "funding_requirement"
+      );
+      // Discovery returns an actual catalogue programme identity.
       const {programmeDiscovery}=universityProgrammeDiscovery(uni,bundle.programsByUni?.get(uni.id)??[],profileData,chancingProfile,false);
       return {
         ...uni,
         programFields: progFields,
+        admissionComparison,
         programmeDiscovery,
         estimatedChance: {
           percentage: null,
           reason: profileData ? "insufficient_validated_outcomes" : "profile_required",
         },
-        matchScore: matchInfo.matchScore,
+        matchScore: hasFitEvidence ? matchInfo.matchScore : null,
         matchReasons: translateReasons(locale, "university", matchInfo.reasonDetails, matchInfo.reasons),
         matchIssues: translateReasons(locale, "university", matchInfo.issueDetails, matchInfo.potentialIssues),
         // The exact arithmetic behind the score (two-decimal points per
         // dimension) so the UI can show HOW the number was reached instead of
         // asking the student to trust it. Null when there is no profile.
-        matchRawScore: matchInfo.rawScore ?? null,
-        matchBreakdown: matchInfo.breakdown ?? null,
+        matchRawScore: hasFitEvidence ? matchInfo.rawScore ?? null : null,
+        matchBreakdown: hasFitEvidence ? matchInfo.breakdown ?? null : null,
         sourceUrl: src?.sourceUrl ?? null,
         sourceTitle: src?.sourceTitle ?? null,
         sourceLastVerifiedAt: src?.lastVerifiedAt ?? null,
@@ -297,12 +326,11 @@ export async function GET(req: Request) {
     // requested — a profile must NEVER turn "QS ranking" into "my match score".
     // `relevance` is the legacy default for API clients that send no `sort`;
     // it is also the only mode semantic search is allowed to nudge.
-    const parsedSort = parseUniversitySort(sort);
     const ordering = sortUniversities(results, parsedSort, Boolean(profileData));
     const ordered = ordering.rows;
 
     // Best-effort multilingual semantic rerank: only in relevance mode, never
-    // over an explicitly requested QS / tuition / name / fit / position order.
+    // over an explicitly requested ordering.
     if (search && search.trim().length >= 4 && ordered.length > 1 && semanticRerankAllowed(parsedSort)) {
       try {
         const candidates = ordered.slice(0, 63).map((uni) => [
@@ -342,6 +370,7 @@ export async function GET(req: Request) {
     // that a profile did not silently replace an explicit choice.
     payload.sortApplied = ordering.applied;
     payload.sortFellBackToRank = ordering.fellBackToRank;
+    payload.admissionDataUnavailable = ordering.admissionDataUnavailable;
     const rows = payload.universities as typeof results;
     if (!profileData && searchParams.get("view") !== "expanded") {
       payload.universities = rows.map((university) => ({
@@ -349,7 +378,7 @@ export async function GET(req: Request) {
         degreeLevel: university.degreeLevel, worldRanking: university.worldRanking, qsRankYear: university.qsRankYear,
         verificationStatus: university.verificationStatus, officialWebsiteUrl: university.officialWebsiteUrl,
         annualTuitionUsd: university.annualTuitionUsd, catalogueTuition: tuitionFor(university),
-        minIelts: resolveAcademicRequirements(bundle.facts?.get(university.id) ?? [], academicContext).summary.ielts?.single ?? null,
+        minIelts: academicFor(university.id).summary.ielts?.single ?? null,
       }));
       return privateNoStoreJson(payload);
     }
@@ -357,21 +386,17 @@ export async function GET(req: Request) {
     // numbers are KEPT but never promoted to a verified official minimum by
     // the entity-level `verified` flag. Clients/UI/Telegram consume the same
     // shape instead of re-interpreting raw columns.
-    payload.universities = rows.map((u) => ({
-      ...localizeUniversityRow(u, locale),
-      catalogueTuition: tuitionFor(u),
-      cardSummary: selectUniversityCardSummary(u, bundle.cardEvidence.programmes.get(u.id) ?? [], bundle.cardEvidence.deadlines.get(u.id) ?? [], {
-        degreeLevel: degreeLevel && degreeLevel !== "All" ? degreeLevel : profileData?.degreeLevel,
-        targetMajor: majorFilter && majorFilter !== "All" ? majorFilter : profileData?.targetMajor,
-      }),
-    }));
-    payload.universities = (payload.universities as typeof rows).map((u) => {
-      const localized = u;
-      const raw = u as unknown as Record<string, unknown>;
+    payload.universities = rows.map(({ admissionComparison: _comparison, ...university }) => {
+      const raw = university as unknown as Record<string, unknown>;
       return {
-        ...localized,
-        academicRequirements:academicDecisionEnvelope(resolveAcademicRequirements(bundle.facts?.get(u.id)??[],academicContext)),
-        resolvedFacts: presentedCatalogueFacts(bundle.facts?.get(u.id) ?? []),
+        ...localizeUniversityRow(university, locale),
+        catalogueTuition: tuitionFor(university),
+        cardSummary: selectUniversityCardSummary(university, bundle.cardEvidence.programmes.get(university.id) ?? [], bundle.cardEvidence.deadlines.get(university.id) ?? [], {
+          degreeLevel: degreeLevel && degreeLevel !== "All" ? degreeLevel : profileData?.degreeLevel,
+          targetMajor: majorFilter && majorFilter !== "All" ? majorFilter : profileData?.targetMajor,
+        }),
+        academicRequirements: academicDecisionEnvelope(academicFor(university.id)),
+        resolvedFacts: presentedCatalogueFacts(bundle.facts?.get(university.id) ?? []),
         evidence: legacyEvidence({
           entityVerified: raw.verificationStatus === "verified",
           sourceUrl: typeof raw.officialWebsiteUrl === "string" ? raw.officialWebsiteUrl : null,

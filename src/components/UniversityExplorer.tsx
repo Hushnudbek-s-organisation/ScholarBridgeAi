@@ -13,6 +13,7 @@ import { campusPhotoSrc, onWikimediaThumbError } from "@/lib/wikimediaThumb";
 import { localizeCity, localizeCountry, localizeMajorOrField } from "@/lib/catalogLocalizer";
 import { CountryFlag } from "@/components/CountryFlag";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
+import { DEFAULT_PERSONAL_UNIVERSITY_SORT, type PersonalUniversitySort } from "@/lib/universitySort";
 import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 
 const UniversityDetail = dynamic(
@@ -228,7 +229,8 @@ export function UniversityExplorer({
     setLastAutoOpenId(autoOpenUniversityId);
     setSelectedUniId(autoOpenUniversityId);
   }
-  const [sortBy, setSortBy] = useState("rank_asc");
+  const [sortBy, setSortBy] = useState<PersonalUniversitySort>(DEFAULT_PERSONAL_UNIVERSITY_SORT);
+  const [admissionDataUnavailable, setAdmissionDataUnavailable] = useState(false);
 
   // Pagination: exactly 8 rows per page on every screen. The grid below is
   // `grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3`, so 8 / 16 / 24 cards.
@@ -330,7 +332,7 @@ export function UniversityExplorer({
     if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     // ALWAYS send the selected order. Omitting the default let the API apply
     // "personal match" whenever a profile existed, which silently overrode QS.
-    params.set("sort", sortBy);
+    params.set("sort", activeProfile ? sortBy : "rank_asc");
     if (maxRank != null) params.set("maxRank", maxRank.toString());
     if (ieltsMax != null) params.set("ielts", ieltsMax.toString());
     // Explicit locale: the API localizes the response AND the SWR cache key
@@ -372,11 +374,13 @@ export function UniversityExplorer({
       total: number;
       totalPages: number;
       page?: number;
+      admissionDataUnavailable?: boolean;
     }>("universities", queryKey);
 
     if (cached) {
       hasLoadedRef.current = true;
       setUniversities(cached.data.universities);
+      setAdmissionDataUnavailable(cached.data.admissionDataUnavailable === true);
       setTotalCount(cached.data.total);
       setTotalPages(cached.data.totalPages);
       setLoading(false);
@@ -411,7 +415,9 @@ export function UniversityExplorer({
           typeof data.total === "number" ? data.total : data.universities.length;
         const nextTotalPages =
           typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1;
+        const missingAdmissionData = data.admissionDataUnavailable === true;
         setUniversities(data.universities);
+        setAdmissionDataUnavailable(missingAdmissionData);
         setTotalCount(nextTotal);
         setTotalPages(nextTotalPages);
         setCatalogSwr("universities", queryKey, {
@@ -419,6 +425,7 @@ export function UniversityExplorer({
           total: nextTotal,
           totalPages: nextTotalPages,
           page: data.page,
+          admissionDataUnavailable: missingAdmissionData,
         });
         // The server clamps out-of-range pages - sync so the UI numbering
         // always matches the returned slice.
@@ -550,7 +557,7 @@ export function UniversityExplorer({
     selectedType !== "All" ||
     selectedLevel !== "All" ||
     debouncedSearch.trim() !== "" ||
-    sortBy !== "rank_asc";
+    sortBy !== DEFAULT_PERSONAL_UNIVERSITY_SORT;
 
   /**
    * Phone (< 640px): the six filter controls used to stack above the first
@@ -580,7 +587,7 @@ export function UniversityExplorer({
     setSelectedLevel("All");
     setMaxRank(null);
     setIeltsMax(null);
-    setSortBy("rank_asc");
+    setSortBy(DEFAULT_PERSONAL_UNIVERSITY_SORT);
     setNotice("");
   };
 
@@ -688,28 +695,6 @@ export function UniversityExplorer({
             </select>
           </div>
 
-          {/* Sort */}
-          <div>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              aria-label={t("exSortRank")}
-              data-scholly-help="sort"
-              className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
-            >
-              <option value="rank_asc">{t("exSortRank")}</option>
-              <option value="relevance">{t("exSortRelevance")}</option>
-              <option value="tuition_asc">{t("exSortTuitionAsc")}</option>
-              <option value="tuition_desc">{t("exSortTuitionDesc")}</option>
-              <option value="name_asc">{t("exSortNameAsc")}</option>
-              <option value="match_desc">{t("exSortMatch")}</option>
-              {/* Orders by the profile FIT (a comparison with the saved
-                  profile). The old composite "positioning index" is retired;
-                  this option never returns a chance percentage. */}
-              <option value="chance_desc">{t("exSortChanceDesc")}</option>
-            </select>
-          </div>
-
           {/* Max Tuition Slider */}
           <div data-scholly-help="tuition" className="bg-slate-50 px-3 py-1.5 rounded-surface border border-slate-200 flex flex-col justify-center">
             <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
@@ -740,7 +725,6 @@ export function UniversityExplorer({
   if (selectedUniId != null) {
     return (
       <UniversityDetail
-        experimentalChancing={sortBy==="chance_desc"}
         universityId={selectedUniId}
         activeProfile={activeProfile}
         onBack={() => setSelectedUniId(null)}
@@ -785,12 +769,8 @@ export function UniversityExplorer({
           )}
         </div>
 
-        {/* Filter Controls Grid
-            3 tiers: on a phone the five secondary controls collapse behind one
-            button (the search box and the quick chips stay visible); from
-            `sm` up the wrapper becomes `display: contents`, so all six
-            controls are direct cells of the outer grid — 3 columns × 2 rows on
-            a tablet, a single 6-column row on a laptop. */}
+        {/* Search and ordering stay visible on phones. The remaining filters
+            use the mobile sheet and share the same state with the desktop controls. */}
         <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           {/* Text Search — always visible, on every screen size. */}
           <div className="relative">
@@ -805,6 +785,24 @@ export function UniversityExplorer({
               className="min-h-11 w-full rounded-surface border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
             />
           </div>
+
+          <select
+            value={activeProfile ? sortBy : "rank_asc"}
+            onChange={(e) => setSortBy(e.target.value as PersonalUniversitySort)}
+            aria-label={t("exSortLabel")}
+            aria-describedby="university-sort-description"
+            disabled={!activeProfile}
+            data-scholly-help="sort"
+            className="min-h-11 w-full min-w-0 rounded-surface border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:text-slate-600 dark:border-slate-700 dark:bg-surface"
+          >
+            {activeProfile ? (
+              <>
+                <option value="best_desc">{t("exSortBest")}</option>
+                <option value="match_desc">{t("exSortMatch")}</option>
+                <option value="chance_desc">{t("exSortChanceDesc")}</option>
+              </>
+            ) : <option value="rank_asc">{t("exSortRank")}</option>}
+          </select>
 
           {/* Phone-only toggle: how many filters are currently narrowing the list. */}
           <Button variant="unstyled"
@@ -830,6 +828,15 @@ export function UniversityExplorer({
             {renderUniversityFilters("university")}
           </div>
         </div>
+
+        <p id="university-sort-description" className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+          {activeProfile ? t(`exSortDescription.${sortBy}`) : t("exSortProfileRequired")}
+        </p>
+        {activeProfile && sortBy !== "match_desc" && admissionDataUnavailable && !loading && !refreshing && !fetchError && (
+          <p role="status" className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+            {t("exSortAdmissionDataUnavailable")}
+          </p>
+        )}
 
         <BottomSheet
           id="university-filter-sheet"

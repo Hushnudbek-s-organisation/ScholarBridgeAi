@@ -1,3 +1,5 @@
+import type { RequirementEvaluation } from "./requirementGroups";
+
 /**
  * University catalogue ordering — one explicit, deterministic contract.
  *
@@ -11,7 +13,7 @@
  *  - an EXPLICIT sort is applied exactly as requested, with or without a
  *    profile; profile presence never silently replaces it;
  *  - `relevance` (the legacy default for API clients that send no `sort`) is
- *    the only mode where profile fit and semantic search may influence order;
+ *    the only mode where semantic search may influence order;
  *  - every comparator has a stable tie-breaker (name, then id), so pagination
  *    never reshuffles equal values between pages;
  *  - a NULL number is unknown and sorts last; it is never treated as zero.
@@ -26,10 +28,19 @@ export const UNIVERSITY_SORTS = [
   "name_asc",
   "match_desc",
   "chance_desc",
+  "best_desc",
   "relevance",
 ] as const;
 
 export type UniversitySort = (typeof UNIVERSITY_SORTS)[number];
+export type PersonalUniversitySort = "match_desc" | "chance_desc" | "best_desc";
+export const DEFAULT_PERSONAL_UNIVERSITY_SORT: PersonalUniversitySort = "best_desc";
+
+export interface AdmissionComparison {
+  state: "met" | "unmet";
+  /** Relative distance to the controlling published minimum, for ordering only. */
+  margin: number | null;
+}
 
 /** Old/alternate values already seen in URLs and saved links stay valid. */
 const ALIASES: Record<string, UniversitySort> = {
@@ -40,6 +51,7 @@ const ALIASES: Record<string, UniversitySort> = {
   name: "name_asc",
   match: "match_desc",
   chance: "chance_desc",
+  best: "best_desc",
 };
 
 export interface SortableUniversity {
@@ -48,12 +60,7 @@ export interface SortableUniversity {
   worldRanking?: number | null;
   annualTuitionUsd?: number | null;
   matchScore?: number | null;
-  /**
-   * @deprecated Retired composite "chance" index. The field is still accepted so
-   * an old cached payload cannot crash the list, but no assessment writes it:
-   * ordering by it now falls back to the fit sort and says so.
-   */
-  chanceScore?: number | null;
+  admissionComparison?: AdmissionComparison | null;
 }
 
 export interface ParsedSort {
@@ -81,6 +88,30 @@ export function parseUniversitySort(raw: string | null | undefined): ParsedSort 
 
 function finite(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function requirementMargin(result: RequirementEvaluation): number | null {
+  if (result.state !== "met" && result.state !== "unmet") return null;
+  if (result.children.length) {
+    const alternatives = result.operator === "anyOf";
+    const margins = result.children
+      .filter((child) => child.state === result.state)
+      .map(requirementMargin)
+      .filter((margin): margin is number => margin != null);
+    if (!margins.length) return null;
+    // All mandatory checks constrain the result. For equivalent alternatives,
+    // the best confirmed route is the relevant one.
+    return alternatives ? Math.max(...margins) : Math.min(...margins);
+  }
+  if (result.reason !== "comparison") return null;
+  const actual = typeof result.actual === "number" ? finite(result.actual) : null;
+  const required = finite(result.required);
+  return actual != null && required != null && required > 0 ? (actual - required) / required : null;
+}
+
+export function toAdmissionComparison(result: RequirementEvaluation): AdmissionComparison | null {
+  if (result.state !== "met" && result.state !== "unmet") return null;
+  return { state: result.state, margin: requirementMargin(result) };
 }
 
 /** Deterministic final key: equal primary values never change order. */
@@ -112,28 +143,41 @@ function byTuition<T extends SortableUniversity>(a: T, b: T, direction: 1 | -1):
   return nullableNumber(a, b, (u) => u.annualTuitionUsd, direction);
 }
 
+function admissionPriority(row: SortableUniversity): number {
+  return row.admissionComparison?.state === "met" ? 2 : row.admissionComparison?.state === "unmet" ? 1 : 0;
+}
+
+function byFit<T extends SortableUniversity>(a: T, b: T): number {
+  return nullableNumber(a, b, (row) => row.matchScore, -1);
+}
+
+function balancedFit(row: SortableUniversity): number | null {
+  const fit = finite(row.matchScore);
+  const margin = finite(row.admissionComparison?.margin);
+  if (fit == null || margin == null) return fit;
+  // Bound the adjustment so a large surplus on one exam cannot swamp fit.
+  return fit * (1 + Math.max(-0.25, Math.min(0.25, margin)));
+}
+
 /**
- * Sort a response-local copy. `hasProfile` reflects a verified, authorised
- * profile — a `profileId` belonging to someone else never personalises order.
+ * Sort a response-local copy. Only an authorized profile can request personal
+ * ordering. Admission comparisons are published-rule comparisons.
  */
 export function sortUniversities<T extends SortableUniversity>(
   rows: T[],
   parsed: ParsedSort,
   hasProfile: boolean,
-): { rows: T[]; applied: UniversitySort; fellBackToRank: boolean } {
+): { rows: T[]; applied: UniversitySort; fellBackToRank: boolean; admissionDataUnavailable: boolean } {
   const out = [...rows];
+  const admissionOrder = parsed.sort === "chance_desc" || parsed.sort === "best_desc";
+  if (!hasProfile && (parsed.sort === "match_desc" || admissionOrder)) {
+    return { rows: out.sort(byRank), applied: "rank_asc", fellBackToRank: true, admissionDataUnavailable: false };
+  }
+  if (admissionOrder && out.length && !out.some((row) => row.admissionComparison != null)) {
+    return { rows: out.sort(byFit), applied: "match_desc", fellBackToRank: false, admissionDataUnavailable: true };
+  }
+
   let applied = parsed.sort;
-  let fellBackToRank = false;
-
-  const personal = (key: "matchScore" | "chanceScore") => {
-    if (!hasProfile) {
-      applied = "rank_asc";
-      fellBackToRank = true;
-      return (a: T, b: T) => byRank(a, b);
-    }
-    return (a: T, b: T) => nullableNumber(a, b, (u) => u[key], -1);
-  };
-
   switch (parsed.sort) {
     case "rank_asc":
       out.sort(byRank);
@@ -148,15 +192,19 @@ export function sortUniversities<T extends SortableUniversity>(
       out.sort((a, b) => tieBreak(a, b));
       break;
     case "match_desc":
-      out.sort(personal("matchScore"));
+      out.sort(byFit);
       break;
     case "chance_desc":
-      // The old chance index no longer exists (it was a fabricated composite of
-      // department multipliers and selectivity penalties). The request is
-      // honoured as a FIT order — the one profile-derived number that is still
-      // published — instead of resurrecting a chance percentage.
-      out.sort(personal("matchScore"));
-      applied = "match_desc";
+      out.sort((a, b) =>
+        admissionPriority(b) - admissionPriority(a) ||
+        nullableNumber(a, b, (row) => row.admissionComparison?.margin, -1)
+      );
+      break;
+    case "best_desc":
+      out.sort((a, b) =>
+        admissionPriority(b) - admissionPriority(a) ||
+        nullableNumber(a, b, balancedFit, -1)
+      );
       break;
     case "relevance":
       if (hasProfile) {
@@ -175,7 +223,7 @@ export function sortUniversities<T extends SortableUniversity>(
       }
       break;
   }
-  return { rows: out, applied, fellBackToRank };
+  return { rows: out, applied, fellBackToRank: false, admissionDataUnavailable: false };
 }
 
 /** Semantic reranking may only nudge the explicitly relevance-oriented mode. */
