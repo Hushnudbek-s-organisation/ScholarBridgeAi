@@ -6,6 +6,7 @@ import type { Expression } from "./scholly/SchollyMesh";
 import type { SchollyMotion } from "./useSchollyMotion";
 
 type Props = {
+  loadModel?: boolean;
   trackPointer?: boolean;
   held?: boolean;
   paused?: boolean;
@@ -21,7 +22,7 @@ const ANIMATED_POSES = new Set<SchollyMotion>([
   "happy", "easter", "notice", "shake", "proud", "celebrate", "levelup", "wave", "drag", "talk",
 ]);
 
-export function SchollyModel({ trackPointer = true, held = false, paused = false, motion = "idle", turn = 0 }: Props) {
+export function SchollyModel({ loadModel = true, trackPointer = true, held = false, paused = false, motion = "idle", turn = 0 }: Props) {
   const host = useRef<HTMLSpanElement>(null);
   const portrait = useRef<HTMLImageElement>(null);
   const state = useRef({ trackPointer, held, paused, motion, turn, since: 0 });
@@ -72,7 +73,7 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
 
   useEffect(() => {
     const element = host.current;
-    if (!element) return;
+    if (!element || !loadModel) return;
     const target = element;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     let mounted = true;
@@ -278,7 +279,7 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
       refresh.current = null;
       cleanup?.();
     };
-  }, []);
+  }, [loadModel]);
 
   return (
     <span ref={host} className="sb-scholly-model" aria-hidden="true" data-companion="scholly" data-model="character-sheet"

@@ -147,6 +147,7 @@ interface NavbarProps {
   setActiveTab: (tab: string) => void;
   activeProfile: StudentProfile | null;
   activeProfileId?: number | null;
+  loadSchollyModel?: boolean;
   onOpenProfileModal: (isNew?: boolean) => void;
   onSwitchProfile?: () => void;
   onStartOnboarding?: () => void;
@@ -366,6 +367,7 @@ export function Navbar({
   setActiveTab,
   activeProfile,
   activeProfileId,
+  loadSchollyModel,
   onOpenProfileModal,
   onSwitchProfile,
   onStartOnboarding,
@@ -882,6 +884,7 @@ export function Navbar({
 
       <SchollyCompanion
         key={activeProfileId ?? activeProfile?.id ?? "guest"}
+        loadModel={loadSchollyModel}
         activeTab={activeTab}
         activePane={activePane}
         locale={locale}
