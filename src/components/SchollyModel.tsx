@@ -82,7 +82,7 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
     let cleanup: (() => void) | undefined;
 
     async function mount() {
-      const [T, { createScholly, makeSchollyEnvironment }] = await Promise.all([
+      const [T, { createScholly }] = await Promise.all([
         import("three"), import("./scholly/SchollyMesh"),
       ]);
       if (!mounted) return;
@@ -98,19 +98,6 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
       camera.lookAt(0, -0.169, 0);
       const model = createScholly(scene);
       const { robot, helmet, arms, faces, eyes, neutralMouth, shadow, voice } = model;
-      let reflections: ReturnType<typeof makeSchollyEnvironment> | undefined;
-      function refreshReflections() {
-        reflections?.dispose();
-        reflections = undefined;
-        try {
-          reflections = makeSchollyEnvironment(renderer);
-          scene.environment = reflections.texture;
-        } catch {
-          scene.environment = null;
-        }
-      }
-      refreshReflections();
-
       let pointer: { x: number; y: number } | null = null;
       let box: DOMRect | null = null;
       let lost = false;
@@ -231,7 +218,6 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
       }
       function contextRestored() {
         lost = false;
-        refreshReflections();
         resize();
       }
 
@@ -258,7 +244,6 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
         renderer.domElement.removeEventListener("webglcontextlost", contextLost);
         renderer.domElement.removeEventListener("webglcontextrestored", contextRestored);
         if (animationFrame) cancelAnimationFrame(animationFrame);
-        reflections?.dispose();
         model.dispose();
         renderer.dispose();
         renderer.forceContextLoss();

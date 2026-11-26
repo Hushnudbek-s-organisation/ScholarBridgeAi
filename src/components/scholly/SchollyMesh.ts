@@ -108,7 +108,7 @@ export function createScholly(scene: T.Scene) {
   torso.position.set(0, -0.83, -0.018);
   robot.add(torso, helmet);
   scene.add(robot);
-  scene.add(new T.HemisphereLight('#becdff', '#243ba0', 1.13));
+  scene.add(new T.HemisphereLight('#becdff', '#243ba0', 1.3));
   const lights: Array<[string, number, Point]> = [
     ['#d8e8ff', 3.3, [3.4, 5, 4.1]],
     ['#40cfff', 4, [-3, 2, -4]],
@@ -123,9 +123,9 @@ export function createScholly(scene: T.Scene) {
   }
 
   const shell = new T.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.26, metalness: 0.15,
-    clearcoat: 0.76, clearcoatRoughness: 0.23, envMapIntensity: 0.65 });
+    clearcoat: 0.76, clearcoatRoughness: 0.23 });
   const dark = new T.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.03, specularIntensity: 0.20,
-    clearcoat: 0.26, clearcoatRoughness: 0.33, envMapIntensity: 0.18, side: T.DoubleSide });
+    clearcoat: 0.26, clearcoatRoughness: 0.33, side: T.DoubleSide });
   const ear = new T.MeshPhysicalMaterial({ color: '#0845d6', roughness: 0.25, metalness: 0.19, clearcoat: 0.82 });
   const joints = new T.MeshPhysicalMaterial({ color: '#051d70', roughness: 0.26, metalness: 0.19 });
   const hand = new T.MeshPhysicalMaterial({ color: '#29b7f2', roughness: 0.30, metalness: 0.04, specularIntensity: 0.65,
@@ -200,7 +200,6 @@ export function createScholly(scene: T.Scene) {
   const body = shell.clone();
   body.onBeforeCompile = shell.onBeforeCompile;
   body.roughness = .38;
-  body.envMapIntensity = .37;
   body.clearcoat = .28;
   body.specularIntensity = .48;
   mesh(torso, beanGeometry(), body);
@@ -323,33 +322,5 @@ export function createScholly(scene: T.Scene) {
   }
 
   return { robot, helmet, arms, faces, eyes, neutralMouth, shadow, voice, dispose };
-}
-
-export function makeSchollyEnvironment(renderer: T.WebGLRenderer) {
-  const lights = new T.Scene();
-  lights.background = new T.Color('#101832');
-  const oval = new T.SphereGeometry(1, 32, 18);
-  const panels = [
-    { position: [4,8,4], scale: [2.1,0.68,0.81], color:'#dfeaff', gain:2.5 },
-    { position: [-6,4,-1], scale: [1.0,2.9,0.52], color:'#32d8ff', gain:2.3 },
-    { position: [4,0,-5], scale: [1.0,2.8,0.75], color:'#70a6ff', gain:1.7 },
-    { position: [0,-4,1], scale: [2.3,0.5,1.1], color:'#008fff', gain:1.6 },
-  ];
-  const materials = panels.map(panel => {
-    const material = new T.MeshBasicMaterial({color: new T.Color(panel.color).multiplyScalar(panel.gain)});
-    const light = new T.Mesh(oval, material);
-    light.position.fromArray(panel.position);
-    light.scale.fromArray(panel.scale);
-    lights.add(light);
-    return material;
-  });
-  const generator = new T.PMREMGenerator(renderer);
-  try {
-    return generator.fromScene(lights, 0.07, 0.1, 100, { size: 64 });
-  } finally {
-    generator.dispose();
-    oval.dispose();
-    materials.forEach(material => material.dispose());
-  }
 }
 
