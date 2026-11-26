@@ -23,8 +23,10 @@ test("Scholly keeps its reference appearance even with a saved legacy outfit", a
     const launcher = page.getByRole("button", {name:"Open Scholly chat"});
     const model = launcher.locator('.sb-scholly-model[data-companion="scholly"]');
     await expect(model).toBeVisible();
-    await expect(model.locator('img[src="/scholly.webp"]')).toBeVisible();
-    await expect(model.locator("canvas")).toHaveCount(0);
+    await expect(model).toHaveAttribute("data-model", "character-sheet");
+    await expect(model).toHaveAttribute("data-rendering", "3d");
+    await expect(model.locator("canvas")).toBeVisible();
+    await expect(model.locator('img[src="/scholly.webp"]')).toBeHidden();
     await expect(launcher).toHaveCSS("width","128px");
     await launcher.screenshot({ path: testInfo.outputPath("scholly-companion.png"), animations: "disabled" });
     const dock = page.getByTestId("grouped-dock");
@@ -39,12 +41,33 @@ test("Scholly keeps its reference appearance even with a saved legacy outfit", a
     await chat.getByRole("button",{name:"Close chat"}).click();
     await page.setViewportSize({width:390,height:820});
     await expect(launcher).toHaveCSS("width","112px");
+    await expect(model.locator("canvas")).toBeVisible();
     await expect(dock).toBeVisible();
     expect((await dock.boundingBox())!.width).toBeLessThan(390);
   } finally {
     await pool.query("UPDATE scholly_profile SET outfit = '{}'::jsonb WHERE user_id=$1", [fixtures.studentId]);
     await pool.end();
   }
+});
+
+test("the public landing page renders the reference Scholly in 3D", async ({ page }) => {
+  const shaderErrors: string[] = [];
+  page.on("console", message => {
+    if (message.type() === "error" && /THREE.*(?:shader|webglprogram)/i.test(message.text())) {
+      shaderErrors.push(message.text());
+    }
+  });
+  await page.setViewportSize({ width: 390, height: 820 });
+  await page.goto("/");
+  const launcher = page.locator(".flight-scholly-wave");
+  await launcher.scrollIntoViewIfNeeded();
+  const model = launcher.locator('[data-model="character-sheet"]');
+  await expect(model).toHaveAttribute("data-rendering", "3d");
+  await expect(model.locator("canvas")).toBeVisible();
+  await expect(launcher.locator("../img")).toBeHidden();
+  await launcher.click();
+  await expect(model).toHaveAttribute("data-motion", "wave");
+  expect(shaderErrors).toEqual([]);
 });
 
 test("Scholly remembers structured feedback only when its owner opts in", async ({ page }) => {

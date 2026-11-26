@@ -46,12 +46,14 @@ test("Scholly docks on mobile, keeps a dragged position, and yields to the keybo
   await page.mouse.down();
   await page.mouse.move(150, 310, { steps: 8 });
   await page.mouse.up();
-  await expect(launcher).not.toHaveAttribute("data-placement", "dock");
+  // Measure the saved position after the button finishes its press-scale transition.
+  await expect(launcher).toHaveAttribute("style", /left: calc\(/);
+  await expect(launcher).toHaveCSS("transform", "none");
   const dragged = (await launcher.boundingBox())!;
   expect(dragged.x + dragged.width / 2).toBeCloseTo(150, 0);
   expect(dragged.y + dragged.height / 2).toBeCloseTo(310, 0);
   await page.reload();
-  await expect(launcher).not.toHaveAttribute("data-placement", "dock");
+  await expect(launcher).toHaveAttribute("style", /left: calc\(/);
   const restored = (await launcher.boundingBox())!;
   expect(restored.x).toBeCloseTo(dragged.x, 0);
   expect(restored.y).toBeCloseTo(dragged.y, 0);
