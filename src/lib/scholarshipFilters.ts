@@ -65,10 +65,10 @@ export const SCHOLARSHIP_FIT_OPTIONS = ["strong", "good", "low"] as const;
 export type ScholarshipFitOption = (typeof SCHOLARSHIP_FIT_OPTIONS)[number];
 export type ScholarshipBasisOption = (typeof SCHOLARSHIP_BASIS_OPTIONS)[number];
 
-export type ScholarshipSortOption = "relevance" | "deadline" | "amount" | "title";
+export type ScholarshipSortOption = "relevance" | "fit" | "requirements" | "deadline" | "amount" | "title";
+export const SCHOLARSHIP_PRIMARY_SORTS = ["relevance", "fit", "requirements", "deadline"] as const;
 export const SCHOLARSHIP_SORT_OPTIONS: readonly ScholarshipSortOption[] = [
-  "relevance",
-  "deadline",
+  ...SCHOLARSHIP_PRIMARY_SORTS,
   "amount",
   "title",
 ];

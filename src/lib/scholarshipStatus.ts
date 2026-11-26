@@ -66,7 +66,7 @@ export type DeadlineType =
   | "recurring"
   | "unknown";
 
-interface ScholarshipLike {
+export interface ScholarshipLike {
   openingDate: string | Date | null;
   deadlineDate: string | Date | null;
   deadlineType: string | null;
@@ -113,16 +113,16 @@ export function computeScholarshipStatus(
   if (s.deadlineType === "rolling") return "rolling";
   if (s.deadlineType === "not_announced") return s.applicationStatus === "upcoming" || (openingIn != null && openingIn > 0) ? "upcoming" : "not_announced";
 
+  if (openingIn != null && openingIn > 0) return "upcoming";
+
   // Exact deadline known. The deadline day itself is still open.
   if (deadlineIn != null) {
-    if (openingIn != null && openingIn > 0) return "upcoming";
     if (deadlineIn >= 0) return "open";
     return "closed";
   }
 
   // Deadline range — the last day of the range is still open.
   if (rangeStartIn != null && rangeEndIn != null) {
-    if (openingIn != null && openingIn > 0) return "upcoming";
     if (rangeStartIn <= 0 && rangeEndIn >= 0) return "open";
     if (rangeEndIn < 0) return "closed";
     if (rangeStartIn > 0) return "upcoming";

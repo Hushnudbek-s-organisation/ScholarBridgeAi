@@ -920,27 +920,24 @@ export function Home({
   // Scholarship Handlers
   const handleSaveScholarship = async (scholarshipId: number) => {
     if (!activeProfile) return;
-    try {
-      await fetch("/api/saved-scholarships", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId: activeProfile.id, scholarshipId }),
-      });
-      fetchSavedScholarships(activeProfile.id);
-    } catch (err) {
-      console.error(err);
-    }
+    const profileId = activeProfile.id;
+    const res = await fetch("/api/saved-scholarships", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId, scholarshipId }),
+    });
+    if (!res.ok) throw new Error("Scholarship could not be saved");
+    await fetchSavedScholarships(profileId);
   };
 
   const handleUnsaveScholarship = async (scholarshipId: number) => {
-    const item = savedScholarships.find((s) => s.scholarshipId === scholarshipId);
+    if (!activeProfile) return;
+    const item = savedScholarships.find((saved) => saved.scholarshipId === scholarshipId);
     if (!item) return;
-    try {
-      const res=await fetch(`/api/saved-scholarships?id=${item.id}`, { method: "DELETE" });
-      if(res.ok&&activeProfile)await fetchSavedScholarships(activeProfile.id);
-    } catch (err) {
-      console.error(err);
-    }
+    const profileId = activeProfile.id;
+    const res = await fetch(`/api/saved-scholarships?id=${item.id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Scholarship could not be removed");
+    await fetchSavedScholarships(profileId);
   };
 
   const handleUpdateSavedScholarshipStatus = async (id: number, status: string, notes?: string) => {

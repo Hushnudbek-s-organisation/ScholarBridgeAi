@@ -18,6 +18,7 @@ import {
   MapPin,
   Wallet,
 } from "lucide-react";
+import { resolveAcademicRequirements } from "@/lib/universityDetailRequirements";
 import { parseEligibilityScope } from "@/lib/eligibilityScope";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
@@ -43,7 +44,8 @@ import {
 } from "@/lib/catalogLocalizer";
 import { SourceLanguageProse } from "@/components/SourceLanguageProse";
 import { formatMoney } from "@/lib/format";
-import { deadlineStateOf, todayYmd } from "@/lib/catalogueOrder";
+import { formatScholarshipDate, scholarshipBrowsingWindow, scholarshipOfficialAction } from "@/lib/scholarshipBrowsing";
+import { statusLabel as scholarshipStatusLabel } from "@/lib/scholarshipStatus";
 
 async function getPageLocale(): Promise<Locale> {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -173,6 +175,11 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
     return (p.evidence === "legacy" ? scope?.unrestricted_legacy : scope?.unrestricted) ?? t.notPublished;
   };
   const degreesParsed = parseEligibilityScope(s.degreeLevels);
+  const degreeScope = degreesParsed.scope === "restricted" && degreesParsed.values.length === 1 ? degreesParsed.values[0] : null;
+  const { summary: academicSummary } = resolveAcademicRequirements(bundle?.facts.get(s.id) ?? [], { degreeLevel: degreeScope });
+  const ieltsMinimum = academicSummary.ielts?.single ?? null;
+  const gpaMinimum = academicSummary.gpa;
+  const gpaValue = gpaMinimum ? `${gpaMinimum.single}${gpaMinimum.unit ? ` / ${gpaMinimum.unit.replace(/^GPA /, "")}` : ""}` : t.notPublished;
   const majors = degreesParsed.scope === "restricted"
     ? listValues(s.eligibleMajors).map((v) =>
         /^all( majors| fields)?$/i.test(v.trim()) ? t.allMajors : localizeMajorOrField(v, locale))
@@ -187,8 +194,9 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   const documents = listValues(s.requiredDocuments);
   const rounds = listValues(s.rounds);
 
-  const deadlineLabel =
-    formatDate(s.deadlineDate, locale) ?? (s.deadline && s.deadline.trim() ? s.deadline : null);
+  const window = scholarshipBrowsingWindow(s);
+  const deadlineLabel = formatScholarshipDate(window.closesOn, locale);
+  const openingLabel = window.computedStatus === "upcoming" ? formatScholarshipDate(window.opensOn, locale) : null;
 
   // The funding cell is a table cell: a long English sentence does not fit and
   // would be unlabelled, so an untranslatable funding description falls back to
@@ -198,52 +206,31 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
 
   const languageLine =
     (englishRequirement.text.trim() ? englishRequirement.text : null) ||
-    (s.minIelts != null ? `IELTS ${s.minIelts}+` : null);
+    (ieltsMinimum != null ? `IELTS ${ieltsMinimum}+` : null);
 
-  const awardValue =
-    s.awardAmount != null
-      ? formatMoney(s.awardAmount, s.awardCurrency, {
-          suffix: s.awardPeriod === "month" ? ` ${copy.publicCatalog.scholarshipPeriodMonth}` : s.awardPeriod === "year" ? ` ${copy.publicCatalog.scholarshipPeriodYear}` : "",
-        })
-      : s.amountUsdValue != null && s.amountUsdValue > 0
-        ? formatMoney(s.amountUsdValue, "USD")
-        : null;
+  const period = s.awardPeriod;
+  const periodCopy = copy.publicCatalog;
+  const periodLabel = period === "month" ? periodCopy.scholarshipPeriodMonth
+    : period === "year" ? periodCopy.scholarshipPeriodYear
+    : period === "semester" ? periodCopy.scholarshipPeriodSemester
+    : period === "one_time" ? periodCopy.scholarshipPeriodOneTime
+    : period === "total" ? periodCopy.scholarshipPeriodTotal
+    : "";
+  const moneyOptions = { suffix: periodLabel ? ` · ${periodLabel}` : "" };
+  const awardValue = s.awardAmount != null && s.awardAmount > 0
+    ? formatMoney(s.awardAmount, s.awardCurrency, moneyOptions)
+    : s.amountUsdValue != null && s.amountUsdValue > 0
+      ? formatMoney(s.amountUsdValue, "USD", moneyOptions)
+      : null;
 
-  // The date decides, not the stored status: `application_status` is a note the
-  // owner made when the row was last touched, and a window that closed last week
-  // must not still say "Ochiq". A passed deadline is stated with its date.
-  const deadlineState = deadlineStateOf(
-    {
-      id: s.id,
-      deadlineDate: s.deadlineDate,
-      deadline: s.deadline,
-      applicationStatus: s.applicationStatus,
-      deadlineType: s.deadlineType,
-    },
-    todayYmd()
-  );
-  const deadlinePassed = deadlineState === "passed";
-
-  const statusLabel =
-    deadlinePassed
-      ? t.statusClosed
-      : s.applicationStatus === "open"
-      ? t.statusOpen
-      : s.applicationStatus === "upcoming"
-        ? t.statusUpcoming
-        : s.applicationStatus === "rolling"
-          ? t.statusRolling
-          : t.statusUnknown;
-
+  const deadlinePassed = window.computedStatus === "closed";
+  const statusLabel = scholarshipStatusLabel(window.computedStatus, locale);
   const verifiedOn = formatDate(s.lastVerifiedAt, locale);
-  // The apply button must exist on every award. When the provider publishes a
-  // dedicated application URL we use it; otherwise we send the student to the
-  // official page (source first), and the label says exactly that - we never
-  // invent an /apply deep link.
   const planLabel = { en: "Add to my plan", uz: "Rejamga qo‘shish", ru: "Добавить в план" }[locale];
   const reminderLabel = { en: "Telegram deadline reminders", uz: "Telegram’da muddat eslatmalari", ru: "Напоминания о сроках в Telegram" }[locale];
-  const applyHref = s.applicationUrl ?? s.sourceUrl ?? s.websiteUrl ?? null;
-  const applyLabel = s.applicationUrl ? t.applyNow : t.applyOnOfficialPage;
+  const action = scholarshipOfficialAction({ ...s, computedStatus: window.computedStatus });
+  const applyHref = action?.href;
+  const applyLabel = action?.kind === "apply" ? t.applyNow : t.applyOnOfficialPage;
   // A stored 0 means "no fee"; a NULL means the source did not say.
   const feeLabel =
     s.applicationFee == null ? t.noFee : s.applicationFee === 0 ? t.applicationFeeFree : formatMoney(s.applicationFee, "USD");
@@ -357,8 +344,8 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
                 <Fact label={t.level} value={degrees.length ? degrees.join(", ") : t.notPublished} />
                 <Fact label={t.eligibleMajors} value={majorsLabel} />
                 <Fact label={t.eligibleCountries} value={countriesLabel} />
-                <Fact label={t.minGpa} value={s.minGpa != null ? String(s.minGpa) : t.notPublished} />
-                <Fact label={t.minIelts} value={s.minIelts != null ? String(s.minIelts) : t.notPublished} />
+                <Fact label={t.minGpa} value={gpaValue} />
+                <Fact label={t.minIelts} value={ieltsMinimum != null ? String(ieltsMinimum) : t.notPublished} />
               </dl>
             </Section>
 
@@ -434,6 +421,7 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
               <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
                 <Fact label={t.recurrence} value={s.recurrence === "annual" ? t.recurrenceAnnual : t.recurrenceNone} />
                 <Fact label={t.status} value={statusLabel} />
+                {openingLabel && <p className="text-sm text-slate-600">{formatMessage(copy.scholarshipHub.opensOn, { date: openingLabel })}</p>}
                 <Fact label={t.applicationFee} value={feeLabel} />
                 <Fact label={t.lastVerified} value={verifiedOn ?? t.notPublished} />
               </dl>

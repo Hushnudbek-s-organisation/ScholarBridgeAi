@@ -656,7 +656,7 @@ check("detail scope refetch never reuses previous academic verdict inputs",detai
 check("the detail view exposes the numbers behind the pills", detail.includes("pillFactGpa") && detail.includes("pillFactWorkVisa"));
 
 const scholarshipHub = read("src/components/ScholarshipHub.tsx");
-check("the scholarship hub renders per-requirement pills", scholarshipHub.includes("<ScholarshipRequirementPills scholarship={s} profile={activeProfile}"));
+check("the scholarship hub shows the same requirement verdict as its filter", scholarshipHub.includes("s.chanceBucket === ") && scholarshipHub.includes("{t(requirement)}") && scholarshipHub.includes("<EvidenceNote"));
 check("the scholarship hub posts to /api/funding", scholarshipHub.includes('fetch("/api/funding"'));
 check("the scholarship hub maps to the funding route's real field names", scholarshipHub.includes('kind: "scholarship"') === false && read("src/lib/scholarshipChecks.ts").includes('kind: "scholarship"') && read("src/lib/scholarshipChecks.ts").includes('status: "planned"'));
 check("the scholarship hub keeps the debounce the journey gate requires", scholarshipHub.includes("const [debouncedSearch, setDebouncedSearch] = useState(\"\")") && scholarshipHub.includes('params.set("search", debouncedSearch.trim())'));

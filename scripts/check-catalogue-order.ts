@@ -1,3 +1,4 @@
+import { compareScholarshipDeadlines, scholarshipBrowsingWindow, scholarshipOfficialAction } from "../src/lib/scholarshipBrowsing";
 /**
  * Phase U gate — the public catalogue's order and its honesty about dates.
  *
@@ -151,12 +152,37 @@ check("the real catalogue slice keeps every row and puts closed ones last", () =
   assert.deepEqual(openDates, sortedDates, "open awards are not ordered by their deadline");
 });
 
+check("scholarship browsing uses the next actionable date and preserves unknown dates", () => {
+  const now = new Date("2026-11-27T10:00:00Z");
+  const base = {
+    deadlineDate: null, openingDate: null, deadlineRangeStart: null, deadlineRangeEnd: null,
+    deadlineType: "exact", rounds: null, recurrence: null, expectedOpeningPeriod: null,
+    expectedDeadlinePeriod: null, isActive: true, applicationStatus: null,
+  };
+  const old = { id: 1, ...scholarshipBrowsingWindow({ ...base, deadlineDate: "2026-11-20" }, now) };
+  const upcoming = { id: 2, ...scholarshipBrowsingWindow({ ...base, openingDate: "2026-12-01" }, now) };
+  const open = { id: 3, ...scholarshipBrowsingWindow({ ...base, rounds: '[{"deadline":"2026-11-18"},{"deadline":"2026-11-30"},{"deadline":"2026-12-04"}]' }, now) };
+  const unknown = { id: 4, ...scholarshipBrowsingWindow({ ...base, rounds: '[{"deadline":"invalid"}]' }, now) };
+  assert.equal(upcoming.computedStatus, "upcoming");
+  assert.equal(upcoming.opensOn, "2026-12-01");
+  assert.equal(open.closesOn, "2026-11-30");
+  assert.equal(unknown.closesOn, null);
+  assert.deepEqual([old, upcoming, open, unknown].sort(compareScholarshipDeadlines).map((row) => row.id), [3, 2, 4, 1]);
+});
+
+check("only an actionable grant points directly to its verified application portal", () => {
+  const award = { applicationUrl: "https://example.edu/apply", sourceUrl: "https://example.edu/rules", verificationStatus: "verified" };
+  assert.deepEqual(scholarshipOfficialAction({ ...award, computedStatus: "open" }), { href: award.applicationUrl, kind: "apply" });
+  assert.deepEqual(scholarshipOfficialAction({ ...award, computedStatus: "closed" }), { href: award.sourceUrl, kind: "source" });
+  assert.equal(scholarshipOfficialAction({ ...award, verificationStatus: "unverified", computedStatus: "open" }), null);
+});
+
 /* -------------------------------------------------------------- 3. the wiring */
 
 check("the public page uses the helper and no longer pages by id", () => {
   const page = readFileSync(join(ROOT, "src/app/scholarships/page.tsx"), "utf8");
-  assert.ok(page.includes("orderForBrowsing("), "the page does not call orderForBrowsing");
-  assert.ok(page.includes("deadlineStateOf("), "the page does not ask for the deadline state");
+  assert.ok(page.includes("found.sort(compareScholarshipDeadlines)"), "the page must order by the published application window");
+  assert.ok(page.includes("scholarshipBrowsingWindow("), "the page must compute the application window");
   assert.ok(
     !/\.sort\(\(a, b\) => a\.id - b\.id\)/.test(page),
     "the insertion-order sort is back"
@@ -168,7 +194,7 @@ check("the card and the detail page can state a closed deadline", () => {
   const card = readFileSync(join(ROOT, "src/app/scholarships/page.tsx"), "utf8");
   const detail = readFileSync(join(ROOT, "src/app/scholarships/[id]/page.tsx"), "utf8");
   assert.ok(card.includes("copy.deadlinePassed"), "the card never renders the passed state");
-  assert.ok(detail.includes("deadlineStateOf("), "the detail page does not ask for the deadline state");
+  assert.ok(detail.includes("scholarshipBrowsingWindow("), "the detail page must use the same application window");
   assert.ok(detail.includes("t.deadlinePassedNote"), "the detail page never explains a closed window");
   const messages = (locale: string) =>
     JSON.parse(readFileSync(join(ROOT, `src/i18n/messages/${locale}.json`), "utf8"));

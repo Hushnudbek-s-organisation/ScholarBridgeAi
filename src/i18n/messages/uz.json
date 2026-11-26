@@ -40,6 +40,7 @@
     "viewDetails": "Batafsil ko‘rish",
     "coverageNotSpecified": "Qamrovi ko‘rsatilmagan",
     "scholarshipPeriodYear": "yiliga",
+    "scholarshipPeriodSemester": "semestriga",
     "scholarshipPeriodMonth": "oyiga",
     "scholarshipPeriodOneTime": "bir martalik",
     "scholarshipPeriodTotal": "jami stipendiya",
@@ -4851,7 +4852,7 @@
     "hideSpecializationsShort": "Yashirish"
   },
   "scholarshipHub": {
-    "title": "Global moliyaviy yordam va stipendiyalar qidiruv tizimi",
+    "title": "Grantlar katalogi",
     "subtitle": "To'liq moliyalashtirilgan davlat grantlari, universitet stipendiyalari va ehtiyojga asoslangan yordamni toping.",
     "searchPlaceholder": "Stipendiya nomi, taʼminotchi yoki davlat bo'yicha qidirish…",
     "allCountries": "🌐 Barcha mezbon davlatlar",
@@ -4864,7 +4865,7 @@
     "pageOf": "{page}-sahifa / {totalPages}",
     "loading": "Stipendiyalar katalogi yuklanmoqda va profilingizga solishtirilmoqda…",
     "empty": "Bu filtrlarga mos stipendiya topilmadi. Filtrlarni tiklab ko'ring.",
-    "matchBadge": "{score}% moslik",
+    "matchBadge": "Moslik {score}/100",
     "matchHint": "Bu profilingizga moslik bahosi — qabul qilinish ehtimoli emas.",
     "selectProfile": "Baholash uchun profilni tanlang",
     "strongBecause": "Kuchli moslik sababi:",
@@ -4885,6 +4886,9 @@
     "awardVariable": "O'zgaruvchan mukofot; batafsil ma'lumotga qarang",
     "awardNotSpecified": "Ko'rsatilmagan",
     "perYear": " / yil",
+    "perSemester": " / semestr",
+    "oneTimeAward": "bir martalik",
+    "totalAward": "jami grant",
     "perMonth": " / oy",
     "dismiss": "Yopish",
     "fundingAdd": "Moliyalashtirish rejamga qo'shish",
@@ -4976,7 +4980,7 @@
     "mercuryReviewValue": "Model berilgan profil barcha ma’lum mezonlarga mos kelish ehtimolini {percent}% deb baholadi.",
     "mercuryReviewUnavailable": "Qo‘shimcha model tekshiruvi mavjud emas; katalogning deterministik moslik natijasi o‘zgarmaydi.",
     "viewDetails": "Batafsil ma'lumot",
-    "filtersTitle": "Filtrlar",
+    "filtersTitle": "Boshqa filtrlar",
     "filtersClear": "Tozalash",
     "filterCountry": "Mezbon davlat",
     "filterDegree": "Ta'lim darajasi",
@@ -4997,9 +5001,11 @@
     "groupAnyDegree": "Barcha darajalar",
     "groupUnspecified": "Moliyalashtirish ko'rsatilmagan",
     "sortOption": {
-      "relevance": "Moslik bo'yicha",
+      "relevance": "Eng mos grantlar",
+      "fit": "Profilga moslik",
+      "requirements": "Talablarga moslik",
       "deadline": "Yaqin muddat",
-      "amount": "Eng katta mukofot",
+      "amount": "Eng katta yillik grant",
       "title": "Nomi (A–Z)"
     },
     "groupOption": {
@@ -5022,7 +5028,28 @@
     "filterRequirementMet": "Tekshirilgan talablar bajarilgan",
     "filterRequirementNotMet": "Bajarilmagan talablar bor",
     "filterRequirementUnknown": "Ma’lumot yetarli emas",
-    "requirementStatusNote": "Bu grant e’lon qilgan minimumlarni saqlangan profilingiz bilan solishtiradi. Bu grantga loyiqlik ham, uni olish ehtimoli ham emas; tekshirilmagan minimum “bajarilgan” emas, “noma’lum” hisoblanadi."
+    "requirementStatusNote": "Profilingiz rasmiy tasdiqlangan talablar bilan solishtiriladi. Yetishmagan ma’lumot «noma’lum» deb belgilanadi.",
+    "quickFilters": "Tezkor filtrlar",
+    "quickOpen": "Hozir ochiq",
+    "quickFull": "To‘liq qamrov",
+    "quickSaved": "Saqlanganlar ({count})",
+    "opensOn": "{date} kuni ochiladi",
+    "catalogueFailed": "Grantlarni yuklab bo‘lmadi.",
+    "catalogueRetry": "Qayta urinish",
+    "clearSearchAndFilters": "Qidiruv va filtrlarni tozalash",
+    "savedEmpty": "Saqlagan grantlaringiz shu yerda chiqadi.",
+    "deadlineUnpublished": "Sana e’lon qilinmagan",
+    "applyAction": "Ariza topshirish",
+    "sourceAction": "Rasmiy manba",
+    "saveNamed": "{title} grantini saqlash",
+    "unsaveNamed": "{title} grantini ro‘yxatdan olish",
+    "saveFailed": "Saqlangan grantlar ro‘yxatini yangilab bo‘lmadi.",
+    "sortHint": {
+      "relevance": "Avval ochiq va profilingizga mos grantlar chiqadi.",
+      "fit": "Profilga moslik balli yuqori grantlar birinchi chiqadi.",
+      "requirements": "Tasdiqlangan talablarga javob beradigan grantlar birinchi chiqadi.",
+      "deadline": "Avval ochiq grantlarning eng yaqin muddatlari chiqadi."
+    }
   },
   "chancing": {
     "signIn": "Profil mosligi baholarini ko‘rish uchun tizimga kiring.",

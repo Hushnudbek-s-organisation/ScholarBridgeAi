@@ -18,6 +18,7 @@ import {
   type ScholarshipFacets,
   type ScholarshipFilters,
 } from "@/lib/scholarshipFilters";
+import { SCHOLARSHIP_ACTIONABLE_STATUSES } from "@/lib/scholarshipBrowsing";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -197,11 +198,14 @@ export function ScholarshipFiltersPanel({
       <Field label={t("filterStatus")} htmlFor={`${idPrefix}-status}`}>
         <select
           id={`${idPrefix}-status}`}
-          value={filters.statuses[0] ?? "All"}
-          onChange={(event) => setSingle("statuses", event.target.value)}
+          value={filters.statuses.length === 2 && filters.statuses.includes("open") && filters.statuses.includes("rolling") ? "active" : filters.statuses[0] ?? "All"}
+          onChange={(event) => event.target.value === "active"
+            ? onChange({ ...filters, statuses: [...SCHOLARSHIP_ACTIONABLE_STATUSES] })
+            : setSingle("statuses", event.target.value)}
           className={SELECT_CLASS}
         >
           <option value="All">{t("allStatuses")}</option>
+          <option value="active">{t("quickOpen")} ({(facets.statuses.open ?? 0) + (facets.statuses.rolling ?? 0)})</option>
           {SCHOLARSHIP_STATUS_OPTIONS.map((status) => (
             <option key={status} value={status}>
               {t(scholarshipStatusMessageKey(status))} ({facets.statuses[status] ?? 0})

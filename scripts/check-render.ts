@@ -1035,7 +1035,7 @@ check("public scholarship awards resolve to USD or stay unknown", /resolvedUsdSc
 check("the university list paginates the filtered active projection", /\.filter\(\(university\) => university\.isActive !== false\)/.test(universitiesPageSource) &&
   /paginateArray\(projected, requestedPage, ITEMS_PER_PAGE\)/.test(universitiesPageSource));
 check("the scholarship list only paginates active cached awards", /from\(scholarships\)\.where\(eq\(scholarships\.isActive, true\)\)/.test(catalogueCacheSource) &&
-  /paginateArray\(orderForBrowsing\(found, today\), requestedPage, ITEMS_PER_PAGE\)/.test(scholarshipsPageSource));
+  /paginateArray\(found\.sort\(compareScholarshipDeadlines\), requestedPage, ITEMS_PER_PAGE\)/.test(scholarshipsPageSource));
 check("public error states do not render raw exception messages", !/\{message\}/.test(universitiesPageSource) && !/\{message\}/.test(scholarshipsPageSource));
 check("both public catalog grids use one mobile column with readable wrapping", /grid-cols-1 gap-4 sm:grid-cols-2/.test(universitiesPageSource) && /grid-cols-1 gap-4 sm:grid-cols-2/.test(scholarshipsPageSource));
 check("pagination copy comes from messages and its controls meet the 44px target", /useTranslations\(\"pagination\"\)/.test(paginationSource) && /h-11 min-w-11/.test(paginationSource));

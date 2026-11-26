@@ -1,3 +1,11 @@
+import { evaluateResolvedAcademicCriteria, originalAcademicRequirementInput } from "@/lib/academicDecision";
+import { todayYmd } from "@/lib/catalogueOrder";
+import { compareDegreeLevels } from "@/lib/degreeLevels";
+import { parseEligibilityScope } from "@/lib/eligibilityScope";
+import type { RequirementEvaluation } from "@/lib/requirementGroups";
+import { compareScholarshipDeadlines, compareScholarshipStatus, publishedYearlyScholarshipUsd, scholarshipWindow } from "@/lib/scholarshipBrowsing";
+import { safeAcademicLink } from "@/lib/universityCardSummary";
+import { resolveAcademicRequirements } from "@/lib/universityDetailRequirements";
 import { findCatalogueMatches } from "@/lib/catalogueSearch";
 import {prepareAwardCoverage} from "@/lib/awardCoverageContext.server";
 import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
@@ -6,11 +14,9 @@ import { authenticate } from "@/lib/auth";
 import {
   calculateScholarshipMatch,
   calculateUniversityMatch,
-  type MatchBreakdown,
-  type ReasonDetail,
   type UniversityData,
 } from "@/lib/matching";
-import { evaluateChance, fitBucket, type ChanceResult, type FitBucket } from "@/lib/scholarshipGates";
+import { fitBucket, type ChanceBucket } from "@/lib/scholarshipGates";
 import { combinedRelevance } from "@/lib/scholarshipRanking";
 import { memoizeMatch } from "@/lib/matchMemo";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
@@ -18,7 +24,7 @@ import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { seedDatabase } from "@/db/seed";
 import { db } from "@/db";
-import { savedUniversities, universities } from "@/db/schema";
+import { savedScholarships, savedUniversities, universities } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { getCachedScholarshipsBundle, getCachedProfileForMatching, getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { legacyEvidence } from "@/lib/factPresentation";
@@ -32,7 +38,6 @@ import {
 } from "@/lib/savedUniCoverage";
 import { expandMultilingualSearchTerms, localizeScholarshipRow } from "@/lib/catalogLocalizer";
 import { rankSemanticTexts } from "@/lib/ai/semanticSearch";
-import { runMercuryDecision } from "@/lib/ai/decide";
 import {
   EMPTY_SCHOLARSHIP_FILTERS,
   SCHOLARSHIP_BASIS_OPTIONS,
@@ -69,14 +74,17 @@ function listParam(searchParams: URLSearchParams, ...names: string[]): string[] 
   return [...new Set(values)].slice(0, 24);
 }
 
-/** `deadlineDate` arrives as a Date (json-serialized to a string) or is absent. */
-function deadlineSortValue(row: { deadlineDate?: Date | string | null; deadline?: string | null }): string {
-  const raw = row.deadlineDate;
-  if (raw) {
-    const asDate = raw instanceof Date ? raw : new Date(raw);
-    if (!Number.isNaN(asDate.getTime())) return asDate.toISOString().slice(0, 10);
-  }
-  return (row.deadline ?? "").trim();
+const requirementRank: Record<ChanceBucket, number> = { meets: 0, unknown: 1, below: 2 };
+
+function countedChecks(result: RequirementEvaluation, fields: Set<string>): number {
+  if (result.field) fields.add(result.field);
+  if (result.children.length) return result.children.reduce((total, child) => total + countedChecks(child, fields), 0);
+  return Number(result.state === "met" || result.state === "unmet");
+}
+
+function compareScore(a: number | null, b: number | null): number {
+  if (a == null) return b == null ? 0 : 1;
+  return b == null ? -1 : b - a;
 }
 
 /** Counts per value, skipping empty buckets — the client renders what exists. */
@@ -142,6 +150,7 @@ export async function GET(req: Request) {
 
     let profileData = null;
     let matchProfile = null;
+    let originalProfile = null;
     /** Owner/admin-verified profile whose PRIVATE saved-university list may steer ordering. */
     let personalisedProfileId: number | null = null;
     if (profileIdStr) {
@@ -155,9 +164,20 @@ export async function GET(req: Request) {
         if (cached) {
           profileData = cached.profileData;
           matchProfile = cached.matchProfile;
+          originalProfile = cached.chancingProfile;
           personalisedProfileId = pId;
         }
       }
+    }
+
+    if (searchParams.get("saved") === "1") {
+      if (personalisedProfileId == null) {
+        return privateNoStoreJson(paginatedPayload("scholarships", [], searchParams));
+      }
+      const saved = await db.select({ id: savedScholarships.scholarshipId })
+        .from(savedScholarships).where(eq(savedScholarships.profileId, personalisedProfileId));
+      const savedIds = new Set(saved.map(({ id }) => id));
+      allScholarships = allScholarships.filter(({ id }) => savedIds.has(id));
     }
 
     // The two personal filters are unanswerable without a profile. Rather than
@@ -168,33 +188,36 @@ export async function GET(req: Request) {
       filters.fit = [];
     }
 
-    // One fingerprint for the whole response: any score-relevant profile edit
-    // changes it, which is exactly when the memoized scores must be recomputed.
     const profileFingerprint = profileData ? profileMatchFingerprint(profileData) : "anonymous";
+    const academicProfile = originalProfile ? originalAcademicRequirementInput(originalProfile) : null;
+    const now = new Date();
+    const today = todayYmd(now);
+    const fitInputs = (row: (typeof allScholarships)[number]) => {
+      const facts = bundle.facts.get(row.id) ?? [];
+      const academics = facts.length ? resolveAcademicRequirements(facts, { degreeLevel: profileData?.degreeLevel }) : null;
+      const summary = academics?.requirementGroup ? null : academics?.summary;
+      const gpa = summary?.gpa;
+      return {
+        academics,
+        scholarship: {
+          ...row,
+          minGpa: gpa && ["4", "4.0", "GPA 4.0"].includes(gpa.unit ?? "") ? gpa.single : null,
+          minIelts: summary?.ielts?.single ?? null,
+        },
+      };
+    };
+    const matchFor = (row: ReturnType<typeof fitInputs>["scholarship"]) => {
+      if (!matchProfile || row.verificationStatus !== "verified") return null;
+      const result = memoizeMatch("scholarship-fit", profileFingerprint, row.id, row as unknown as Record<string, unknown>, () =>
+        calculateScholarshipMatch(matchProfile, row)
+      );
+      return result.breakdown.comparedDimensions > 0 ? result : null;
+    };
 
-    // The dashboard needs one number, not the full catalogue payload. Avoid
-    // generating localized reasons, coverage metadata, and serializing every
-    // scholarship just to count scores >= 60. The matching calculation itself
-    // remains identical to the regular personalized response.
     if (searchParams.get("summary") === "match-count") {
-      const matchCount = matchProfile
-        ? bundle.entries.reduce(
-            (count, scholarship) =>
-              count +
-              Number(
-                scholarship.verificationStatus === "verified" &&
-                  (memoizeMatch(
-                    "scholarship-fit",
-                    profileFingerprint,
-                    scholarship.id,
-                    scholarship as unknown as Record<string, unknown>,
-                    () => calculateScholarshipMatch(matchProfile!, scholarship)
-                  ).matchScore ?? 0) >= 60
-              ),
-            0,
-          )
-        : 0;
-      return privateNoStoreJson({ matchCount }, { headers: { "Cache-Control": "private, no-store" } });
+      const matchCount = matchProfile ? bundle.entries.reduce((count, row) =>
+        count + Number((matchFor(fitInputs(row).scholarship)?.matchScore ?? 0) >= 60), 0) : 0;
+      return privateNoStoreJson({ matchCount });
     }
 
     // Module 1 — awards that 100% cover a university the student SAVED lead
@@ -285,93 +308,43 @@ export async function GET(req: Request) {
 
     const mapped = allScholarships.map((s) => {
       const isVerified = s.verificationStatus === "verified";
-      // Historical seed rows contain unsupported amounts, eligibility and
-      // cycles. Preserve them in storage (an admin may have edited them), but
-      // never publish those claims or derive a match/status from them until a
-      // source review is recorded.
-      const publicRow = isVerified ? s : {
-        ...s,
-        coverageType: "Unspecified",
-        amountUsdValue: null,
-        awardAmount: null,
-        awardCurrency: null,
-        awardPeriod: null,
-        awardBasis: null,
-        deadline: null,
-        openingDate: null,
-        deadlineDate: null,
-        deadlineType: "unknown",
-        deadlineRangeStart: null,
-        deadlineRangeEnd: null,
-        recurrence: "none",
-        expectedOpeningPeriod: null,
-        expectedDeadlinePeriod: null,
-        applicationStatus: "unknown",
-        rounds: "[]",
-        degreeLevels: "[]",
-        eligibleMajors: "[]",
-        eligibleCountries: "[]",
-        minGpa: null,
-        minIelts: null,
-        financialNeedBased: null,
-        meritBased: null,
-        description: "Current award details are unverified.",
-        requirements: "Confirm current eligibility, award coverage, required documents, and dates with the official provider.",
-        fundingType: "",
-        tuitionCoverage: "",
-        livingAllowance: null,
-        travelAllowance: null,
-        accommodation: "",
-        applicationFee: null,
-        englishRequirements: "",
-        requiredDocuments: "[]",
-        applicationUrl: null,
-        sourceUrl: null,
-      };
-      let matchInfo: {
-        matchScore: number | null;
-        isEligible: boolean | null;
-        reasons?: string[];
-        potentialIssues?: string[];
-        reasonDetails?: ReasonDetail[];
-        issueDetails?: ReasonDetail[];
-        breakdown?: MatchBreakdown;
-      } = { matchScore: null, isEligible: null, reasons: [], potentialIssues: [] };
-      if (matchProfile && isVerified) {
-        // Memoized per (profile fingerprint, scholarship): the catalogue is
-        // re-scored for every filter change and neither side moved.
-        matchInfo = memoizeMatch("scholarship-fit", profileFingerprint, s.id, s as unknown as Record<string, unknown>, () =>
-          calculateScholarshipMatch(matchProfile!, s)
-        );
-      }
-      // Computed application status from dates (spec §6) — never stale.
-      const statusInfo = withStatus(publicRow, locale);
-      // Three answers the list is ordered by, computed once per row: the
-      // scholarship fit (already above), the fit of the university behind it,
-      // and whether the published gates are met.
-      const chanceInfo: ChanceResult | null =
-        matchProfile && isVerified
-          ? evaluateChance(matchProfile, {
-              minGpa: s.minGpa,
-              minIelts: s.minIelts,
-              degreeLevels: s.degreeLevels,
-            })
-          : null;
-      const rowFit: FitBucket | null = isVerified ? fitBucket(matchInfo.matchScore) : null;
+      // The cached catalogue already suppresses unverified money, dates and links.
+      const { academics, scholarship } = matchProfile && isVerified ? fitInputs(s) : { academics: null, scholarship: s };
+      const matchInfo = matchFor(scholarship);
+      const matchScore = matchInfo?.matchScore ?? null;
+      const statusInfo = withStatus(s, locale, now);
+      const window = scholarshipWindow(s, statusInfo.computedStatus, today);
+
+      const academicCheck = academicProfile && academics ? evaluateResolvedAcademicCriteria(academics, academicProfile, today) : null;
+      const degreeRestricted = parseEligibilityScope(s.degreeLevels).scope === "restricted";
+      const degree = degreeRestricted ? compareDegreeLevels(matchProfile?.degreeLevel, s.degreeLevels) : "unknown";
+      const academicFields = new Set<string>();
+      const checked = (academicCheck ? countedChecks(academicCheck, academicFields) : 0) + Number(degree !== "unknown");
+      const unreviewedMinimum =
+        (s.minGpa != null && s.minGpa > 0 && !academicFields.has("gpa")) ||
+        (s.minIelts != null && s.minIelts > 0 && !academicFields.has("ielts"));
+      const hasAcademicCheck = Boolean(academics?.requirementGroup || Object.values(academics?.summary ?? {}).some(Boolean));
+      const incomplete = unreviewedMinimum || (hasAcademicCheck && academicCheck?.state === "unknown") ||
+        (degreeRestricted && degree === "unknown");
+      const chanceBucket: ChanceBucket | null = !matchProfile ? null
+        : !isVerified ? "unknown"
+        : degree === "mismatch" || academicCheck?.state === "unmet" ? "below"
+        : incomplete || checked === 0 ? "unknown" : "meets";
       const universityFit = isVerified ? universityMatchFor(s.universityId) : null;
-      const relevance = matchProfile && isVerified
-        ? combinedRelevance({
-            fit: matchInfo.matchScore,
-            university: universityFit,
-            chance: chanceInfo?.bucket ?? null,
-          })
-        : { score: null, parts: [] };
+      const relevance = combinedRelevance({
+        fit: matchScore, university: universityFit, chance: chanceBucket === "unknown" ? null : chanceBucket,
+      });
       const src = sourceMap.get(s.id) || null;
       // Saved-university coverage (Module 1) — empty refs means no private
       // saved list was available, and every flag below stays honestly false.
       const cov = savedUniRefs.length > 0 ? evaluateScholarshipForSavedUnis({...s,catalogueFacts:bundle.facts?.get(s.id)??[]}, savedUniRefs) : null;
       return {
-        ...publicRow,
+        ...s,
+        ...window,
+        checkedRequirements: checked,
+        requirementFacts: Object.entries(academics?.evidence ?? {}).flatMap(([fieldKey, fact]) =>
+          fact.isOfficialMinimum ? [{ ...fact, fieldKey }] : []
+        ),
         coverageAssessment:cov,
         coverageState:cov?.coverageState??"unknown",
         coveredUniversities: cov?.coveredUniNames ?? [],
@@ -379,20 +352,20 @@ export async function GET(req: Request) {
         isFullForSavedUni: cov?.isFullForSavedUni ?? false,
         isFullCoverage: cov ? cov.isFullCoverage : false,
         covTier: cov ? coverageTier(cov) : 0,
-        matchScore: matchInfo.matchScore,
-        isEligible: matchInfo.isEligible,
-        matchReasons: translateReasons(locale, "scholarship", matchInfo.reasonDetails, matchInfo.reasons),
-        matchIssues: translateReasons(locale, "scholarship", matchInfo.issueDetails, matchInfo.potentialIssues),
-        matchBreakdown: matchInfo.breakdown ?? null,
+        matchScore,
+        isEligible: chanceBucket === "meets" ? true : chanceBucket === "below" ? false : null,
+        matchReasons: translateReasons(locale, "scholarship", matchInfo?.reasonDetails, matchInfo?.reasons),
+        matchIssues: translateReasons(locale, "scholarship", matchInfo?.issueDetails, matchInfo?.potentialIssues),
+        matchBreakdown: matchInfo?.breakdown ?? null,
         // Personal filters read these two; the browser also shows them.
-        chanceBucket: chanceInfo?.bucket ?? null,
-        fitBucket: rowFit,
+        chanceBucket,
+        fitBucket: fitBucket(matchScore),
         universityMatchScore: universityFit,
         relevanceScore: relevance.score,
         computedStatus: statusInfo.computedStatus,
         statusLabel: statusInfo.statusLabel,
         expectedLabel: statusInfo.expectedLabel,
-        sourceUrl: isVerified ? (src?.sourceUrl ?? null) : null,
+        sourceUrl: isVerified ? (safeAcademicLink(src?.sourceUrl) ?? safeAcademicLink(s.sourceUrl)) : null,
         sourceTitle: isVerified ? (src?.sourceTitle ?? null) : null,
         sourceLastVerifiedAt: isVerified ? (src?.lastVerifiedAt ?? null) : null,
       };
@@ -434,103 +407,43 @@ export async function GET(req: Request) {
     }
 
     const semanticScores = new Map<number, number>();
-    if (search && search.trim().length >= 4 && results.length > 1) {
+    if (sortBy === "relevance" && search && search.length >= 4 && results.length > 1) {
       try {
-        const candidates = results.slice(0, 63).map((item) => [item.title, item.provider, item.country, item.description, item.coverageType, item.eligibleMajors, item.degreeLevels].filter(Boolean).join(". "));
-        const ranked = await rankSemanticTexts(search, candidates, { profileId: personalisedProfileId, timeoutMs: 3_500, limit: candidates.length });
-        for (const item of ranked) {
-          const result = results[item.index];
-          if (result) semanticScores.set(result.id, item.similarity);
+        const candidates = results.slice(0, 63).map((row) => [row.title, row.provider, row.country, row.description].filter(Boolean).join(". "));
+        for (const item of await rankSemanticTexts(search, candidates, { profileId: personalisedProfileId, timeoutMs: 3_500, limit: candidates.length })) {
+          const row = results[item.index];
+          if (row) semanticScores.set(row.id, item.similarity);
         }
-        if (!profileData) results.sort((a, b) => (semanticScores.get(b.id) ?? -1) - (semanticScores.get(a.id) ?? -1));
       } catch {
-        // Embedding timeout or provider errors preserve deterministic text matches and ordering.
+        // Lexical matches are sufficient to serve the catalogue.
       }
     }
 
-    if (profileData) {
-      // Sort: the four coverage tiers first (full-coverage AT a saved
-      // university → other saved-university awards → general full-coverage →
-      // rest), then match score desc, then the nearest deadline (soonest
-      // first, unknown deadlines last), then id. Without the deadline/id
-      // tie-break, equal-scoring scholarships changed order between requests
-      // (Postgres row order is not stable) — a student would see a shuffled
-      // list on every refresh. `covTier` is 0 for every row when no private
-      // saved list exists, so the anonymous ordering is unchanged.
-      results.sort((a, b) => {
-        if (a.covTier !== b.covTier) return b.covTier - a.covTier;
-        // The combined number decides the order: it reads the scholarship fit,
-        // the university behind it and the published-gate verdict together.
-        // A row with no relevance (unverified, or a sparse profile) falls
-        // through to the old fit/deadline tie-breaks instead of leading.
-        if (a.relevanceScore != null || b.relevanceScore != null) {
-          if (a.relevanceScore == null) return 1;
-          if (b.relevanceScore == null) return -1;
-          if (b.relevanceScore !== a.relevanceScore) return b.relevanceScore - a.relevanceScore;
-        }
-        if (a.matchScore == null && b.matchScore == null) return 0;
-        if (a.matchScore == null) return 1;
-        if (b.matchScore == null) return -1;
-        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-        const semanticDifference = (semanticScores.get(b.id) ?? -1) - (semanticScores.get(a.id) ?? -1);
-        if (semanticDifference !== 0) return semanticDifference;
-        // `deadlineDate` arrives as a Date (json serialized to ISO) — turning
-        // it into a string directly would compare "Wed Oct 15" lexicographically.
-        const asYmd = (v: Date | string | null): string => {
-          if (!v) return "";
-          if (v instanceof Date) return v.toISOString().slice(0, 10);
-          const t = new Date(v);
-          return Number.isNaN(t.getTime()) ? String(v) : t.toISOString().slice(0, 10);
-        };
-        const ad = asYmd(a.deadlineDate) || a.deadline || "";
-        const bd = asYmd(b.deadlineDate) || b.deadline || "";
-        if (ad !== bd) {
-          if (!ad) return 1;
-          if (!bd) return -1;
-          return ad.localeCompare(bd);
-        }
-        return a.id - b.id;
-      });
-    } else {
-      // NULL amounts sort after verified amounts (never treat NULL as $0).
-      results.sort((a, b) => {
-        if (a.amountUsdValue == null && b.amountUsdValue == null) return a.id - b.id;
-        if (a.amountUsdValue == null) return 1;
-        if (b.amountUsdValue == null) return -1;
-        if (b.amountUsdValue !== a.amountUsdValue) return b.amountUsdValue - a.amountUsdValue;
-        return a.id - b.id;
-      });
-    }
-
-    /**
-     * The student's own ordering choice. Without it the list keeps the
-     * relevance order above (match score / coverage tier), which stays the
-     * default: "best fit for me" is the question this catalogue answers.
-     */
-    if (sortBy === "deadline") {
-      // Soonest published deadline first; awards with no published date last —
-      // never at the top pretending to be urgent.
-      results.sort((a, b) => {
-        const ad = deadlineSortValue(a);
-        const bd = deadlineSortValue(b);
-        if (ad !== bd) {
-          if (!ad) return 1;
-          if (!bd) return -1;
-          return ad.localeCompare(bd);
-        }
-        return a.id - b.id;
-      });
-    } else if (sortBy === "amount") {
-      results.sort((a, b) => {
-        if (a.amountUsdValue == null && b.amountUsdValue == null) return a.id - b.id;
-        if (a.amountUsdValue == null) return 1;
-        if (b.amountUsdValue == null) return -1;
-        if (b.amountUsdValue !== a.amountUsdValue) return b.amountUsdValue - a.amountUsdValue;
-        return a.id - b.id;
-      });
-    } else if (sortBy === "title") {
-      results.sort((a, b) => a.title.localeCompare(b.title) || a.id - b.id);
-    }
+    const effectiveSort = !profileData && (sortBy === "fit" || sortBy === "requirements") ? "deadline" : sortBy;
+    const byRequirements = (a: (typeof results)[number], b: (typeof results)[number]) =>
+      requirementRank[a.chanceBucket ?? "unknown"] - requirementRank[b.chanceBucket ?? "unknown"];
+    results.sort((a, b) => {
+      switch (effectiveSort) {
+        case "deadline":
+          return compareScholarshipDeadlines(a, b);
+        case "fit":
+          return compareScore(a.matchScore, b.matchScore) || compareScholarshipDeadlines(a, b);
+        case "requirements":
+          return byRequirements(a, b) || b.checkedRequirements - a.checkedRequirements ||
+            compareScholarshipDeadlines(a, b);
+        case "amount":
+          return compareScore(publishedYearlyScholarshipUsd(a), publishedYearlyScholarshipUsd(b)) ||
+            compareScholarshipDeadlines(a, b);
+        case "title":
+          return a.title.localeCompare(b.title) || a.id - b.id;
+        default:
+          return compareScholarshipStatus(a, b) || byRequirements(a, b) ||
+            compareScore(a.matchScore, b.matchScore) || b.covTier - a.covTier ||
+            compareScore(a.relevanceScore, b.relevanceScore) ||
+            (semanticScores.get(b.id) ?? -1) - (semanticScores.get(a.id) ?? -1) ||
+            compareScholarshipDeadlines(a, b);
+      }
+    });
 
     /**
      * Grouping is a stable re-sort on the group key, so the order chosen above
@@ -550,62 +463,6 @@ export async function GET(req: Request) {
       results.sort((a, b) => Number(b.id === focusId) - Number(a.id === focusId));
     }
 
-    // A Mercury signal is an auxiliary consistency check on one explicitly
-    // focused award. The deterministic eligibility engine remains the product
-    // result; unknown criteria stay unknown and the provider signal is never a
-    // guarantee. Only owner-authorized profile fields are sent, and failures
-    // leave the catalogue response intact.
-    let mercuryEligibilityReview: {
-      model: string;
-      available: boolean;
-      probabilityPercent: number | null;
-      deterministicEligibility: boolean | null;
-      disclaimer: string;
-    } | null = null;
-    const focusedScholarship = results.find((item) => item.id === focusId);
-    if (focusedScholarship && profileData && personalisedProfileId != null) {
-      const review = await runMercuryDecision({
-        profileId: personalisedProfileId,
-        timeoutMs: 3_500,
-        state: JSON.stringify({
-          applicant: {
-            degreeLevel: profileData.degreeLevel,
-            targetMajor: profileData.targetMajor,
-            gpa: profileData.gpa,
-            gpaScale: profileData.gpaScale,
-            ieltsScore: profileData.ieltsScore ?? null,
-            toeflScore: profileData.toeflScore ?? null,
-            preferredCountries: profileData.preferredCountries ?? null,
-            needsFinancialAid: profileData.needsFinancialAid ?? profileData.needScholarship ?? null,
-            requiresFullScholarship: profileData.requiresFullScholarship ?? null,
-          },
-          publishedAwardCriteria: {
-            title: focusedScholarship.title,
-            provider: focusedScholarship.provider,
-            country: focusedScholarship.country,
-            eligibilityText: focusedScholarship.requirements,
-            eligibleCountries: focusedScholarship.eligibleCountries,
-            eligibleMajors: focusedScholarship.eligibleMajors,
-            degreeLevels: focusedScholarship.degreeLevels,
-            coverageType: focusedScholarship.coverageType,
-          },
-        }),
-        questions: [{
-          key: "meetsAllKnownEligibilityCriteria",
-          type: "yes_no",
-          question: "Based only on the applicant facts and published award criteria supplied, does the applicant meet every explicitly stated eligibility requirement? Treat any missing, ambiguous, or unpublished requirement as unknown rather than assuming it is met. This is an auxiliary review, not a final eligibility ruling or award prediction.",
-        }],
-      });
-      const signal = review.signals.meetsAllKnownEligibilityCriteria;
-      mercuryEligibilityReview = {
-        model: review.model,
-        available: review.available && signal?.status === "ok",
-        probabilityPercent: signal?.probabilityPercent ?? null,
-        deterministicEligibility: typeof focusedScholarship.isEligible === "boolean" ? focusedScholarship.isEligible : null,
-        disclaimer: "Supplementary AI signal only; the deterministic catalogue match and official provider rules remain controlling.",
-      };
-    }
-
     // Paginate after filtering and sorting.
     // Rows are localized LAST — every filter above ran on canonical English
     // data, so canonical dropdown values like "Full Tuition" never break.
@@ -623,6 +480,7 @@ export async function GET(req: Request) {
       id: row.id, title: row.title, country: row.country, provider: row.provider, degreeLevels: row.degreeLevels,
       coverageType: row.coverageType, amountUsdValue: row.amountUsdValue, verificationStatus: row.verificationStatus,
       computedStatus: row.computedStatus, deadlineDate: row.deadlineDate, deadline: row.deadline,
+      opensOn: row.opensOn, closesOn: row.closesOn,
       sourceUrl: row.sourceUrl, applicationUrl: row.applicationUrl,
     })) : pageRows.map((row) => {
       const r = row as unknown as Record<string, unknown>;
@@ -644,7 +502,7 @@ export async function GET(req: Request) {
     });
     return privateNoStoreJson({
       ...paginated,
-      ...(mercuryEligibilityReview ? { mercuryEligibilityReview } : {}),
+      sortApplied: effectiveSort,
       // Facet counts describe the CANONICAL catalogue, so they are sent as-is
       // (country names are localized in the browser, like every other option).
       ...(facets ? { facets } : {}),

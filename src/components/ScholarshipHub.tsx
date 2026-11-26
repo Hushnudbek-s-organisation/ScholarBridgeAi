@@ -26,7 +26,7 @@ import {
   SCHOLARSHIP_CHANCE_OPTIONS,
   SCHOLARSHIP_FIT_OPTIONS,
   SCHOLARSHIP_GROUP_OPTIONS,
-  SCHOLARSHIP_SORT_OPTIONS,
+  SCHOLARSHIP_PRIMARY_SORTS,
   parseScholarshipDegreeLevels,
   scholarshipActiveFilterCount,
   scholarshipStatusMessageKey,
@@ -40,9 +40,9 @@ import {
   Search, 
   DollarSign, 
   Calendar, 
-  CheckCircle2, 
+  CheckCircle2,
+  Bookmark,
   ExternalLink, 
-  Plus, 
   Check, 
   Sparkles,
   BookOpen,
@@ -62,7 +62,7 @@ import { AppNote } from "@/components/AppNote";
 import { MatchEvidenceBadge } from "@/components/MatchEvidenceBadge";
 import { fitBadgeClass } from "@/lib/fitBadge";
 import { MatchBreakdownStrip } from "@/components/MatchBreakdownStrip";
-import { ScholarshipRequirementPills } from "@/components/ScholarshipRequirementPills";
+import { formatScholarshipDate, scholarshipOfficialAction, publishedYearlyScholarshipUsd, SCHOLARSHIP_ACTIONABLE_STATUSES } from "@/lib/scholarshipBrowsing";
 import { scholarshipFundingPayload } from "@/lib/scholarshipChecks";
 import { getCatalogSwr, setCatalogSwr, invalidateCatalogSwr } from "@/lib/clientCatalogSwr";
 import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
@@ -81,7 +81,10 @@ export interface Scholarship {
   awardCurrency?: string | null;
   awardPeriod?: string | null;
   awardBasis?: string | null;
-  deadline: string;
+  deadline: string | null;
+  opensOn?: string | null;
+  closesOn?: string | null;
+  applicationUrl?: string | null;
   degreeLevels: string;
   eligibleMajors: string;
   minGpa?: number | null;
@@ -91,7 +94,9 @@ export interface Scholarship {
   description: string;
   requirements: string;
   websiteUrl: string;
-  matchScore?: number;
+  verificationStatus?: string | null;
+  matchScore?: number | null;
+  requirementFacts?: (PresentedFact & { fieldKey: string })[];
   matchBreakdown?: MatchBreakdown | null;
   isEligible?: boolean;
   /**
@@ -133,13 +138,17 @@ export function awardLabel(s: Scholarship, t: HubTranslator, locale: Locale = "e
   if (s.awardBasis === "need_based") return t("awardNeedBased");
   if (s.awardBasis === "full_tuition") return t("awardFullTuition");
   if (s.awardBasis === "variable") return t("awardVariable");
-  if (s.awardAmount != null) {
-    const period = s.awardPeriod === "year" ? t("perYear") : s.awardPeriod === "month" ? t("perMonth") : "";
-    return formatMoney(s.awardAmount, s.awardCurrency, { suffix: period });
+  const suffix = s.awardPeriod === "year" ? t("perYear")
+    : s.awardPeriod === "month" ? t("perMonth")
+    : s.awardPeriod === "semester" ? t("perSemester")
+    : s.awardPeriod === "one_time" ? ` · ${t("oneTimeAward")}`
+    : s.awardPeriod === "total" ? ` · ${t("totalAward")}`
+    : "";
+  if (s.awardAmount != null && s.awardAmount > 0) {
+    return formatMoney(s.awardAmount, s.awardCurrency, { suffix });
   }
-  // 0 is the catalogue's "no cash value published" sentinel, not an award of
-  // zero dollars: fall through to the coverage label instead of printing "$0".
-  if (s.amountUsdValue != null && s.amountUsdValue > 0) return formatMoney(s.amountUsdValue, "USD");
+  // A stored zero is the legacy sentinel for an unpublished cash value.
+  if (s.amountUsdValue != null && s.amountUsdValue > 0) return formatMoney(s.amountUsdValue, "USD", { suffix });
   return s.coverageType && s.coverageType !== "Unspecified"
     ? localizeCoverageType(s.coverageType, locale)
     : t("awardNotSpecified");
@@ -156,6 +165,8 @@ function readStoredFilters(): {
   filters: ScholarshipFilters;
   sortBy: ScholarshipSortOption;
   groupBy: ScholarshipGroupOption;
+  search: string;
+  savedForProfile: number | null;
 } | null {
   if (typeof window === "undefined") return null;
   try {
@@ -165,6 +176,8 @@ function readStoredFilters(): {
       filters: Partial<ScholarshipFilters>;
       sortBy: ScholarshipSortOption;
       groupBy: ScholarshipGroupOption;
+      search: string;
+      savedForProfile: number;
     }>;
     const stored = parsed?.filters ?? {};
     const stringsOnly = (value: unknown): string[] =>
@@ -185,7 +198,9 @@ function readStoredFilters(): {
           (SCHOLARSHIP_FIT_OPTIONS as readonly string[]).includes(value)
         ),
       },
-      sortBy: SCHOLARSHIP_SORT_OPTIONS.includes(parsed?.sortBy as ScholarshipSortOption)
+      search: typeof parsed?.search === "string" ? parsed.search.slice(0, 200) : "",
+      savedForProfile: typeof parsed?.savedForProfile === "number" ? parsed.savedForProfile : null,
+      sortBy: (SCHOLARSHIP_PRIMARY_SORTS as readonly string[]).includes(parsed?.sortBy ?? "")
         ? (parsed?.sortBy as ScholarshipSortOption)
         : "relevance",
       groupBy: SCHOLARSHIP_GROUP_OPTIONS.includes(parsed?.groupBy as ScholarshipGroupOption)
@@ -214,10 +229,12 @@ export function ScholarshipHub({
 }: ScholarshipHubProps) {
   const t = useTranslations("scholarshipHub");
   const tCommon = useTranslations("common");
-  const tCountry = useTranslations("countryNames");
   const { locale } = useLocaleContext();
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
-  const [mercuryEligibilityReview, setMercuryEligibilityReview] = useState<{ available: boolean; probabilityPercent: number | null; deterministicEligibility: boolean | null } | null>(null);
+  const [fetchError, setFetchError] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
+  const [saveBusyId, setSaveBusyId] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState(false);
   // `loading` = first load (skeletons); `refreshing` = a later filter/page
   // change, where the current cards stay mounted instead of collapsing.
   const [loading, setLoading] = useState(true);
@@ -247,10 +264,10 @@ export function ScholarshipHub({
         // The catalogue's resolved USD figure (period-normalised server-side).
         // NULL means no published amount — the plan line goes in at 0 so the
         // student can enter the real number rather than us inventing one.
-        awardAmountUsd: scholarship.amountUsdValue ?? null,
+        awardAmountUsd: publishedYearlyScholarshipUsd(scholarship),
         country: scholarship.country,
-        deadline: scholarship.deadline ? new Date(scholarship.deadline).toISOString().slice(0, 10) : null,
-        url: scholarship.websiteUrl,
+        deadline: scholarship.computedStatus === "closed" ? null : scholarship.closesOn,
+        url: scholarshipOfficialAction(scholarship)?.href,
       });
       const res = await fetch("/api/funding", {
         method: "POST",
@@ -280,6 +297,7 @@ export function ScholarshipHub({
   // localizes the labels, so switching language never drops a selection.
   const [filters, setFilters] = useState<ScholarshipFilters>(EMPTY_SCHOLARSHIP_FILTERS);
   const [sortBy, setSortBy] = useState<ScholarshipSortOption>("relevance");
+  const [savedOnly, setSavedOnly] = useState(false);
   const [groupBy, setGroupBy] = useState<ScholarshipGroupOption>("none");
   const [facets, setFacets] = useState<ScholarshipFacets>(EMPTY_SCHOLARSHIP_FACETS);
   const [lastFocusRequestId, setLastFocusRequestId] = useState<number | null>(null);
@@ -289,9 +307,15 @@ export function ScholarshipHub({
    * is a sticky sidebar next to the results.
    */
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const activeFilterCount = scholarshipActiveFilterCount(filters);
+  const showingSaved = Boolean(activeProfile) && savedOnly;
+  const savedKey = showingSaved ? [...savedScholarshipIds].sort((a, b) => a - b).join(",") : "";
+  const openOnly = filters.statuses.length === 2 && filters.statuses.includes("open") && filters.statuses.includes("rolling");
+  const fullOnly = filters.coverages.length === 1 && filters.coverages[0] === "Full Funding";
+  const activeFilterCount = scholarshipActiveFilterCount(filters) + Number(showingSaved);
+  const effectiveSort = activeProfile || sortBy === "deadline" ? sortBy : "relevance";
   if (autoFocusScholarship && autoFocusScholarship.requestId !== lastFocusRequestId) {
     setLastFocusRequestId(autoFocusScholarship.requestId);
+    setSavedOnly(false);
     setSearch(autoFocusScholarship.title);
     // Deep link from global search: commit the term at once — there is nothing
     // to debounce, the student already chose the record.
@@ -311,38 +335,42 @@ export function ScholarshipHub({
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const resultsTopRef = useRef<HTMLDivElement>(null);
-  const restoredFiltersRef = useRef(false);
+  const [storageReady, setStorageReady] = useState(false);
 
   // Restore the last selection once, on mount: coming back from a detail page
   // lands on the list the student left, not on a reset catalogue. An explicit
   // deep link (global search, university card) always wins over the stored one.
   useEffect(() => {
-    if (restoredFiltersRef.current) return;
-    restoredFiltersRef.current = true;
-    if (autoFocusScholarship) return;
-    // Read in a microtask so the effect body never calls setState synchronously
-    // (the same pattern the fetch effect below uses).
+    let current = true;
     void Promise.resolve().then(() => {
-      const stored = readStoredFilters();
-      if (!stored) return;
-      setFilters(stored.filters);
-      setSortBy(stored.sortBy);
-      setGroupBy(stored.groupBy);
+      if (!current) return;
+      const stored = autoFocusScholarship ? null : readStoredFilters();
+      if (stored) {
+        setFilters(stored.filters);
+        setSortBy(stored.sortBy);
+        setGroupBy(stored.groupBy);
+        setSearch(stored.search);
+        setDebouncedSearch(stored.search);
+        setSavedOnly(activeProfile?.id === stored.savedForProfile);
+      }
+      setStorageReady(true);
     });
+    return () => { current = false; };
+    // The first render restores the catalogue; later deep links supply their own state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!storageReady) return;
     try {
-      window.sessionStorage.setItem(
-        SCHOLARSHIP_FILTER_STORAGE_KEY,
-        JSON.stringify({ filters, sortBy, groupBy }),
-      );
+      window.sessionStorage.setItem(SCHOLARSHIP_FILTER_STORAGE_KEY, JSON.stringify({
+        filters, sortBy, groupBy, search: debouncedSearch,
+        savedForProfile: showingSaved ? activeProfile?.id : null,
+      }));
     } catch {
-      // Private mode / storage disabled — the hub simply starts fresh next time.
+      // Session storage can be disabled.
     }
-  }, [filters, sortBy, groupBy]);
+  }, [filters, sortBy, groupBy, debouncedSearch, storageReady, showingSaved, activeProfile?.id]);
 
   // Restart numbering from page 1 whenever the result-set identity changes
   // (filters, search, profile, locale, or page size). Adjusted during render (the
@@ -350,7 +378,7 @@ export function ScholarshipHub({
   // below always fires once - already with the correct page.
   const profileFingerprint = profileMatchFingerprint(activeProfile);
   const filtersKey = JSON.stringify(filters);
-  const resultKey = [activeProfile?.id, filtersKey, sortBy, groupBy, debouncedSearch, perPage, locale, profileFingerprint].join("|");
+  const resultKey = [activeProfile?.id, filtersKey, effectiveSort, groupBy, debouncedSearch, perPage, locale, profileFingerprint, showingSaved, savedKey].join("|");
   const [prevResultKey, setPrevResultKey] = useState(resultKey);
   if (resultKey !== prevResultKey) {
     setPrevResultKey(resultKey);
@@ -358,6 +386,7 @@ export function ScholarshipHub({
   }
 
   const hasLoadedRef = useRef(false);
+  const fetchEpochRef = useRef(0);
 
   // Profile edits must re-score what is on screen — cached slices were computed
   // from the OLD profile data, so drop them before the fingerprint refetch.
@@ -369,7 +398,11 @@ export function ScholarshipHub({
     }
   }, [profileFingerprint]);
 
-  const fetchScholarships = async (signal?: AbortSignal) => {
+  const fetchScholarships = async (signal: AbortSignal) => {
+    if (signal.aborted) return;
+    const epoch = ++fetchEpochRef.current;
+    const current = () => epoch === fetchEpochRef.current && !signal.aborted;
+    setFetchError(false);
     const params = new URLSearchParams({ view: "expanded" });
     if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
     if (filters.country !== "All") params.set("country", filters.country);
@@ -377,9 +410,10 @@ export function ScholarshipHub({
     if (filters.coverages.length > 0) params.set("coverageTypes", filters.coverages.join(","));
     if (filters.statuses.length > 0) params.set("status", filters.statuses.join(","));
     if (filters.basis.length > 0) params.set("basis", filters.basis.join(","));
-    if (filters.chance.length > 0) params.set("chance", filters.chance.join(","));
-    if (filters.fit.length > 0) params.set("fit", filters.fit.join(","));
-    if (sortBy !== "relevance") params.set("sort", sortBy);
+    if (showingSaved) params.set("saved", "1");
+    if (activeProfile && filters.chance.length > 0) params.set("chance", filters.chance.join(","));
+    if (activeProfile && filters.fit.length > 0) params.set("fit", filters.fit.join(","));
+    params.set("sort", effectiveSort);
     if (groupBy !== "none") params.set("groupBy", groupBy);
     if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     if (
@@ -395,7 +429,8 @@ export function ScholarshipHub({
     // Explicit locale: the API localizes the response and the SWR cache key
     // (params.toString()) splits per language, so cached rows never mix.
     params.set("locale", locale);
-    const queryKey = params.toString();
+    const query = params.toString();
+    const queryKey = showingSaved ? `${query}|${savedKey}` : query;
 
     const cached = getCatalogSwr<{
       scholarships: Scholarship[];
@@ -408,7 +443,6 @@ export function ScholarshipHub({
     if (cached) {
       hasLoadedRef.current = true;
       setScholarships(cached.data.scholarships);
-      setMercuryEligibilityReview(null);
       setTotalCount(cached.data.total);
       setTotalPages(cached.data.totalPages);
       if (cached.data.facets) setFacets(cached.data.facets);
@@ -424,52 +458,35 @@ export function ScholarshipHub({
     }
 
     try {
-      const res = await fetch(`/api/scholarships?${queryKey}`, { signal });
+      const res = await fetch(`/api/scholarships?${query}`, { signal });
+      if (!res.ok) throw new Error("Scholarship catalogue request failed");
       const data = await res.json();
+      if (!current()) return;
+      if (!Array.isArray(data.scholarships)) throw new Error("Invalid scholarship response");
+
+      const total = typeof data.total === "number" ? data.total : data.scholarships.length;
+      const pages = typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1;
+      const nextFacets = data.facets ?? EMPTY_SCHOLARSHIP_FACETS;
       hasLoadedRef.current = true;
-      const rawEligibility = data.mercuryEligibilityReview && typeof data.mercuryEligibilityReview === "object" && !Array.isArray(data.mercuryEligibilityReview)
-        ? data.mercuryEligibilityReview as Record<string, unknown>
-        : null;
-      setMercuryEligibilityReview(rawEligibility ? {
-        available: rawEligibility.available === true,
-        probabilityPercent: typeof rawEligibility.probabilityPercent === "number" && Number.isFinite(rawEligibility.probabilityPercent)
-          ? Math.max(0, Math.min(100, Math.round(rawEligibility.probabilityPercent)))
-          : null,
-        deterministicEligibility: typeof rawEligibility.deterministicEligibility === "boolean" ? rawEligibility.deterministicEligibility : null,
-      } : null);
-      if (data.scholarships) {
-        const nextTotal =
-          typeof data.total === "number" ? data.total : data.scholarships.length;
-        const nextTotalPages =
-          typeof data.totalPages === "number" ? Math.max(1, data.totalPages) : 1;
-        setScholarships(data.scholarships);
-        setTotalCount(nextTotal);
-        setTotalPages(nextTotalPages);
-        const nextFacets: ScholarshipFacets | undefined =
-          data.facets && typeof data.facets === "object"
-            ? (data.facets as ScholarshipFacets)
-            : undefined;
-        if (nextFacets) setFacets(nextFacets);
-        setCatalogSwr("scholarships", queryKey, {
-          scholarships: data.scholarships,
-          total: nextTotal,
-          totalPages: nextTotalPages,
-          page: data.page,
-          facets: nextFacets,
-        });
-        // The server clamps out-of-range pages - sync so the UI numbering
-        // always matches the returned slice.
-        if (typeof data.page === "number" && data.page !== page) {
-          setPage(data.page);
-        }
-      }
-    } catch (err) {
-      // A superseded request is aborted on purpose — never report it.
-      if ((err as { name?: string })?.name === "AbortError") return;
-      console.error("Error fetching scholarships:", err);
+      setScholarships(data.scholarships);
+      setTotalCount(total);
+      setTotalPages(pages);
+      setFacets(nextFacets);
+      setCatalogSwr("scholarships", queryKey, {
+        scholarships: data.scholarships, total, totalPages: pages, page: data.page, facets: nextFacets,
+      });
+      if (typeof data.page === "number" && data.page !== page) setPage(data.page);
+    } catch {
+      if (!current()) return;
+      setScholarships([]);
+      setTotalCount(0);
+      setTotalPages(1);
+      setFetchError(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (current()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -500,13 +517,37 @@ export function ScholarshipHub({
   // matches the filter state the student can see. The previous in-flight
   // request is aborted so a slow response can never overwrite a newer one.
   useEffect(() => {
+    if (!storageReady) return;
     const controller = new AbortController();
     // Started in a microtask: the effect body must not call setState
     // synchronously (the fetch begins with the "refreshing" flag).
     void Promise.resolve().then(() => fetchScholarships(controller.signal));
-    return () => controller.abort();
+    return () => { controller.abort(); fetchEpochRef.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id, filtersKey, sortBy, groupBy, debouncedSearch, page, perPage, autoFocusScholarship?.requestId, locale, profileFingerprint]);
+  }, [activeProfile?.id, filtersKey, effectiveSort, groupBy, debouncedSearch, page, perPage, autoFocusScholarship?.requestId, locale, profileFingerprint, showingSaved, savedKey, retryVersion, storageReady]);
+
+  const resetSearch = () => {
+    if (searchDebounceRef.current !== null) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = null;
+    setSearch("");
+    setDebouncedSearch("");
+    setFilters(EMPTY_SCHOLARSHIP_FILTERS);
+    setSavedOnly(false);
+  };
+
+  const toggleSave = async (id: number, saved: boolean) => {
+    if (saveBusyId != null) return;
+    setSaveError(false);
+    setSaveBusyId(id);
+    try {
+      await (saved ? onUnsaveScholarship(id) : onSaveScholarship(id));
+      invalidateCatalogSwr("scholarships");
+    } catch {
+      setSaveError(true);
+    } finally {
+      setSaveBusyId(null);
+    }
+  };
 
   const focusScholarshipId = autoFocusScholarship?.id ?? null;
   const focusRequestId = autoFocusScholarship?.requestId ?? null;
@@ -552,6 +593,22 @@ export function ScholarshipHub({
     }
   };
 
+  const groupControl = (id: string) => (
+    <label htmlFor={id} className="grid min-w-0 gap-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+      {t("groupLabel")}
+      <select
+        id={id}
+        value={groupBy}
+        onChange={(event) => setGroupBy(event.target.value as ScholarshipGroupOption)}
+        className="min-h-11 w-full rounded-surface border border-slate-200 bg-white px-3 text-sm dark:border-slate-700 dark:bg-surface"
+      >
+        {SCHOLARSHIP_GROUP_OPTIONS.map((option) => <option key={option} value={option}>{t(`groupOption.${option}`)}</option>)}
+      </select>
+    </label>
+  );
+
+  const quickFilterClass = "inline-flex min-h-11 items-center gap-1.5 rounded-surface border px-2.5 text-xs font-semibold transition-colors sm:px-3 sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500";
+
   return (
     <div className="space-y-6">
       {/* Search & Filter toolbar — ONE compact card. The hub header already
@@ -563,13 +620,8 @@ export function ScholarshipHub({
           <span className="min-w-0 break-words">{t("title")}</span>
         </h2>
 
-        {/* Toolbar — search, ordering and grouping on the first row; the
-            categorical dropdowns (country, degree, funding, status, basis)
-            sit right under it, in the same card. No side panel: the cards
-            keep their full width. */}
-        <div className="grid grid-cols-1 items-start gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Search Box */}
-          <div className="relative sm:col-span-2">
+        <div className="grid grid-cols-1 items-end gap-3 pt-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)]">
+          <div className="relative min-w-0">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
             <input
               type="text"
@@ -577,7 +629,7 @@ export function ScholarshipHub({
               aria-label={t("searchPlaceholder")}
               value={search}
               onChange={(e) => onSearchInput(e.target.value)}
-              className="min-h-11 w-full pl-9 pr-3 py-2 text-sm sm:text-sm border border-slate-200 rounded-surface focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              className="min-h-11 w-full rounded-surface border border-slate-200 bg-white py-2 pr-3 pl-9 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-surface"
             />
           </div>
 
@@ -590,11 +642,12 @@ export function ScholarshipHub({
               <ArrowUpDown className="pointer-events-none absolute left-2.5 top-3.5 h-3.5 w-3.5 text-slate-500" aria-hidden />
               <select
                 id="scholarship-sort"
-                value={sortBy}
+                value={effectiveSort}
+                aria-describedby="scholarship-sort-note"
                 onChange={(e) => setSortBy(e.target.value as ScholarshipSortOption)}
                 className="min-h-11 w-full rounded-surface border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm"
               >
-                {SCHOLARSHIP_SORT_OPTIONS.map((option) => (
+                {SCHOLARSHIP_PRIMARY_SORTS.filter((option) => activeProfile || option === "relevance" || option === "deadline").map((option) => (
                   <option key={option} value={option}>
                     {t(`sortOption.${option}`)}
                   </option>
@@ -603,28 +656,38 @@ export function ScholarshipHub({
             </div>
           </div>
 
-          {/* Grouping */}
-          <div>
-            <label htmlFor="scholarship-group" className="mb-1 block text-sm font-bold uppercase tracking-wide text-slate-500">
-              {t("groupLabel")}
-            </label>
-            <div className="relative">
-              <Layers className="pointer-events-none absolute left-2.5 top-3.5 h-3.5 w-3.5 text-slate-500" aria-hidden />
-              <select
-                id="scholarship-group"
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value as ScholarshipGroupOption)}
-                className="min-h-11 w-full rounded-surface border border-slate-200 bg-white py-2 pl-8 pr-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none sm:text-sm"
-              >
-                {SCHOLARSHIP_GROUP_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {t(`groupOption.${option}`)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2" aria-label={t("quickFilters")}>
+          <button
+            type="button"
+            aria-pressed={openOnly}
+            onClick={() => setFilters((current) => ({ ...current, statuses: openOnly ? [] : [...SCHOLARSHIP_ACTIONABLE_STATUSES] }))}
+            className={`${quickFilterClass} ${openOnly ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200" : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"}`}
+          >
+            <Calendar className="h-4 w-4" aria-hidden /> {t("quickOpen")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={fullOnly}
+            onClick={() => setFilters((current) => ({ ...current, coverages: fullOnly ? [] : ["Full Funding"] }))}
+            className={`${quickFilterClass} ${fullOnly ? "border-indigo-300 bg-indigo-50 text-indigo-800 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-200" : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"}`}
+          >
+            <Award className="h-4 w-4" aria-hidden /> {t("quickFull")}
+          </button>
+          {activeProfile && (
+            <button
+              type="button"
+              aria-pressed={showingSaved}
+              onClick={() => setSavedOnly(!showingSaved)}
+              className={`${quickFilterClass} ${showingSaved ? "border-indigo-300 bg-indigo-50 text-indigo-800 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-200" : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"}`}
+            >
+              <Bookmark className="h-4 w-4" aria-hidden /> {t("quickSaved", { count: savedScholarshipIds.size })}
+            </button>
+          )}
+        </div>
+        <p id="scholarship-sort-note" className="text-xs text-slate-600 dark:text-slate-300">
+          {activeProfile ? t(`sortHint.${effectiveSort}`) : t("sortHint.deadline")}
+        </p>
 
         {/* Phone-only: categorical filters open in an accessible bottom sheet
             so the first card is not pushed off the screen. From `sm` up the
@@ -645,10 +708,13 @@ export function ScholarshipHub({
           )}
         </Button>
 
-        <div
-          id="scholarship-filters"
-          className="hidden sm:block"
-        >
+        <details id="scholarship-filters" className="group hidden rounded-surface border border-slate-200 px-3 dark:border-slate-700 sm:block">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-slate-200 [&::-webkit-details-marker]:hidden">
+            <Filter className="h-4 w-4" aria-hidden /> {t("filtersTitle")}
+            {activeFilterCount > 0 && <span className="rounded-full bg-indigo-100 px-2 text-xs text-indigo-800">{activeFilterCount}</span>}
+            <ChevronDown className="ml-auto h-4 w-4 group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="space-y-3 pb-3">
           <ScholarshipFiltersPanel
             filters={filters}
             facets={facets}
@@ -656,7 +722,9 @@ export function ScholarshipHub({
             onReset={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
             hasProfile={Boolean(activeProfile)}
           />
-        </div>
+            <div className="max-w-xs">{groupControl("scholarship-group")}</div>
+          </div>
+        </details>
 
         <BottomSheet
           id="scholarship-filter-sheet"
@@ -667,7 +735,7 @@ export function ScholarshipHub({
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" onClick={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}>{t("filtersClear")}</Button>
               <Button onClick={() => setMobileFiltersOpen(false)}>
-                {tCommon("showResults")} ({totalCount})
+                {tCommon("showResults")}{!loading && !refreshing && !fetchError ? ` (${totalCount})` : ""}
               </Button>
             </div>
           )}
@@ -680,6 +748,7 @@ export function ScholarshipHub({
             hasProfile={Boolean(activeProfile)}
             idPrefix="mobile-scholarship-filter"
           />
+          <div className="mt-3">{groupControl("mobile-scholarship-group")}</div>
         </BottomSheet>
       </div>
 
@@ -710,29 +779,14 @@ export function ScholarshipHub({
       )}
 
       <div className="min-w-0 space-y-4">
-      {/* Results Count */}
-      <div ref={resultsTopRef} className="flex items-center justify-between gap-2 text-xs text-slate-500 px-1 scroll-mt-4">
-        <span>
-          {t("showing", {
-            from: totalCount === 0 ? 0 : (page - 1) * perPage + 1,
-            to: (page - 1) * perPage + filtered.length,
-            total: totalCount,
-          })}
-        </span>
-        <span className="shrink-0">{t("pageOf", { page, totalPages })}</span>
+      <div ref={resultsTopRef} aria-live="polite" className="flex items-center justify-between gap-2 px-1 text-xs text-slate-500 scroll-mt-4">
+        {loading || refreshing ? <span>{t("loading")}</span> : !fetchError && totalCount > 0 ? (
+          <>
+            <span>{t("showing", { from: (page - 1) * perPage + 1, to: (page - 1) * perPage + filtered.length, total: totalCount })}</span>
+            <span className="shrink-0">{t("pageOf", { page, totalPages })}</span>
+          </>
+        ) : null}
       </div>
-
-      {mercuryEligibilityReview && (
-        <aside className="rounded-surface border border-indigo-200 bg-indigo-50/60 p-3 text-xs dark:border-indigo-300/20 dark:bg-indigo-300/10" aria-live="polite">
-          <h3 className="font-bold text-indigo-950 dark:text-indigo-100">{t("mercuryReviewTitle")}</h3>
-          <p className="mt-1 leading-relaxed text-slate-700 dark:text-slate-200">{t("mercuryReviewDescription")}</p>
-          <p className="mt-2 font-semibold text-indigo-900 dark:text-indigo-100">
-            {mercuryEligibilityReview.available && mercuryEligibilityReview.probabilityPercent !== null
-              ? t("mercuryReviewValue", { percent: mercuryEligibilityReview.probabilityPercent })
-              : t("mercuryReviewUnavailable")}
-          </p>
-        </aside>
-      )}
 
       {/* Grid List */}
       {loading ? (
@@ -753,17 +807,24 @@ export function ScholarshipHub({
           ))}
           <span className="sr-only">{t("loading")}</span>
         </div>
+      ) : fetchError ? (
+        <div role="alert" className="space-y-3 rounded-overlay border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-surface">
+          <p className="text-sm text-slate-700 dark:text-slate-200">{t("catalogueFailed")}</p>
+          <Button type="button" variant="outline" onClick={() => setRetryVersion((version) => version + 1)}>
+            <RotateCcw className="h-4 w-4" aria-hidden /> {t("catalogueRetry")}
+          </Button>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-overlay border border-slate-200 bg-white p-8 text-center sm:p-12">
-          <p className="text-sm font-medium text-slate-600">{t("empty")}</p>
-          {activeFilterCount > 0 && (
+          <p className="text-sm font-medium text-slate-600">{showingSaved && !savedScholarshipIds.size ? t("savedEmpty") : t("empty")}</p>
+          {(activeFilterCount > 0 || debouncedSearch) && (
             <Button variant="unstyled"
               type="button"
-              onClick={() => setFilters(EMPTY_SCHOLARSHIP_FILTERS)}
+              onClick={resetSearch}
               className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-surface border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 hover:border-indigo-300 hover:text-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-              {t("filtersClear")}
+              {t("clearSearchAndFilters")}
             </Button>
           )}
         </div>
@@ -787,6 +848,12 @@ export function ScholarshipHub({
               search.trim().toLowerCase() === autoFocusScholarship.title.trim().toLowerCase();
             // NULL score = no profile selected — never show a fake 80%.
             const score = s.matchScore ?? null;
+            const action = scholarshipOfficialAction(s);
+            const status = s.computedStatus ?? "unknown";
+            const requirement = s.chanceBucket === "meets" ? "filterRequirementMet"
+              : s.chanceBucket === "below" ? "filterRequirementNotMet" : "filterRequirementUnknown";
+            const closingDate = formatScholarshipDate(s.closesOn, locale);
+            const openingDate = status === "upcoming" ? formatScholarshipDate(s.opensOn, locale) : null;
 
             return (
               <React.Fragment key={s.id}>
@@ -796,13 +863,13 @@ export function ScholarshipHub({
                     <span className="min-w-0 break-words">{heading}</span>
                   </h4>
                 )}
-              <div
+              <article
                 data-scholarship-id={s.id}
                 data-focused-record={isFocused ? "true" : undefined}
-                className={`flex h-full flex-col gap-4 rounded-overlay border bg-white p-5 shadow-xs transition-all ${
+                className={`flex h-full min-w-0 flex-col gap-3 rounded-overlay border bg-white p-4 shadow-xs transition-shadow dark:bg-surface sm:p-5 ${
                   isFocused
                     ? "border-amber-500 ring-2 ring-amber-300 shadow-lg"
-                    : "border-slate-200 hover:shadow-lg hover:border-indigo-300"
+                    : "border-slate-200 hover:border-indigo-300 hover:shadow-md dark:border-slate-700"
                 }`}
               >
                 {/* Header — the provider chip and the fit badge share the first
@@ -816,7 +883,7 @@ export function ScholarshipHub({
                         not a ragged box per line. Neutral, so amber stays
                         reserved for deadlines and match issues. */}
                     <span
-                      className="line-clamp-2 h-9 min-w-0 max-w-full break-words rounded-control border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+                      className="line-clamp-2 min-w-0 max-w-full break-words rounded-control border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-bold uppercase leading-snug tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
                       title={`${localizeCountry(s.country, locale)} • ${localizeScholarshipProvider(s.provider, locale)}`}
                     >
                       <CountryFlag country={s.country} size="xs" className="mr-1 align-[-2px]" />
@@ -827,36 +894,26 @@ export function ScholarshipHub({
                       // This number is a FIT/match score (requirements + field +
                       // funding) — labelling it "Eligibility" implied more than the
                       // score means. The hint says what it is, and what it is not.
-                      <div className="flex shrink-0 flex-col items-end gap-1">
+                      <div className="flex shrink-0 items-end">
                         <span
                           className={`px-2.5 py-1 rounded-full text-xs font-extrabold border ${fitBadgeClass(score)}`}
                           title={t("matchHint")}
                         >
                           {t("matchBadge", { score })}
                         </span>
-                        {s.matchBreakdown && (
-                          <MatchEvidenceBadge
-                            comparedDimensions={s.matchBreakdown.comparedDimensions}
-                            totalDimensions={s.matchBreakdown.totalDimensions}
-                            evidenceCoveragePct={s.matchBreakdown.evidenceCoveragePct}
-                            evidenceLevel={s.matchBreakdown.evidenceLevel}
-                          />
-                        )}
                       </div>
-                    ) : (
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border shrink-0 ${fitBadgeClass(null)}`}>
-                        {t("selectProfile")}
-                      </span>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Full-width, balanced heading: award names stay readable
                       and wrapped lines line up instead of trailing off. */}
                   <h3
-                    className="line-clamp-3 min-h-[4.125rem] break-words text-base font-bold leading-snug text-slate-900 [text-wrap:balance]"
+                    className="break-words text-base font-bold leading-snug text-slate-900 dark:text-slate-100"
                     title={localizeScholarshipTitle(s.title, locale)}
                   >
-                    {localizeScholarshipTitle(s.title, locale)}
+                    <Link href={`/scholarships/${s.id}?from=app`} className="rounded-control hover:text-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 dark:hover:text-indigo-300">
+                      {localizeScholarshipTitle(s.title, locale)}
+                    </Link>
                   </h3>
 
                   {/* Computed application status (spec §6) — "is this open
@@ -901,28 +958,35 @@ export function ScholarshipHub({
                   </p>
                 )}
 
-                <AwardCoverageNote state={s.coverageState}/>
                 {/* Key Details Cards */}
-                <div className="mt-auto grid grid-cols-2 gap-3 rounded-surface border border-slate-100 bg-slate-50 p-3 text-xs">
+                <div className="grid grid-cols-2 gap-3 rounded-surface border border-slate-100 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800/80">
                   <div className="min-w-0">
                     <span className="text-slate-500 block font-medium">{t("awardValue")}</span>
-                    <strong className="break-words text-emerald-700 font-extrabold">{awardLabel(s, t, locale)}</strong>
-                    <EvidenceNote fact={s.evidence?.awardAmount ?? s.evidence?.amountUsdValue} compact />
+                    <strong className="break-words text-emerald-700 font-extrabold dark:text-emerald-300">{awardLabel(s, t, locale)}</strong>
                   </div>
 
                   <div className="min-w-0">
                     <span className="text-slate-500 block font-medium">{t("coverage")}</span>
-                    <strong className="break-words text-slate-800 font-bold">{localizeCoverageType(s.coverageType, locale)}</strong>
+                    <strong className="break-words text-slate-800 font-bold dark:text-slate-100">{localizeCoverageType(s.coverageType, locale)}</strong>
                   </div>
 
                   <div className="col-span-2 min-w-0">
                     <span className="text-slate-500 block font-medium">{t("deadline")}</span>
-                    <strong className="flex min-w-0 items-start gap-1 break-words text-amber-800 font-bold">
+                    <strong className="flex min-w-0 items-start gap-1 break-words text-amber-800 font-bold dark:text-amber-300">
                       <Calendar className="mt-0.5 h-3 w-3 shrink-0" />
-                      <span className="min-w-0 break-words">{s.deadline}</span>
+                      <span className="min-w-0 break-words">
+                        {status === "rolling" ? t("filterStatusRolling") : closingDate ?? t("deadlineUnpublished")}
+                      </span>
                     </strong>
+                    {openingDate && <p className="mt-1 text-slate-600 dark:text-slate-300">{t("opensOn", { date: openingDate })}</p>}
                   </div>
                 </div>
+                {activeProfile && (
+                  <p className={`flex items-start gap-1.5 text-xs font-medium ${s.chanceBucket === "meets" ? "text-emerald-700 dark:text-emerald-300" : s.chanceBucket === "below" ? "text-amber-800 dark:text-amber-300" : "text-slate-600 dark:text-slate-300"}`}>
+                    {s.chanceBucket === "meets" ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden /> : <BookOpen className="h-4 w-4 shrink-0" aria-hidden />}
+                    {t(requirement)}
+                  </p>
+                )}
 
                 {/* Secondary diagnostics — the prose, the per-requirement
                     answers, the score arithmetic, the source footnote and the
@@ -931,7 +995,7 @@ export function ScholarshipHub({
                     breakdown (they are in the markup), while the browser only
                     shows the summary line until asked. */}
                 <details className="group rounded-surface border border-slate-200/70 bg-slate-50/60 px-3 py-2 dark:border-slate-800/60 dark:bg-slate-900/40">
-                  <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-control text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-control text-xs font-medium text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0 break-words">{t("cardDetails")}</span>
                     <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />
                   </summary>
@@ -953,7 +1017,17 @@ export function ScholarshipHub({
                         ))}
                       </div>
                     )}
+                    {s.matchBreakdown && (
+                      <MatchEvidenceBadge
+                        comparedDimensions={s.matchBreakdown.comparedDimensions}
+                        totalDimensions={s.matchBreakdown.totalDimensions}
+                        evidenceCoveragePct={s.matchBreakdown.evidenceCoveragePct}
+                        evidenceLevel={s.matchBreakdown.evidenceLevel}
+                      />
+                    )}
                     <MatchBreakdownStrip breakdown={s.matchBreakdown} />
+                    <AwardCoverageNote state={s.coverageState} />
+                    <EvidenceNote fact={s.evidence?.awardAmount ?? s.evidence?.amountUsdValue} compact />
 
                     {s.description && (
                       <p className="break-words text-sm leading-relaxed text-slate-600">
@@ -970,7 +1044,9 @@ export function ScholarshipHub({
                       </span>
                       {/* Priority 4.2 — the published gates, answered per
                           requirement instead of buried in the prose below. */}
-                      <ScholarshipRequirementPills scholarship={s} profile={activeProfile} className="mb-1.5" />
+                      {s.requirementFacts?.map((fact) => (
+                        <EvidenceNote key={fact.fieldKey + (fact.sourceUrl ?? "")} fact={fact} compact />
+                      ))}
                       <p className="text-sm leading-relaxed">{s.requirements}</p>
                     </div>
 
@@ -1029,48 +1105,37 @@ export function ScholarshipHub({
                   </div>
                 </details>
 
-                {/* Actions — one row, two controls: the official portal link
-                    and Track/Save. Everything else moved to the drawer. */}
-                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <Link
-                      // `?from=app` tells the detail page which catalogue the
-                      // student came from, so "back" returns HERE (the hub) and
-                      // not to the public catalogue.
-                      href={`/scholarships/${s.id}?from=app`}
-                      className="inline-flex min-h-11 items-center gap-1 rounded-control bg-slate-100 px-3 text-xs font-semibold text-slate-800 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 dark:bg-slate-800 dark:text-slate-100"
-                    >
-                      {t("viewDetails")} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                    </Link>
+                <div className="mt-auto flex shrink-0 flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-700">
+                  {action && (
                     <a
-                      href={s.websiteUrl}
+                      href={action.href}
                       target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-11 items-center gap-1 rounded-control px-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500"
+                      rel="noopener noreferrer"
+                      className={`inline-flex min-h-11 items-center gap-1.5 rounded-surface px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 ${action.kind === "apply" ? "bg-indigo-700 text-white hover:bg-indigo-800" : "border border-slate-200 text-indigo-700 hover:bg-indigo-50 dark:border-slate-700 dark:text-indigo-300 dark:hover:bg-slate-800"}`}
                     >
-                      {t("officialPortal")} <ExternalLink className="h-3.5 w-3.5" />
+                      {t(action.kind === "apply" ? "applyAction" : "sourceAction")} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                     </a>
-                  </span>
-
-                  {isSaved ? (
-                    <Button variant="unstyled"
-                      onClick={() => onUnsaveScholarship(s.id)}
-                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-bold rounded-surface text-xs hover:bg-rose-100 hover:text-rose-700 transition-colors"
+                  )}
+                  <Link
+                    href={`/scholarships/${s.id}?from=app`}
+                    className="inline-flex min-h-11 items-center gap-1 rounded-surface px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    {t("viewDetails")} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                  {activeProfile && (
+                    <button
+                      type="button"
+                      aria-pressed={isSaved}
+                      disabled={saveBusyId != null}
+                      aria-label={t(isSaved ? "unsaveNamed" : "saveNamed", { title: s.title })}
+                      onClick={() => void toggleSave(s.id, isSaved)}
+                      className={`ml-auto inline-flex min-h-11 min-w-11 items-center justify-center rounded-surface border focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-60 ${isSaved ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" : "border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"}`}
                     >
-                      <Check className="h-3.5 w-3.5" />
-                      {t("tracked")}
-                    </Button>
-                  ) : (
-                    <Button variant="unstyled"
-                      onClick={() => onSaveScholarship(s.id)}
-                      className="flex min-h-11 items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-surface text-xs shadow-xs shadow-indigo-600/20 transition-colors"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      {t("track")}
-                    </Button>
+                      {saveBusyId === s.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Bookmark className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} aria-hidden />}
+                    </button>
                   )}
                 </div>
-              </div>
+              </article>
               </React.Fragment>
             );
           })}
@@ -1079,7 +1144,7 @@ export function ScholarshipHub({
 
       {/* Numbered pages (Google-style). Renders nothing while loading, when
           empty, or when everything fits on a single page. */}
-      {!loading && filtered.length > 0 && (
+      {!loading && !fetchError && filtered.length > 0 && (
         <Pagination
           currentPage={page}
           totalPages={totalPages}
@@ -1088,18 +1153,18 @@ export function ScholarshipHub({
       )}
       </div>
       {/* The funding-plan action reports its own outcome inline — no alert(). */}
-      {fundingError && (
+      {(fundingError || saveError) && (
         <div
           role="alert"
           className="flex items-start justify-between gap-3 rounded-surface border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
         >
           <span className="flex min-w-0 items-start gap-1.5">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span className="min-w-0 break-words whitespace-normal">{fundingError}</span>
+            <span className="min-w-0 break-words whitespace-normal">{fundingError || t("saveFailed")}</span>
           </span>
           <Button variant="unstyled"
             type="button"
-            onClick={() => setFundingError("")}
+            onClick={() => { setFundingError(""); setSaveError(false); }}
             aria-label={t("dismiss")}
             className="min-h-11 min-w-11 rounded-control p-1 text-rose-700 hover:bg-rose-100"
           >

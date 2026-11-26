@@ -5,7 +5,6 @@ import { countriesMatch } from "@/lib/countries";
 import { supportsDegreeLevel } from "@/lib/degreeLevels";
 import { parseScholarshipDegreeLevels } from "@/lib/scholarshipFilters";
 import { ITEMS_PER_PAGE, paginateArray, parsePage } from "@/lib/pagination";
-import { safeAcademicLink } from "@/lib/universityCardSummary";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -19,7 +18,8 @@ import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { resolvedUsdScholarshipAmount } from "@/lib/usdCosts";
 import { getCachedScholarshipsBundle } from "@/lib/catalogCache";
-import { deadlineStateOf, orderForBrowsing, todayYmd, type DeadlineState } from "@/lib/catalogueOrder";
+import { compareScholarshipDeadlines, formatScholarshipDate, scholarshipBrowsingWindow, scholarshipOfficialAction } from "@/lib/scholarshipBrowsing";
+import { statusLabel, type ScholarshipApplicationStatus } from "@/lib/scholarshipStatus";
 import { expandMultilingualSearchTerms, localizeCountry, localizeCoverageType, localizeScholarshipProvider, localizeScholarshipTitle } from "@/lib/catalogLocalizer";
 
 async function getPageLocale() {
@@ -44,12 +44,11 @@ interface ScholarshipRow {
   coverage_type: string;
   amount_usd_value: number | null;
   award_period: string | null;
-  deadline: string | null;
-  website_url: string | null;
+  action: ReturnType<typeof scholarshipOfficialAction>;
   /** The date the award closes, when the catalogue knows one. */
   deadline_date?: string | null;
   /** Verdict for today — a passed date is never shown as "open". */
-  state: DeadlineState;
+  state: ScholarshipApplicationStatus;
 }
 
 // Next.js 15+: `searchParams` is async and must be awaited.
@@ -57,16 +56,11 @@ interface ScholarshipsPageProps {
   searchParams: Promise<CatalogueQuery>;
 }
 
-function formatDate(value: string, locale: string): string {
-  const parsed = new Date(`${value}T12:00:00Z`);
-  if (!Number.isFinite(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(parsed);
-}
-
 function awardPeriodLabel(period: string | null, copy: typeof dictionaries.en.publicCatalog): string | null {
   switch (period) {
     case "year": return copy.scholarshipPeriodYear;
     case "month": return copy.scholarshipPeriodMonth;
+    case "semester": return copy.scholarshipPeriodSemester;
     case "one_time": return copy.scholarshipPeriodOneTime;
     case "total": return copy.scholarshipPeriodTotal;
     case "variable": return copy.scholarshipPeriodVariable;
@@ -81,7 +75,7 @@ export default async function ScholarshipsPage({
   const copy = dictionaries[locale].publicCatalog;
   const params = await searchParams;
   const requestedPage = parsePage(params.page);
-  const today = todayYmd();
+  const now = new Date();
   let rows: ScholarshipRow[];
   let currentPage: number;
   let totalPages: number;
@@ -95,9 +89,8 @@ export default async function ScholarshipsPage({
     const coverage = catalogueParam(params, "coverage", 20);
     const status = catalogueParam(params, "status", 20);
     countries = [...new Set(bundle.entries.map((scholarship) => scholarship.country))].sort();
-    const candidates = bundle.entries.filter((row) => {
-      const state = deadlineStateOf(row, today);
-      const matchesStatus = !status || (status === "closed" ? state === "passed" : state === status);
+    const candidates = bundle.entries.map((row) => ({ ...row, ...scholarshipBrowsingWindow(row, now) })).filter((row) => {
+      const matchesStatus = !status || row.computedStatus === status;
       const category = row.coverageType.trim().toLowerCase();
       const matchesCoverage = !coverage || (
         coverage === "full" ? category === "full funding"
@@ -113,7 +106,7 @@ export default async function ScholarshipsPage({
     const found = search ? findCatalogueMatches(candidates, search, (row) => terms.some((term) =>
       [row.title, row.provider, row.country, row.eligibleMajors].some((field) => field?.toLowerCase().includes(term)),
     ), (row) => [row.title, row.provider, row.country, row.eligibleMajors]) : candidates;
-    const page = paginateArray(orderForBrowsing(found, today), requestedPage, ITEMS_PER_PAGE);
+    const page = paginateArray(found.sort(compareScholarshipDeadlines), requestedPage, ITEMS_PER_PAGE);
     ({ page: currentPage, totalPages, total: totalItems } = page);
     rows = page.items.map((scholarship) => ({
       id: scholarship.id,
@@ -123,10 +116,9 @@ export default async function ScholarshipsPage({
       coverage_type: scholarship.coverageType,
       amount_usd_value: resolvedUsdScholarshipAmount(scholarship),
       award_period: scholarship.awardPeriod,
-      deadline: scholarship.deadline,
-      website_url: safeAcademicLink(scholarship.sourceUrl ?? scholarship.websiteUrl),
-      deadline_date: scholarship.deadlineDate ? String(scholarship.deadlineDate).slice(0, 10) : null,
-      state: deadlineStateOf(scholarship, today),
+      action: scholarshipOfficialAction(scholarship),
+      deadline_date: scholarship.closesOn,
+      state: scholarship.computedStatus,
     }));
   } catch (error) {
     // Keep database/provider details out of the public response and logs.
@@ -190,14 +182,9 @@ export default async function ScholarshipsPage({
                 <span className="inline-flex min-h-7 w-fit max-w-full items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 ring-inset">
                   <span className="break-words">{localizeCoverageType(scholarship.coverage_type, locale) || copy.coverageNotSpecified}</span>
                 </span>
-                {/* A passed date is stated, not hidden: the award stays in the
-                    catalogue (its next round is usually the same page) but the
-                    card must not look like something to apply to today. */}
-                {scholarship.state === "passed" && (
-                  <span className="mt-2 inline-flex w-fit items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-300 ring-inset">
-                    {copy.deadlinePassed}
-                  </span>
-                )}
+                <span className={`mt-2 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-semibold ${scholarship.state === "open" || scholarship.state === "rolling" ? "bg-emerald-100 text-emerald-800" : scholarship.state === "upcoming" ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700"}`}>
+                  {statusLabel(scholarship.state, locale)}
+                </span>
 
                 <h2 className="mt-2 break-words text-sm font-bold text-slate-900 dark:text-slate-100 sm:text-base">
                   <Link href={`/scholarships/${scholarship.id}`} className="inline-flex min-h-11 items-center hover:text-blue-800">{localizeScholarshipTitle(scholarship.title, locale)}</Link>
@@ -211,15 +198,15 @@ export default async function ScholarshipsPage({
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
                     <span className="break-words">{localizeCountry(scholarship.country, locale)}</span>
                   </p>
-                  {(scholarship.deadline_date || scholarship.deadline) && (
+                  {scholarship.deadline_date && (
                     <p className="flex items-start gap-1.5">
                       <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
                       <span className="break-words">
-                        {formatMessage(copy.deadline, { date: formatDate((scholarship.deadline_date ?? scholarship.deadline) as string, locale) })}
+                        {formatMessage(copy.deadline, { date: formatScholarshipDate(scholarship.deadline_date, locale) ?? copy.notPublished })}
                       </span>
                     </p>
                   )}
-                  {scholarship.state === "passed" && (
+                  {scholarship.state === "closed" && (
                     <p className="text-sm leading-relaxed text-slate-500">{copy.deadlinePassedHint}</p>
                   )}
                   {/* A stored 0 means "the provider publishes no cash value" —
@@ -244,19 +231,19 @@ export default async function ScholarshipsPage({
                     {copy.viewDetails}
                     <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                   </Link>
-                  {scholarship.website_url && (
+                  {scholarship.action && (
                     <Link
-                      href={scholarship.website_url}
+                      href={scholarship.action.href}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900 sm:text-sm"
                     >
-                      {copy.website}
+                      {scholarship.action.kind === "apply" ? dictionaries[locale].scholarshipHub.applyAction : copy.website}
                       <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                     </Link>
                   )}
                   <PublicCompareButton item={{
-                    id: scholarship.id, title: scholarship.title, href: scholarship.website_url,
+                    id: scholarship.id, title: scholarship.title, href: scholarship.action?.href ?? null,
                     values: [localizeCoverageType(scholarship.coverage_type, locale) || "", scholarship.deadline_date ?? ""],
                   }} />
                 </div>
