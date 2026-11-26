@@ -6320,7 +6320,64 @@
     "openReference": "Manba sahifasini ochish",
     "unverifiedDeadline": "Sana tasdiqlanmagan — manbani tekshiring",
     "filterMine": "⭐ Mening muddatlarim ({count})",
-    "filterAll": "🌐 Barcha grant muddatlari ({count})"
+    "filterAll": "🌐 Barcha grant muddatlari ({count})",
+    "scopeLabel": "Muddat manbasi",
+    "scope": {
+      "mine": "Mening muddatlarim",
+      "catalogue": "Katalogdagi muddatlar"
+    },
+    "summary": {
+      "mine": "Mening xulosam",
+      "catalogue": "Katalog xulosasi"
+    },
+    "nextDeadline": "Keyingi muddat",
+    "withinWeek": "7 kun ichida",
+    "today": "Bugun",
+    "tomorrow": "Ertaga",
+    "listTitle": "Muddatlar ro‘yxati",
+    "results": "{count} ta muddat",
+    "periodLabel": "Vaqt oralig‘i",
+    "periodAny": "Barcha sanalar",
+    "periodDays": "Keyingi {days} kun",
+    "kindLabel": "Muddat turi",
+    "kindAny": "Barcha turlar",
+    "groupLabel": "Muddat holati",
+    "groups": {
+      "upcoming": "Yaqin",
+      "late": "Kechikkan",
+      "undated": "Sanasiz",
+      "done": "Bajarilgan"
+    },
+    "emptyGroups": {
+      "upcoming": "Yaqin muddatlar yo‘q",
+      "late": "Muddati o‘tgan yozuvlar yo‘q",
+      "undated": "Sanasiz yozuvlar yo‘q",
+      "done": "Bajarilgan yozuvlar yo‘q"
+    },
+    "emptyFiltered": "Bu filtrlarga mos muddat topilmadi",
+    "resetFilters": "Filtrlarni tozalash",
+    "details": "Batafsil",
+    "detailsFor": "Batafsil · {title}",
+    "monthCalendar": "Oy taqvimi",
+    "calendarPrevious": "Oldingi oy",
+    "calendarNext": "Keyingi oy",
+    "calendarDay": "{date}, {count} ta muddat",
+    "calendarHint": "Muddatlarni ko‘rish uchun belgilangan kunni tanlang.",
+    "backwardsPlan": "Tayyorgarlik rejasini ochish",
+    "testExamDate": "{test} imtihon sanasi",
+    "testPreparationTarget": "{test} tayyorgarlik maqsadi",
+    "taskComplete": "Bajarildi deb belgilash",
+    "taskReopen": "Vazifani qayta ochish",
+    "taskSaveFailed": "Vazifani saqlab bo‘lmadi. Qayta urinib ko‘ring.",
+    "taskCompleted": "Vazifa bajarildi deb belgilandi",
+    "taskReopened": "Vazifa qayta ochildi",
+    "navigate": {
+      "application": "Arizalarni ochish",
+      "scholarship": "Grantlarni ochish",
+      "test": "Testlarni ochish",
+      "milestone": "Vazifalarni ochish",
+      "university": "Universitetlarni ochish"
+    }
   },
   "consultingPanel": {
     "title": "Yakka tartibdagi maslahat",

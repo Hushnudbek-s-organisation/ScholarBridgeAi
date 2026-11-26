@@ -89,11 +89,12 @@ function savedUniStatusLabel(upcoming: string | null): string {
  */
 function isoDateOr(value: unknown): string | null {
   if (value == null || value === "") return null;
+  if (value instanceof Date && !Number.isFinite(value.getTime())) return null;
   const raw = value instanceof Date ? value.toISOString() : String(value).trim();
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
   if (!m) return null;
   const parsed = new Date(`${m[0]}T00:00:00Z`);
-  return Number.isNaN(parsed.getTime()) ? null : m[0];
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === m[0] ? m[0] : null;
 }
 
 type UniRow = typeof universities.$inferSelect;
@@ -347,19 +348,16 @@ export async function GET(req: Request) {
 
     // --- Scholarships: the student's saved awards (+ a small recommended
     //     full-coverage shortlist when they have barely saved anything) ---
-    const datedScholarships = allScholarships
-      .map((s) => {
-        let date: Date | null = null;
-        if (s.deadlineDate) date = new Date(s.deadlineDate);
-        else if (s.deadlineRangeEnd) date = new Date(s.deadlineRangeEnd);
-        else if (s.deadlineRangeStart) date = new Date(s.deadlineRangeStart);
-        return { s, date };
-      })
-      .filter((x) => x.date && Number.isFinite(x.date.getTime()) && x.date.getTime() > now.getTime() - 365 * 86400000);
+    const scholarshipDates = allScholarships.map((s) => ({
+      s,
+      date: isoDateOr(s.deadlineDate) ?? isoDateOr(s.deadlineRangeEnd) ?? isoDateOr(s.deadlineRangeStart),
+    }));
     // Unverified dates may be stale or copied from prior cycles. Keep an
     // explicitly saved item visible with its provenance, but recommend only
     // verified dates from the active catalogue.
-    const verifiedDatedScholarships = datedScholarships.filter(({ s }) => s.isActive && s.verificationStatus === "verified");
+    const verifiedDatedScholarships = scholarshipDates.filter(
+      ({ s, date }) => s.isActive && s.verificationStatus === "verified" && date !== null && (daysUntil(now, date) ?? -1) >= 0,
+    );
     const awardCoverage=await prepareAwardCoverage(req,profile,savedUniRefs,allScholarships.map(s=>s.id));
     const coverageOf = new Map<number, SavedUniCoverage | null>();
     const coverageFor = (s: (typeof scholarships.$inferSelect)) => {
@@ -373,7 +371,7 @@ export async function GET(req: Request) {
       }
       return coverageOf.get(s.id) ?? null;
     };
-    for (const { s, date } of datedScholarships) {
+    for (const { s, date } of scholarshipDates) {
       if (!savedSchSet.has(s.id)) continue;
       const status = computeScholarshipStatus(s);
       const cov = coverageFor(s);
@@ -382,9 +380,9 @@ export async function GET(req: Request) {
         type: "scholarship",
         title: localizeScholarshipTitle(s.title, locale),
         subtitle: localizeScholarshipProvider(s.provider, locale),
-        date: date!.toISOString().slice(0, 10),
+        date,
         status: statusLabel(status).toUpperCase(),
-        daysRemaining: daysUntil(now, date!.toISOString()),
+        daysRemaining: daysUntil(now, date),
         source: s.sourceUrl || s.websiteUrl || null,
         saved: true,
         recommended: false,
@@ -408,7 +406,7 @@ export async function GET(req: Request) {
           const ta = a.cov ? coverageTier(a.cov) : 0;
           const tb = b.cov ? coverageTier(b.cov) : 0;
           if (tb !== ta) return tb - ta;
-          return a.date!.getTime() - b.date!.getTime();
+          return (a.date ?? "").localeCompare(b.date ?? "");
         })
         .slice(0, 3);
       for (const { s, date } of candidates) {
@@ -419,9 +417,9 @@ export async function GET(req: Request) {
           type: "scholarship",
           title: localizeScholarshipTitle(s.title, locale),
           subtitle: localizeScholarshipProvider(s.provider, locale),
-          date: date!.toISOString().slice(0, 10),
+          date,
           status: statusLabel(status).toUpperCase(),
-          daysRemaining: daysUntil(now, date!.toISOString()),
+          daysRemaining: daysUntil(now, date),
           source: s.sourceUrl || s.websiteUrl || null,
           saved: false,
           recommended: true,
@@ -486,15 +484,16 @@ export async function GET(req: Request) {
       .from(applicationTasks)
       .where(eq(applicationTasks.profileId, profileId));
     for (const t of tasks) {
-      const due = t.dueDate ? new Date(t.dueDate) : null;
+      const due = isoDateOr(t.dueDate);
       items.push({
         id: `task-${t.id}`,
+        taskId: t.id,
         type: "milestone",
         title: t.title,
         subtitle: t.category,
-        date: due ? due.toISOString().slice(0, 10) : null,
+        date: due,
         status: t.isCompleted ? "COMPLETED" : "PENDING",
-        daysRemaining: due ? daysUntil(now, due.toISOString()) : null,
+        daysRemaining: daysUntil(now, due),
         source: null,
         saved: false,
       });
@@ -503,15 +502,15 @@ export async function GET(req: Request) {
     // --- Application deadlines (from the universal tracker) ---
     for (const a of appRows) {
       if (a.status === "withdrawn") continue;
-      const due = a.deadline ? new Date(a.deadline) : null;
+      const due = isoDateOr(a.deadline);
       items.push({
         id: `app-${a.id}`,
         type: "application",
         title: `${a.universityName}${a.programName ? ` — ${a.programName}` : ""}`,
         subtitle: [a.applicationRound, a.intakeTerm].filter(Boolean).join(" · "),
-        date: due ? due.toISOString().slice(0, 10) : null,
+        date: due,
         status: String(a.status || "PENDING").toUpperCase(),
-        daysRemaining: due ? daysUntil(now, due.toISOString()) : null,
+        daysRemaining: daysUntil(now, due),
         source: a.portalUrl || null,
         saved: true,
       });
@@ -523,18 +522,19 @@ export async function GET(req: Request) {
       db.select().from(testPlans).where(eq(testPlans.profileId, profileId)),
     ]);
     for (const b of bookings) {
-      const testDay = new Date(b.testDate);
+      const testDay = isoDateOr(b.testDate);
       items.push({
         id: `test-${b.id}`,
         type: "test",
         title: `${b.testType.toUpperCase()} test${b.location ? ` — ${b.location}` : ""}`,
         subtitle: b.registered ? "Registered" : "Not registered yet",
         testType: b.testType,
+        testDateKind: "booking",
         testLocation: b.location,
         testRegistered: b.registered,
-        date: testDay.toISOString().slice(0, 10),
+        date: testDay,
         status: b.registered ? "REGISTERED" : "PENDING",
-        daysRemaining: daysUntil(now, testDay.toISOString()),
+        daysRemaining: daysUntil(now, testDay),
         source: null,
         saved: true,
       });
@@ -543,14 +543,19 @@ export async function GET(req: Request) {
     const bookedTestDates = new Set(bookings.map((b) => `${String(b.testType).toLowerCase()}|${isoDateOr(b.testDate)}`));
     for (const plan of plans) {
       if (!plan.isActive) continue;
-      for (const candidateDate of [...new Set([isoDateOr(plan.nextTestDate), isoDateOr(plan.targetDate)].filter((d): d is string => !!d))]) {
-        if (bookedTestDates.has(`${plan.testType.toLowerCase()}|${candidateDate}`)) continue;
+      const examDate = isoDateOr(plan.nextTestDate);
+      const targetDate = isoDateOr(plan.targetDate);
+      for (const [testDateKind, candidateDate] of [["planned_exam", examDate], ["preparation_target", targetDate]] as const) {
+        if (!candidateDate) continue;
+        const isExam = testDateKind === "planned_exam";
+        if (isExam && bookedTestDates.has(`${plan.testType.toLowerCase()}|${candidateDate}`)) continue;
         items.push({
-          id: `test-plan-${plan.id}-${candidateDate}`,
+          id: `test-plan-${plan.id}-${candidateDate}${isExam ? "" : "-target"}`,
           type: "test",
-          title: `${plan.testType.toUpperCase()} test (planned)`,
+          title: isExam ? `${plan.testType.toUpperCase()} exam date` : `${plan.testType.toUpperCase()} preparation target`,
           subtitle: plan.currentScore == null ? "Study plan" : `Current ${plan.currentScore}; target ${plan.targetScore ?? "—"}`,
           testType: plan.testType,
+          testDateKind,
           testRegistered: false,
           date: candidateDate,
           status: "PENDING",

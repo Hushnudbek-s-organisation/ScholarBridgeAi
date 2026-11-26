@@ -6276,7 +6276,7 @@
     "types": {
       "scholarship": "Scholarship",
       "university": "University",
-      "milestone": "Milestone",
+      "milestone": "Task",
       "application": "Application",
       "test": "Test"
     },
@@ -6320,7 +6320,64 @@
     "openReference": "Open reference page",
     "unverifiedDeadline": "Date not verified — check the source",
     "filterMine": "⭐ My deadlines ({count})",
-    "filterAll": "🌐 All deadlines ({count})"
+    "filterAll": "🌐 All deadlines ({count})",
+    "scopeLabel": "Deadline source",
+    "scope": {
+      "mine": "My deadlines",
+      "catalogue": "Catalogue deadlines"
+    },
+    "summary": {
+      "mine": "My summary",
+      "catalogue": "Catalogue summary"
+    },
+    "nextDeadline": "Next deadline",
+    "withinWeek": "Within 7 days",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "listTitle": "Deadline list",
+    "results": "{count, plural, one {# deadline} other {# deadlines}}",
+    "periodLabel": "Date range",
+    "periodAny": "All dates",
+    "periodDays": "Next {days} days",
+    "kindLabel": "Deadline type",
+    "kindAny": "All types",
+    "groupLabel": "Deadline status",
+    "groups": {
+      "upcoming": "Upcoming",
+      "late": "Past due",
+      "undated": "No date",
+      "done": "Completed"
+    },
+    "emptyGroups": {
+      "upcoming": "No upcoming deadlines",
+      "late": "No past deadlines",
+      "undated": "No undated items",
+      "done": "No completed items"
+    },
+    "emptyFiltered": "No deadlines match these filters",
+    "resetFilters": "Clear filters",
+    "details": "Details",
+    "detailsFor": "Details for {title}",
+    "monthCalendar": "Monthly calendar",
+    "calendarPrevious": "Previous month",
+    "calendarNext": "Next month",
+    "calendarDay": "{date}, {count, plural, one {# deadline} other {# deadlines}}",
+    "calendarHint": "Select a marked day to see its deadlines.",
+    "backwardsPlan": "Open preparation timeline",
+    "testExamDate": "{test} exam date",
+    "testPreparationTarget": "{test} preparation target",
+    "taskComplete": "Mark task complete",
+    "taskReopen": "Reopen task",
+    "taskSaveFailed": "Could not save the task. Try again.",
+    "taskCompleted": "Task marked complete",
+    "taskReopened": "Task reopened",
+    "navigate": {
+      "application": "Open applications",
+      "scholarship": "Open scholarships",
+      "test": "Open tests",
+      "milestone": "Open tasks",
+      "university": "Open universities"
+    }
   },
   "consultingPanel": {
     "title": "One-to-one guidance",

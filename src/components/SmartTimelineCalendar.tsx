@@ -58,6 +58,7 @@ export interface DeadlineRow {
   status?: string | null;
   daysRemaining?: number | null;
   testType?: string | null;
+  testDateKind?: "booking" | "planned_exam" | "preparation_target";
   source?: string | null;
   /** Module 3 — the row belongs to the student's own saved list. */
   saved?: boolean | null;
@@ -244,7 +245,7 @@ export function SmartTimelineCalendar({ profileId, onTasksSynced, onNavigateTab,
       }));
 
     const tests: TimelineTest[] = rows
-      .filter((row) => row.type === "test" && row.testType)
+      .filter((row) => row.type === "test" && row.testType && row.testDateKind !== "preparation_target")
       .map((row) => ({
         id: row.id ?? null,
         testType: String(row.testType),

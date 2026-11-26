@@ -6320,7 +6320,64 @@
     "openReference": "Открыть страницу источника",
     "unverifiedDeadline": "Дата не подтверждена — проверьте источник",
     "filterMine": "⭐ Мои сроки ({count})",
-    "filterAll": "🌐 Все сроки грантов ({count})"
+    "filterAll": "🌐 Все сроки грантов ({count})",
+    "scopeLabel": "Источник сроков",
+    "scope": {
+      "mine": "Мои сроки",
+      "catalogue": "Сроки из каталога"
+    },
+    "summary": {
+      "mine": "Моя сводка",
+      "catalogue": "Сводка каталога"
+    },
+    "nextDeadline": "Ближайший срок",
+    "withinWeek": "В течение 7 дней",
+    "today": "Сегодня",
+    "tomorrow": "Завтра",
+    "listTitle": "Список сроков",
+    "results": "{count, plural, one {# срок} few {# срока} many {# сроков} other {# срока}}",
+    "periodLabel": "Период",
+    "periodAny": "Все даты",
+    "periodDays": "{days, plural, one {Следующий # день} few {Следующие # дня} many {Следующие # дней} other {Следующие # дня}}",
+    "kindLabel": "Тип срока",
+    "kindAny": "Все типы",
+    "groupLabel": "Статус срока",
+    "groups": {
+      "upcoming": "Предстоящие",
+      "late": "Просроченные",
+      "undated": "Без даты",
+      "done": "Завершённые"
+    },
+    "emptyGroups": {
+      "upcoming": "Предстоящих сроков нет",
+      "late": "Прошедших сроков нет",
+      "undated": "Нет записей без даты",
+      "done": "Нет завершённых записей"
+    },
+    "emptyFiltered": "По этим фильтрам ничего не найдено",
+    "resetFilters": "Сбросить фильтры",
+    "details": "Подробнее",
+    "detailsFor": "Подробнее · {title}",
+    "monthCalendar": "Календарь на месяц",
+    "calendarPrevious": "Предыдущий месяц",
+    "calendarNext": "Следующий месяц",
+    "calendarDay": "{date}, {count, plural, one {# срок} few {# срока} many {# сроков} other {# срока}}",
+    "calendarHint": "Выберите отмеченный день, чтобы увидеть сроки.",
+    "backwardsPlan": "Открыть план подготовки",
+    "testExamDate": "Дата экзамена {test}",
+    "testPreparationTarget": "Цель подготовки к {test}",
+    "taskComplete": "Отметить выполненной",
+    "taskReopen": "Возобновить задачу",
+    "taskSaveFailed": "Не удалось сохранить задачу. Попробуйте ещё раз.",
+    "taskCompleted": "Задача выполнена",
+    "taskReopened": "Задача возобновлена",
+    "navigate": {
+      "application": "Открыть заявки",
+      "scholarship": "Открыть стипендии",
+      "test": "Открыть тесты",
+      "milestone": "Открыть задачи",
+      "university": "Открыть университеты"
+    }
   },
   "consultingPanel": {
     "title": "Индивидуальная консультация",
