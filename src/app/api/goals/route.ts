@@ -6,6 +6,7 @@ import { clampString } from "@/lib/request";
 import { GOAL_PILLARS, MAX_ACTIVE_GOALS } from "@/lib/growth/defaults";
 import { guardStudent, idParam, jsonError, oneOf, readBody, serverError } from "@/lib/growth/api";
 import { goalProgress, parseSteps } from "@/lib/growth/logic";
+import { ymdOf } from "@/lib/catalogueOrder";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,14 @@ export const dynamic = "force-dynamic";
 function shape(r: typeof studentGoals.$inferSelect) {
   const steps = parseSteps(r.steps);
   return { ...r, steps, progress: goalProgress(steps) };
+}
+
+function goalDate(value: unknown) {
+  if (typeof value !== "string") return null;
+  const date = ymdOf(value);
+  if (!date) return null;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date ? date : null;
 }
 
 export async function GET(req: Request) {
@@ -80,6 +89,7 @@ export async function POST(req: Request) {
         steps: JSON.stringify(parseSteps(b.value.steps)),
       };
     }
+    if (b.value.targetDate !== undefined) values.targetDate = goalDate(b.value.targetDate);
     const [row] = await db.insert(studentGoals).values(values).returning();
     return NextResponse.json({ goal: shape(row) }, { status: 201 });
   } catch (err) {
@@ -112,8 +122,7 @@ export async function PUT(req: Request) {
       if (title) patch.title = title;
     }
     if (b.value.targetDate !== undefined) {
-      const d = typeof b.value.targetDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.value.targetDate) ? b.value.targetDate : null;
-      patch.targetDate = d;
+      patch.targetDate = goalDate(b.value.targetDate);
     }
     // Re-activating must respect the focus limit too.
     if (patch.status === "active" && row.status !== "active") {

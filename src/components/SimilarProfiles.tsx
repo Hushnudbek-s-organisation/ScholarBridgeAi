@@ -53,6 +53,7 @@ const RESULT_BADGE: Record<OutcomeResult, string> = {
 
 export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
   const t = useTranslations("similarOutcomes");
+  const tTwin = useTranslations("twin");
   const { locale } = useLocaleContext();
   const [data, setData] = useState<EnrichedSimilarProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,7 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
   const [decisionFilter, setDecisionFilter] = useState<string>("");
   const [universitySearch, setUniversitySearch] = useState<string>("");
   const [limit, setLimit] = useState<number>(20);
+  const [twinOpen, setTwinOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,8 +115,8 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div className="bg-white dark:bg-slate-900 rounded-overlay border border-slate-200 dark:border-slate-700 p-6 sm:p-8 shadow-sm">
+    <div className="space-y-3">
+      <div className="bg-white dark:bg-slate-900 rounded-overlay border border-slate-200 p-4 shadow-xs dark:border-slate-700 sm:p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -134,20 +136,22 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
         {/* Interactive Filter Bar */}
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-500" aria-hidden />
             <input
               type="text"
               value={universitySearch}
               onChange={(e) => setUniversitySearch(e.target.value)}
               placeholder={t("filterUniversity")}
-              className="w-full rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-8 pr-3 py-1.5 text-sm text-slate-900 dark:text-slate-100"
+              aria-label={t("filterUniversity")}
+              className="w-full min-h-11 rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pl-8 pr-3 py-1.5 text-sm text-slate-900 dark:text-slate-100"
             />
           </div>
 
           <select
+            aria-label={t("allDecisions")}
             value={decisionFilter}
             onChange={(e) => setDecisionFilter(e.target.value)}
-            className="rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100"
+            className="min-h-11 min-w-0 rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100"
           >
             <option value="">{t("allDecisions")}</option>
             <option value="accepted">{t("results.accepted")}</option>
@@ -156,21 +160,16 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
           </select>
 
           <select
+            aria-label={t("showClosest", { count: limit })}
             value={String(limit)}
             onChange={(e) => setLimit(Number(e.target.value))}
-            className="rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100"
+            className="min-h-11 min-w-0 rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100"
           >
             <option value="10">{t("showClosest", { count: 10 })}</option>
             <option value="20">{t("showClosest", { count: 20 })}</option>
             <option value="50">{t("showClosest", { count: 50 })}</option>
           </select>
         </div>
-
-        {/* Priority 5.5 — the list below shows everyone similar to you. This
-            takes the single admitted student whose record overlaps yours most
-            and turns the difference into a row-by-row gap plus at most three
-            actions, the first of which can go straight into the goal planner. */}
-        <TwinStrategyCard profileId={activeProfile?.id ?? null} className="mt-6" />
 
         {loading ? (
           <div className="py-12 text-center text-sm text-slate-500">{t("loading")}</div>
@@ -288,6 +287,10 @@ export function SimilarProfiles({ activeProfile }: SimilarProfilesProps) {
           </div>
         )}
       </div>
+      <details className="rounded-overlay border border-slate-200 bg-white px-4 dark:border-slate-700 dark:bg-slate-900" onToggle={(event) => setTwinOpen(event.currentTarget.open)}>
+        <summary className="min-h-11 cursor-pointer py-2.5 text-sm font-semibold">{tTwin("title")}</summary>
+        {twinOpen && <TwinStrategyCard profileId={activeProfile?.id ?? null} className="mb-3" />}
+      </details>
     </div>
   );
 }

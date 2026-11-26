@@ -1168,7 +1168,7 @@ export function Home({
               current destination; the sidebar, session and every other tab
               stay usable. Changing tab/pane/profile is a fresh attempt. */}
           <ChunkErrorBoundary
-            resetKey={`${activeProfile?.id ?? "none"}:${activeTab}:${activePane ?? ""}`}
+            resetKey={`${activeProfile?.id ?? "none"}:${activeTab}:${activeTab === "profile" && activePane === "similar" ? "stories" : activePane ?? ""}`}
             section={activeTab}
           >
 

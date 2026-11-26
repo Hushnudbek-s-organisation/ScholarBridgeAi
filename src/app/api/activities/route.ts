@@ -85,22 +85,25 @@ export async function POST(req: Request) {
   const title = text(b.value.title, 200);
   if (!title) return jsonError(400, "title is required", "bad_request");
   try {
-    const [row] = await db
-      .insert(studentActivities)
-      .values({
-        profileId,
-        category: oneOf(b.value.category, ACTIVITY_CATEGORIES, "project"),
-        title,
-        role: text(b.value.role, 120),
-        organization: text(b.value.organization, 160),
-        startDate: isoDate(dateOnly(b.value.startDate)),
-        endDate: isoDate(dateOnly(b.value.endDate)),
-        hours: numberOrNull(b.value.hours),
-        description: text(b.value.description, 4000),
-        achievements: text(b.value.achievements, 4000),
-      })
-      .returning();
-    const withEvidence = await attachEvidence(profileId, row.id, b.value.evidence);
+    const { row, withEvidence } = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(studentActivities)
+        .values({
+          profileId,
+          category: oneOf(b.value.category, ACTIVITY_CATEGORIES, "project"),
+          title,
+          role: text(b.value.role, 120),
+          organization: text(b.value.organization, 160),
+          startDate: isoDate(dateOnly(b.value.startDate)),
+          endDate: isoDate(dateOnly(b.value.endDate)),
+          hours: numberOrNull(b.value.hours),
+          description: text(b.value.description, 4000),
+          achievements: text(b.value.achievements, 4000),
+        })
+        .returning();
+      const withEvidence = await attachEvidence(profileId, row.id, b.value.evidence, tx);
+      return { row, withEvidence };
+    });
     // A new activity changes the match inputs — never serve a stale score.
     invalidateProfileMatchCache(profileId);
     invalidateSavedActivities(profileId);
@@ -120,34 +123,50 @@ export async function PATCH(req: Request) {
   const id = Number(b.value.id);
   if (!Number.isInteger(id) || id <= 0) return jsonError(400, "id is required", "bad_request");
   try {
-    const [row] = await db
-      .select()
-      .from(studentActivities)
-      .where(and(eq(studentActivities.id, id), eq(studentActivities.profileId, profileId)))
-      .limit(1);
-    if (!row) return jsonError(404, "Activity not found", "not_found");
+    const result = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(studentActivities)
+        .where(and(eq(studentActivities.id, id), eq(studentActivities.profileId, profileId)))
+        .limit(1)
+        .for("update");
+      if (!row) return { found: false as const };
 
-    const patch: Record<string, unknown> = { updatedAt: new Date() };
-    if (b.value.category !== undefined) patch.category = oneOf(b.value.category, ACTIVITY_CATEGORIES, row.category);
-    if (b.value.title !== undefined) patch.title = text(b.value.title, 200) ?? row.title;
-    if (b.value.role !== undefined) patch.role = text(b.value.role, 120);
-    if (b.value.organization !== undefined) patch.organization = text(b.value.organization, 160);
-    if (b.value.startDate !== undefined) patch.startDate = isoDate(dateOnly(b.value.startDate));
-    if (b.value.endDate !== undefined) patch.endDate = isoDate(dateOnly(b.value.endDate));
-    if (b.value.hours !== undefined) patch.hours = numberOrNull(b.value.hours);
-    if (b.value.description !== undefined) patch.description = text(b.value.description, 4000);
-    if (b.value.achievements !== undefined) patch.achievements = text(b.value.achievements, 4000);
-    await db.update(studentActivities).set(patch).where(eq(studentActivities.id, id));
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (b.value.category !== undefined) patch.category = oneOf(b.value.category, ACTIVITY_CATEGORIES, row.category);
+      if (b.value.title !== undefined) patch.title = text(b.value.title, 200) ?? row.title;
+      if (b.value.role !== undefined) patch.role = text(b.value.role, 120);
+      if (b.value.organization !== undefined) patch.organization = text(b.value.organization, 160);
+      if (b.value.startDate !== undefined) patch.startDate = isoDate(dateOnly(b.value.startDate));
+      if (b.value.endDate !== undefined) patch.endDate = isoDate(dateOnly(b.value.endDate));
+      if (b.value.hours !== undefined) patch.hours = numberOrNull(b.value.hours);
+      if (b.value.description !== undefined) patch.description = text(b.value.description, 4000);
+      if (b.value.achievements !== undefined) patch.achievements = text(b.value.achievements, 4000);
 
-    let evidence = null;
-    if (b.value.evidence !== undefined) {
-      await db.delete(activityEvidence).where(eq(activityEvidence.activityId, id));
-      evidence = await attachEvidence(profileId, id, b.value.evidence);
-    }
+      const addition = b.value.appendEvidence;
+      const label = addition && typeof addition === "object" ? text((addition as Record<string, unknown>).label, 160) : null;
+      let pendingEvidence: unknown;
+      if (b.value.evidence !== undefined) {
+        await tx.delete(activityEvidence).where(eq(activityEvidence.activityId, id));
+        pendingEvidence = b.value.evidence;
+      } else if (label && addition && typeof addition === "object") {
+        const evidence = await tx.select().from(activityEvidence).where(eq(activityEvidence.activityId, id));
+        const url = text((addition as Record<string, unknown>).url, 800);
+        const alreadyPresent = evidence.some((entry) => entry.label === label && entry.url === url);
+        if (!alreadyPresent) {
+          if (evidence.length >= 12) return { found: true as const, limit: true as const };
+          pendingEvidence = [addition];
+        }
+      }
+      await tx.update(studentActivities).set(patch).where(eq(studentActivities.id, id));
+      return { found: true as const, limit: false as const, evidence: pendingEvidence === undefined ? null : await attachEvidence(profileId, id, pendingEvidence, tx) };
+    });
+    if (!result.found) return jsonError(404, "Activity not found", "not_found");
+    if (result.limit) return jsonError(409, "Evidence limit reached", "limit");
     invalidateProfileMatchCache(profileId);
     invalidateSavedActivities(profileId);
     await invalidateDashboardRecommendationsForProfile(profileId);
-    return NextResponse.json({ ok: true, id, evidence });
+    return NextResponse.json({ ok: true, id, evidence: result.evidence });
   } catch (err) {
     return serverError("activities PATCH", err);
   }
@@ -176,7 +195,7 @@ export async function DELETE(req: Request) {
 
 // ---------------------------------------------------------------------------
 
-async function attachEvidence(profileId: number, activityId: number, raw: unknown) {
+async function attachEvidence(profileId: number, activityId: number, raw: unknown, writer: Pick<typeof db, "select" | "insert">) {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   const rows: { activityId: number; evidenceType: string; label: string; url: string | null; documentId: number | null }[] = [];
   for (const item of raw.slice(0, 12) as Record<string, unknown>[]) {
@@ -185,7 +204,7 @@ async function attachEvidence(profileId: number, activityId: number, raw: unknow
     let documentId: number | null = numberOrNull(item?.documentId);
     if (documentId != null) {
       // A document can only be attached if the student actually owns it.
-      const [owned] = await db
+      const [owned] = await writer
         .select({ id: userDocuments.id })
         .from(userDocuments)
         .where(and(eq(userDocuments.id, documentId), eq(userDocuments.profileId, profileId)))
@@ -201,7 +220,7 @@ async function attachEvidence(profileId: number, activityId: number, raw: unknow
     });
   }
   if (!rows.length) return [];
-  return db.insert(activityEvidence).values(rows).returning();
+  return writer.insert(activityEvidence).values(rows).returning();
 }
 
 function numberOrNull(v: unknown): number | null {

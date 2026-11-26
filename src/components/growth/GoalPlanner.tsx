@@ -1,17 +1,20 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
-import { AnimatePresence, m as Motion } from "framer-motion";
-import { BookOpen, Briefcase, Check, Clock, Flag, Plus, Sparkles, Trash2, Trophy, Wrench, X } from "lucide-react";
+import { useCallback, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { Plus, Trash2 } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
-import { AnimatedBar } from "../motion";
 import { useSeedText } from "./useSeedText";
-import { api, EmptyState, ErrorNote, Field, inputCls, LoadingBlock, PageHeader, Segmented, Toast, useToast } from "@/components/ui/growth";
+import { getJson, sendJson, useResource } from "@/components/journey/useResource";
 import { AppNote } from "@/components/AppNote";
 import { Button } from "@/components/ui/Button";
+import { Empty, ErrorNote, Field, inputClass, JourneyCard, Loading, Pill, ProgressBar } from "@/components/ui/journey";
+import { PanelDialog } from "@/components/ui/PanelDialog";
 
-type Pillar = "academic" | "activities" | "skills" | "career";
+const PILLARS = ["academic", "activities", "skills", "career"] as const;
+const VIEWS = { active: "viewActive", done: "viewDone", library: "viewLibrary" } as const;
+type Pillar = typeof PILLARS[number];
+type View = keyof typeof VIEWS;
 
 interface Template {
   id: number;
@@ -34,367 +37,181 @@ interface Goal {
   progress: number;
 }
 
-const PILLAR_STYLE: Record<Pillar, { icon: React.ComponentType<{ className?: string }>; chip: string; bar: string }> = {
-  academic: { icon: BookOpen, chip: "bg-indigo-100 text-indigo-700", bar: "bg-indigo-500" },
-  activities: { icon: Trophy, chip: "bg-amber-100 text-amber-700", bar: "bg-amber-500" },
-  skills: { icon: Wrench, chip: "bg-teal-100 text-teal-700", bar: "bg-teal-500" },
-  career: { icon: Briefcase, chip: "bg-rose-100 text-rose-700", bar: "bg-rose-500" },
-};
+interface GoalData {
+  templates: Template[];
+  goals: Goal[];
+  maxActive: number;
+}
 
-/**
- * Goal planner — Crimson Rise's "pick a few outcomes and work on them with a
- * strategist" idea, adapted into a self-serve tool: an admin-curated goal
- * library, a hard limit of 6 active goals, and tick-box steps.
- */
+const EMPTY: GoalData = { templates: [], goals: [], maxActive: 6 };
+const EMPTY_FORM = { title: "", pillar: "academic" as Pillar, steps: "", targetDate: "" };
+
 export function GoalPlanner({ activeProfile }: { activeProfile: StudentProfile | null }) {
   const t = useTranslations("goals");
+  const tc = useTranslations("common");
   const tr = useSeedText();
-  const [templates, setTemplates] = useState<Template[] | null>(null);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [maxActive, setMaxActive] = useState(6);
-  const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<"active" | "library" | "done">("active");
-  const [pillar, setPillar] = useState<"all" | Pillar>("all");
-  const [custom, setCustom] = useState(false);
-  const [form, setForm] = useState({ title: "", pillar: "academic" as Pillar, steps: "" });
-  const [busy, setBusy] = useState(false);
-  const [toast, showToast] = useToast();
-  const profileId = activeProfile?.id ?? null;
-
-  useEffect(() => {
-    if (!profileId) return;
-    let live = true;
-    api<{ templates: Template[]; goals: Goal[]; maxActive: number }>(`/api/goals?profileId=${profileId}`)
-      .then((d) => {
-        if (!live) return;
-        setTemplates(d.templates);
-        setGoals(d.goals);
-        setMaxActive(d.maxActive);
-        if (d.goals.filter((g) => g.status === "active").length === 0) setView("library");
-      })
-      .catch((e: Error) => live && setError(e.message));
-    return () => {
-      live = false;
-    };
-  }, [profileId]);
-
-  const active = goals.filter((g) => g.status === "active");
-  const done = goals.filter((g) => g.status === "done");
-  const adoptedIds = new Set(active.map((g) => g.templateId));
-  const pillarLabel = (p: Pillar) => t(`pillar.${p}`);
-
-  const filteredTemplates = useMemo(
-    () => (templates ?? []).filter((tp) => pillar === "all" || tp.pillar === pillar),
-    [templates, pillar]
+  const locale = useLocale();
+  const profileId = activeProfile?.id;
+  const { data, loading, error, reload, setData } = useResource(
+    useCallback(() => getJson<GoalData>(`/api/goals?profileId=${profileId}`, t("loadFailed")), [profileId, t]),
+    [profileId],
+    { initial: EMPTY, enabled: !!profileId, errorFallback: t("loadFailed") },
   );
+  const [view, setView] = useState<View>("active");
+  const [pillar, setPillar] = useState<Pillar | "all">("all");
+  const [editor, setEditor] = useState<"new" | Goal | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  const add = async (body: Record<string, unknown>) => {
-    if (!profileId) return;
+  const active = data.goals.filter((goal) => goal.status === "active");
+  const done = data.goals.filter((goal) => goal.status === "done");
+  const limited = active.length >= data.maxActive;
+  const adopted = new Set(active.map((goal) => goal.templateId));
+  const visible = (view === "done" ? done : active).filter((goal) => pillar === "all" || goal.pillar === pillar);
+  const templates = data.templates.filter((template) => pillar === "all" || template.pillar === pillar);
+  const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" });
+
+  function openEditor(target: "new" | Goal) {
+    setEditor(target);
+    setActionError("");
+    setNotice("");
+    setForm(target === "new" ? EMPTY_FORM : { title: target.title, pillar: target.pillar, targetDate: target.targetDate ?? "", steps: "" });
+  }
+
+  async function write(method: "POST" | "PUT" | "DELETE", payload: Record<string, unknown>, options: { close?: boolean; removed?: number; previous?: Goal } = {}) {
+    if (busy) return;
     setBusy(true);
+    setActionError("");
+    setNotice("");
     try {
-      const d = await api<{ goal: Goal }>("/api/goals", { method: "POST", body: JSON.stringify({ profileId, ...body }) });
-      setGoals((g) => [d.goal, ...g]);
-      showToast(t("added"));
-      setView("active");
-      setCustom(false);
-      setForm({ title: "", pillar: "academic", steps: "" });
-    } catch (e) {
-      showToast((e as Error).message);
+      const url = options.removed ? `/api/goals?id=${options.removed}` : "/api/goals";
+      const init = method === "DELETE" ? { method } : { method, body: JSON.stringify({ profileId, ...payload }) };
+      const result = await sendJson<{ goal?: Goal }>(url, init, t("saveFailed"));
+      const goal = result.goal;
+      if (options.removed) {
+        setData((previous) => ({ ...previous, goals: previous.goals.filter((item) => item.id !== options.removed) }));
+      } else if (goal) {
+        setData((previous) => ({
+          ...previous,
+          goals: method === "POST" ? [goal, ...previous.goals] : previous.goals.map((item) => item.id === goal.id ? goal : item),
+        }));
+        if (method === "POST") {
+          setView("active");
+          setPillar("all");
+          setNotice(t("added"));
+        } else if (options.previous?.status === "active" && goal.status === "done") {
+          setNotice(t("completed"));
+        }
+      }
+      if (options.close) setEditor(null);
+    } catch (failure) {
+      setActionError(failure instanceof Error ? failure.message : t("saveFailed"));
     } finally {
       setBusy(false);
     }
-  };
+  }
 
-  const update = async (goal: Goal, patch: Record<string, unknown>) => {
-    try {
-      const d = await api<{ goal: Goal }>("/api/goals", { method: "PUT", body: JSON.stringify({ id: goal.id, ...patch }) });
-      setGoals((gs) => gs.map((g) => (g.id === goal.id ? d.goal : g)));
-      if (d.goal.status === "done" && goal.status !== "done") showToast(t("completed"));
-    } catch (e) {
-      showToast((e as Error).message);
-    }
-  };
-
-  const toggleStep = (goal: Goal, idx: number) => {
-    const steps = goal.steps.map((s, i) => (i === idx ? { ...s, done: !s.done } : s));
-    // Optimistic tick so the checkbox reacts instantly.
-    setGoals((gs) => gs.map((g) => (g.id === goal.id ? { ...g, steps } : g)));
-    void update(goal, { steps });
-  };
-
-  const remove = async (goal: Goal) => {
-    if (!window.confirm(t("confirmRemove"))) return;
-    try {
-      await api(`/api/goals?id=${goal.id}`, { method: "DELETE" });
-      setGoals((gs) => gs.filter((g) => g.id !== goal.id));
-    } catch (e) {
-      showToast((e as Error).message);
-    }
-  };
-
-  if (!profileId) return <EmptyState icon={Flag} title={t("signInTitle")} body={t("signInBody")} />;
-
-  const goalCard = (g: Goal) => {
-    const st = PILLAR_STYLE[g.pillar] ?? PILLAR_STYLE.academic;
-    const Icon = st.icon;
-    return (
-      <Motion.li
-        key={g.id}
-        layout
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.97 }}
-        className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs"
-      >
-        <div className="flex items-start gap-3">
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-surface ${st.chip}`}>
-            <Icon className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-slate-900">{tr(g.title)}</p>
-            <p className="text-sm text-slate-500">
-              {pillarLabel(g.pillar)} · {t("stepsDone", { done: g.steps.filter((s) => s.done).length, total: g.steps.length })}
-            </p>
-          </div>
-          <span className="text-lg font-black text-slate-800">{g.progress}%</span>
-        </div>
-        <div className="mt-2">
-          <AnimatedBar value={g.progress} barClassName={st.bar} trackClassName="h-1.5 w-full overflow-hidden rounded-full bg-slate-100" />
-        </div>
-        <ul className="mt-3 space-y-1">
-          {g.steps.map((s, i) => (
-            <li key={i}>
-              <Button variant="unstyled" onClick={() => toggleStep(g, i)} className="flex w-full items-start gap-2 rounded-control px-1.5 py-1 text-left hover:bg-slate-50">
-                <span
-                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-control ${s.done ? "bg-emerald-700 text-white sb-ink-on-bright" : "border-2 border-slate-300"}`}
-                >
-                  {s.done && <Check className="h-3 w-3" />}
-                </span>
-                <span className={`text-xs leading-snug ${s.done ? "text-slate-500 line-through" : "text-slate-700"}`}>{tr(s.text)}</span>
-              </Button>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-          <label className="flex items-center gap-1.5 text-sm text-slate-500">
-            <Clock className="h-3.5 w-3.5" /> {t("targetDate")}
-            <input
-              type="date"
-              value={g.targetDate ?? ""}
-              onChange={(e) => void update(g, { targetDate: e.target.value || null })}
-              className="rounded-control border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700"
-            />
-          </label>
-          <div className="flex gap-1.5">
-            {g.status === "done" ? (
-              <Button variant="unstyled" onClick={() => void update(g, { status: "active" })} className="rounded-control border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
-                {t("reopen")}
-              </Button>
-            ) : (
-              <Button variant="unstyled" onClick={() => void update(g, { status: "done" })} className="rounded-control border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
-                {t("markDone")}
-              </Button>
-            )}
-            <Button variant="unstyled" onClick={() => void remove(g)} className="rounded-control border border-slate-200 p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600" aria-label={t("remove")}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      </Motion.li>
-    );
-  };
+  if (!profileId) return <Empty title={t("signInTitle")} hint={t("signInBody")} />;
+  if (loading && data === EMPTY) return <Loading label={t("loading")} />;
+  if (error && data === EMPTY) return <JourneyCard title={t("title")}><ErrorNote message={t("loadFailed")} /><Button type="button" className="mt-3 min-h-11" variant="outline" onClick={() => void reload()}>{t("retry")}</Button></JourneyCard>;
 
   return (
-    <div className="space-y-4">
-      <PageHeader icon={Flag} title={t("title")} subtitle={t("subtitle")} accent="amber">
-        <Button variant="unstyled"
-          onClick={() => {
-            setCustom(true);
-            setView("library");
-          }}
-          className="inline-flex items-center gap-1.5 rounded-surface bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
-        >
-          <Plus className="h-3.5 w-3.5" /> {t("customGoal")}
-        </Button>
-      </PageHeader>
+    <div className="space-y-3">
+      {error && <ErrorNote message={t("loadFailed")} />}
+      {!editor && actionError && <ErrorNote message={actionError} />}
+      {notice && <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300" role="status">{notice}</p>}
+      <JourneyCard title={t("title")} action={<Button type="button" className="min-h-11" disabled={busy || limited} onClick={() => openEditor("new")}><Plus className="size-4" aria-hidden />{t("addGoal")}</Button>}>
+        <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t("activeUsage", { active: active.length, max: data.maxActive })}{limited ? ` · ${t("limitReached")}` : ""}</p>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t("viewLabel")}>
+          {(Object.keys(VIEWS) as View[]).map((value) => (
+            <Button key={value} type="button" aria-pressed={view === value} variant={view === value ? "primary" : "outline"} className="min-h-11 whitespace-normal" onClick={() => { setView(value); setNotice(""); setActionError(""); }}>
+              {t(VIEWS[value])}{value !== "library" && <span className="tabular-nums">{value === "active" ? active.length : done.length}</span>}
+            </Button>
+          ))}
+        </div>
+        <div className="mt-3 max-w-xs">
+          <Field label={t("fPillar")}>
+            <select className={`${inputClass} min-h-11`} value={pillar} onChange={(event) => setPillar(event.target.value as typeof pillar)}>
+              <option value="all">{t("all")}</option>
+              {PILLARS.map((value) => <option key={value} value={value}>{t(`pillar.${value}`)}</option>)}
+            </select>
+          </Field>
+        </div>
+      </JourneyCard>
 
-      {error && <ErrorNote message={error} />}
-      {!templates && !error && <LoadingBlock label={t("loading")} />}
-
-      {templates && (
-        <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {(Object.keys(PILLAR_STYLE) as Pillar[]).map((p) => {
-              const st = PILLAR_STYLE[p];
-              const Icon = st.icon;
-              const n = active.filter((g) => g.pillar === p).length;
-              return (
-                <div key={p} className="flex items-center gap-2.5 rounded-overlay border border-slate-200 bg-white p-3">
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-control ${st.chip}`}>
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="break-words text-sm font-bold text-slate-500">{pillarLabel(p)}</p>
-                    <p className="text-lg font-black leading-none text-slate-900">{n}</p>
-                  </div>
-                </div>
-              );
-            })}
+      {view === "library" ? (
+        templates.length > 0 ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            {templates.map((template) => (
+              <JourneyCard key={template.id} title={tr(template.title)} action={<Pill tone="brand">{t(`pillar.${template.pillar}`)}</Pill>}>
+                <p className="break-words text-sm text-slate-600 dark:text-slate-300">{tr(template.description)}</p>
+                <details className="mt-2">
+                  <summary className="min-h-11 cursor-pointer py-2.5 text-sm font-semibold">{t("stepsCount", { n: template.steps.length })}{template.estWeeks ? ` · ${t("weeks", { n: template.estWeeks })}` : ""}</summary>
+                  <ol className="mb-3 list-decimal space-y-1 pl-5 text-sm">{template.steps.map((step, index) => <li key={index}>{tr(step)}</li>)}</ol>
+                </details>
+                <Button type="button" variant="outline" className="min-h-11" disabled={busy || limited || adopted.has(template.id)} onClick={() => void write("POST", { templateId: template.id })}>
+                  {adopted.has(template.id) ? t("onList") : t("addGoal")}
+                </Button>
+              </JourneyCard>
+            ))}
           </div>
-
-          <p className="rounded-surface border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            {t("focusRule", { max: maxActive, active: active.length })}
-          </p>
-
-          <Segmented
-            value={view}
-            onChange={setView}
-            options={[
-              { id: "active", label: t("viewActive"), count: active.length },
-              { id: "library", label: t("viewLibrary"), count: templates.length },
-              { id: "done", label: t("viewDone"), count: done.length },
-            ]}
-          />
-
-          {view === "active" &&
-            (active.length === 0 ? (
-              <EmptyState
-                icon={Sparkles}
-                title={t("emptyActive")}
-                body={t("emptyActiveBody")}
-                action={
-                  <Button variant="unstyled" onClick={() => setView("library")} className="rounded-surface bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600">
-                    {t("browseLibrary")}
-                  </Button>
-                }
-              />
-            ) : (
-              <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                <AnimatePresence initial={false}>{active.map(goalCard)}</AnimatePresence>
-              </ul>
-            ))}
-
-          {view === "done" &&
-            (done.length === 0 ? (
-              <EmptyState icon={Trophy} title={t("emptyDone")} />
-            ) : (
-              <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                <AnimatePresence initial={false}>{done.map(goalCard)}</AnimatePresence>
-              </ul>
-            ))}
-
-          {view === "library" && (
-            <div className="space-y-3">
-              <AnimatePresence>
-                {custom && (
-                  <Motion.form
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void add({ title: form.title, pillar: form.pillar, steps: form.steps.split("\n").map((s) => s.trim()).filter(Boolean) });
-                    }}
-                    className="overflow-hidden rounded-overlay border border-slate-200 bg-white p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-slate-900">{t("customGoal")}</p>
-                      <Button variant="unstyled" type="button" onClick={() => setCustom(false)} className="rounded-control p-1 text-slate-500 hover:bg-slate-100" aria-label={t("cancel")}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                      <div className="sm:col-span-2">
-                        <Field label={t("fTitle")}>
-                          <input required maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputCls} placeholder={t("fTitlePh")} />
-                        </Field>
-                      </div>
-                      <Field label={t("fPillar")}>
-                        <select value={form.pillar} onChange={(e) => setForm({ ...form, pillar: e.target.value as Pillar })} className={inputCls}>
-                          {(Object.keys(PILLAR_STYLE) as Pillar[]).map((p) => (
-                            <option key={p} value={p}>
-                              {pillarLabel(p)}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <div className="sm:col-span-3">
-                        <Field label={t("fSteps")} hint={t("fStepsHint")}>
-                          <textarea rows={4} value={form.steps} onChange={(e) => setForm({ ...form, steps: e.target.value })} className={inputCls} />
-                        </Field>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex justify-end">
-                      <Button variant="unstyled" disabled={busy || active.length >= maxActive} className="rounded-surface bg-amber-500 px-4 py-2 text-xs font-bold text-white sb-ink-on-warm hover:bg-amber-600 disabled:opacity-50">
-                        {t("addGoal")}
-                      </Button>
-                    </div>
-                  </Motion.form>
-                )}
-              </AnimatePresence>
-
-              <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
-                {(["all", "academic", "activities", "skills", "career"] as const).map((p) => (
-                  <Button variant="unstyled"
-                    key={p}
-                    onClick={() => setPillar(p)}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${
-                      pillar === p ? "border-amber-300 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    {p === "all" ? t("all") : pillarLabel(p)}
-                  </Button>
-                ))}
+        ) : <Empty title={t("emptyFiltered")} />
+      ) : visible.length > 0 ? (
+        <div className="grid items-start gap-3 md:grid-cols-2">
+          {visible.map((goal) => (
+            <JourneyCard key={goal.id} title={tr(goal.title)} action={<Pill tone={goal.status === "done" ? "good" : "brand"}>{t(`pillar.${goal.pillar}`)}</Pill>}>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span>{t("stepsDone", { done: goal.steps.filter((step) => step.done).length, total: goal.steps.length })}</span>
+                {goal.targetDate && <time dateTime={goal.targetDate}>{dateFormatter.format(new Date(goal.targetDate))}</time>}
               </div>
-
-              <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                {filteredTemplates.map((tp) => {
-                  const st = PILLAR_STYLE[tp.pillar] ?? PILLAR_STYLE.academic;
-                  const Icon = st.icon;
-                  const adopted = adoptedIds.has(tp.id);
-                  return (
-                    <li key={tp.id} className="flex flex-col rounded-overlay border border-slate-200 bg-white p-4">
-                      <div className="flex items-start gap-3">
-                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-surface ${st.chip}`}>
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900">{tr(tp.title)}</p>
-                          <p className="text-sm text-slate-500">
-                            {pillarLabel(tp.pillar)}
-                            {tp.estWeeks ? ` · ${t("weeks", { n: tp.estWeeks })}` : ""} · {t("stepsCount", { n: tp.steps.length })}
-                          </p>
-                        </div>
-                      </div>
-                      {tp.description && <p className="mt-2 text-sm leading-relaxed text-slate-600">{tr(tp.description)}</p>}
-                      <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-sm text-slate-500">
-                        {tp.steps.slice(0, 3).map((s, i) => (
-                          <li key={i}>{tr(s)}</li>
-                        ))}
-                        {tp.steps.length > 3 && <li className="list-none text-slate-500">{t("more", { n: tp.steps.length - 3 })}</li>}
-                      </ol>
-                      <div className="mt-auto pt-3">
-                        <Button variant="unstyled"
-                          disabled={busy || adopted || active.length >= maxActive}
-                          onClick={() => void add({ templateId: tp.id })}
-                          className={`w-full rounded-surface px-3 py-2 text-xs font-bold ${
-                            adopted ? "bg-emerald-50 text-emerald-700" : "bg-amber-500 text-white sb-ink-on-warm hover:bg-amber-600"
-                          } disabled:cursor-not-allowed disabled:opacity-70`}
-                        >
-                          {adopted ? t("onList") : active.length >= maxActive ? t("limitReached") : t("addGoal")}
-                        </Button>
-                      </div>
-                    </li>
-                  );
-                })}
+              {!!goal.steps.length && <ProgressBar pct={goal.progress} tone={goal.status === "done" ? "good" : "brand"} size="sm" label={tr(goal.title)} />}
+              <ul className="mt-2 divide-y divide-slate-200 dark:divide-slate-700">
+                {goal.steps.map((step, index) => (
+                  <li key={index}>
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 py-1.5 text-sm">
+                      <input type="checkbox" className="size-4 shrink-0 accent-indigo-600" checked={step.done} disabled={busy || (limited && goal.status === "done")} onChange={() => void write("PUT", { id: goal.id, steps: goal.steps.map((entry, stepIndex) => stepIndex === index ? { ...entry, done: !entry.done } : entry) }, { previous: goal })} />
+                      <span className={`min-w-0 break-words ${step.done ? "text-slate-600 dark:text-slate-300" : ""}`}>{tr(step.text)}</span>
+                    </label>
+                  </li>
+                ))}
               </ul>
-            </div>
-          )}
-        </>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => openEditor(goal)}>{t("editGoal")}</Button>
+                <Button type="button" variant="ghost" className="min-h-11" disabled={busy || (limited && goal.status === "done")} onClick={() => void write("PUT", { id: goal.id, status: goal.status === "done" ? "active" : "done" }, { previous: goal })}>{t(goal.status === "done" ? "reopen" : "markDone")}</Button>
+                <Button type="button" variant="ghost" size="icon" aria-label={t("remove")} disabled={busy} onClick={() => { if (window.confirm(t("confirmRemove"))) void write("DELETE", {}, { removed: goal.id }); }}><Trash2 className="size-4" aria-hidden /></Button>
+              </div>
+            </JourneyCard>
+          ))}
+        </div>
+      ) : (
+        <Empty title={pillar !== "all" ? t("emptyFiltered") : view === "done" ? t("emptyDone") : t("emptyActive")} hint={view === "active" && pillar === "all" ? t("emptyActiveBody") : undefined}
+          action={view === "active" && pillar === "all" ? <Button type="button" className="min-h-11" variant="outline" onClick={() => setView("library")}>{t("browseLibrary")}</Button> : undefined} />
       )}
-      <Toast message={toast} />
-      {/* Standing small print: this panel can be wrong — say so where it is read. */}
-      <AppNote kind="planning" className="mt-2" />
+      {editor && (
+        <PanelDialog title={editor === "new" ? t("addGoal") : t("editGoal")} busy={busy} error={actionError} onClose={() => { setEditor(null); setActionError(""); }}>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => {
+            event.preventDefault();
+            const title = form.title.trim();
+            if (!title) return;
+            if (editor !== "new") {
+              void write("PUT", { id: editor.id, title, targetDate: form.targetDate || null }, { previous: editor, close: true });
+              return;
+            }
+            const steps = form.steps.split("\n").map((step) => step.trim()).filter(Boolean);
+            if (!steps.length) { setActionError(t("fStepsHint")); return; }
+            void write("POST", { title, pillar: form.pillar, steps, targetDate: form.targetDate || null }, { close: true });
+          }}>
+            <div className="sm:col-span-2"><Field label={t("fTitle")}><input className={inputClass} required maxLength={120} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field></div>
+            {editor === "new" && <Field label={t("fPillar")}><select className={inputClass} value={form.pillar} onChange={(event) => setForm({ ...form, pillar: event.target.value as Pillar })}>{PILLARS.map((value) => <option key={value} value={value}>{t(`pillar.${value}`)}</option>)}</select></Field>}
+            <Field label={t("targetDate")}><input className={inputClass} type="date" value={form.targetDate} onChange={(event) => setForm({ ...form, targetDate: event.target.value })} /></Field>
+            {editor === "new" && <div className="sm:col-span-2"><Field label={t("fSteps")} hint={t("fStepsHint")}><textarea rows={3} className={inputClass} required maxLength={1200} value={form.steps} onChange={(event) => setForm({ ...form, steps: event.target.value })} /></Field></div>}
+            <Button type="submit" className="min-h-11 justify-self-start" disabled={busy || !form.title.trim()}>{editor === "new" ? t("addGoal") : tc("save")}</Button>
+          </form>
+        </PanelDialog>
+      )}
+      <AppNote kind="planning" />
     </div>
   );
 }

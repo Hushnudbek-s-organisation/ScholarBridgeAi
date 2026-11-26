@@ -8,7 +8,7 @@
  * same visual language, and because together they cover the whole PREPARE
  * group of the sidebar.
  */
-import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
 import { CalendarPlus, Check, ExternalLink, Link2, Plus, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
@@ -22,6 +22,7 @@ import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCar
 import type { ActivitySample } from "@/lib/samples/exemplars";
 import { isUnmodifiedSample } from "@/lib/samples/text";
 import { Button } from "@/components/ui/Button";
+import { PanelDialog } from "@/components/ui/PanelDialog";
 
 // ===========================================================================
 // DOCUMENT VAULT (spec §7)
@@ -279,39 +280,6 @@ const emptyTestForm: TestForm = {
   testType: "", roadmap: "", currentScore: "", targetScore: "", targetDate: "", nextTestDate: "", attemptDate: "", score: "",
 };
 
-function PlanEditor({ title, busy, error, onClose, children }: {
-  title: string;
-  busy: boolean;
-  error: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const tc = useTranslations("common");
-  const id = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    dialog.showModal();
-    return () => { if (dialog.open) dialog.close(); };
-  }, []);
-  return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby={id}
-      className="m-auto max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-lg overflow-y-auto rounded-overlay border border-slate-200 bg-white p-4 text-slate-900 shadow-xl backdrop:bg-slate-950/70 dark:border-slate-700 dark:bg-surface dark:text-slate-100 sm:p-6"
-      onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
-    >
-      <header className="mb-4 flex items-start justify-between gap-3">
-        <h2 id={id} className="break-words text-lg font-bold">{title}</h2>
-        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onClose}>{tc("close")}</Button>
-      </header>
-      {error && <div className="mb-3"><ErrorNote message={error} /></div>}
-      {children}
-    </dialog>
-  );
-}
-
 function planDate(value: string | null | undefined, locale: string): string | null {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const day = new Date(value + "T12:00:00Z");
@@ -517,7 +485,7 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
         </details>
       )}
       {editor && (
-        <PlanEditor title={editor === "add" ? t("mpAddTest") : editor === "attempt" ? t("tpRecordAttempt") : t("mpEditTest")} busy={busy} error={actionError} onClose={() => setEditor(null)}>
+        <PanelDialog title={editor === "add" ? t("mpAddTest") : editor === "attempt" ? t("tpRecordAttempt") : t("mpEditTest")} busy={busy} error={actionError} onClose={() => setEditor(null)}>
           <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
             {editor === "add" ? (
               <>
@@ -548,7 +516,7 @@ export function TestPlannerPanel({ profileId }: { profileId: number }) {
             )}
             <div className="sm:col-span-2"><Button type="submit" className="min-h-11" disabled={busy}>{editor === "add" ? t("mpAddTest") : tc("save")}</Button></div>
           </form>
-        </PlanEditor>
+        </PanelDialog>
       )}
     </div>
   );
@@ -750,7 +718,7 @@ export function StudyPlanPanel({
         </JourneyCard>
       )}
       {editing && (
-        <PlanEditor title={plan ? t("mpEditGoal") : t("spCreate")} busy={busy} error={actionError} onClose={() => setEditing(false)}>
+        <PanelDialog title={plan ? t("mpEditGoal") : t("spCreate")} busy={busy} error={actionError} onClose={() => setEditing(false)}>
           <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => {
             event.preventDefault();
             if (!form.title.trim()) return;
@@ -769,7 +737,7 @@ export function StudyPlanPanel({
               {!plan && <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={prefill}>{t("mpPrefill")}</Button>}
             </div>
           </form>
-        </PlanEditor>
+        </PanelDialog>
       )}
     </div>
   );
@@ -796,164 +764,234 @@ interface ActivityData {
   summary: { total: number; totalHours: number; withEvidence: number };
 }
 
+const EMPTY_ACTIVITY = { category: "project", title: "", role: "", organization: "", hours: "", description: "", achievements: "", evidenceLabel: "", evidenceUrl: "" };
+
+function evidenceLink(value: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function ActivityPortfolioPanel({ profileId }: { profileId: number }) {
   const t = useTranslations("journey");
   const ts = useTranslations("samples");
+  const tc = useTranslations("common");
   const { data, loading, error, reload } = useResource<ActivityData>(
     useCallback(() => getJson<ActivityData>(`/api/activities?profileId=${profileId}`, t("actLoadError")), [profileId, t]),
     [profileId],
     { initial: { categories: [], activities: [], summary: { total: 0, totalHours: 0, withEvidence: 0 } }, errorFallback: t("actLoadError") }
   );
+  const [category, setCategory] = useState("all");
+  const [details, setDetails] = useState<ActivityRow | null>(null);
+  const [editing, setEditing] = useState<"new" | ActivityRow | null>(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ category: "volunteering", title: "", role: "", organization: "", hours: "", description: "", achievements: "" });
-  // SPEC §14: never fabricate activities. An example may fill the form on an
-  // explicit click, but it cannot be added until its claims are replaced.
+  const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [form, setForm] = useState(EMPTY_ACTIVITY);
   const [loadedActivity, setLoadedActivity] = useState<ActivitySample | null>(null);
-  const formHoldsSample =
-    loadedActivity != null &&
+
+  // An example may fill the form on request. Replace its sample claims before saving.
+  const formHoldsSample = loadedActivity != null &&
     (isUnmodifiedSample(form.title, loadedActivity.activity.title) ||
       isUnmodifiedSample(form.description, loadedActivity.activity.description) ||
       isUnmodifiedSample(form.achievements, loadedActivity.activity.achievements));
 
-  const loadActivitySample = (sample: ActivitySample) => {
-    const a = sample.activity;
+  function openEditor(item: "new" | ActivityRow) {
+    setDetails(null);
+    setLoadedActivity(null);
+    setActionError("");
+    setNotice("");
+    setForm(item === "new" ? EMPTY_ACTIVITY : {
+      ...EMPTY_ACTIVITY,
+      title: item.title,
+      category: item.category,
+      role: item.role ?? "",
+      organization: item.organization ?? "",
+      hours: item.hours?.toString() ?? "",
+      description: item.description ?? "",
+      achievements: item.achievements ?? "",
+    });
+    setEditing(item);
+  }
+
+  function loadActivitySample(sample: ActivitySample) {
+    const activity = sample.activity;
     setForm({
-      category: a.category,
-      title: a.title,
-      role: a.role,
-      organization: a.organization,
-      hours: String(a.hours),
-      description: a.description,
-      achievements: a.achievements,
+      ...EMPTY_ACTIVITY,
+      category: activity.category,
+      title: activity.title,
+      role: activity.role,
+      organization: activity.organization,
+      hours: String(activity.hours),
+      description: activity.description,
+      achievements: activity.achievements,
     });
     setLoadedActivity(sample);
-  };
+  }
 
-  const add = async () => {
-    if (!form.title.trim() || formHoldsSample) return;
+  function change(key: keyof typeof EMPTY_ACTIVITY, value: string) {
+    setForm((previous) => ({ ...previous, [key]: value }));
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (!editing || !form.title.trim() || formHoldsSample || busy) return;
+    const { evidenceLabel, evidenceUrl, ...fields } = form;
+    const link = evidenceLink(evidenceUrl.trim());
+    if (evidenceUrl.trim() && (!link || !evidenceLabel.trim())) {
+      setActionError(t("actEvidenceError"));
+      return;
+    }
     setBusy(true);
+    setActionError("");
     try {
-      await sendJson(
-        "/api/activities",
-        { method: "POST", body: JSON.stringify({ profileId, ...form, hours: form.hours ? Number(form.hours) : null }) },
-        t("actSaveError")
-      );
-      setForm({ category: "volunteering", title: "", role: "", organization: "", hours: "", description: "", achievements: "" });
-      setLoadedActivity(null);
+      const evidence = evidenceLabel.trim() ? { evidenceType: "url", label: evidenceLabel.trim(), url: link } : undefined;
+      await sendJson("/api/activities", {
+        method: editing === "new" ? "POST" : "PATCH",
+        body: JSON.stringify({
+          profileId,
+          ...fields,
+          title: fields.title.trim(),
+          hours: fields.hours ? Number(fields.hours) : null,
+          ...(editing === "new" ? { evidence: evidence ? [evidence] : undefined } : { id: editing.id, appendEvidence: evidence }),
+        }),
+      }, t("actSaveError"));
       await reload();
+      if (category !== fields.category) setCategory("all");
+      setEditing(null);
+      setNotice(t("mpSaved"));
+    } catch {
+      setActionError(t("actSaveError"));
     } finally {
       setBusy(false);
     }
-  };
+  }
 
-  const remove = async (id: number) => {
-    await fetch(`/api/activities?profileId=${profileId}&id=${id}`, { method: "DELETE" });
-    await reload();
-  };
+  async function remove(item: ActivityRow) {
+    if (busy || !window.confirm(t("actConfirmDelete"))) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      await sendJson(`/api/activities?profileId=${profileId}&id=${item.id}`, { method: "DELETE" }, t("actSaveError"));
+      await reload();
+      setDetails(null);
+    } catch {
+      setActionError(t("actSaveError"));
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  if (loading && data.activities.length === 0) return <Loading label={t("actLoading")} />;
+  if (loading && !data.categories.length) return <Loading label={t("actLoading")} />;
+  if (error && !data.categories.length) return <JourneyCard title={t("actTitle")}><ErrorNote message={error} /><Button type="button" className="mt-3 min-h-11" variant="outline" onClick={() => void reload()}>{t("mpRetry")}</Button></JourneyCard>;
+
+  const categories = data.categories.length ? data.categories : ["volunteering", "leadership", "project"];
+  const categoryLabel = (value: string) => t.has(`actCat_${value}`) ? t(`actCat_${value}`) : value;
+  const visible = data.activities.filter((item) => category === "all" || category === item.category);
+  const showEvidenceFields = editing === "new" || (editing && editing.evidence.length < 12);
 
   return (
-    <div className="space-y-4">
-      <JourneyCard
-        title={t("actTitle")}
-        subtitle={t("actSubtitle")}
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Pill tone="slate">{data.summary.total}</Pill>
-            <Pill tone="brand">{data.summary.totalHours}h</Pill>
-            <Pill tone="good">{t("actWithEvidence", { count: data.summary.withEvidence })}</Pill>
-          </div>
-        }
-      >
-        {error && <ErrorNote message={error} />}
-        <SampleExemplarBar group="activity" className="mb-3" loadLabel={ts("activityLoad")} onLoad={loadActivitySample} />
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-3">
+      {error && <ErrorNote message={error} />}
+      {notice && <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300" role="status">{notice}</p>}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <JourneyCard title={t("actTitle")} tone="accent" action={<Button type="button" className="min-h-11" onClick={() => openEditor("new")}><Plus className="size-4" aria-hidden />{t("actAdd")}</Button>}>
+          <p className="text-sm text-slate-600 dark:text-slate-300">{t("actOverviewHint")}</p>
+        </JourneyCard>
+        <JourneyCard title={t("actSummary")}>
+          <dl className="grid grid-cols-3 gap-1.5">
+            {[
+              [t("actTotalLabel"), data.summary.total],
+              [t("actHours"), data.summary.totalHours],
+              [t("actEvidenceCount"), data.summary.withEvidence],
+            ].map(([label, number]) => <div key={label} className="min-w-0 rounded-surface bg-slate-50 p-2 dark:bg-slate-800"><dt className="break-words text-xs text-slate-600 dark:text-slate-300">{label}</dt><dd className="text-lg font-bold tabular-nums">{number}</dd></div>)}
+          </dl>
+        </JourneyCard>
+      </div>
+      <JourneyCard title={t("actSavedList")}>
+        <div className="mb-3 max-w-xs">
           <Field label={t("actCategory")}>
-            <select className={inputClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-              {(data.categories.length ? data.categories : ["volunteering", "leadership", "project"]).map((c) => (
-                <option key={c} value={c}>
-                  {t(`actCat_${c}` as never)}
-                </option>
-              ))}
+            <select value={category} className={`${inputClass} min-h-11`} onChange={(event) => setCategory(event.target.value)}>
+              <option value="all">{t("actAllCategories")}</option>
+              {categories.map((value) => <option key={value} value={value}>{categoryLabel(value)}</option>)}
             </select>
           </Field>
-          <Field label={t("actFieldTitle")}>
-            <input className={inputClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={t("actTitlePlaceholder")} />
-          </Field>
-          <Field label={t("actRole")}>
-            <input className={inputClass} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder={t("actRolePlaceholder")} />
-          </Field>
-          <Field label={t("actOrganization")}>
-            <input className={inputClass} value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })} />
-          </Field>
-          <Field label={t("actHours")}>
-            <input className={inputClass} type="number" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} />
-          </Field>
-          <div className="sm:col-span-1 lg:col-span-3">
-            <Field label={t("actDescription")}>
-              <input className={inputClass} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            </Field>
-          </div>
-          <div className="sm:col-span-2 lg:col-span-4">
-            <Field label={t("actAchievements")} hint={t("actAchievementsHint")}>
-              <input className={inputClass} value={form.achievements} onChange={(e) => setForm({ ...form, achievements: e.target.value })} />
-            </Field>
-          </div>
         </div>
-        {loadedActivity && (
-          <p role="status" className={`mt-3 text-sm leading-relaxed ${formHoldsSample ? "font-semibold text-violet-800 dark:text-violet-200" : "text-slate-600"}`}>
-            {formHoldsSample ? ts("activityLoaded") : ts("loadedNotice")}
-          </p>
+        {visible.length === 0 ? <Empty title={category === "all" ? t("actEmptyTitle") : t("actEmptyFiltered")} hint={category === "all" ? t("actEmptyHint") : undefined} /> : (
+          <ul className="grid gap-2 md:grid-cols-2">
+            {visible.map((item) => (
+              <li key={item.id} className="min-w-0 space-y-2 rounded-surface border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/80">
+                <div className="flex flex-wrap gap-1.5"><Pill tone="brand">{categoryLabel(item.category)}</Pill>{item.evidence.length > 0 && <Pill tone="good">{t("actEvidenceCount")}</Pill>}</div>
+                <h3 className="break-words text-sm font-bold">{item.title}</h3>
+                {(item.role || item.organization || item.hours != null) && <p className="break-words text-sm text-slate-600 dark:text-slate-300">{[item.role, item.organization, item.hours != null ? t("actHoursValue", { hours: item.hours }) : null].filter(Boolean).join(" · ")}</p>}
+                <Button type="button" className="min-h-11" variant="outline" aria-label={t("actDetailsFor", { title: item.title })} onClick={() => { setActionError(""); setDetails(item); }}>{t("actDetails")}</Button>
+              </li>
+            ))}
+          </ul>
         )}
-        <Button className="mt-3" onClick={add} disabled={busy || !form.title.trim() || formHoldsSample}>
-          <Plus className="h-3.5 w-3.5" />{t("actAdd")}
-        </Button>
       </JourneyCard>
+      <details className="rounded-overlay border border-slate-200 bg-white px-4 dark:border-slate-700 dark:bg-slate-900">
+        <summary className="min-h-11 cursor-pointer py-2.5 font-semibold">{t("actExample")}</summary>
+        <p className="mb-1 text-sm text-slate-600 dark:text-slate-300">{t("actExampleHint")}</p>
+        <Button type="button" className="mb-3 min-h-11" variant="outline" onClick={() => openEditor("new")}>{t("actAdd")}</Button>
+      </details>
 
-      {data.activities.length === 0 ? (
-        <Empty
-          title={t("actEmptyTitle")}
-          hint={t("actEmptyHint")}
-        />
-      ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {data.activities.map((a) => (
-            <div key={a.id} className="sb-card-hover rounded-surface border border-slate-200 p-3 dark:border-slate-700">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{a.title}</p>
-                  <p className="text-sm text-slate-500">
-                    {a.category}
-                    {a.role && ` · ${a.role}`}
-                    {a.organization && ` · ${a.organization}`}
-                    {a.hours ? ` · ${a.hours}h` : ""}
-                  </p>
-                </div>
-                <Button size="sm" variant="danger" onClick={() => void remove(a.id)} aria-label={t("actDelete", { title: a.title })}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+      {(editing || details) && (
+        <PanelDialog
+          title={editing === "new" ? t("actAdd") : editing ? t("actEdit") : details?.title ?? ""}
+          busy={busy}
+          error={actionError}
+          className="max-w-2xl"
+          onClose={() => { setEditing(null); setDetails(null); setActionError(""); }}
+        >
+          {details && !editing ? (
+            <div className="space-y-3">
+              <Pill tone="brand">{categoryLabel(details.category)}</Pill>
+              {details.description && <p className="whitespace-pre-wrap break-words text-sm">{details.description}</p>}
+              {details.achievements && <p className="whitespace-pre-wrap break-words text-sm font-semibold">{details.achievements}</p>}
+              {details.evidence.length > 0 ? (
+                <ul className="flex flex-wrap gap-2">
+                  {details.evidence.map((item) => {
+                    const link = evidenceLink(item.url);
+                    return <li key={item.id}>{link ? (
+                      <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 break-words font-semibold text-indigo-700 underline underline-offset-2 dark:text-indigo-300"><Link2 className="size-4 shrink-0" aria-hidden />{item.label}</a>
+                    ) : <Pill tone="slate">{item.label}</Pill>}</li>;
+                  })}
+                </ul>
+              ) : <p className="text-sm text-slate-600 dark:text-slate-300">{t("actNoEvidence")}</p>}
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => openEditor(details)}>{t("actEdit")}</Button>
+                <Button type="button" variant="ghost" size="icon" disabled={busy} onClick={() => void remove(details)} aria-label={t("actDelete", { title: details.title })}><Trash2 className="size-4" aria-hidden /></Button>
               </div>
-              {a.description && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{a.description}</p>}
-              {a.achievements && <p className="mt-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">{a.achievements}</p>}
-              {a.evidence.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {a.evidence.map((e) => (
-                    <a
-                      key={e.id}
-                      href={e.url ?? "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200"
-                    >
-                      <Link2 className="h-2.5 w-2.5" /> {e.label}
-                    </a>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
-        </div>
+          ) : (
+            <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => void save(event)}>
+              <Field label={t("actFieldTitle")}><input required maxLength={200} value={form.title} className={inputClass} onChange={(event) => change("title", event.target.value)} /></Field>
+              <Field label={t("actCategory")}><select className={inputClass} value={form.category} onChange={(event) => change("category", event.target.value)}>{categories.map((value) => <option key={value} value={value}>{categoryLabel(value)}</option>)}{!categories.includes(form.category) && <option value={form.category}>{categoryLabel(form.category)}</option>}</select></Field>
+              <Field label={t("actRole")}><input maxLength={120} className={inputClass} value={form.role} onChange={(event) => change("role", event.target.value)} /></Field>
+              <Field label={t("actOrganization")}><input maxLength={160} className={inputClass} value={form.organization} onChange={(event) => change("organization", event.target.value)} /></Field>
+              <Field label={t("actHours")}><input type="number" min={0} step="any" className={inputClass} value={form.hours} onChange={(event) => change("hours", event.target.value)} /></Field>
+              <div className="sm:col-span-2"><Field label={t("actDescription")}><textarea className={inputClass} rows={3} value={form.description} maxLength={4000} onChange={(event) => change("description", event.target.value)} /></Field></div>
+              <div className="sm:col-span-2"><Field label={t("actAchievements")} hint={t("actAchievementsHint")}><textarea className={inputClass} rows={2} value={form.achievements} maxLength={4000} onChange={(event) => change("achievements", event.target.value)} /></Field></div>
+              {showEvidenceFields && <>
+                <Field label={t("actEvidenceLabel")}><input className={inputClass} maxLength={160} value={form.evidenceLabel} onChange={(event) => change("evidenceLabel", event.target.value)} /></Field>
+                <Field label={t("actEvidenceUrl")}><input type="url" className={inputClass} maxLength={800} value={form.evidenceUrl} onChange={(event) => change("evidenceUrl", event.target.value)} /></Field>
+              </>}
+              {editing === "new" && (
+                <details className="sm:col-span-2">
+                  <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">{t("actExample")}</summary>
+                  <SampleExemplarBar group="activity" loadLabel={ts("activityLoad")} onLoad={loadActivitySample} />
+                </details>
+              )}
+              {loadedActivity && <p role="status" className="text-sm text-slate-600 dark:text-slate-300 sm:col-span-2">{formHoldsSample ? ts("activityLoaded") : ts("loadedNotice")}</p>}
+              <div className="sm:col-span-2"><Button type="submit" className="min-h-11" disabled={busy || !form.title.trim() || formHoldsSample}>{editing === "new" ? t("actAdd") : tc("save")}</Button></div>
+            </form>
+          )}
+        </PanelDialog>
       )}
     </div>
   );

@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   try {
-    const access = await requireProfileAccess(req, undefined);
+    const access = await requireProfileAccess(req, new URL(req.url).searchParams.get("profileId"));
     if (!access.ok) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }

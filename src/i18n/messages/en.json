@@ -1366,7 +1366,16 @@
       "budgetPlan": "Add an annual budget if you want to compare study costs.",
       "incomeDetail": "Add household income only if it is relevant to a funding assessment.",
       "fundingPreference": "Record whether you are seeking aid if you want to compare funding options."
-    }
+    },
+    "recordedSections": "Sections with profile details",
+    "recorded": "Recorded",
+    "nextStep": "Next step",
+    "reviewTitle": "Review your profile",
+    "reviewHint": "Update the profile when your grades, results or plans change.",
+    "breakdownTitle": "Profile breakdown",
+    "breakdownToggle": "Review {total} profile areas",
+    "loadFailed": "Could not load profile details.",
+    "retry": "Try again"
   },
   "costPlanner": {
     "savedCount": "{count, plural, one {# saved scholarship} other {# saved scholarships}}",
@@ -2749,7 +2758,25 @@
     "opRepayableLoans": "Confirmed repayable loans",
     "opTuitionBasisLabel": "Tuition basis / period",
     "fpUsdRounding": "Stored in whole USD, rounded to the nearest dollar. Original fractional amounts are not retained.",
-    "fpUsdAmountInvalid": "Enter a non-negative USD amount within the supported range."
+    "fpUsdAmountInvalid": "Enter a non-negative USD amount within the supported range.",
+    "actOverviewHint": "Projects, volunteering, leadership and other experience.",
+    "actSummary": "Portfolio summary",
+    "actTotalLabel": "Saved",
+    "actEvidenceCount": "With evidence",
+    "actSavedList": "Saved activities",
+    "actAllCategories": "All types",
+    "actEmptyFiltered": "No activities of this type",
+    "actHoursValue": "{hours, plural, one {# hour} other {# hours}}",
+    "actDetails": "Details",
+    "actDetailsFor": "Details for {title}",
+    "actExample": "Activity examples",
+    "actExampleHint": "Use the examples in the activity form to see how to describe your own contribution and results.",
+    "actEdit": "Edit activity",
+    "actNoEvidence": "No evidence recorded",
+    "actConfirmDelete": "Remove this activity?",
+    "actEvidenceLabel": "Evidence description (optional)",
+    "actEvidenceUrl": "Evidence link (optional)",
+    "actEvidenceError": "Enter an evidence description with a valid web link."
   },
   "autopilot": {
     "title": "Scholarship Autopilot",
@@ -2878,7 +2905,14 @@
       "activities": "Activities",
       "skills": "Skills",
       "career": "University & career"
-    }
+    },
+    "activeUsage": "{active} of {max} active goals",
+    "viewLabel": "Goal view",
+    "editGoal": "Edit goal",
+    "emptyFiltered": "No goals in this view",
+    "loadFailed": "Could not load goals.",
+    "saveFailed": "Could not save your change.",
+    "retry": "Try again"
   },
   "departure": {
     "dateLabel": "Planned departure date",
@@ -2978,7 +3012,10 @@
       "similar_sat": "similar SAT",
       "target_country": "your target country",
       "same_home_country": "same home country"
-    }
+    },
+    "viewLabel": "Story view",
+    "viewSimilar": "Students like me",
+    "optionalDetails": "Additional story details"
   },
   "admin": {
     "title": "Admin Panel",
@@ -4495,7 +4532,7 @@
     "introScholarships": "One place for funding. Browse the catalog or open the queue matched to your profile — every recommendation says why it matched, what you meet and what is unknown. Nothing is submitted for you.",
     "introStudyPlan": "Your plan and your tests together, so a test date and the task that prepares for it can never drift apart.",
     "introTasks": "Everything with a date in one timeline: what it is, why it matters, when it is due, and the page where you do it.",
-    "introProfile": "What universities see, and what to improve next. A readiness score describes your inputs — it never guarantees admission.",
+    "introProfile": "Review your profile details, track goals and activities, and explore student stories.",
     "introFunding": "Plan the money before you apply: the full yearly cost, your budget, funding you already have, and the gap that is left.",
     "introApplications": "One tracker and one workspace per application: status, progress, next deadline and the next useful action.",
     "introMaterials": "The reusable material behind every application: requirements, documents, saved answers, essays, recommendations and interview practice.",

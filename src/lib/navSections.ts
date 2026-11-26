@@ -187,7 +187,6 @@ export const NAV_SECTIONS: NavSectionMeta[] = [
       { id: "goals", label: "Goals", isNew: true, description: "Up to six focused goals with step-by-step progress." },
       { id: "activities", label: "Activities", description: "Volunteering, leadership, projects and competitions — with evidence." },
       { id: "stories", label: "Stories", isNew: true, description: "Moderated stories of admitted students and a 'find my twin' match." },
-      { id: "similar", label: "Students like me", description: "Accepted students whose profiles are close to yours." },
     ],
   },
   {
@@ -502,6 +501,8 @@ export function resolveNavTarget(id: string, pane?: string | null): NavTarget | 
 
   const destination = NAV_SECTIONS.find((s) => s.id === clean);
   if (destination) {
+    // Preserve historical links to the similar-outcomes view inside Stories.
+    if (destination.id === "profile" && wantedPane === "similar") return { section: "profile", pane: "similar", utility: false };
     const wanted = wantedPane ? destination.panes.find((p) => p.id === wantedPane) : undefined;
     const fallback = destination.panes[0]?.id ?? null;
     return { section: destination.id, pane: wanted ? wanted.id : fallback, utility: false };

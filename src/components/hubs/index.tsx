@@ -405,28 +405,30 @@ export function ProfileHub({
   onOpenProfileModal,
 }: HubProps) {
   const t = useTranslations("hubs");
-  const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("profile");
-  const active = useActivePane(pane, visible, hidden);
+  const active = useActivePane(pane === "similar" ? "stories" : pane, visible, hidden);
+  const openProfile = onOpenProfileModal ? () => onOpenProfileModal(false) : undefined;
   if (!profile) return <MissingProfile />;
 
   return (
     <HubPage
       title={label}
       intro={t("introProfile")}
-      primaryLabel={t("primaryProfile")}
-      onPrimary={() => onOpenProfileModal?.(false)}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "warn", text: td("estimate") }}
     >
-      {active === "readiness" && <ProfileStrengthPanel activeProfile={profile} />}
-      {active === "goals" && <GoalPlanner activeProfile={profile} />}
-      {active === "activities" && <ActivityPortfolioPanel profileId={profile.id} />}
-      {active === "stories" && <SuccessStories activeProfile={profile} />}
-      {active === "similar" && <SimilarProfiles activeProfile={profile} />}
+      {active === "readiness" && <ProfileStrengthPanel key={profile.id} activeProfile={profile} onEditProfile={openProfile} />}
+      {active === "goals" && <GoalPlanner key={profile.id} activeProfile={profile} />}
+      {active === "activities" && <ActivityPortfolioPanel key={profile.id} profileId={profile.id} />}
+      {active === "stories" && (
+        <SuccessStories key={profile.id} activeProfile={profile} similar={hidden.includes("similar") ? undefined : {
+          active: pane === "similar",
+          setActive: (show) => setPane(show ? "similar" : "stories"),
+          panel: <SimilarProfiles activeProfile={profile} />,
+        }} />
+      )}
     </HubPage>
   );
 }
