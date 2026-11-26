@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { studentProfiles, studyPlanPhases, studyPlans } from "@/db/schema";
+import { studentProfiles, studyPlanPhases, studyPlans, testPlans } from "@/db/schema";
 import { guardStudent, idParam, jsonError, readBody, serverError, text } from "@/lib/journey/api";
 import { buildPhaseProgress, PLAN_PHASES } from "@/lib/journey/planning";
 
@@ -27,10 +27,14 @@ export async function GET(req: Request) {
       .orderBy(asc(studyPlans.id))
       .limit(1);
 
-    const live = await phaseProgress(profileId);
-    const storedPhases = plan
-      ? await db.select().from(studyPlanPhases).where(eq(studyPlanPhases.planId, plan.id))
-      : [];
+    const [live, storedPhases, nextTests] = await Promise.all([
+      phaseProgress(profileId),
+      plan ? db.select().from(studyPlanPhases).where(eq(studyPlanPhases.planId, plan.id)) : [],
+      db.select({ id: testPlans.id, testType: testPlans.testType, date: testPlans.nextTestDate })
+        .from(testPlans)
+        .where(and(eq(testPlans.profileId, profileId), eq(testPlans.isActive, true), isNotNull(testPlans.nextTestDate)))
+        .orderBy(asc(testPlans.nextTestDate)),
+    ]);
     const phases = live.map((phase) => {
       const stored = storedPhases.find((item) => item.phaseKey === phase.key);
       // A timestamp distinguishes an explicit student choice from the default
@@ -49,6 +53,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       plan: plan ?? null,
       phases,
+      nextTests,
       phaseDefinitions: PLAN_PHASES.map((p) => ({ key: p.key, title: p.title, description: p.description, icon: p.icon, tab: p.tab })),
     });
   } catch (err) {
@@ -144,9 +149,14 @@ export async function PATCH(req: Request) {
       .limit(1);
     if (!plan) return jsonError(404, "Plan not found", "not_found");
     const patch: Record<string, unknown> = { updatedAt: new Date() };
-    if (b.value.title !== undefined) patch.title = text(b.value.title, 160);
+    if (b.value.title !== undefined) {
+      const title = text(b.value.title, 160);
+      if (!title) return jsonError(400, "title is required", "bad_request");
+      patch.title = title;
+    }
     if (b.value.targetMajor !== undefined) patch.targetMajor = text(b.value.targetMajor, 120);
     if (b.value.targetCountry !== undefined) patch.targetCountry = text(b.value.targetCountry, 120);
+    if (b.value.fundingGoal !== undefined) patch.fundingGoal = text(b.value.fundingGoal, 120);
     if (b.value.goalYear !== undefined) {
       const y = Number(b.value.goalYear);
       patch.goalYear = Number.isInteger(y) && y > 1990 ? y : null;

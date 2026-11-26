@@ -8,7 +8,7 @@
  * same visual language, and because together they cover the whole PREPARE
  * group of the sidebar.
  */
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { CalendarPlus, Check, ExternalLink, Link2, Plus, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
@@ -17,7 +17,6 @@ import { SmartTimelineCalendar } from "@/components/SmartTimelineCalendar";
 import { Empty, ErrorNote, Field, InlineAlert, JourneyCard, Loading, Pill, ProgressBar, StatusIcon, daysLabel, inputClass, toneForDays } from "@/components/ui/journey";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
-import { AppNote } from "@/components/AppNote";
 import { SampleExemplarBar } from "@/components/samples/SampleExemplarBar";
 import { DocumentTemplatesCard } from "@/components/samples/DocumentTemplatesCard";
 import type { ActivitySample } from "@/lib/samples/exemplars";
@@ -273,308 +272,284 @@ interface TestData {
   catalogueSignals: { testType: string; catalogueFigure: number; universities: string[] }[];
 }
 
+type TestEditor = "add" | "settings" | "attempt";
+type TestForm = { testType: string; roadmap: string; currentScore: string; targetScore: string; targetDate: string; nextTestDate: string; attemptDate: string; score: string };
+
+const emptyTestForm: TestForm = {
+  testType: "", roadmap: "", currentScore: "", targetScore: "", targetDate: "", nextTestDate: "", attemptDate: "", score: "",
+};
+
+function PlanEditor({ title, busy, error, onClose, children }: {
+  title: string;
+  busy: boolean;
+  error: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const tc = useTranslations("common");
+  const id = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.showModal();
+    return () => { if (dialog.open) dialog.close(); };
+  }, []);
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={id}
+      className="m-auto max-h-[90dvh] w-[calc(100%-1.5rem)] max-w-lg overflow-y-auto rounded-overlay border border-slate-200 bg-white p-4 text-slate-900 shadow-xl backdrop:bg-slate-950/70 dark:border-slate-700 dark:bg-surface dark:text-slate-100 sm:p-6"
+      onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
+    >
+      <header className="mb-4 flex items-start justify-between gap-3">
+        <h2 id={id} className="break-words text-lg font-bold">{title}</h2>
+        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onClose}>{tc("close")}</Button>
+      </header>
+      {error && <div className="mb-3"><ErrorNote message={error} /></div>}
+      {children}
+    </dialog>
+  );
+}
+
+function planDate(value: string | null | undefined, locale: string): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const day = new Date(value + "T12:00:00Z");
+  if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== value) return null;
+  if (locale === "uz") return value.split("-").reverse().join(".");
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(day);
+}
+
 export function TestPlannerPanel({ profileId }: { profileId: number }) {
   const t = useTranslations("journey");
+  const tc = useTranslations("common");
+  const { locale } = useLocaleContext();
   const { data, loading, error, reload } = useResource<TestData>(
     useCallback(() => getJson<TestData>(`/api/test-planner?profileId=${profileId}`, t("tpLoadError")), [profileId, t]),
     [profileId],
     { initial: { testTypes: [], roadmaps: [], plans: [], catalogueSignals: [] }, errorFallback: t("tpLoadError") }
   );
+  const [selected, setSelected] = useState<number | null>(null);
+  const [editor, setEditor] = useState<TestEditor | null>(null);
+  const [form, setForm] = useState<TestForm>(emptyTestForm);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  const save = async (payload: Record<string, unknown>) => {
+  const plan = data.plans.find((record) => record.id === selected) ?? data.plans[0];
+  const unusedTypes = data.testTypes.filter((test) => !data.plans.some((record) => record.testType === test.key));
+  const untrackedSignals = data.catalogueSignals.filter((signal) => !data.plans.some((record) => record.testType === signal.testType));
+  const roadmaps = data.roadmaps.filter((item) => unusedTypes.some((test) => test.key === item.testType));
+  const maxScore = data.testTypes.find((test) => test.key === plan?.testType)?.max;
+  const step = plan?.testType === "ielts" ? "0.5" : plan?.testType === "other" ? "0.1" : "1";
+  const noValue = t("mpNotSet");
+
+  const testLabel = (key: string) => t.has(`tpTestType.${key}`) ? t(`tpTestType.${key}`) : data.testTypes.find((type) => type.key === key)?.label ?? key;
+  const currentRoadmap = data.roadmaps.find((roadmap) => roadmap.testType === plan?.testType);
+
+  const openEditor = (mode: TestEditor, testType?: string, roadmap = "") => {
+    setActionError("");
+    setNotice("");
+    setForm(mode === "settings" && plan ? {
+      ...emptyTestForm,
+      currentScore: plan.currentScore?.toString() ?? "",
+      targetScore: plan.targetScore?.toString() ?? "",
+      targetDate: plan.targetDate ?? "",
+      nextTestDate: plan.nextTestDate ?? "",
+    } : {
+      ...emptyTestForm,
+      testType: testType ?? unusedTypes[0]?.key ?? "",
+      roadmap,
+      attemptDate: new Date().toISOString().slice(0, 10),
+    });
+    setEditor(mode);
+  };
+
+  const write = async (method: "POST" | "PATCH", payload: Record<string, unknown>, closeEditor = false) => {
+    if (busy) return;
     setBusy(true);
+    setActionError("");
+    setNotice("");
     try {
-      await sendJson("/api/test-planner", { method: "POST", body: JSON.stringify({ profileId, ...payload }) }, t("tpSaveError"));
+      const result = await sendJson<{ plan?: { id: number } }>("/api/test-planner", {
+        method, body: JSON.stringify({ profileId, ...payload }),
+      }, t("tpSaveError"));
+      if (result.plan?.id) setSelected(result.plan.id);
       await reload();
+      if (closeEditor) setEditor(null);
+      setNotice(t("mpSaved"));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t("tpSaveError"));
     } finally {
       setBusy(false);
     }
   };
 
-  const patch = async (payload: Record<string, unknown>) => {
-    await sendJson("/api/test-planner", { method: "PATCH", body: JSON.stringify({ profileId, ...payload }) }, t("tpSaveError"));
-    await reload();
-  };
-
-  const testLabel = (key: string) => {
-    const translationKey = `tpTestType.${key}`;
-    try {
-      return t(translationKey as never);
-    } catch {
-      return data.testTypes.find((item) => item.key === key)?.label ?? key;
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (editor === "add" && form.testType) {
+      void write("POST", { testType: form.testType, ...(form.roadmap ? { roadmap: form.roadmap } : {}) }, true);
+    } else if (editor === "settings" && plan) {
+      void write("PATCH", {
+        testPlanId: plan.id,
+        currentScore: form.currentScore === "" ? null : Number(form.currentScore),
+        targetScore: form.targetScore === "" ? null : Number(form.targetScore),
+        targetDate: form.targetDate,
+        nextTestDate: form.nextTestDate,
+      }, true);
+    } else if (editor === "attempt" && plan && form.attemptDate && form.score !== "") {
+      void write("PATCH", { testPlanId: plan.id, attemptDate: form.attemptDate, score: Number(form.score) }, true);
     }
   };
 
-  const gapMessage = (gap: TestPlanRow["gap"], label: string) => {
-    switch (gap.messageKey) {
-      case "scoreNotRecorded":
-        return t("tpGapScoreNotRecorded", { test: label, figure: gap.catalogueFigure ?? "—" });
-      case "belowCatalogueFigure":
-        return t("tpGapBelowFigure", { test: label, current: gap.current ?? "—", figure: gap.catalogueFigure ?? "—" });
-      case "atOrAboveCatalogueFigure":
-        return t("tpGapAtOrAboveFigure", { test: label, current: gap.current ?? "—", figure: gap.catalogueFigure ?? "—" });
-      default:
-        return t("tpGapNoFigure", { test: label });
-    }
-  };
+  if (loading && !data.testTypes.length) return <Loading label={t("tpLoading")} />;
+  if (error && !data.testTypes.length) return <JourneyCard title={t("tpLoadError")}><ErrorNote message={error} /><Button type="button" variant="outline" onClick={() => void reload()}>{t("mpRetry")}</Button></JourneyCard>;
 
-  if (loading && data.plans.length === 0) return <Loading label={t("tpLoading")} />;
-
-  // Catalogue figures with no saved plan are shown as verification prompts,
-  // not as tests the student's applications require.
-  const untrackedSignals = data.catalogueSignals.filter(
-    (signal) => !data.plans.some((plan) => plan.testType === signal.testType),
+  const dateInput = (key: "targetDate" | "nextTestDate" | "attemptDate", label: string) => (
+    <Field label={label}>
+      <input type="date" className={inputClass} value={form[key]} required={key === "attemptDate"} onChange={(event) => setForm({ ...form, [key]: event.target.value })} />
+    </Field>
   );
+  const scoreInput = (key: "currentScore" | "targetScore" | "score", label: string) => (
+    <Field label={label}>
+      <input type="number" min={0} max={maxScore} step={key === "score" ? step : "any"} className={inputClass} value={form[key]} required={key === "score"} onChange={(event) => setForm({ ...form, [key]: event.target.value })} />
+    </Field>
+  );
+  const completed = plan?.tasks.filter((task) => task.isCompleted).length ?? 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {error && <ErrorNote message={error} />}
-      <JourneyCard title={t("tpAddTestTitle")} subtitle={t("tpAddTestSubtitle")}>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {data.testTypes.map((test) => (
-            <Button
-              key={test.key}
-              variant="outline"
-              size="sm"
-              className="min-h-11 whitespace-normal text-left"
-              disabled={busy}
-              onClick={() => void save({ testType: test.key })}
-            >
-              <Plus className="h-3.5 w-3.5 shrink-0" /> <span className="break-words">{testLabel(test.key)}</span>
-            </Button>
-          ))}
-        </div>
-      </JourneyCard>
-
-      {/*
-        One-click starter roadmaps. The empty state below used to be the first
-        thing a new student saw, with no indication of what a realistic plan
-        looks like. Each card creates the plan AND its five milestones.
-      */}
-      {data.roadmaps.length > 0 && (
-        <JourneyCard title={t("tpRoadmapsTitle")} subtitle={t("tpRoadmapsSubtitle")}>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {data.roadmaps.map((r) => {
-              const existing = data.plans.some((p) => p.testType === r.testType);
-              return (
-                <div
-                  key={r.id}
-                  className="flex flex-col rounded-surface border border-slate-200 p-3 dark:border-slate-700"
-                >
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                    {testLabel(r.testType)} · {t("tpRoadmapTarget", { score: r.targetScore })}
-                  </p>
-                  <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                    {t("tpRoadmapMilestones", { count: r.milestones.length })}
-                  </p>
-                  <ol className="mt-2 flex-1 space-y-0.5">
-                    {r.milestones.map((m, i) => (
-                      <li key={i} className="text-sm leading-snug text-slate-600 dark:text-slate-300">
-                        {i + 1}. {m}
-                      </li>
-                    ))}
-                  </ol>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {r.booking.map((b) => (
-                      <a
-                        key={b.url}
-                        href={b.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300"
-                      >
-                        {b.label}
-                        <ExternalLink className="h-2.5 w-2.5" />
-                      </a>
-                    ))}
-                  </div>
-                  <Button
-                    size="sm"
-                    className="mt-2 min-h-11"
-                    variant={existing ? "outline" : "primary"}
-                    disabled={busy}
-                    onClick={() => void save({ testType: r.testType, roadmap: r.id })}
-                  >
-                    {existing ? t("tpRoadmapRefresh") : t("tpRoadmapStart")}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
+      {!editor && <InlineAlert message={actionError} onDismiss={() => setActionError("")} />}
+      {notice && <p role="status" className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{notice}</p>}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(12rem,1fr)_minmax(0,3fr)]">
+        <JourneyCard title={t("mpMyTests")}>
+          {!!data.plans.length && (
+            <div className="mb-3 grid grid-cols-2 gap-2 lg:grid-cols-1" aria-label={t("mpMyTests")}>
+              {data.plans.map((item) => (
+                <Button key={item.id} type="button" aria-pressed={item.id === plan?.id} variant={item.id === plan?.id ? "primary" : "outline"} className="min-h-11 min-w-0 justify-between gap-2 whitespace-normal" onClick={() => { setSelected(item.id); setNotice(""); }}>
+                  <span className="min-w-0 text-left break-words">{testLabel(item.testType)}</span>
+                  <span className="hidden text-right text-xs sm:inline">{planDate(item.nextTestDate, locale) ?? ""}</span>
+                </Button>
+              ))}
+            </div>
+          )}
+          {unusedTypes.length > 0 && <Button type="button" className="min-h-11" onClick={() => openEditor("add")}><Plus className="h-4 w-4" aria-hidden /> {t("mpAddTest")}</Button>}
+          {roadmaps.length > 0 && (
+            <details className="mt-3 border-t border-slate-200 dark:border-slate-700">
+              <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">{t("mpTemplates")}</summary>
+              <ul className="space-y-2">
+                {roadmaps.map((roadmap) => (
+                  <li key={roadmap.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="min-w-0 text-sm">{testLabel(roadmap.testType)} · {t("tpRoadmapTarget", { score: roadmap.targetScore })}</span>
+                    <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => openEditor("add", roadmap.testType, roadmap.id)}>{t("tpRoadmapStart")}</Button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </JourneyCard>
-      )}
 
-      {data.plans.length === 0 ? (
-        <Empty title={t("tpEmptyTitle")} hint={t("tpEmptyHint")} />
-      ) : (
-        data.plans.map((plan) => {
-          const label = testLabel(plan.testType);
-          const maxScore = data.testTypes.find((test) => test.key === plan.testType)?.max;
-          return (
-            <JourneyCard
-              key={plan.id}
-              title={label}
-              subtitle={gapMessage(plan.gap, label)}
-              action={
-                <Pill tone="slate" className="max-w-full whitespace-normal">
-                  {t("tpScoreAndTarget", { current: plan.currentScore ?? "—", target: plan.targetScore ?? "—" })}
-                </Pill>
-              }
-            >
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Field label={t("tpCurrentScore")}>
-                  <input
-                    className={inputClass}
-                    type="number"
-                    min={0}
-                    max={maxScore}
-                    step="0.1"
-                    defaultValue={plan.currentScore ?? ""}
-                    onBlur={(event) => void patch({ testPlanId: plan.id, currentScore: event.target.value === "" ? null : Number(event.target.value) })}
-                  />
-                </Field>
-                <Field label={t("tpTargetScore")}>
-                  <input
-                    className={inputClass}
-                    type="number"
-                    min={0}
-                    max={maxScore}
-                    step="0.1"
-                    defaultValue={plan.targetScore ?? ""}
-                    onBlur={(event) => void patch({ testPlanId: plan.id, targetScore: event.target.value === "" ? null : Number(event.target.value) })}
-                  />
-                </Field>
-                <Field label={t("tpTargetDate")}>
-                  <input className={inputClass} type="date" defaultValue={plan.targetDate ?? ""} onChange={(event) => void patch({ testPlanId: plan.id, targetDate: event.target.value })} />
-                </Field>
-                <Field label={t("tpNextTestDate")}>
-                  <input className={inputClass} type="date" defaultValue={plan.nextTestDate ?? ""} onChange={(event) => void patch({ testPlanId: plan.id, nextTestDate: event.target.value })} />
-                </Field>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="min-w-0">
-                  <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">{t("tpPracticeTasks")}</h3>
-                  {plan.tasks.length === 0 ? (
-                    <p className="text-sm text-slate-500">{t("tpNoTasks")}</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {plan.tasks.map((task) => (
-                        <li key={task.id}>
-                          <Button variant="unstyled"
-                            type="button"
-                            aria-pressed={task.isCompleted}
-                            onClick={() => void patch({ taskId: task.id, isCompleted: !task.isCompleted })}
-                            className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-control px-2 py-1 text-left text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-slate-800"
-                          >
-                            <span
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-control border text-xs ${
-                                task.isCompleted ? "border-emerald-600 bg-emerald-700 text-white sb-ink-on-bright" : "border-slate-300 dark:border-slate-600"
-                              }`}
-                              aria-hidden="true"
-                            >
-                              {task.isCompleted && <Check className="h-3 w-3" />}
-                            </span>
-                            <span className={`min-w-0 break-words ${task.isCompleted ? "text-slate-500 line-through" : "text-slate-700 dark:text-slate-200"}`}>
-                              {task.title}
-                            </span>
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">{t("tpPreviousAttempts")}</h3>
-                  {plan.attempts.length === 0 ? (
-                    <p className="text-sm text-slate-500">{t("tpNoAttempts")}</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {plan.attempts.map((attempt) => (
-                        <li key={attempt.id} className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
-                          <time className="text-xs text-slate-500" dateTime={attempt.testDate}>{attempt.testDate}</time>
-                          <span className="font-bold text-slate-800 dark:text-slate-100">{attempt.score ?? "—"}</span>
-                          {attempt.resultLabel && <Pill tone="slate">{attempt.resultLabel}</Pill>}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <RecordAttempt planId={plan.id} onSubmit={patch} />
-                </div>
-              </div>
-
-              {plan.catalogueFigures.length > 0 && (
-                <div className="mt-4 rounded-control bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                  <p className="text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("tpCatalogueFiguresTitle")}</p>
-                  <ul className="mt-1 space-y-1">
-                    {plan.catalogueFigures.map((figure) => (
-                      <li key={figure.university} className="break-words text-sm text-slate-600 dark:text-slate-300">
-                        {t("tpUniversityFigure", { university: figure.university, figure: figure.catalogueFigure })}
+        {plan ? (
+          <div className="min-w-0 space-y-4">
+            <JourneyCard title={testLabel(plan.testType)} action={<Button type="button" variant="outline" className="min-h-11 whitespace-normal" onClick={() => openEditor("settings")}>{t("mpEditTest")}</Button>}>
+              <dl className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+                {[
+                  [t("tpCurrentScore"), plan.currentScore ?? noValue],
+                  [t("tpTargetScore"), plan.targetScore ?? noValue],
+                  [t("tpNextTestDate"), planDate(plan.nextTestDate, locale) ?? noValue],
+                  [t("tpTargetDate"), planDate(plan.targetDate, locale) ?? noValue],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0 rounded-surface bg-slate-50 p-2.5 dark:bg-slate-800/80">
+                    <dt className="break-words text-xs text-slate-600 dark:text-slate-300">{label}</dt>
+                    <dd className="break-words text-sm font-bold">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </JourneyCard>
+            <div className="grid items-start gap-4 xl:grid-cols-2">
+              <JourneyCard title={t("tpPracticeTasks")} action={<Pill tone="slate">{t("mpTasksProgress", { count: completed, total: plan.tasks.length })}</Pill>}>
+                {plan.tasks.length > 0 ? (
+                  <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {plan.tasks.map((task) => (
+                      <li key={task.id}>
+                        <label className="flex min-h-11 cursor-pointer items-center gap-2 py-2 text-sm">
+                          <input type="checkbox" className="h-4 w-4 shrink-0 accent-indigo-600" checked={task.isCompleted} disabled={busy} onChange={() => void write("PATCH", { taskId: task.id, isCompleted: !task.isCompleted })} />
+                          <span className="min-w-0 break-words">{task.title}</span>
+                        </label>
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
-            </JourneyCard>
-          );
-        })
+                ) : <p className="text-sm text-slate-600 dark:text-slate-300">{t("tpNoTasks")}</p>}
+              </JourneyCard>
+              <JourneyCard title={t("tpPreviousAttempts")} action={<Button type="button" size="sm" variant="outline" className="min-h-11" onClick={() => openEditor("attempt")}><CalendarPlus className="h-4 w-4" aria-hidden /> {t("tpRecordAttempt")}</Button>}>
+                {plan.attempts.length ? (
+                  <>
+                    <p className="text-sm font-semibold">{planDate(plan.attempts[0].testDate, locale) ?? noValue} · {plan.attempts[0].score ?? noValue}</p>
+                    <details className="mt-2 border-t border-slate-200 dark:border-slate-700">
+                      <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">{t("mpAttemptHistory")}</summary>
+                      <ul className="space-y-1">
+                        {plan.attempts.map((attempt) => <li key={attempt.id} className="flex flex-wrap justify-between gap-2 text-sm"><time dateTime={attempt.testDate}>{planDate(attempt.testDate, locale) ?? noValue}</time><strong>{attempt.score ?? noValue}</strong>{attempt.resultLabel && <Pill tone="slate">{attempt.resultLabel}</Pill>}</li>)}
+                      </ul>
+                    </details>
+                  </>
+                ) : <p className="text-sm text-slate-600 dark:text-slate-300">{t("tpNoAttempts")}</p>}
+              </JourneyCard>
+            </div>
+          </div>
+        ) : <Empty title={t("tpEmptyTitle")} hint={t("tpEmptyHint")} />}
+      </div>
+      {!!(currentRoadmap?.booking.length || plan?.catalogueFigures.length || untrackedSignals.length) && (
+        <details className="rounded-overlay border border-slate-200 bg-white px-4 dark:border-slate-700 dark:bg-surface">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">{t("mpTestReferences")}</summary>
+          <div className="space-y-3 pb-4 text-sm">
+            {currentRoadmap?.booking.map((booking) => <a key={booking.url} className="mr-2 inline-flex min-h-11 items-center gap-1 font-semibold text-indigo-700 dark:text-indigo-300" href={booking.url} target="_blank" rel="noopener noreferrer">{booking.label}<ExternalLink className="h-4 w-4" aria-hidden /></a>)}
+            {!!plan?.catalogueFigures.length && <ul className="space-y-1">{plan.catalogueFigures.map((figure) => <li key={figure.university} className="break-words">{t("tpUniversityFigure", { university: figure.university, figure: figure.catalogueFigure })}</li>)}</ul>}
+            {untrackedSignals.map((signal) => (
+              <div key={signal.testType} className="flex flex-wrap items-center gap-2">
+                <strong>{testLabel(signal.testType)}</strong> <span>{t("tpCatalogueReference", { figure: signal.catalogueFigure })}</span>
+                <span className="min-w-0 break-words text-xs text-slate-600 dark:text-slate-300">{signal.universities.join(", ")}</span>
+                {unusedTypes.some((test) => test.key === signal.testType) && <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={() => openEditor("add", signal.testType)}>{t("tpTrackIt")}</Button>}
+              </div>
+            ))}
+            <p className="text-slate-600 dark:text-slate-300">{t("tpHonesty")}</p>
+          </div>
+        </details>
       )}
-
-      <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t("tpHonesty")}</p>
-
-      {untrackedSignals.length > 0 && (
-        <JourneyCard title={t("tpSignalsTitle")} subtitle={t("tpSignalsSubtitle")}>
-          <ul className="space-y-2">
-            {untrackedSignals.map((signal) => {
-              const label = testLabel(signal.testType);
-              return (
-                <li key={signal.testType} className="flex min-w-0 flex-col gap-2 rounded-control border border-slate-200 p-3 text-sm dark:border-slate-700 sm:flex-row sm:items-center">
-                  <span className="min-w-0 flex-1 break-words font-semibold text-slate-700 dark:text-slate-200">{label}</span>
-                  <Pill tone="slate" className="max-w-full whitespace-normal">{t("tpCatalogueReference", { figure: signal.catalogueFigure })}</Pill>
-                  <span className="min-w-0 break-words text-xs text-slate-500 sm:flex-1">{signal.universities.join(", ")}</span>
-                  <Button size="sm" variant="outline" className="min-h-11 w-full shrink-0 sm:w-auto" disabled={busy} onClick={() => void save({ testType: signal.testType })}>
-                    <Plus className="h-3.5 w-3.5" /> {t("tpTrackIt")}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        </JourneyCard>
+      {editor && (
+        <PlanEditor title={editor === "add" ? t("mpAddTest") : editor === "attempt" ? t("tpRecordAttempt") : t("mpEditTest")} busy={busy} error={actionError} onClose={() => setEditor(null)}>
+          <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+            {editor === "add" ? (
+              <>
+                <Field label={t("mpTestType")}>
+                  <select required value={form.testType} className={inputClass} onChange={(event) => setForm({ ...form, testType: event.target.value, roadmap: "" })}>
+                    {unusedTypes.map((test) => <option key={test.key} value={test.key}>{testLabel(test.key)}</option>)}
+                  </select>
+                </Field>
+                <Field label={t("mpTemplates")}>
+                  <select value={form.roadmap} className={inputClass} onChange={(event) => setForm({ ...form, roadmap: event.target.value })}>
+                    <option value="">{t("mpBasicPlan")}</option>
+                    {roadmaps.filter((roadmap) => roadmap.testType === form.testType).map((roadmap) => <option key={roadmap.id} value={roadmap.id}>{t("tpRoadmapTarget", { score: roadmap.targetScore })}</option>)}
+                  </select>
+                </Field>
+              </>
+            ) : editor === "settings" ? (
+              <>
+                {scoreInput("currentScore", t("tpCurrentScore"))}
+                {scoreInput("targetScore", t("tpTargetScore"))}
+                {dateInput("nextTestDate", t("tpNextTestDate"))}
+                {dateInput("targetDate", t("tpTargetDate"))}
+              </>
+            ) : (
+              <>
+                {dateInput("attemptDate", t("tpAttemptDate"))}
+                {scoreInput("score", t("tpScorePlaceholder"))}
+              </>
+            )}
+            <div className="sm:col-span-2"><Button type="submit" className="min-h-11" disabled={busy}>{editor === "add" ? t("mpAddTest") : tc("save")}</Button></div>
+          </form>
+        </PlanEditor>
       )}
-      <AppNote kind="planning" className="mt-2" />
-    </div>
-  );
-}
-
-function RecordAttempt({ planId, onSubmit }: { planId: number; onSubmit: (p: Record<string, unknown>) => Promise<void> }) {
-  const t = useTranslations("journey");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [score, setScore] = useState("");
-  return (
-    <div className="mt-2 flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-end">
-      <label className="min-w-0 text-sm font-medium text-slate-600 dark:text-slate-300">
-        <span className="sr-only">{t("tpAttemptDate")}</span>
-        <input type="date" aria-label={t("tpAttemptDate")} className={inputClass} value={date} onChange={(event) => setDate(event.target.value)} />
-      </label>
-      <label className="min-w-0 text-sm font-medium text-slate-600 dark:text-slate-300 sm:w-28">
-        <span className="sr-only">{t("tpScorePlaceholder")}</span>
-        <input type="number" step="0.1" placeholder={t("tpScorePlaceholder")} aria-label={t("tpScorePlaceholder")} className={inputClass} value={score} onChange={(event) => setScore(event.target.value)} />
-      </label>
-      <Button
-        size="sm"
-        variant="outline"
-        className="min-h-11 w-full sm:w-auto"
-        disabled={!score}
-        onClick={() => {
-          const n = Number(score);
-          if (!Number.isFinite(n)) return;
-          setScore("");
-          void onSubmit({ testPlanId: planId, attemptDate: date, score: n });
-        }}
-      >
-        <CalendarPlus className="h-4 w-4" /> {t("tpRecordAttempt")}
-      </Button>
     </div>
   );
 }
@@ -593,11 +568,25 @@ interface Phase {
   pct: number;
   missing: string[];
 }
+
 interface StudyPlanData {
   plan: { id: number; title: string; targetMajor: string | null; targetCountry: string | null; goalYear: number | null; fundingGoal: string | null } | null;
   phases: Phase[];
-  phaseDefinitions: Omit<Phase, "status" | "pct" | "missing">[];
+  nextTests: { id: number; testType: string; date: string | null }[];
 }
+
+const planGroups = [
+  { title: "mpGroupPreparation", keys: ["profile", "tests", "university_research", "scholarship_research"] },
+  { title: "mpGroupApplications", keys: ["documents", "applications", "interviews"] },
+  { title: "mpGroupAfter", keys: ["admission", "visa", "departure"] },
+] as const;
+
+const fundingOptions = [
+  ["Not decided", "spFundUndecided"],
+  ["Full scholarship", "spFundFull"],
+  ["Partial scholarship", "spFundPartial"],
+  ["Self-funded", "spFundSelf"],
+] as const;
 
 export function StudyPlanPanel({
   profileId,
@@ -606,227 +595,185 @@ export function StudyPlanPanel({
 }: {
   profileId: number;
   onNavigateTab: (t: string) => void;
-  /**
-   * Session profile. Optional: the panel is also rendered in contexts that have
-   * no profile loaded, and the blueprint must still work (it falls back to
-   * documented defaults rather than blocking).
-   */
-  profile?: { targetMajor?: string | null; preferredCountries?: string | null; needScholarship?: boolean | null } | null;
+  profile?: { targetMajor?: string | null; preferredCountries?: string | null } | null;
 }) {
   const t = useTranslations("journey");
-  const phaseTitle = (key: string) => t(`spPhase.${key}.title` as never);
-  const phaseDescription = (key: string) => t(`spPhase.${key}.description` as never);
-  const phaseMissing = (key: string) => t(`spPhaseMissing.${key}` as never);
+  const tc = useTranslations("common");
+  const { locale } = useLocaleContext();
   const { data, loading, error, reload } = useResource<StudyPlanData>(
     useCallback(() => getJson<StudyPlanData>(`/api/study-plan?profileId=${profileId}`, t("spLoadError")), [profileId, t]),
     [profileId],
-    { initial: { plan: null, phases: [], phaseDefinitions: [] }, errorFallback: t("spLoadError") }
+    { initial: { plan: null, phases: [], nextTests: [] }, errorFallback: t("spLoadError") }
   );
+  const [editing, setEditing] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
   const [form, setForm] = useState({ title: "", targetMajor: "", targetCountry: "", goalYear: "", fundingGoal: "Not decided" });
 
-  /** `preferredCountries` is a JSON array in new rows and a comma list in old ones. */
-  const countriesLabel = useMemo(() => {
-    const raw = profile?.preferredCountries;
-    if (!raw) return "";
-    let list: string[] = [];
+  const phaseTitle = (phase: Phase) => t(`spPhase.${phase.key}.title` as never);
+  const phaseDescription = (phase: Phase) => t(`spPhase.${phase.key}.description` as never);
+  const phaseHint = (phase: Phase) => phase.missing[0] ? t(`spPhaseMissing.${phase.missing[0]}` as never) : phaseDescription(phase);
+  const focusPhase = (phase: Phase) => onNavigateTab(phase.key === "tests" ? "study-plan/tests" : phase.tab);
+  const plan = data.plan;
+
+  const openForm = () => {
+    setActionError("");
+    setNotice("");
+    setForm(plan ? {
+      title: plan.title,
+      targetMajor: plan.targetMajor ?? "",
+      targetCountry: plan.targetCountry ?? "",
+      goalYear: plan.goalYear?.toString() ?? "",
+      fundingGoal: plan.fundingGoal ?? "Not decided",
+    } : { title: "", targetMajor: "", targetCountry: "", goalYear: "", fundingGoal: "Not decided" });
+    setEditing(true);
+  };
+
+  const prefill = () => {
+    const stored = profile?.preferredCountries ?? "";
+    let countries = stored.split(",");
     try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) list = parsed.filter((x): x is string => typeof x === "string" && !!x.trim());
+      const parsed: unknown = JSON.parse(stored);
+      if (Array.isArray(parsed)) countries = parsed.filter((item): item is string => typeof item === "string");
     } catch {
-      // plain comma list
+      // Older profile rows store a comma-separated list.
     }
-    if (list.length === 0) list = raw.split(",").map((v) => v.trim()).filter(Boolean);
-    return list.slice(0, 3).join(" / ");
-  }, [profile?.preferredCountries]);
+    setForm((previous) => ({
+      ...previous,
+      title: previous.title || t("spTitle"),
+      targetMajor: previous.targetMajor || profile?.targetMajor?.trim() || "",
+      targetCountry: previous.targetCountry || countries.map((name) => name.trim()).filter(Boolean).slice(0, 3).join(" / "),
+    }));
+  };
 
-  /** Next application cycle — a rolling default, not a stored promise. */
-  const nextGoalYear = new Date().getFullYear() + 1;
-
-  /**
-   * Create the plan from whatever was typed, or from a complete default.
-   *
-   * A brand-new student saw an empty five-field form with a disabled button and
-   * no idea what a good plan looks like, so most never created one. The
-   * blueprint button below calls this with every field pre-filled: profile
-   * facts when we have them, documented defaults when we do not.
-   */
-  const create = async (overrides?: Partial<typeof form>) => {
-    const payload = { ...form, ...overrides };
-    if (!payload.title.trim()) return;
+  const write = async (method: "POST" | "PATCH", body: Record<string, unknown>, closeEditor = false) => {
+    if (busy) return;
     setBusy(true);
+    setActionError("");
+    setNotice("");
     try {
-      await sendJson(
-        "/api/study-plan",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            profileId,
-            ...payload,
-            goalYear: payload.goalYear ? Number(payload.goalYear) : null,
-          }),
-        },
-        t("spSaveError")
-      );
+      await sendJson("/api/study-plan", { method, body: JSON.stringify({ profileId, ...body }) }, t("spSaveError"));
       await reload();
+      if (closeEditor) setEditing(false);
+      setNotice(t("mpSaved"));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t("spSaveError"));
     } finally {
       setBusy(false);
     }
   };
 
-  /** Pre-fill from the profile, then create — one click, no typing. */
-  const loadBlueprint = () => {
-    const blueprint = {
-      title: t("spBlueprintTitle"),
-      targetMajor: profile?.targetMajor?.trim() || "Computer Science & AI",
-      targetCountry: countriesLabel || "Germany / South Korea / USA",
-      goalYear: String(nextGoalYear),
-      fundingGoal: profile?.needScholarship === false ? "Self-funded" : "Full scholarship",
-    };
-    setForm(blueprint);
-    void create(blueprint);
-  };
+  if (loading && !plan && !editing) return <Loading label={t("spLoading")} />;
+  if (error && !plan && !editing) return <JourneyCard title={t("spLoadError")}><ErrorNote message={error} /><Button type="button" variant="outline" onClick={() => void reload()}>{t("mpRetry")}</Button></JourneyCard>;
 
-  const togglePhase = async (phaseKey: string, done: boolean) => {
-    await sendJson("/api/study-plan", { method: "PATCH", body: JSON.stringify({ profileId, phaseKey, done }) }, "Could not update");
-    await reload();
-  };
-
-  if (loading) return <Loading label={t("spLoading")} />;
-
-  if (!data.plan) {
-    return (
-      <div className="space-y-4">
-        <JourneyCard title={t("spTitle")} subtitle={t("spSubtitle")}>
-          {error && <ErrorNote message={error} />}
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            <Field label={t("spFieldGoal")}>
-              <input className={inputClass} placeholder={t("spGoalPlaceholder")} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            </Field>
-            <Field label={t("spFieldMajor")}>
-              <input className={inputClass} value={form.targetMajor} onChange={(e) => setForm({ ...form, targetMajor: e.target.value })} />
-            </Field>
-            <Field label={t("spFieldCountry")}>
-              <input className={inputClass} value={form.targetCountry} onChange={(e) => setForm({ ...form, targetCountry: e.target.value })} />
-            </Field>
-            <Field label={t("spFieldYear")}>
-              <input className={inputClass} type="number" value={form.goalYear} onChange={(e) => setForm({ ...form, goalYear: e.target.value })} />
-            </Field>
-            <Field label={t("spFieldFunding")}>
-              <select className={inputClass} value={form.fundingGoal} onChange={(e) => setForm({ ...form, fundingGoal: e.target.value })}>
-                <option value="Full scholarship">{t("spFundFull")}</option>
-                <option value="Partial scholarship">{t("spFundPartial")}</option>
-                <option value="Self-funded">{t("spFundSelf")}</option>
-                <option value="Not decided">{t("spFundUndecided")}</option>
-              </select>
-            </Field>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button className="min-h-12" onClick={() => void create()} disabled={busy || !form.title.trim()}>
-              {t("spCreate")}
-            </Button>
-            <Button className="min-h-12" variant="outline" onClick={loadBlueprint} disabled={busy}>
-              ⚡ {t("spBlueprintButton")}
-            </Button>
-          </div>
-        </JourneyCard>
-        <JourneyCard title={t("spWhatYouGet")}>
-          <ol className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {(data.phaseDefinitions.length ? data.phaseDefinitions : DEFAULT_PHASES).map((phase, index) => (
-              <li key={phase.key} className="flex min-w-0 items-start gap-2 text-sm">
-                <span aria-hidden className="shrink-0">{phase.icon}</span>
-                <span className="min-w-0 break-words text-slate-700 dark:text-slate-200">
-                  <strong>{index + 1}.</strong> {phaseTitle(phase.key)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </JourneyCard>
-      </div>
-    );
-  }
-
-  const done = data.phases.filter((p) => p.status === "done").length;
+  const done = data.phases.filter((phase) => phase.status === "done").length;
+  const next = data.phases.find((phase) => phase.status !== "done");
+  const today = new Date().toISOString().slice(0, 10);
+  const nextTests = (data.nextTests ?? []).filter((test) => test.date && test.date >= today).slice(0, 3);
+  const fundingLabel = fundingOptions.find(([value]) => value === plan?.fundingGoal)?.[1];
+  const goalFields = [
+    [t("spFieldMajor"), plan?.targetMajor],
+    [t("spFieldCountry"), plan?.targetCountry],
+    [t("spFieldYear"), plan?.goalYear],
+    [t("spFieldFunding"), fundingLabel ? t(fundingLabel) : plan?.fundingGoal],
+  ] as const;
 
   return (
-    <div className="space-y-4">
-      <JourneyCard
-        title={data.plan.title}
-        subtitle={[data.plan.targetMajor, data.plan.targetCountry, data.plan.goalYear, data.plan.fundingGoal].filter(Boolean).join(" · ")}
-        action={
-          <div className="text-right">
-            <p className="text-2xl font-extrabold text-slate-900 dark:text-white">
-              {done}/{data.phases.length}
-            </p>
-            <p className="text-sm font-bold uppercase text-slate-500">{t("spPhasesDone")}</p>
-          </div>
-        }
-      >
-        {error && <ErrorNote message={error} />}
-        <ol className="space-y-2">
-          {data.phases.map((p, i) => (
-            <li
-              key={p.key}
-              className={`rounded-surface border p-3 ${
-                p.status === "done" ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40" : "border-slate-200 dark:border-slate-700"
-              }`}
-            >
-              <div className="flex flex-wrap items-start gap-3">
-                <Button variant="unstyled"
-                  type="button"
-                  onClick={() => void togglePhase(p.key, p.status !== "done")}
-                  aria-label={t(p.status === "done" ? "spReopenPhase" : "spCompletePhase", { title: phaseTitle(p.key) })}
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                    p.status === "done" ? "bg-emerald-700 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
-                  }`}
-                >
-                  {p.status === "done" ? <Check className="h-3 w-3" /> : i + 1}
-                </Button>
-                <div className="min-w-0 flex-1">
-                  <p className="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    <span aria-hidden>{p.icon}</span> {phaseTitle(p.key)}
-                  </p>
-                  <p className="break-words text-sm leading-relaxed text-slate-600 dark:text-slate-400">{phaseDescription(p.key)}</p>
-                  {p.missing.length > 0 && <p className="mt-1 break-words text-sm leading-relaxed text-slate-700 dark:text-slate-300">{phaseMissing(p.missing[0])}</p>}
-                  <div className="mt-1.5 max-w-xs">
-                    <ProgressBar pct={p.pct} size="sm" tone={p.status === "done" ? "good" : "brand"} />
-                  </div>
-                </div>
-                <Button size="sm" variant="outline" className="min-h-11 w-full sm:w-auto" onClick={() => onNavigateTab(p.tab)}>
-                  {t("spOpenPhase")}
-                </Button>
+    <div className="space-y-3">
+      {error && <ErrorNote message={error} />}
+      {!editing && <InlineAlert message={actionError} onDismiss={() => setActionError("")} />}
+      {notice && <p role="status" className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{notice}</p>}
+      {plan ? (
+        <>
+          <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <JourneyCard title={plan.title} action={<Button type="button" variant="outline" className="min-h-11 whitespace-normal" onClick={openForm}>{t("mpEditGoal")}</Button>}>
+              <dl className="grid grid-cols-2 gap-2">
+                {goalFields.map(([label, value]) => <div key={label} className="min-w-0 rounded-surface bg-slate-50 p-2.5 dark:bg-slate-800/80"><dt className="break-words text-xs text-slate-600 dark:text-slate-300">{label}</dt><dd className="break-words text-sm font-bold">{value ?? t("mpNotSet")}</dd></div>)}
+              </dl>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span>{t("spPhasesDone")}</span><strong>{done} / {data.phases.length}</strong>
               </div>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-3 text-sm text-slate-500">
-          {t("spProgressFromData")}
-        </p>
-      </JourneyCard>
-
-      {/* Priority 5.3 — a study plan says which phase you are in; the backwards
-          timeline says which date each phase has to be finished by, and flags the
-          plans that no longer fit (an exam booked too close to a deadline). */}
-      <SmartTimelineCalendar profileId={profileId} onNavigateTab={onNavigateTab} />
-
-      {/* Standing small print: this panel can be wrong — say so where it is read. */}
-      <AppNote kind="planning" className="mt-2" />
+              <div className="mt-2"><ProgressBar pct={data.phases.length ? (done / data.phases.length) * 100 : 0} size="sm" tone="brand" /></div>
+            </JourneyCard>
+            <article className="min-w-0 space-y-2 rounded-overlay border border-indigo-200 bg-gradient-to-br from-indigo-50 to-slate-50 p-4 dark:border-indigo-800 dark:from-indigo-950/80 dark:to-slate-900 sm:p-5">
+              <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300">{t("mpNext")}</p>
+              <h2 className="break-words text-lg font-extrabold text-slate-900 dark:text-slate-100">{next ? phaseTitle(next) : t("mpAllDone")}</h2>
+              {next && <p className="break-words text-sm leading-relaxed text-slate-600 dark:text-slate-300">{phaseHint(next)}</p>}
+              <Button type="button" className="min-h-11" onClick={() => next ? focusPhase(next) : setCalendarOpen(true)}>
+                {next ? next.key === "tests" ? t("mpOpenTests") : t("spOpenPhase") : t("mpCalendar")}
+              </Button>
+            </article>
+          </div>
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <JourneyCard title={t("mpPhases")}>
+              {planGroups.map(({ title, keys }) => {
+                const phases = data.phases.filter((phase) => (keys as readonly string[]).includes(phase.key));
+                if (!phases.length) return null;
+                return (
+                  <details key={title} open={phases.some((phase) => phase.key === next?.key)} className="border-t border-slate-200 dark:border-slate-700">
+                    <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">
+                      {t(title)} <span className="ml-2 text-xs text-slate-600 dark:text-slate-400">{phases.filter((phase) => phase.status === "done").length} / {phases.length}</span>
+                    </summary>
+                    <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {phases.map((phase) => (
+                        <li key={phase.key} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                          <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm">
+                            <input type="checkbox" checked={phase.status === "done"} disabled={busy} className="h-4 w-4 shrink-0 accent-indigo-600" onChange={() => void write("PATCH", { phaseKey: phase.key, done: phase.status !== "done" })} />
+                            <span className="min-w-0 break-words">{phaseTitle(phase)}</span>
+                          </label>
+                          <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => focusPhase(phase)}>{t("spOpenPhase")}</Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                );
+              })}
+              <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">{t("spProgressFromData")}</p>
+            </JourneyCard>
+            <JourneyCard title={t("mpUpcoming")} action={<Button type="button" variant="outline" className="min-h-11" aria-expanded={calendarOpen} aria-controls="study-plan-calendar" onClick={() => setCalendarOpen((value) => !value)}>{t("mpCalendar")}</Button>}>
+              {nextTests.length ? (
+                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {nextTests.map((test) => <li key={test.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm"><span>{t.has(`tpTestType.${test.testType}`) ? t(`tpTestType.${test.testType}`) : test.testType}</span><time className="font-semibold text-indigo-700 dark:text-indigo-300" dateTime={test.date ?? undefined}>{planDate(test.date, locale)}</time></li>)}
+                </ul>
+              ) : <p className="text-sm text-slate-600 dark:text-slate-300">{t("mpNoUpcoming")}</p>}
+            </JourneyCard>
+          </div>
+          <div id="study-plan-calendar" hidden={!calendarOpen}>
+            {calendarOpen && <SmartTimelineCalendar profileId={profileId} onNavigateTab={onNavigateTab} />}
+          </div>
+        </>
+      ) : (
+        <JourneyCard title={t("spTitle")} subtitle={t("spSubtitle")}>
+          <Button type="button" className="min-h-11" onClick={openForm}>{t("spCreate")}</Button>
+        </JourneyCard>
+      )}
+      {editing && (
+        <PlanEditor title={plan ? t("mpEditGoal") : t("spCreate")} busy={busy} error={actionError} onClose={() => setEditing(false)}>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => {
+            event.preventDefault();
+            if (!form.title.trim()) return;
+            void write(plan ? "PATCH" : "POST", { ...form, ...(plan ? { id: plan.id } : {}), title: form.title.trim(), goalYear: form.goalYear ? Number(form.goalYear) : null }, true);
+          }}>
+            <div className="sm:col-span-2"><Field label={t("spFieldGoal")}><input required maxLength={160} className={inputClass} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></Field></div>
+            <Field label={t("spFieldMajor")}><input maxLength={120} className={inputClass} value={form.targetMajor} onChange={(event) => setForm({ ...form, targetMajor: event.target.value })} /></Field>
+            <Field label={t("spFieldCountry")}><input maxLength={120} className={inputClass} value={form.targetCountry} onChange={(event) => setForm({ ...form, targetCountry: event.target.value })} /></Field>
+            <Field label={t("spFieldYear")}><input type="number" min={1991} max={2100} className={inputClass} value={form.goalYear} onChange={(event) => setForm({ ...form, goalYear: event.target.value })} /></Field>
+            <Field label={t("spFieldFunding")}><select className={inputClass} value={form.fundingGoal} onChange={(event) => setForm({ ...form, fundingGoal: event.target.value })}>
+              {fundingOptions.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
+              {form.fundingGoal && !fundingOptions.some(([value]) => value === form.fundingGoal) && <option value={form.fundingGoal}>{form.fundingGoal}</option>}
+            </select></Field>
+            <div className="flex flex-wrap gap-2 sm:col-span-2">
+              <Button type="submit" className="min-h-11" disabled={busy || !form.title.trim()}>{plan ? tc("save") : t("spCreate")}</Button>
+              {!plan && <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={prefill}>{t("mpPrefill")}</Button>}
+            </div>
+          </form>
+        </PlanEditor>
+      )}
     </div>
   );
 }
-
-const DEFAULT_PHASES: { key: string; title: string; icon: string }[] = [
-  { key: "profile", title: "Build profile", icon: "🧱" },
-  { key: "tests", title: "Tests", icon: "📝" },
-  { key: "university_research", title: "University research", icon: "🔎" },
-  { key: "scholarship_research", title: "Scholarship research", icon: "💰" },
-  { key: "documents", title: "Documents", icon: "📄" },
-  { key: "applications", title: "Applications", icon: "📝" },
-  { key: "interviews", title: "Interviews", icon: "🎤" },
-  { key: "admission", title: "Admission", icon: "🎓" },
-  { key: "visa", title: "Visa", icon: "🛂" },
-  { key: "departure", title: "Departure", icon: "✈️" },
-];
 
 // ===========================================================================
 // ACTIVITY PORTFOLIO (spec §14)

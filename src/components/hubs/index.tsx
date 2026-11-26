@@ -355,8 +355,6 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
     <HubPage
       title={label}
       intro={t("introStudyPlan")}
-      primaryLabel={active !== "plan" ? t("primaryStudyPlan") : undefined}
-      onPrimary={active !== "plan" ? () => setPane("plan") : undefined}
       panes={panes}
       activePane={active || undefined}
       onPaneChange={setPane}
@@ -364,9 +362,9 @@ export function StudyPlanHub({ profile, pane, setPane, navigate, hidden }: HubPr
       note={{ tone: "info", text: td("planning") }}
     >
       {active === "plan" && (
-        <StudyPlanPanel profileId={profile.id} onNavigateTab={navigate} profile={profile} />
+        <StudyPlanPanel key={profile.id} profileId={profile.id} onNavigateTab={navigate} profile={profile} />
       )}
-      {active === "tests" && <TestPlannerPanel profileId={profile.id} />}
+      {active === "tests" && <TestPlannerPanel key={profile.id} profileId={profile.id} />}
       {active === "tools" && <PlanningStudio activeProfile={profile} />}
     </HubPage>
   );
