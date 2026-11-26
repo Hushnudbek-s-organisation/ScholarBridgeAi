@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { scheduleWhenIdle } from "@/lib/idle";
 import type { Expression } from "./scholly/SchollyMesh";
 import type { SchollyMotion } from "./useSchollyMotion";
 
@@ -16,6 +17,9 @@ const EXPRESSIONS: Partial<Record<SchollyMotion, Expression>> = {
   happy: "happy", easter: "happy", think: "thinking", notice: "surprised", shake: "surprised",
   proud: "proud", concern: "concerned", sleep: "sleepy", celebrate: "celebrating", levelup: "celebrating",
 };
+const ANIMATED_POSES = new Set<SchollyMotion>([
+  "happy", "easter", "notice", "shake", "proud", "celebrate", "levelup", "wave", "drag", "talk",
+]);
 
 export function SchollyModel({ trackPointer = true, held = false, paused = false, motion = "idle", turn = 0 }: Props) {
   const host = useRef<HTMLSpanElement>(null);
@@ -74,6 +78,7 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
     let mounted = true;
     let inView = false;
     let starting = false;
+    let cancelStart: (() => void) | undefined;
     let cleanup: (() => void) | undefined;
 
     async function mount() {
@@ -110,17 +115,17 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
       let box: DOMRect | null = null;
       let lost = false;
       let ready = false;
-      let running = false;
+      let compiled = false;
+      let animationFrame = 0;
+      let pointerUntil = 0;
       let lastFrame = -Infinity;
-      let nextBlink = performance.now() + 1800;
       const clamp = (n: number) => Math.max(-1, Math.min(1, n));
 
       function draw(now: number, immediate = false) {
         if (!ready || lost || !mounted || !inView || document.hidden) return;
         const { motion: pose, since, held: pressed, paused: stopped, turn: facing, trackPointer: reacts } = state.current;
         const steady = stopped || reduced.matches;
-        const interval = pose === "idle" && !pointer ? 61 : 37;
-        if (!immediate && now - lastFrame < interval) return;
+        if (!immediate && now - lastFrame < 40) return;
         lastFrame = now;
         const time = now / 1000;
         const elapsed = Math.max(0, (now - since) / 1000);
@@ -142,14 +147,12 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
         helmet.rotation.x += ((steady ? 0 : y * 0.17 + lean) - helmet.rotation.x) * smoothing;
         helmet.rotation.z = steady ? 0 : thinking ? -0.078 : shake * 0.21;
         robot.rotation.z = steady ? 0 : shake * 0.09 + (wave ? Math.sin(elapsed * 7) * 0.052 : 0);
-        robot.position.y = steady ? 0 : asleep ? -0.06 : Math.sin(time * 2.3) * 0.027 + (happy ? Math.max(0, Math.sin(elapsed * 8)) * 0.12 : 0);
+        robot.position.y = steady ? 0 : asleep ? -0.06 : happy ? Math.max(0, Math.sin(elapsed * 8)) * 0.12 : 0;
         robot.scale.setScalar(pressed ? 0.94 : 1);
-        if (now > nextBlink + 130) nextBlink = now + 3100 + Math.random() * 3300;
-        const blink = (!steady && now >= nextBlink) || drag ? 0.13 : 1;
         const expression = EXPRESSIONS[pose] ?? "neutral";
         const talking = pose === "talk";
         for (const [key, face] of faces) face.visible = key === expression;
-        for (const eye of eyes) eye.scale.y = blink;
+        for (const eye of eyes) eye.scale.y = drag ? 0.13 : 1;
         if (neutralMouth) neutralMouth.visible = !talking;
         arms.forEach((arm, index) => {
           const side = index ? 1 : -1;
@@ -167,13 +170,21 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
         if (target.dataset.rendering !== "3d") target.dataset.rendering = "3d";
       }
 
-      function sync() {
-        const animate = inView && ready && !document.hidden && !lost && !reduced.matches && !state.current.paused;
-        if (animate !== running) {
-          renderer.setAnimationLoop(animate ? (now) => draw(now) : null);
-          running = animate;
+      function tick(now: number) {
+        animationFrame = 0;
+        if (!inView || !ready || document.hidden || lost) return;
+        const { motion: pose, paused: stopped } = state.current;
+        if (!stopped && !reduced.matches && (now < pointerUntil || ANIMATED_POSES.has(pose))) {
+          draw(now);
+          animationFrame = requestAnimationFrame(tick);
+        } else {
+          draw(now, true);
         }
-        if (!animate) draw(performance.now(), true);
+      }
+
+      function sync() {
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        animationFrame = inView && ready && !document.hidden && !lost ? requestAnimationFrame(tick) : 0;
       }
 
       let lastPoint = -Infinity;
@@ -182,13 +193,24 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
         if (!state.current.trackPointer || state.current.paused || reduced.matches || !inView) return;
         if (event.timeStamp - lastPoint < 24) return;
         lastPoint = event.timeStamp;
-        pointer = { x: event.clientX, y: event.clientY };
+        box ??= target.getBoundingClientRect();
+        const near = state.current.held || Math.hypot(event.clientX - box.left - box.width / 2, event.clientY - box.top - box.height / 2) < 220;
+        if (!near && !pointer) return;
+        pointer = near ? { x: event.clientX, y: event.clientY } : null;
+        pointerUntil = performance.now() + 300;
+        if (!animationFrame) sync();
       }
-      function center() { pointer = null; box = null; }
+      function center() {
+        box = null;
+        if (!pointer) return;
+        pointer = null;
+        pointerUntil = performance.now() + 300;
+        if (!animationFrame) sync();
+      }
       function resize() {
         const rect = target.getBoundingClientRect();
         box = rect;
-        if (lost || !rect.width || !rect.height) return;
+        if (!compiled || lost || !rect.width || !rect.height) return;
         const aspect = rect.width / rect.height;
         const halfWidth = Math.max(1.52, 1.565 * aspect);
         const halfHeight = halfWidth / aspect;
@@ -199,7 +221,6 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
         camera.updateProjectionMatrix();
         renderer.setSize(rect.width, rect.height, false);
         ready = true;
-        draw(performance.now(), true);
         sync();
       }
       function contextLost(event: Event) {
@@ -236,7 +257,7 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
         reduced.removeEventListener("change", sync);
         renderer.domElement.removeEventListener("webglcontextlost", contextLost);
         renderer.domElement.removeEventListener("webglcontextrestored", contextRestored);
-        renderer.setAnimationLoop(null);
+        if (animationFrame) cancelAnimationFrame(animationFrame);
         reflections?.dispose();
         model.dispose();
         renderer.dispose();
@@ -244,14 +265,23 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
         renderer.domElement.remove();
         delete target.dataset.rendering;
       };
-      resize();
+      await renderer.compileAsync(scene, camera);
+      compiled = true;
+      if (mounted && !lost) resize();
     }
 
     const visibility = new IntersectionObserver(([entry]) => {
       inView = entry.isIntersecting;
-      if (inView && !starting) {
-        starting = true;
-        void mount().catch(() => { cleanup?.(); cleanup = undefined; refresh.current = null; });
+      if (inView && !starting && !cancelStart) {
+        cancelStart = scheduleWhenIdle(() => {
+          cancelStart = undefined;
+          if (!mounted || !inView) return;
+          starting = true;
+          void mount().catch(() => { cleanup?.(); cleanup = undefined; refresh.current = null; });
+        }, 1200, 380);
+      } else if (!inView) {
+        cancelStart?.();
+        cancelStart = undefined;
       }
       refresh.current?.();
     });
@@ -259,6 +289,7 @@ export function SchollyModel({ trackPointer = true, held = false, paused = false
     return () => {
       mounted = false;
       visibility.disconnect();
+      cancelStart?.();
       refresh.current = null;
       cleanup?.();
     };

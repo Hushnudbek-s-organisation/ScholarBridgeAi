@@ -345,7 +345,7 @@ export function makeSchollyEnvironment(renderer: T.WebGLRenderer) {
   });
   const generator = new T.PMREMGenerator(renderer);
   try {
-    return generator.fromScene(lights, 0.07);
+    return generator.fromScene(lights, 0.07, 0.1, 100, { size: 64 });
   } finally {
     generator.dispose();
     oval.dispose();
