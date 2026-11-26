@@ -145,6 +145,7 @@ interface NavbarProps {
   setActiveTab: (tab: string) => void;
   activeProfile: StudentProfile | null;
   activeProfileId?: number | null;
+  loadSchollyModel?: boolean;
   onOpenProfileModal: (isNew?: boolean) => void;
   onSwitchProfile?: () => void;
   onStartOnboarding?: () => void;
@@ -364,6 +365,7 @@ export function Navbar({
   setActiveTab,
   activeProfile,
   activeProfileId,
+  loadSchollyModel,
   onOpenProfileModal,
   onSwitchProfile,
   onStartOnboarding,
@@ -901,14 +903,23 @@ export function Navbar({
         })
       } />
 
-      {activeProfile && !hiddenItems.includes("guidance") && activeTab !== "guidance" && (
-        <Button variant="unstyled" type="button" onClick={() => go("guidance")}
-          aria-label={workspaceLabels.advisor}
-          className="fixed right-4 z-40 grid h-12 w-12 place-items-center rounded-full border border-slate-300 bg-white shadow-lg bottom-[calc(var(--sb-dock-height,60px)+env(safe-area-inset-bottom)+1rem)] dark:border-slate-600 dark:bg-slate-900">
-          {/* eslint-disable-next-line @next/next/no-img-element -- compact local mascot asset */}
-          <img src="/scholly.webp" width="32" height="32" alt="" />
-        </Button>
-      )}
+      <SchollyCompanion
+        key={activeProfileId ?? activeProfile?.id ?? "guest"}
+        loadModel={loadSchollyModel}
+        activeTab={activeTab}
+        activePane={activePane}
+        locale={locale}
+        profileId={activeProfileId ?? activeProfile?.id ?? null}
+        profileName={activeProfile?.name ?? ""}
+        profileFacts={[activeProfile?.targetMajor ?? "", activeProfile?.degreeLevel ?? ""]}
+        navigate={go}
+        topics={paletteItems.filter(item => !item.premium).map(item => ({
+          id: item.id,
+          title: item.label,
+          hint: ("hint" in item ? item.hint : undefined) ?? ("searchTerms" in item ? item.searchTerms?.split("  ")[0] : undefined),
+          keywords: "searchTerms" in item ? item.searchTerms ?? "" : "",
+        }))}
+      />
 
       {/* ================= PHONE / TABLET: SLIDE-IN MENU ================= */}
       <AnimatePresence>

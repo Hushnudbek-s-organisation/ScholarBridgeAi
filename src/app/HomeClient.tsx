@@ -292,6 +292,8 @@ export function Home({
   // `profiles` is used by the picker to show this device's saved accounts.
   const [profiles, setProfiles] = useState<StudentProfile[]>([]);
   const [activeProfile, setActiveProfile] = useState<StudentProfile | null>(null);
+  // Give the first dashboard paint priority over Scholly's WebGL startup.
+  const [resolvedDashboardProfile, setResolvedDashboardProfile] = useState<number | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewProfile, setIsNewProfile] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -802,6 +804,7 @@ export function Home({
       // ignore
     }
     setActiveProfile(null);
+    setResolvedDashboardProfile(null);
     invalidateClientCache();
     setActiveTab("dashboard");
     setIsProfileModalOpen(false);
@@ -1113,6 +1116,7 @@ export function Home({
         setActiveTab={setActiveTab}
         activeProfile={activeProfile}
         activeProfileId={activeProfile?.id ?? null}
+        loadSchollyModel={activeTab !== "dashboard" || !activeProfile?.onboardingCompleted || resolvedDashboardProfile === activeProfile.id}
         onOpenProfileModal={openProfileModal}
         onSwitchProfile={openProfilePicker}
         onStartOnboarding={startOnboarding}
@@ -1195,6 +1199,7 @@ export function Home({
                 afterOverview={<DailyStreakCard profileId={activeProfile?.id ?? null} compact />}
                 profileId={activeProfile?.id ?? null}
                 profileVersion={activeProfile ? profileMatchFingerprint(activeProfile) : null}
+                onResolved={setResolvedDashboardProfile}
                 onNavigateTab={handleNavigateTab}
                 onOpenWorkspace={(applicationId) => {
                   setWorkspaceId(applicationId);
