@@ -14,6 +14,7 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
   onNavigate: (tab: string) => void;
 }) {
   const t = useTranslations("journey");
+  const tn = useTranslations("nav");
   const locale = useLocale();
   const sop = locale === "uz" ? "SOP’ni davom ettirish" : locale === "ru" ? "Продолжить работу над SOP" : "Continue your SOP";
   const [firstDeadline] = data.deadlines.filter((deadline) => (deadline.daysRemaining ?? -1) >= 0)
@@ -45,8 +46,8 @@ export function DashboardOverview({ data, primaryTitle, primaryDetail, primaryLa
             </li>)}
           </ul>}
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => onNavigate("universities")}>{t("overviewTab.universities")}</Button>
-            <Button variant="outline" onClick={() => onNavigate("scholarships")}>{t("overviewTab.scholarships")}</Button>
+            <Button variant="outline" onClick={() => onNavigate("universities")}>{tn("universities")}</Button>
+            <Button variant="outline" onClick={() => onNavigate("scholarships")}>{tn("scholarships")}</Button>
           </div>
         </section>
         <section className={panel}>

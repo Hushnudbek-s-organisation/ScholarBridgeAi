@@ -307,7 +307,7 @@ export function DeadlineCenter({ profileId, onNavigateTab }: { profileId: number
             <Button key={value} type="button" variant={scope === value ? "primary" : "outline"} className="min-h-11 whitespace-normal" aria-pressed={scope === value} onClick={() => { setChosenScope(value); setGroup("upcoming"); setExpanded(false); setNotice(""); }}>{t(`scope.${value}`)}</Button>
           ))}
         </div>
-        <Button type="button" variant="ghost" className="min-h-11" disabled={loading} onClick={() => void reload()}><RefreshCw className="size-4" aria-hidden />{t("refresh")}</Button>
+        <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" disabled={loading} onClick={() => void reload()}><RefreshCw className="size-4" aria-hidden />{t("refresh")}</Button>
       </div>
       <div className="grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <JourneyCard title={t("nextDeadline")} tone="accent">

@@ -22,6 +22,7 @@ assert.equal(canEnterSchollyMotion("idle", SCHOLLY_MOTION_PRIORITY.idle, SCHOLLY
 
 const companion = readFileSync(join(root, "src/components/SchollyCompanion.tsx"), "utf8");
 const model = readFileSync(join(root, "src/components/SchollyModel.tsx"), "utf8");
+const scene = readFileSync(join(root, "src/components/scholly/SchollyScene.ts"), "utf8");
 const activityCues = readFileSync(join(root, "src/components/useSchollyActivityCues.ts"), "utf8");
 const styles = readFileSync(join(root, "src/app/globals.css"), "utf8");
 assert.match(companion, /animation === "easter"/);
@@ -31,7 +32,8 @@ assert.match(companion, /quiet \|\| keyboardOpen \|\| hidden/);
 assert.match(model, /src="\/scholly\.webp"/);
 assert.match(model, /pointermove/);
 assert.match(model, /portrait\.current\?\.animate/);
-assert.match(model, /new T\.WebGLRenderer/);
+assert.match(model, /connectSchollyScene\(canvas/);
+assert.match(scene, /new T\.WebGLRenderer/);
 assert.match(model, /target\.dataset\.rendering = "3d"/);
 assert.match(styles, /\[data-rendering="3d"\] \.sb-scholly-portrait \{ visibility: hidden; \}/);
 assert.match(activityCues, /element\.matches\("input, textarea"\) \|\| element\.isContentEditable/);

@@ -72,6 +72,7 @@ import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { loadBootConfig } from "@/lib/bootConfig";
 import { Button } from "@/components/ui/Button";
 import { GroupedDock } from "./GroupedDock";
+import { SchollyCompanion } from "./SchollyCompanion";
 import { setGuidedJourneyHidden, useGuidedJourneyHidden } from "@/lib/guided-journey-visibility";
 
 export interface StudentProfile {

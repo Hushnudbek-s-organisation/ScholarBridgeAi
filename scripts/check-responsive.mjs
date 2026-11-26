@@ -71,7 +71,11 @@ check("landing header actions have 44px targets", /flight-mobile-menu[\s\S]+min-
 check("theme switch and theme choices meet 44px touch targets", /min-h-11 min-w-11/.test(source.themeToggle));
 check("theme controls use translated mode names and switch labels", /useTranslations\("theme"\)/.test(source.themeToggle) && /aria-label=\{t\(value\)\}/.test(source.themeToggle) && /targetModeLabel/.test(source.themeToggle));
 check("pre-paint theme bootstrap treats explicit light as false and dark as true", source.themeScript.includes('t==="system"?window.matchMedia("(prefers-color-scheme: dark)").matches:t==="dark"'));
-check("landing legal links meet 44×44px touch targets and retain visible focus", /href="\/privacy" className="inline-flex min-h-11 min-w-11[^"]*focus-visible:ring-2/.test(source.landing) && /href="\/terms" className="inline-flex min-h-11 min-w-11[^"]*focus-visible:ring-2/.test(source.landing));
+const landingFooter = source.landing.match(/<footer class="footer-minimal">[\s\S]*?<\/footer>/)?.[0] ?? "";
+check("landing legal links meet 44×44px touch targets and retain visible focus",
+  landingFooter.includes('href="/privacy"') && landingFooter.includes('href="/terms"') &&
+  /\.footer-minimal a \{[^}]*min-width: 44px;[^}]*min-height: 44px;/.test(source.landingCss) &&
+  /\.footer-minimal a:focus-visible \{[^}]*outline: 2px solid/.test(source.landingCss));
 check("profile picker close and sign-in controls meet the 44px minimum", /h-11 w-11/.test(source.profilePicker) && (source.profilePicker.match(/min-h-11/g) ?? []).length >= 5);
 check("recommendation brief inputs, actions and disclosures meet 44px targets with visible focus", (source.recLetter.match(/min-h-11/g) ?? []).length >= 7 && /min-w-11/.test(source.recLetter) && (source.recLetter.match(/<summary className=\"[^\"]*min-h-11/g) ?? []).length >= 2 && (source.recLetter.match(/focus-visible:ring-2/g) ?? []).length >= 4);
 check("consulting fields and submit action meet 44px/48px minimums with focus", (source.consulting.match(/min-h-11/g) ?? []).length >= 2 && /min-h-12/.test(source.consulting) && /focus-visible:outline/.test(source.consulting));
@@ -114,8 +118,13 @@ check("scholarship search and filters have accessible names", /aria-label=\{t\("
 check("scholarship filter dropdowns are labelled, 44px tall and sit in the toolbar (no side panel)", (source.scholarshipFilters.match(/htmlFor=\{`\$\{idPrefix\}-/g) ?? []).length === 7 && (source.scholarshipFilters.match(/id=\{`\$\{idPrefix\}-/g) ?? []).length === 7 && /idPrefix = "scholarship-filter"/.test(source.scholarshipFilters) && /idPrefix="mobile-scholarship-filter"/.test(source.scholarship) && /min-h-11/.test(source.scholarshipFilters) && !/lg:sticky/.test(source.scholarship));
 check("the personal scholarship filters stay behind a profile", /hasProfile && \(/.test(source.scholarshipFilters) && /hasProfile=\{Boolean\(activeProfile\)\}/.test(source.scholarship));
 check("scholarship filter options state how many awards they return", /\(\{entry\.count\}\)/.test(source.scholarshipFilters) && /facets\.degrees\[degree\]/.test(source.scholarshipFilters));
-check("scholarship cards reserve one heading box so a row lines up", /line-clamp-3 min-h-\[4\.125rem\]/.test(source.scholarship) && /line-clamp-2 h-9/.test(source.scholarship));
-check("scholarship sort and group selects have programmatic labels", /htmlFor="scholarship-sort"/.test(source.scholarship) && /id="scholarship-sort"/.test(source.scholarship) && /htmlFor="scholarship-group"/.test(source.scholarship) && /id="scholarship-group"/.test(source.scholarship));
+const awardHeading = source.scholarship.match(/<h3\s+className="[^"]+"\s+title=\{localizeScholarshipTitle[^}]+\}/)?.[0] ?? "";
+check("scholarship cards wrap full award names without clipping", awardHeading.includes("break-words") &&
+  !/(?:line-clamp|truncate|whitespace-nowrap)/.test(awardHeading));
+check("scholarship sort and both group selects have programmatic labels",
+  source.scholarship.includes('htmlFor="scholarship-sort"') && source.scholarship.includes('id="scholarship-sort"') &&
+  /htmlFor=\{id\}[\s\S]*?<select\s+id=\{id\}\s+value=\{groupBy\}/.test(source.scholarship) &&
+  source.scholarship.includes('groupControl("scholarship-group")') && source.scholarship.includes('groupControl("mobile-scholarship-group")'));
 check("mobile help and dismiss actions retain 44px targets and visible focus",  /min-h-11 min-w-11/.test(source.sectionIntro) && /h-11 w-11/.test(source.sectionIntro));
 check("compact language selector and logout control meet 44px targets", /min-h-11/.test(source.languageSwitcher) && /h-11 w-11/.test(source.navbar));
 check("hash-only shell navigation keeps framework state across history entries", /const state = window\.history\.state \?\? shellHistoryState\.current/.test(source.homeClient)
