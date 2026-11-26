@@ -64,9 +64,10 @@ export async function checkSharedRateLimit(
     // Opportunistic pruning so the table cannot grow without bound.
     if (now - lastCleanupAt > CLEANUP_INTERVAL_MS) {
       lastCleanupAt = now;
-      await db
-        .delete(rateLimitHits)
-        .where(lt(rateLimitHits.hitAt, new Date(now - Math.max(options.windowMs, MAX_ROW_AGE_MS))));
+      void db.delete(rateLimitHits)
+        .where(lt(rateLimitHits.hitAt, new Date(now - Math.max(options.windowMs, MAX_ROW_AGE_MS))))
+        .catch(() => {});
+
     }
 
     const n = row?.n ?? 1;

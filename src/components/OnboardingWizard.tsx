@@ -2,8 +2,10 @@
 
 import { ApplicantContextFields } from "@/components/ApplicantContextFields";
 import type {ApplicantContext} from "@/lib/applicantContext";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useLocaleContext } from "@/i18n/LocaleProvider";
+import { TelegramCodeFlow } from "@/components/telegram/TelegramCodeFlow";
 import {countriesMatch, countryTranslationKey, withQsTop200Countries, resolveCountryCode} from "@/lib/countries";
 
 import { collapsePicks, countrySearchMatch, rankCountryPicks } from "@/lib/countryPicker";
@@ -49,8 +51,7 @@ type OnboardingPath = "goal" | "interests" | "undecided";
 interface OnboardingWizardProps {
   /**
    * Existing profile (resume mode) OR null for a brand-new visitor:
-   * in that case step 1 (name + email) creates the profile via POST /api/profiles,
-   * and every following step saves through PUT /api/profiles/:id.
+   * in that case the final identity step creates the profile via POST /api/profiles.
    */
   profile: StudentProfile | null;
   /**
@@ -128,6 +129,12 @@ const inputCls =
 const labelCls = "block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5";
 
 export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete }: OnboardingWizardProps) {
+  const { locale } = useLocaleContext();
+  const newCopy = {
+    en: ["Build your study plan", "GPA (out of 5)", "IELTS score", "Annual budget (USD)", "Explore universities", "Explore scholarships", "Sign in with Telegram", "Use a Telegram account already linked to ScholarBridgeAI."],
+    uz: ["O‘qish rejangizni yarating", "GPA (5 ballik)", "IELTS balli", "Yillik byudjet (USD)", "Universitetlarni ko‘ring", "Grantlarni ko‘ring", "Telegram orqali kirish", "ScholarBridgeAI’ga avval ulangan Telegram hisobidan foydalaning."],
+    ru: ["Составьте план поступления", "GPA (из 5)", "Балл IELTS", "Годовой бюджет (USD)", "Посмотреть университеты", "Посмотреть стипендии", "Войти через Telegram", "Используйте Telegram, уже привязанный к ScholarBridgeAI."],
+  }[locale];
   const tCountry = useTranslations("countryNames");
   const tCommon = useTranslations("common");
   const tOnboarding = useTranslations("onboarding");
@@ -151,8 +158,11 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
   };
   const [onboardingPath, setOnboardingPath] = useState<OnboardingPath | null>(inferPath);
   const [step, setStep] = useState<number>(startStep);
+  const fresh = profile == null;
+  const phase = fresh ? (step + 1) % STEPS.length : step;
   const [createdId, setCreatedId] = useState<number | null>(profile?.id ?? null);
   const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<{ title: string; href: string }[]>([]);
   // STEP 7 country wall → search + ranked 12-card preview (the same pattern
   // as the profile modal), so the wizard fits one screen on a phone.
   const [countrySearch, setCountrySearch] = useState("");
@@ -175,13 +185,13 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
     degreeLevel: profile?.degreeLevel || "",
     targetMajor: profile?.targetMajor || "",
     studyInterests: resumeStudyInterests,
-    gpa: profile?.gpa ? String(profile.gpa) : "",
+    gpa: profile?.gpa != null ? String(profile.gpa) : "",
     gpaScale: profile?.gpaScale ? String(profile.gpaScale) : "",
     ieltsScore: profile?.ieltsScore != null ? String(profile.ieltsScore) : "",
     toeflScore: profile?.toeflScore ? String(profile.toeflScore) : "",
     satScore: profile?.satScore ? String(profile.satScore) : "",
     greScore: profile?.greScore ? String(profile.greScore) : "",
-    budgetAnnualUsd: profile?.budgetAnnualUsd ? String(profile.budgetAnnualUsd) : "",
+    budgetAnnualUsd: profile?.budgetAnnualUsd != null ? String(profile.budgetAnnualUsd) : "",
     // Unchecked until the student ticks the step that asks this question.
     needsFinancialAid: profile?.needsFinancialAid ?? (profile?.needScholarship === true ? true : null),
     preferredCountries: safeParseCountries(profile?.preferredCountries),
@@ -192,6 +202,33 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const sampleMajor = form.targetMajor || compatibilityTargetMajor(form.studyInterests) || "";
+  const sampleCountry = form.preferredCountries[0] ?? "";
+  useEffect(() => {
+    if (!fresh || phase !== 2) return;
+    const controller = new AbortController();
+    const base = new URLSearchParams({ perPage: "2" });
+    if (form.degreeLevel) base.set("degree", form.degreeLevel);
+    if (sampleCountry) base.set("country", sampleCountry);
+    const universityParams = new URLSearchParams(base);
+    if (sampleMajor) universityParams.set("major", sampleMajor);
+    if (form.budgetAnnualUsd) universityParams.set("maxTuition", form.budgetAnnualUsd);
+    const request = async (path: string, params: URLSearchParams) => {
+      const response = await fetch(`/api/${path}?${params}`, { signal: controller.signal });
+      if (!response.ok) return [];
+      const json = await response.json();
+      return (json[path] as { id: number; name?: string; title?: string }[]).map((row) => ({
+        title: row.name ?? row.title ?? "",
+        href: `/${path}/${row.id}`,
+      }));
+    };
+    void Promise.allSettled([request("universities", universityParams), request("scholarships", base)])
+      .then((results) => {
+        if (!controller.signal.aborted) setPreview(results.flatMap((result) => result.status === "fulfilled" ? result.value : []));
+      });
+    return () => controller.abort();
+  }, [form.budgetAnnualUsd, form.degreeLevel, fresh, phase, sampleCountry, sampleMajor]);
 
   const selectOnboardingPath = (path: OnboardingPath) => {
     setOnboardingPath(path);
@@ -233,10 +270,8 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
   };
 
   /**
-   * Persist the current step. For a brand-new visitor the very first save
-   * creates the profile (POST /api/profiles with name/email + referral code),
-   * afterwards every step uses PUT /api/profiles/:id. Each save advances
-   * onboardingStep so the user can leave and resume later.
+   * Persist the current step. Guests save once after choosing their options.
+   * Signed-in students keep the existing resumable update flow.
    */
   const persist = async (nextStep: number, completed: boolean) => {
     const creatingProfile = createdId == null;
@@ -264,7 +299,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
               : form.targetMajor || compatibilityTargetMajor(form.studyInterests) || null,
         applicantContext:form.applicantContext,
         gpa: num(form.gpa),
-        gpaScale: num(form.gpaScale),
+        gpaScale: form.gpa ? num(form.gpaScale) : null,
         ieltsScore: num(form.ieltsScore),
         toeflScore: num(form.toeflScore),
         satScore: num(form.satScore),
@@ -278,6 +313,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
         workExperienceYears: num(form.workExperienceYears),
         researchPublications: num(form.researchPublications),
         extracurriculars: form.extracurriculars || null,
+        preferredLocale: locale,
         onboardingStep: nextStep,
         onboardingCompleted: completed,
       };
@@ -286,7 +322,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
       }
 
       if (createdId == null) {
-        // Step 1: create the profile (name + email + password are mandatory
+        // Create the profile (name + email + password are mandatory
         // here — this pair is what the student signs in with later, from any
         // device). The referral code from the URL (?ref=) is applied
         // server-side.
@@ -337,12 +373,6 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
         setCreatedId(created.id);
         onCreated?.(created);
 
-        // Legacy profile claimed via auth (e.g. the admin account) is already
-        // fully onboarded — jump straight to the app.
-        if (created.onboardingCompleted) {
-          onComplete(created);
-          return created;
-        }
         return created;
       }
 
@@ -408,7 +438,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
   };
 
   const handleNext = async () => {
-    if (step === 0 && step0Invalid) {
+    if (phase === 0 && step0Invalid) {
       setError(step0Problems.join(" · "));
       focusFirstProblem();
       return;
@@ -421,6 +451,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
       }
       return;
     }
+    if (fresh) { setStep((s) => s + 1); return; }
     const updated = await persist(step + 1, false);
     if (updated) setStep((s) => s + 1);
   };
@@ -434,6 +465,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
       }
       return;
     }
+    if (fresh) { setStep((s) => s + 1); return; }
     const updated = await persist(step + 1, false);
     if (updated) setStep((s) => s + 1);
   };
@@ -493,16 +525,17 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
     );
   }
 
-  const stepInfo = STEPS[step];
+  const stepInfo = STEPS[phase];
   const StepIcon = stepInfo.icon;
   const progressPct = Math.round((step / (STEPS.length - 1)) * 100);
   const isLast = step === STEPS.length - 1;
-  const nextDisabled = saving || (step === 0 && step0Invalid);
+  const nextDisabled = saving || (phase === 0 && step0Invalid);
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-3xl">
       {/* Progress header */}
       <div className="mb-4 sm:mb-5">
+        <h1 className="mb-3 text-2xl font-extrabold text-slate-900 dark:text-slate-50">{newCopy[0]}</h1>
         <div className="flex items-center justify-between mb-2">
           <p className="min-w-0 break-words text-sm font-bold uppercase tracking-wide text-slate-600">
             {createdId == null ? tOnboarding("createAccount") : tOnboarding("completeProfile")}
@@ -524,7 +557,15 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
         </div>
       </div>
 
-      <div
+      {fresh && phase === 0 && (
+        <details className="mb-3 rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <summary className="min-h-11 cursor-pointer font-semibold">{newCopy[6]}</summary>
+          <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{newCopy[7]}</p>
+          <TelegramCodeFlow purpose="login" onLoggedIn={(authenticated) => { onCreated?.(authenticated); onComplete(authenticated); }} />
+        </details>
+      )}
+      <form
+        onSubmit={(event) => { event.preventDefault(); void handleNext(); }}
         key={step}
         className="relative min-w-0 rounded-overlay border border-slate-200 bg-white p-4 shadow-md animate-fadeIn sm:p-6 lg:p-8"
       >
@@ -536,7 +577,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
             {error}
           </div>
         )}
-        {!error && step === 0 && step0Invalid && (
+        {!error && phase === 0 && step0Invalid && (
           <p className="mb-4 text-sm font-semibold text-slate-500 dark:text-slate-400">
             {/* Only pre-existing accounts (no password step) get the short note. */}
             {isNewAccount ? step0Problems.join(" · ") : tOnboarding("identityRequired")}
@@ -544,7 +585,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
         )}
 
         {/* STEP 1 — Name, email & password (mandatory on new accounts) */}
-        {step === 0 && (
+        {phase === 0 && (
           <div className="space-y-4">
             <div>
               <label className={labelCls} htmlFor="ob-name">{tOnboarding("fullNameLabel")}</label>
@@ -655,13 +696,13 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
 
         {/* STEP 2 — Degree plus optional study direction. Advanced academic
             details deliberately live in the post-onboarding profile editor. */}
-        {step === 1 && (
+        {phase === 1 && (
           <p className="rounded-surface border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             {tOnboarding("optionalHint")}
           </p>
         )}
         {/* Target degree */}
-        {step === 1 && (
+        {phase === 1 && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-stretch">
             {DEGREES.map((d) => {
               const selected = normalizeDegreeLevel(form.degreeLevel) === d;
@@ -698,14 +739,25 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
           </div>
         )}
 
-        {step === 1 && (
-          <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-            {tOnboarding("deferredDetails")}
-          </p>
+        {fresh && phase === 1 && (
+          <div className="my-4 grid gap-3 sm:grid-cols-3">
+            <label className="text-sm font-semibold">{newCopy[1]}
+              <input className={inputCls} type="number" min="0" max="5" step="0.01" inputMode="decimal"
+                value={form.gpa} onChange={(event) => setForm((current) => ({ ...current, gpa: event.target.value, gpaScale: "5" }))} />
+            </label>
+            <label className="text-sm font-semibold">{newCopy[2]}
+              <input className={inputCls} type="number" min="0" max="9" step="0.5" inputMode="decimal"
+                value={form.ieltsScore} onChange={(event) => set("ieltsScore", event.target.value)} />
+            </label>
+            <label className="text-sm font-semibold">{newCopy[3]}
+              <input className={inputCls} type="number" min="0" max="10000000" step="1" inputMode="numeric"
+                value={form.budgetAnnualUsd} onChange={(event) => set("budgetAnnualUsd", event.target.value)} />
+            </label>
+          </div>
         )}
         {/* STEP 3 — Where are you now? (3 equal choices) → study interests,
             or the guided career-discovery flow for the undecided. */}
-        {step === 1 && (
+        {phase === 1 && (
           <div className="min-w-0 space-y-3 sm:space-y-5">
             {/* Three equal, equally-respectful starting points. No answer is
                 required before choosing; "I don't know yet" is a full flow. */}
@@ -839,15 +891,15 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
           </div>
         )}
 
-        {step===2&&<ApplicantContextFields value={form.applicantContext} onChange={value=>setForm(f=>({...f,applicantContext:value}))} legacyGpa={form.gpa} legacyScale={form.gpaScale} legacyToefl={form.toeflScore}/>}
+        {phase===2&&<ApplicantContextFields value={form.applicantContext} onChange={value=>setForm(f=>({...f,applicantContext:value}))} legacyGpa={form.gpa} legacyScale={form.gpaScale} legacyToefl={form.toeflScore}/>}
         {/* STEP 3 — Optional budget plus preferred destinations. */}
-        {step === 2 && (
+        {phase === 2 && (
           <p className="rounded-surface border border-indigo-100 bg-indigo-50 px-3 py-2.5 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             {tOnboarding("destinationsHint")}
           </p>
         )}
         {/* STEP 6 — Budget & financial aid */}
-        {step === 2 && (
+        {phase === 2 && (
           <div className="space-y-4">
             <div>
               <label className={labelCls}>{tOnboarding("annualBudgetLabel")}</label>
@@ -893,7 +945,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
         )}
 
         {/* STEP 7 — Preferred countries */}
-        {step === 2 && (
+        {phase === 2 && (
           <div className="space-y-3">
             <input
               type="search"
@@ -938,6 +990,18 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
           </div>
         )}
 
+        {fresh && phase === 2 && (
+          <div className="my-4 rounded-surface border border-slate-200 p-3 dark:border-slate-700">
+            <div className="flex flex-wrap gap-3">
+              <a className="inline-flex min-h-11 items-center text-blue-700 underline dark:text-blue-300" href={`/universities?${new URLSearchParams({ degree: form.degreeLevel, country: sampleCountry, major: sampleMajor })}`} target="_blank" rel="noopener noreferrer">{newCopy[4]}</a>
+              <a className="inline-flex min-h-11 items-center text-blue-700 underline dark:text-blue-300" href={`/scholarships?${new URLSearchParams({ degree: form.degreeLevel, country: sampleCountry })}`} target="_blank" rel="noopener noreferrer">{newCopy[5]}</a>
+            </div>
+            <ul className="grid gap-1 sm:grid-cols-2" aria-live="polite">
+              {preview.map(({ title, href }) => <li key={href}><a className="inline-flex min-h-11 items-center underline" href={href} target="_blank" rel="noopener noreferrer">{title}</a></li>)}
+            </ul>
+          </div>
+        )}
+
         {/* Legal copy and controls share the phone's sticky panel so the
             consent note stays visible instead of slipping behind the actions. */}
         <div className="sticky bottom-0 z-20 -mx-4 -mb-4 mt-3 flex flex-col rounded-b-3xl border-t border-slate-200 bg-white/95 px-3 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:mt-4 sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0 sm:pt-0 sm:pb-0 sm:shadow-none sm:backdrop-blur-none">
@@ -961,7 +1025,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
               <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" /> {tOnboarding("back")}
             </Button>
 
-            {step !== 0 && (
+            {!fresh && phase !== 0 && (
               <Button variant="unstyled"
                 type="button"
                 onClick={handleSkip}
@@ -973,8 +1037,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
             )}
 
             <Button variant="unstyled"
-              type="button"
-              onClick={handleNext}
+              type="submit"
               disabled={nextDisabled}
               className={`ml-auto inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-surface px-4 py-3 text-sm font-bold transition-[background-color,box-shadow,color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-100 motion-reduce:transition-none ${
                 nextDisabled
@@ -991,7 +1054,7 @@ export function OnboardingWizard({ profile, initialEmail, onCreated, onComplete 
             </Button>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

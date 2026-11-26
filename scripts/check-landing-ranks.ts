@@ -161,18 +161,10 @@ check("every card keeps its photo and landmark", () => {
 
 /* ---------------------------------------------------------------- wiring */
 
-check("the badge renders the number, not a stored string", () => {
-  const source = readFileSync(join(ROOT, "src/components/LandingPage.tsx"), "utf8");
-  assert.match(source, /\{`QS #\$\{university\.qsRank\}`\}/, "the badge still prints a hand-typed label");
-  assert.doesNotMatch(source, /rank: "QS #/, "a hardcoded QS label survived in the data");
-});
-
-check("the item type cannot carry a free-form ranking string", () => {
-  const source = readFileSync(join(ROOT, "src/components/LandingPage.tsx"), "utf8");
-  const iface = /export interface MarqueeUniversityItem \{([\s\S]*?)\n\}/.exec(source);
-  assert.ok(iface, "the marquee item type is gone");
-  assert.match(iface[1], /qsRank: number;/, "the rank is not a number");
-  assert.doesNotMatch(iface[1], /^\s*rank:/m, "a free-form rank field is back");
+check("the public catalogue shows the recorded edition and official rank label", () => {
+  const source = readFileSync(join(ROOT, "src/app/universities/page.tsx"), "utf8");
+  assert.match(source, /qs_ranking\.year/);
+  assert.match(source, /qs_ranking\.label/);
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

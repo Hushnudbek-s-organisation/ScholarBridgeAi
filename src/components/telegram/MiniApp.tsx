@@ -286,9 +286,9 @@ const SETTABLE_STATUSES = [
 // Component
 // ---------------------------------------------------------------------------
 
-export function MiniApp() {
+export function MiniApp({ initialLang = "uz" }: { initialLang?: Lang }) {
   const [phase, setPhase] = useState<Phase>({ k: "loading" });
-  const [lang, setLang] = useState<Lang>("uz");
+  const [lang, setLang] = useState<Lang>(initialLang);
   const [screen, setScreen] = useState<Screen>("home");
   const [profile, setProfile] = useState<MiniProfile | null>(null);
   const [siteUrl, setSiteUrl] = useState<string | null>(null);

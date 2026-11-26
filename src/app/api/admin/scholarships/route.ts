@@ -1,3 +1,4 @@
+import { privateNoStoreJson } from "@/lib/apiResponse";
 import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
@@ -103,6 +104,17 @@ function buildScholarshipValues(s: any) {
     notes: s.notes || null,
     lastUpdatedAt: new Date(),
   };
+}
+
+export async function GET(req: Request) {
+  try {
+    const access = await requireAdmin(req);
+    if (!access.ok) return privateNoStoreJson({ error: access.error, code: access.code }, { status: access.status });
+    const rows = await db.select().from(scholarships).orderBy(scholarships.id);
+    return privateNoStoreJson({ scholarships: rows });
+  } catch {
+    return privateNoStoreJson({ error: "Catalogue unavailable" }, { status: 503 });
+  }
 }
 
 export async function POST(req: Request) {

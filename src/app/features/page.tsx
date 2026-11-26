@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -15,7 +16,7 @@ import {
 } from "lucide-react";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { dictionaries, clientMessagesFor } from "@/i18n/messages.server";
+import { dictionaries, publicMessagesFor } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { getTelegramSettings } from "@/lib/telegram/settings";
 
@@ -73,6 +74,12 @@ export default async function FeaturesPage() {
   const locale = await getPageLocale();
   const copy = dictionaries[locale].publicFeatures;
   const bot = await botLink();
+  const viewLabel = { en: "Open tool", uz: "Vosita bilan tanishish", ru: "Открыть инструмент" }[locale];
+  const routeByFeature = {
+    match: "/universities", chancing: "/?start=1#universities", deadlines: "/?start=1#tasks",
+    documents: "/?start=1#materials", ai: "/?start=1#guidance", visa: "/?start=1#visa",
+    money: "/?start=1#funding", telegram: bot ?? "/tg",
+  };
 
   const steps = [
     { title: copy.stepOneTitle, body: copy.stepOneBody },
@@ -81,18 +88,18 @@ export default async function FeaturesPage() {
   ];
 
   return (
-    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
-      <div className="min-h-screen bg-slate-50">
+    <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale)}>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
         <PublicCatalogHeader />
 
         <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           {/* ------------------------------------------------------------ hero */}
-          <section className="rounded-overlay border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
+          <section className="rounded-overlay border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900 shadow-xs sm:p-8">
             <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">{copy.heroEyebrow}</p>
-            <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+            <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
               {copy.heroTitle}
             </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-700">{copy.heroBody}</p>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-700 dark:text-slate-300">{copy.heroBody}</p>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Link
                 href="/?start=1"
@@ -124,9 +131,11 @@ export default async function FeaturesPage() {
             </p>
           </section>
 
+          <Image src="/landing/flight/dashboard.webp" alt={copy.featuresTitle} width={900} height={450}
+            className="mt-6 h-auto w-full rounded-overlay border border-slate-300 object-cover dark:border-slate-700" />
           {/* --------------------------------------------------------- features */}
           <section className="mt-8" aria-labelledby="features-heading">
-            <h2 id="features-heading" className="text-lg font-bold text-slate-900 sm:text-xl">
+            <h2 id="features-heading" className="text-lg font-bold text-slate-900 dark:text-slate-100 sm:text-xl">
               {copy.featuresTitle}
             </h2>
             <p className="mt-1 text-sm text-slate-600">{copy.featuresBody}</p>
@@ -135,12 +144,13 @@ export default async function FeaturesPage() {
                 const Icon = FEATURE_ICONS[key];
                 const entry = copy.features[key];
                 return (
-                  <li key={key} className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs">
+                  <li key={key} className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 shadow-xs">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-surface bg-indigo-50 text-indigo-700">
                       <Icon className="h-4.5 w-4.5" aria-hidden />
                     </span>
-                    <h3 className="mt-2 text-sm font-bold text-slate-900">{entry.title}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{entry.body}</p>
+                    <h3 className="mt-2 text-sm font-bold text-slate-900 dark:text-slate-100">{entry.title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{entry.body}</p>
+                    <Link href={routeByFeature[key]} className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-700 underline dark:text-blue-300">{viewLabel} ↗</Link>
                   </li>
                 );
               })}
@@ -149,12 +159,12 @@ export default async function FeaturesPage() {
 
           {/* ------------------------------------------------------------ steps */}
           <section className="mt-8" aria-labelledby="steps-heading">
-            <h2 id="steps-heading" className="text-lg font-bold text-slate-900 sm:text-xl">
+            <h2 id="steps-heading" className="text-lg font-bold text-slate-900 dark:text-slate-100 sm:text-xl">
               {copy.stepsTitle}
             </h2>
             <ol className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               {steps.map((step, index) => (
-                <li key={step.title} className="rounded-overlay border border-slate-200 bg-white p-4 shadow-xs">
+                <li key={step.title} className="rounded-overlay border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 shadow-xs">
                   <p className="text-sm font-bold text-indigo-700">{index + 1}</p>
                   <h3 className="mt-1 text-sm font-bold text-slate-900">{step.title}</h3>
                   <p className="mt-1 text-sm leading-relaxed text-slate-600">{step.body}</p>

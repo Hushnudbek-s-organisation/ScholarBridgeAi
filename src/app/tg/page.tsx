@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import Script from "next/script";
+import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { MiniApp } from "@/components/telegram/MiniApp";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +18,14 @@ export const metadata: Metadata = {
  * short-lived session on the server before showing any account data.
  */
 export default async function TelegramMiniAppPage() {
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const [requestHeaders, jar] = await Promise.all([headers(), cookies()]);
+  const nonce = requestHeaders.get("x-nonce") ?? undefined;
+  const stored = jar.get(LOCALE_COOKIE)?.value;
+  const locale = stored && isLocale(stored) ? stored : defaultLocale;
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-sync-scripts -- must load before the app reads window.Telegram */}
-      <script src="https://telegram.org/js/telegram-web-app.js" nonce={nonce} />
-      <MiniApp />
+      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" nonce={nonce} />
+      <MiniApp initialLang={locale} />
     </>
   );
 }

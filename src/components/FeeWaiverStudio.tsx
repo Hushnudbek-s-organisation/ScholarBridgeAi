@@ -223,7 +223,7 @@ export function FeeWaiverStudio({ profile, universityIds, className = "" }: FeeW
 
         // No shortlist yet: show what the destination countries actually charge,
         // so the panel is still useful before the student saves anything.
-        const params = new URLSearchParams({ perPage: "40", sort: "rank" });
+        const params = new URLSearchParams({ perPage: "40", sort: "rank", view: "expanded" });
         if (preferred[0]) params.set("country", preferred[0]);
         const catRes = await fetch(`/api/universities?${params.toString()}`, { signal: controller.signal });
         const catData = await catRes.json().catch(() => null);

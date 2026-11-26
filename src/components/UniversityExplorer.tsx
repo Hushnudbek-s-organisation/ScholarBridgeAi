@@ -318,7 +318,7 @@ export function UniversityExplorer({
   // Shared filter params (no pagination) - reused by the compare modal so it
   // loads the same filtered list the grid is paginating through.
   const buildFilterParams = () => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ view: "expanded" });
     if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
     if (selectedCountry !== "All") params.set("country", selectedCountry);
     if (selectedType !== "All") params.set("type", selectedType);
@@ -603,15 +603,14 @@ export function UniversityExplorer({
 
   const openCompareModal = async () => {
     setShowCompareModal(true);
-    // Selections may live on other pages - load the full filtered list
-    // (same filters, no pagination) so every selected row appears.
+    // Compare the selected records directly, including selections from prior pages.
     setCompareLoading(true);
     try {
-      const res = await fetch(`/api/universities?${buildFilterParams().toString()}`);
+      const params = new URLSearchParams({ ids: compareIds.join(","), perPage: "3", view: "expanded" });
+      if (activeProfile?.id) params.set("profileId", String(activeProfile.id));
+      const res = await fetch(`/api/universities?${params}`);
       const data = await res.json();
-      setComparePool(
-        res.ok && Array.isArray(data.universities) ? data.universities : universities,
-      );
+      setComparePool(res.ok && Array.isArray(data.universities) ? data.universities : universities);
     } catch {
       setComparePool(universities);
     } finally {

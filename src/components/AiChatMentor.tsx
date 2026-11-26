@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { StudentProfile } from "./Navbar";
@@ -16,6 +16,7 @@ import {
   Award
 } from "lucide-react";
 import { AiFormattedText } from "./AiFormattedText";
+import { readSseData } from "@/lib/sseData";
 import { AnimatePresence, m as Motion } from "framer-motion";
 import { AppNote } from "@/components/AppNote";
 import { Button } from "@/components/ui/Button";
@@ -48,6 +49,10 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamText, setStreamText] = useState("");
+  const requestRef = useRef<AbortController | null>(null);
+  useEffect(() => () => requestRef.current?.abort(), []);
+
 
   const samplePrompts = [
     t("chatPrompt1"),
@@ -58,7 +63,9 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
 
   const handleSend = async (textToSend?: string) => {
     const query = textToSend || input;
-    if (!query.trim() || loading) return;
+    if (!query.trim() || requestRef.current) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -69,17 +76,34 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
     setMessages((prev) => [...prev, userMsg]);
     if (!textToSend) setInput("");
     setLoading(true);
+    setStreamText("");
 
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({
           message: query,
           profileId: activeProfile?.id,
           chatHistory: messages.map((m) => ({ sender: m.sender, text: m.text })),
         }),
       });
+
+      if (res.ok && res.body && res.headers.get("content-type")?.includes("text/event-stream")) {
+        let final: { reply: string; offline?: boolean } | undefined;
+        for await (const chunk of readSseData(res.body)) {
+          const event = JSON.parse(chunk) as { type: string; text?: string; reply?: string; offline?: boolean };
+          if (event.type === "delta" && typeof event.text === "string") setStreamText((value) => value + event.text);
+          if (event.type === "reset") setStreamText("");
+          if (event.type === "done" && typeof event.reply === "string") final = { reply: event.reply, offline: event.offline };
+          if (event.type === "error") throw new Error("Chat stream failed");
+        }
+        if (!final) throw new Error("Chat stream ended early");
+        const { reply, offline } = final;
+        setMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: "ai", text: reply, offline }]);
+        return;
+      }
 
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.reply) {
@@ -105,8 +129,8 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
           { id: crypto.randomUUID(), sender: "ai", text, error: true },
         ]);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      if (controller.signal.aborted) return;
       setMessages((prev) => [
         ...prev,
         {
@@ -116,7 +140,11 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
         },
       ]);
     } finally {
-      setLoading(false);
+      requestRef.current = null;
+      if (!controller.signal.aborted) {
+        setStreamText("");
+        setLoading(false);
+      }
     }
   };
 
@@ -184,8 +212,10 @@ export function AiChatMentor({ activeProfile }: AiChatMentorProps) {
           </Motion.div>
         ))}
         </AnimatePresence>
+        {streamText && <p className="max-w-3xl whitespace-pre-wrap rounded-overlay bg-white p-4 text-sm text-slate-800 dark:bg-slate-900 dark:text-slate-100">{streamText}</p>}
 
-        {loading && (
+
+        {loading && !streamText && (
           <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

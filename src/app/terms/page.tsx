@@ -1,33 +1,57 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrandingImage } from "@/components/BrandingImage";
+import { cookies } from "next/headers";
+import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
+import { publicMessagesFor } from "@/i18n/messages.server";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 
-export const metadata: Metadata = {
-  title: "Terms of Service | ScholarBridgeAI",
-  description: "Terms of Service for ScholarBridgeAI — study abroad matching platform.",
+const localized = {
+  "en": {
+    "title": "Terms of Service",
+    "description": "Terms of use for ScholarBridgeAI.",
+    "summary": ""
+  },
+  "uz": {
+    "title": "Foydalanish shartlari",
+    "description": "ScholarBridgeAI xizmatidan foydalanish qoidalari.",
+    "summary": "Katalog va AI yordamchisi arizaga tayyorlanishga yordam beradi. Qabul yoki grant bo‘yicha qarorni tegishli tashkilot qabul qiladi. Xizmat, obuna va foydalanuvchi majburiyatlari quyidagi to‘liq matnda bayon qilingan."
+  },
+  "ru": {
+    "title": "Условия использования",
+    "description": "Правила использования ScholarBridgeAI.",
+    "summary": "Каталог и ИИ-помощник помогают подготовить заявку. Решения о поступлении или стипендии принимает соответствующая организация. Полный текст ниже описывает сервис, подписку и обязанности пользователя."
+  }
 };
 
-export default function TermsPage() {
-  return (
-    <div lang="en" className="min-h-screen bg-slate-50 font-sans">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-control bg-white flex items-center justify-center overflow-hidden shadow-sm border border-slate-200">
-              <BrandingImage alt="ScholarBridgeAI Logo" className="h-8 w-8 object-cover" />
-            </div>
-            <span className="font-extrabold text-slate-900 tracking-tight">ScholarBridgeAI</span>
-          </Link>
-          <Link href="/" className="text-xs font-bold text-indigo-700 hover:text-indigo-900">
-            Back to home
-          </Link>
-        </div>
-      </header>
+async function getLocale() {
+  const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
+  return stored && isLocale(stored) ? stored : defaultLocale;
+}
 
+export async function generateMetadata(): Promise<Metadata> {
+  const { title, description } = localized[await getLocale()];
+  return { title, description };
+}
+
+export default async function TermsPage() {
+  const locale = await getLocale();
+  const copy = localized[locale];
+  return (
+    <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale)}>
+      <PublicCatalogHeader />
+      {copy.summary && <section className="mx-auto max-w-4xl px-4 pt-7 sm:px-6">
+        <div className="rounded-overlay border border-blue-200 bg-blue-50 p-5 dark:border-blue-800 dark:bg-blue-950">
+          <h1 className="mb-2 text-2xl font-bold">{copy.title}</h1>
+          <p>{copy.summary}</p>
+        </div>
+      </section>}
+      <div lang="en" className="min-h-screen bg-slate-50 font-sans dark:bg-slate-950">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
         <div className="bg-white rounded-overlay border border-slate-200 shadow-sm p-6 sm:p-10">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Terms of Service</h1>
+          {locale === "en"
+            ? <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">Terms of Service</h1>
+            : <h2 className="text-xl font-extrabold text-slate-900">Terms of Service · English</h2>}
           <p className="mt-2 text-sm text-slate-500">Last updated: <time dateTime="2026-11-04">November 4, 2026</time> • Effective for all users of ScholarBridgeAI</p>
 
           <div className="mt-8 space-y-8 text-sm text-slate-700 leading-relaxed">
@@ -44,7 +68,7 @@ export default function TermsPage() {
                 <li>Community forum, video courses, referral rewards, and consulting requests.</li>
               </ul>
               <p className="mt-2">
-                ScholarBridgeAI is currently in prototype / early-access stage. Features and availability may change as we improve the product.
+                Features and availability may change as we improve the product.
               </p>
             </section>
 
@@ -157,6 +181,7 @@ export default function TermsPage() {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </LocaleProvider>
   );
 }

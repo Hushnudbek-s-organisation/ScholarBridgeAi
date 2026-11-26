@@ -1,3 +1,4 @@
+import { findCatalogueMatches } from "@/lib/catalogueSearch";
 import {prepareAwardCoverage} from "@/lib/awardCoverageContext.server";
 import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { privateNoStoreJson } from "@/lib/apiResponse";
@@ -222,7 +223,7 @@ export async function GET(req: Request) {
     // canonical keywords ("to'liq"→"full", "stipendiya"→"scholarship", …).
     const searchTerms = search ? expandMultilingualSearchTerms(search) : [];
     if (searchTerms.length > 0) {
-      allScholarships = allScholarships.filter(s =>
+      allScholarships = findCatalogueMatches(allScholarships, search ?? "", s =>
         searchTerms.some(term =>
           s.title.toLowerCase().includes(term) ||
           s.provider.toLowerCase().includes(term) ||
@@ -232,7 +233,7 @@ export async function GET(req: Request) {
           (s.degreeLevels ?? "").toLowerCase().includes(term) ||
           (s.eligibleMajors ?? "").toLowerCase().includes(term) ||
           countriesMatch(s.country, term)
-        )
+        ), s => [s.title, s.provider, s.country, s.eligibleMajors],
       );
     }
 
@@ -605,8 +606,7 @@ export async function GET(req: Request) {
       };
     }
 
-    // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).
-    // Without those params the full list is returned (admin tools, ...).
+    // Paginate after filtering and sorting.
     // Rows are localized LAST — every filter above ran on canonical English
     // data, so canonical dropdown values like "Full Tuition" never break.
     // `covTier` is an internal ordering key — the payload carries the honest
@@ -619,7 +619,12 @@ export async function GET(req: Request) {
     // §4: funding facts carry the same field-level evidence envelope. An
     // amount without a verified official source stays `legacy_unknown`; it is
     // never presented as a guaranteed stipend or an official minimum.
-    paginated.scholarships = pageRows.map((row) => {
+    paginated.scholarships = !profileData && searchParams.get("view") !== "expanded" ? pageRows.map((row) => ({
+      id: row.id, title: row.title, country: row.country, provider: row.provider, degreeLevels: row.degreeLevels,
+      coverageType: row.coverageType, amountUsdValue: row.amountUsdValue, verificationStatus: row.verificationStatus,
+      computedStatus: row.computedStatus, deadlineDate: row.deadlineDate, deadline: row.deadline,
+      sourceUrl: row.sourceUrl, applicationUrl: row.applicationUrl,
+    })) : pageRows.map((row) => {
       const r = row as unknown as Record<string, unknown>;
       return {
         ...localizeScholarshipRow(row, locale),

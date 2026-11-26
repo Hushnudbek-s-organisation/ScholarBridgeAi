@@ -9,7 +9,7 @@ import { hasUndergraduateAdmission } from "@/lib/degreeLevels";
 export const dynamic = "force-dynamic";
 
 /** Configurable test catalogue (spec §8). */
-export const TEST_TYPES = [
+const TEST_TYPES = [
   { key: "ielts", label: "IELTS", max: 9, skills: ["reading", "listening", "writing", "speaking"] },
   { key: "toefl", label: "TOEFL", max: 120, skills: ["reading", "listening", "writing", "speaking"] },
   { key: "duolingo", label: "Duolingo English Test", max: 160, skills: ["reading", "listening", "writing", "speaking"] },
@@ -43,7 +43,7 @@ export interface StarterRoadmap {
   booking: { label: string; url: string }[];
 }
 
-export const STARTER_ROADMAPS: StarterRoadmap[] = [
+const STARTER_ROADMAPS: StarterRoadmap[] = [
   {
     id: "ielts_75",
     testType: "ielts",

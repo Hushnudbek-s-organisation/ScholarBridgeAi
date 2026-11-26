@@ -35,3 +35,15 @@ export function clientMessagesFor(locale: string | null | undefined): Messages |
 
 /** Root front door has its own bundled bootstrap; no duplicated English RSC payload. */
 export function shellMessagesFor(locale:string|null|undefined):Messages|null{return !locale||locale==="en"?null:messagesFor(locale);}
+
+/** These routes render their content on the server. Only their client controls need messages. */
+export function publicMessagesFor(locale: string, ...extra: (keyof Messages)[]): Messages {
+  const dictionary = messagesFor(locale);
+  const namespaces: (keyof Messages)[] = ["meta", "nav", "publicCatalog", "publicFeatures", "pagination", "theme", "language", "common", ...extra];
+  return Object.fromEntries(namespaces.map((key) => [key, dictionary[key]])) as Messages;
+}
+
+export function landingMessagesFor(locale: string): Messages {
+  const { landing, picker, telegram, theme, appError } = messagesFor(locale);
+  return { landing: { navAria: landing.navAria, signIn: landing.signIn }, picker, telegram, theme, appError } as Messages;
+}

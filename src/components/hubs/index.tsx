@@ -68,7 +68,6 @@ const ApostilleReadinessCard = dynamic(() => import("@/components/ApostilleReadi
 const ArrivalPlanPanel = dynamic(() => import("@/components/journey/ArrivalPlanPanel").then((m) => m.ArrivalPlanPanel), { loading: panelLoading });
 const ApplicationWorkspacePanel = dynamic(() => import("@/components/journey/ApplicationWorkspacePanel").then((m) => m.ApplicationWorkspacePanel), { loading: panelLoading });
 const FinancialPlanPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.FinancialPlanPanel), { loading: panelLoading });
-const LearningProvidersPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.LearningProvidersPanel), { loading: panelLoading });
 const OffersPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.OffersPanel), { loading: panelLoading });
 const PostAdmissionOfferMatrix = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.PostAdmissionOfferMatrix), { loading: panelLoading });
 const RecommendationManagerPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.RecommendationManagerPanel), { loading: panelLoading });
@@ -87,14 +86,11 @@ const PlanningStudio = dynamic(() => import("@/components/PlanningStudio").then(
 const AiSopStudio = dynamic(() => import("@/components/AiSopStudio").then((m) => m.AiSopStudio), { loading: panelLoading });
 const EssayRubricStudio = dynamic(() => import("@/components/EssayRubricStudio").then((m) => m.EssayRubricStudio), { loading: panelLoading });
 const ProfessorOutreachStudio = dynamic(() => import("@/components/ProfessorOutreachStudio").then((m) => m.ProfessorOutreachStudio), { loading: panelLoading });
-const DailySpeaking = dynamic(() => import("@/components/DailySpeaking").then((m) => m.DailySpeaking), { loading: panelLoading });
 const VisaSpeakingAssistant = dynamic(() => import("@/components/VisaSpeakingAssistant").then((m) => m.VisaSpeakingAssistant), { loading: panelLoading });
 const AiChatMentor = dynamic(() => import("@/components/AiChatMentor").then((m) => m.AiChatMentor), { loading: panelLoading });
 const AdmissionsAdvisor = dynamic(() => import("@/components/AdmissionsAdvisor").then((m) => m.AdmissionsAdvisor), { loading: panelLoading });
 const ConsultingSection = dynamic(() => import("@/components/ConsultingSection").then((m) => m.ConsultingSection), { loading: panelLoading });
 const MentorMarketplace = dynamic(() => import("@/components/MentorMarketplace").then((m) => m.MentorMarketplace), { loading: panelLoading });
-const ForumSection = dynamic(() => import("@/components/ForumSection").then((m) => m.ForumSection), { loading: panelLoading });
-const CoursesSection = dynamic(() => import("@/components/CoursesSection").then((m) => m.CoursesSection), { loading: panelLoading });
 
 type Profile = StudentProfile | null;
 
@@ -870,13 +866,12 @@ export function VisaHub({ profile, pane, setPane, navigate, hidden }: HubProps) 
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={["daily-speaking", "speaking"].includes(active) ? undefined : { tone: "warn", text: td("visa"), compact: true }}
+      note={active === "speaking" ? undefined : { tone: "warn", text: td("visa"), compact: true }}
     >
       {/* The simulator used to render 1,500 px BELOW the requirements wall in
           one shared "visa" tab. Now every tool owns its pane and the
           simulator IS the default landing pane of this hub. */}
       {active === "speaking" && <VisaSpeakingAssistant activeProfile={profile} />}
-      {active === "daily-speaking" && <DailySpeaking />}
       {active === "visa" && (
         <VisaCenterPanel profileId={profile.id} onNavigateTab={navigate} hideApostille />
       )}
@@ -976,45 +971,16 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
 /* =========================================================================
  * HELP & LEARNING → Community & Learning
  * ====================================================================== */
-export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
+export function CommunityHub({ profile }: HubProps) {
   const t = useTranslations("hubs");
-  const td = useTranslations("disclaimers");
-  const { panes, visible, label } = usePanes("community");
-  const active = useActivePane(pane, visible, hidden);
-  const [courseTool, setCourseTool] = useState<"courses" | "providers">("courses");
+  const { label } = usePanes("community");
   if (!profile) return <MissingProfile />;
-
   return (
-    <HubPage
-      title={label}
-      intro={t("introCommunity")}
-      primaryLabel={active !== "forum" ? t("primaryCommunity") : undefined}
-      onPrimary={active !== "forum" ? () => setPane("forum") : undefined}
-      panes={panes}
-      activePane={active || undefined}
-      onPaneChange={setPane}
-      hiddenPanes={hidden}
-      note={{ tone: "info", text: td("community") }}
-    >
-      {active === "forum" && <ForumSection activeProfile={profile} isModerator={profile.isAdmin ?? false} />}
-      {active === "courses" && (
-        <div className="space-y-4">
-          <SubPills
-            ariaLabel={label}
-            value={courseTool}
-            onChange={(id) => setCourseTool(id as "courses" | "providers")}
-            options={[
-              { id: "courses", label: t("pillCourses") },
-              { id: "providers", label: t("pillProviders") },
-            ]}
-          />
-          {courseTool === "courses" ? (
-            <CoursesSection activeProfile={profile} />
-          ) : (
-            <LearningProvidersPanel key={`lp-${profile.id}`} profileId={profile.id} />
-          )}
-        </div>
-      )}
+    <HubPage title={label} intro={t("introCommunity")}>
+      <a href="https://t.me/scholarbridge_uz" target="_blank" rel="noopener noreferrer"
+        className="inline-flex min-h-11 items-center rounded-control bg-blue-700 px-4 text-sm font-semibold text-white">
+        Telegram ↗
+      </a>
     </HubPage>
   );
 }

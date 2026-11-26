@@ -9,7 +9,7 @@ import { invalidateDashboardRecommendationsForProfile } from "@/lib/dashboardRec
 
 export const dynamic = "force-dynamic";
 
-export const ACTIVITY_CATEGORIES = [
+const ACTIVITY_CATEGORIES = [
   "volunteering",
   "leadership",
   "competition",

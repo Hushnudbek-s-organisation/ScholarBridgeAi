@@ -63,25 +63,13 @@ export function paginateArray<T>(
   };
 }
 
-/**
- * Opt-in pagination wrapper for list APIs (`/api/universities`,
- * `/api/scholarships`). When the client passes `?page=` and/or `?perPage=`,
- * returns `{ [key]: sliced, total, page, perPage, totalPages }`; otherwise
- * returns `{ [key]: all }` untouched, so existing consumers (admin tools,
- * dashboard widgets, …) keep receiving the full list.
- */
+/** Public list APIs always return a bounded page after filtering and sorting. */
 export function paginatedPayload<T>(
   key: string,
   all: T[],
   searchParams: URLSearchParams,
 ): Record<string, unknown> {
-  if (
-    searchParams.get("page") === null &&
-    searchParams.get("perPage") === null
-  ) {
-    return { [key]: all };
-  }
-  const perPage = parsePerPage(searchParams.get("perPage"));
+  const perPage = parsePerPage(searchParams.get("perPage") ?? searchParams.get("limit"));
   const paged = paginateArray(
     all,
     parsePage(searchParams.get("page") ?? undefined),

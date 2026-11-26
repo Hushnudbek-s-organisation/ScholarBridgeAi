@@ -69,7 +69,10 @@ export function deadlineStateOf(row: DeadlineFields, todayYmd: string): Deadline
   const stored = (row.applicationStatus ?? "").toLowerCase();
   if (type === "rolling" || stored === "rolling") return "rolling";
   const ymd = deadlineYmd(row);
-  if (!ymd) return "unknown";
+  if (!ymd) {
+    if (stored === "closed") return "passed";
+    return stored === "upcoming" ? "upcoming" : "unknown";
+  }
   if (ymd < todayYmd) return "passed";
   if (stored === "upcoming") return "upcoming";
   return "open";

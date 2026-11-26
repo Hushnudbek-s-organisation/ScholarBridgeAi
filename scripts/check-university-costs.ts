@@ -144,7 +144,7 @@ check("a zero is a figure, not a missing value", () => {
 check("both university endpoints publish the resolved figure", () => {
   const list = source("src/app/api/universities/route.ts");
   assert.match(list, /import \{ withResolvedUsdCosts \} from "@\/lib\/usdCosts";/);
-  assert.match(list, /const resolved = withResolvedUsdCosts\(uni\);/, "the list endpoint ships the raw pair again");
+  assert.match(list, /withResolvedUsdCosts\(uni\)/, "the list endpoint ships the raw pair again");
 
   const detail = source("src/app/api/universities/[id]/route.ts");
   assert.match(detail, /import \{ withResolvedUsdCosts \} from "@\/lib\/usdCosts";/);
@@ -172,17 +172,22 @@ check("every other cost consumer already resolves through the helper", () => {
 
 check("the catalogue cards read the published figure, not a raw column", () => {
   const explorer = source("src/components/UniversityExplorer.tsx");
-  assert.match(explorer, /formatMoney\(uni\.annualTuitionUsd, "USD"\)/, "the card no longer prints the published tuition");
+  assert.match(explorer, /formatMoney\(uni\.annualTuitionUsd, "USD"(?:,|\))/, "the card no longer prints the published tuition");
   assert.doesNotMatch(explorer, /formatMoney\(uni\.annualTuition\b/, "the card reads the canonical pair directly");
   assert.doesNotMatch(explorer, /tuitionCurrency/, "the card decides the currency itself instead of the server");
 });
 
-check("the server-rendered catalogue applies the Phase AD rank rule", () => {
+check("the server-rendered catalogue reads QS rank and edition from the verified cache", () => {
   const page = source("src/app/universities/page.tsx");
-  assert.match(page, /import \{ verifiedQsRank \} from "@\/lib\/universityRank";/);
-  assert.doesNotMatch(page, /verified \? university\.worldRanking : null/, "the SSR catalogue still trusts the raw rank");
-  const uses = page.match(/world_ranking: verifiedQsRank\(university\)\?\.rank \?\? null/g) ?? [];
-  assert.equal(uses.length, 2, `expected both SSR branches to use the rule, found ${uses.length}`);
+  assert.match(page, /const rank = bundle\.qsRankings\.get\(university\.id\)/);
+  assert.match(page, /qs_ranking: rank/);
+  assert.doesNotMatch(page, /world_ranking: university\.worldRanking/);
+});
+
+check("an academic-year tuition period is equivalent to one year", () => {
+  for (const period of ["academic year", "per academic year", "academic-year"]) {
+    assert.equal(resolvedUsdUniversityCosts({ annualTuition: 65670, tuitionCurrency: "USD", tuitionPeriod: period }).annualTuitionUsd, 65670);
+  }
 });
 
 /* ------------------------------------------------------------- the data */

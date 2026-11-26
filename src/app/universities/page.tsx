@@ -1,27 +1,30 @@
+import { PublicCatalogCompare, PublicCompareButton } from "@/components/PublicCatalogCompare";
+import { catalogueParam, PublicCatalogFilters, type CatalogueQuery } from "@/components/PublicCatalogFilters";
+import { findCatalogueMatches } from "@/lib/catalogueSearch";
+import { countriesMatch } from "@/lib/countries";
+import { supportsDegreeLevel } from "@/lib/degreeLevels";
+import { subjectAffinity } from "@/lib/subjectAffinity";
+import { catalogueTuition } from "@/lib/catalogueTuition";
+import { safeAcademicLink, selectUniversityCardSummary } from "@/lib/universityCardSummary";
 import {resolveAcademicRequirements} from "@/lib/universityDetailRequirements";
-import {loadCatalogueFacts} from "@/lib/catalogueFacts.server";
 import {EvidenceNote} from "@/components/EvidenceNote";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import type { ReactElement } from "react";
 import { Building2, ExternalLink, GraduationCap, MapPin, Trophy } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
+import { publicMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
-import { asc, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { universities as universitiesTable } from "@/db/schema";
-import { ITEMS_PER_PAGE, getRange, parsePage } from "@/lib/pagination";
+import { ITEMS_PER_PAGE, paginateArray, parsePage } from "@/lib/pagination";
 import { resolvedUsdUniversityCosts } from "@/lib/usdCosts";
 import type { SourcedQsRanking } from "@/lib/universityRank";
-import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
-import { localizeCity, localizeCountry, localizeMajorOrField, localizeUniversityType } from "@/lib/catalogLocalizer";
+import { getCachedUniversitiesBundleForAssessment } from "@/lib/catalogCache";
+import { expandMultilingualSearchTerms, localizeCity, localizeCountry, localizeMajorOrField, localizeUniversityType } from "@/lib/catalogLocalizer";
 
 async function getPageLocale() {
   const stored = (await cookies()).get(LOCALE_COOKIE)?.value;
@@ -51,11 +54,16 @@ interface UniversityRow {
   min_ielts: number | null;
   post_study_work_visa_years: number | null;
   official_website_url: string | null;
+  tuition_source_url: string | null;
+  tuition_estimated: boolean;
+  deadline: string | null;
+  ieltsEvidence: ReturnType<typeof resolveAcademicRequirements>["evidence"]["ielts"];
+  recorded_min_ielts: number | null;
 }
 
 // Next.js 15+: searchParams is a Promise.
 interface UniversitiesPageProps {
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<CatalogueQuery>;
 }
 
 export default async function UniversitiesPage({
@@ -64,129 +72,87 @@ export default async function UniversitiesPage({
   const locale = await getPageLocale();
   const copy = dictionaries[locale].publicCatalog;
 
-  // Page from URL: /universities?page=2.
-  const requestedPage = parsePage((await searchParams).page);
-  const { from } = getRange(requestedPage);
-
-  // Read from the same PostgreSQL/Drizzle catalogue used by the API. Count
-  // only active rows, matching the page query, so pagination cannot point to
-  // pages containing only inactive universities.
+  const params = await searchParams;
+  const requestedPage = parsePage(params.page);
   let rows: UniversityRow[];
+  let currentPage: number;
+  let totalPages: number;
   let totalItems: number;
+  let countries: string[];
+  let years: number[];
   try {
-    const bundle = await getCachedUniversitiesBundle().catch(() => null);
-    if (bundle && bundle.unis.length > 0) {
-      const activeUnis = bundle.unis
-        .filter((u) => u.isActive !== false)
-        .sort((a, b) => {
-          const ar = bundle.qsRankings.get(a.id)?.rank ?? Number.MAX_SAFE_INTEGER;
-          const br = bundle.qsRankings.get(b.id)?.rank ?? Number.MAX_SAFE_INTEGER;
-          return ar !== br ? ar - br : a.id - b.id;
-        });
-      totalItems = activeUnis.length;
-      const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-      if (requestedPage > lastPage) {
-        redirect(lastPage > 1 ? `/universities?page=${lastPage}` : "/universities");
-      }
-      rows = activeUnis.slice(from, from + ITEMS_PER_PAGE).map((university) => {
-        const costs = resolvedUsdUniversityCosts(university);
-        const verified = university.verificationStatus === "verified";
-        return {
-          id: university.id,
-          name: university.name,
-          verification_status: university.verificationStatus,
-          country: university.country,
-          city: university.city,
-          flag_emoji: university.flagEmoji,
-          qs_ranking: bundle.qsRankings.get(university.id) ?? null,
-          program_major: university.programMajor,
-          university_type: university.universityType,
-          annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
-          annual_living_est_usd: verified ? costs.annualLivingEstUsd : null,
-          min_ielts: verified ? university.minIelts : null,
-          post_study_work_visa_years: verified ? university.postStudyWorkVisaYears : null,
-          official_website_url: university.officialWebsiteUrl || university.websiteUrl,
-        };
-      });
-    } else {
-      // Count and page in ONE round trip: the two statements are independent,
-      // so running them in parallel halves the time this fallback path waits
-      // for PostgreSQL. The active predicate is identical in both, so the
-      // pagination total still matches the visible rows.
-      const [countRows, data] = await Promise.all([
-        db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(universitiesTable)
-          .where(eq(universitiesTable.isActive, true)),
-        db
-          .select({
-            id: universitiesTable.id,
-            name: universitiesTable.name,
-            verificationStatus: universitiesTable.verificationStatus,
-            country: universitiesTable.country,
-            city: universitiesTable.city,
-            flagEmoji: universitiesTable.flagEmoji,
-            worldRanking: universitiesTable.worldRanking,
-            programMajor: universitiesTable.programMajor,
-            universityType: universitiesTable.universityType,
-            annualTuition: universitiesTable.annualTuition,
-            tuitionCurrency: universitiesTable.tuitionCurrency,
-            tuitionPeriod: universitiesTable.tuitionPeriod,
-            annualTuitionUsd: universitiesTable.annualTuitionUsd,
-            annualLivingEst: universitiesTable.annualLivingEst,
-            livingCostCurrency: universitiesTable.livingCostCurrency,
-            livingCostPeriod: universitiesTable.livingCostPeriod,
-            annualLivingEstUsd: universitiesTable.annualLivingEstUsd,
-            minIelts: universitiesTable.minIelts,
-            postStudyWorkVisaYears: universitiesTable.postStudyWorkVisaYears,
-            officialWebsiteUrl: universitiesTable.officialWebsiteUrl,
-            websiteUrl: universitiesTable.websiteUrl,
-          })
-          .from(universitiesTable)
-          .where(eq(universitiesTable.isActive, true))
-          .orderBy(
-            asc(sql`CASE WHEN ${universitiesTable.verificationStatus} = 'verified' THEN ${universitiesTable.worldRanking} ELSE NULL END`),
-            asc(universitiesTable.id),
-          )
-          .limit(ITEMS_PER_PAGE)
-          .offset(from),
-      ]);
-      const [countRow] = countRows;
-      totalItems = Number(countRow?.n ?? 0);
-      const lastPage = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-      if (requestedPage > lastPage) {
-        redirect(lastPage > 1 ? `/universities?page=${lastPage}` : "/universities");
-      }
-      // Nullable columns stay null (never "" or 0) — the card renders nothing
-      // rather than pretending a ranking/focus exists.
-      rows = data.map((university) => {
-        const costs = resolvedUsdUniversityCosts(university);
-        const verified = university.verificationStatus === "verified";
-        return {
-          id: university.id,
-          name: university.name,
-          verification_status: university.verificationStatus,
-          country: university.country,
-          city: university.city,
-          flag_emoji: university.flagEmoji,
-          qs_ranking: null,
-          program_major: university.programMajor,
-          university_type: university.universityType,
-          annual_tuition_usd: verified ? costs.annualTuitionUsd : null,
-          annual_living_est_usd: verified ? costs.annualLivingEstUsd : null,
-          min_ielts: verified ? university.minIelts : null,
-          post_study_work_visa_years: verified ? university.postStudyWorkVisaYears : null,
-          official_website_url: university.officialWebsiteUrl || university.websiteUrl,
-        };
-      });
-    }
+    const bundle = await getCachedUniversitiesBundleForAssessment();
+    const active = bundle.unis.filter((university) => university.isActive !== false);
+    countries = [...new Set(active.map((university) => university.country))].sort();
+    years = [...new Set([...bundle.qsRankings.values()].map((ranking) => ranking.year))].sort((a, b) => b - a);
+    const country = catalogueParam(params, "country");
+    const degree = catalogueParam(params, "degree", 30);
+    const major = catalogueParam(params, "major");
+    const search = catalogueParam(params, "search");
+    const qsYear = Number(catalogueParam(params, "qsYear", 4)) || null;
+    const maxTuitionValue = catalogueParam(params, "maxTuition", 12);
+    const ieltsValue = catalogueParam(params, "ielts", 12);
+    const maxTuition = maxTuitionValue === "" ? null : Number(maxTuitionValue);
+    const maxIelts = ieltsValue === "" ? null : Number(ieltsValue);
+    const fields = (id: number) => bundle.programFieldsByUni.get(id) ?? [];
+    const candidates = active.filter((row) => (
+      (!country || countriesMatch(row.country, country)) &&
+      (!degree || supportsDegreeLevel(row.degreeLevel, degree)) &&
+      (!major || [row.programMajor, ...fields(row.id)].some((field) => field && subjectAffinity([major], field).score > 0)) &&
+      (!qsYear || bundle.qsRankings.get(row.id)?.year === qsYear)
+    ));
+    const terms = search ? expandMultilingualSearchTerms(search) : [];
+    const found = search ? findCatalogueMatches(candidates, search, (row) => terms.some((term) =>
+      [row.name, row.country, row.city, row.programMajor, ...fields(row.id)].some((field) => field?.toLowerCase().includes(term)),
+    ), (row) => [row.name, row.country, row.city, row.programMajor, ...fields(row.id)]) : candidates;
+    const projected = found.map((university) => {
+      const rank = bundle.qsRankings.get(university.id) ?? null;
+      const card = selectUniversityCardSummary(
+        university, bundle.cardEvidence.programmes.get(university.id) ?? [],
+        bundle.cardEvidence.deadlines.get(university.id) ?? [],
+        { degreeLevel: degree, targetMajor: major },
+      );
+      const verified = university.verificationStatus === "verified";
+      const costs = resolvedUsdUniversityCosts(university);
+      const tuition = catalogueTuition(university, bundle.cardEvidence.programmes.get(university.id) ?? [], degree, major);
+      const academic = resolveAcademicRequirements(bundle.facts.get(university.id) ?? [], { degreeLevel: degree || null });
+      return {
+        id: university.id,
+        name: university.name,
+        country: university.country,
+        verification_status: university.verificationStatus,
+        city: university.city,
+        flag_emoji: university.flagEmoji,
+        qs_ranking: rank,
+        program_major: university.programMajor,
+        university_type: university.universityType,
+        annual_tuition_usd: tuition?.amount ?? null,
+        tuition_estimated: tuition?.estimated ?? false,
+        annual_living_est_usd: verified ? costs.annualLivingEstUsd : null,
+        min_ielts: academic.summary.ielts?.single ?? null,
+        post_study_work_visa_years: verified ? university.postStudyWorkVisaYears : null,
+        official_website_url: card.admissionsUrl,
+        tuition_source_url: tuition?.source ?? safeAcademicLink(university.sourceUrl),
+        deadline: card.deadline && (!degree || supportsDegreeLevel(card.deadline.degreeLevel, degree)) ? card.deadline.date : null,
+        ieltsEvidence: academic.evidence.ielts,
+        recorded_min_ielts: verified ? university.minIelts : null,
+      };
+    }).filter((row) => (
+      (maxTuition == null || (row.annual_tuition_usd != null && row.annual_tuition_usd <= maxTuition)) &&
+      (maxIelts == null || (row.min_ielts != null && row.min_ielts <= maxIelts))
+    )).sort((a, b) =>
+      (b.qs_ranking?.year ?? 0) - (a.qs_ranking?.year ?? 0) ||
+      (a.qs_ranking?.rank ?? Infinity) - (b.qs_ranking?.rank ?? Infinity) || a.id - b.id,
+    );
+    const page = paginateArray(projected, requestedPage, ITEMS_PER_PAGE);
+    ({ items: rows, page: currentPage, totalPages, total: totalItems } = page);
   } catch (error) {
     // Keep database/provider details out of the public response and logs.
     console.error("University catalogue query failed", error instanceof Error ? error.name : "unknown error");
     return (
-      <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
+      <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale)}>
         <PublicCatalogHeader />
-        <main className="mx-auto max-w-7xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
+        <main className="mx-auto max-w-7xl px-4 py-16 text-slate-900 dark:text-slate-100 sm:px-6 lg:px-8">
           <p role="alert" className="rounded-overlay border border-rose-200 bg-rose-50 p-8 text-center text-sm text-rose-700">
             {copy.universitiesLoadError}
           </p>
@@ -195,10 +161,8 @@ export default async function UniversitiesPage({
     );
   }
 
-  const academicFacts=await loadCatalogueFacts("university",rows.map(row=>row.id));
-  const universities = rows.map(row=>{const academic=resolveAcademicRequirements(academicFacts.get(row.id)??[],{});return {...row,recorded_min_ielts:row.min_ielts,min_ielts:academic.summary.ielts?.single??null,ieltsEvidence:academic.evidence.ielts};});
-  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-  const currentPage = Math.min(requestedPage, totalPages);
+  const universities = rows;
+  const from = (currentPage - 1) * ITEMS_PER_PAGE;
   const number = new Intl.NumberFormat(locale);
   const usd = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   const summary = formatMessage(copy.universitiesSummary, {
@@ -210,19 +174,21 @@ export default async function UniversitiesPage({
   });
 
   return (
-    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
+    <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale)}>
       <PublicCatalogHeader />
-      <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 dark:text-slate-100 sm:px-6 lg:px-8">
         <header className="mb-6">
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-slate-100">
             <GraduationCap className="h-6 w-6 shrink-0 text-blue-600" aria-hidden />
             {copy.universityHeading}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">{summary}</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{summary}</p>
         </header>
 
+        <PublicCatalogFilters kind="universities" locale={locale} countries={countries} params={params} years={years} />
+        <PublicCatalogCompare locale={locale} fields={[copy.annualTuition, "IELTS", "QS", dictionaries[locale].universityDetail.postStudyLabel, (locale === "ru" ? "Срок подачи" : locale === "uz" ? "Ariza muddati" : "Application deadline")]}>
         {universities.length === 0 ? (
-          <p className="rounded-overlay border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
+          <p className="rounded-overlay border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300">
             {copy.noUniversities}
           </p>
         ) : (
@@ -256,7 +222,7 @@ export default async function UniversitiesPage({
               return (
                 <article
                   key={university.id}
-                  className="flex h-full flex-col rounded-overlay border border-slate-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5"
+                  className="flex h-full flex-col rounded-overlay border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900 transition-shadow hover:shadow-md sm:p-5"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-2xl" aria-hidden>{university.flag_emoji}</span>
@@ -269,12 +235,12 @@ export default async function UniversitiesPage({
                   {/* Equal-height cards start with a fixed-length title: the
                       clamp keeps a long institution name from pushing its own
                       numbers below its neighbours'. */}
-                  <h2 className="mt-2 line-clamp-2 break-words text-sm font-bold leading-snug text-slate-900 sm:text-base">
-                    <Link href={`/universities/${university.id}`} className="hover:text-blue-800">
+                  <h2 className="mt-2 line-clamp-2 break-words text-sm font-bold leading-snug text-slate-900 dark:text-slate-100 sm:text-base">
+                    <Link href={`/universities/${university.id}`} className="inline-flex min-h-11 items-center hover:text-blue-800">
                       {university.name}
                     </Link>
                   </h2>
-                  <p className="mt-1 break-words text-sm text-slate-600">
+                  <p className="mt-1 break-words text-sm text-slate-600 dark:text-slate-300">
                     {localizeCity(university.city, locale) || localizeCountry(university.country, locale)}
                   </p>
 
@@ -302,7 +268,10 @@ export default async function UniversitiesPage({
                   )}
 
                   <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-xs">
-                    <CatalogFact label={copy.annualTuition} value={university.annual_tuition_usd == null ? copy.notPublished : `${usd.format(university.annual_tuition_usd)} · ${copy.perYear}`} numeric />
+                    {university.tuition_source_url && university.annual_tuition_usd != null && (
+                      <a className="inline-flex min-h-11 items-center text-blue-700 underline dark:text-blue-300" href={university.tuition_source_url} target="_blank" rel="noopener noreferrer">{copy.website}</a>
+                    )}
+                    <CatalogFact label={copy.annualTuition} value={university.annual_tuition_usd == null ? copy.notPublished : `${university.tuition_estimated ? "≈ " : ""}${usd.format(university.annual_tuition_usd)} · ${copy.perYear}`} numeric />
                     <CatalogFact label={copy.annualLiving} value={university.annual_living_est_usd == null ? copy.notPublished : `${usd.format(university.annual_living_est_usd)} · ${copy.perYear}`} numeric />
                     <CatalogFact label={copy.minIelts} value={university.min_ielts == null ? dictionaries[locale].university.notSpecified : number.format(university.min_ielts)} numeric />
                     <EvidenceNote compact label="IELTS" fact={university.ieltsEvidence}/>
@@ -328,6 +297,15 @@ export default async function UniversitiesPage({
                         <ExternalLink className="h-4 w-4" aria-hidden />
                       </a>
                     )}
+                    <PublicCompareButton item={{
+                      id: university.id, title: university.name, href: university.official_website_url,
+                      values: [
+                        university.annual_tuition_usd == null ? "" : (university.tuition_estimated ? "≈ " : "") + usd.format(university.annual_tuition_usd),
+                        university.min_ielts == null ? "" : number.format(university.min_ielts),
+                        university.qs_ranking ? `${university.qs_ranking.year} ${university.qs_ranking.label}` : "",
+                        "", university.deadline ?? "",
+                      ],
+                    }} />
                   </div>
                 </article>
               );
@@ -336,6 +314,7 @@ export default async function UniversitiesPage({
         )}
 
         <Pagination currentPage={currentPage} totalPages={totalPages} />
+        </PublicCatalogCompare>
 
         <PublicFeaturePromo className="mt-6" />
 

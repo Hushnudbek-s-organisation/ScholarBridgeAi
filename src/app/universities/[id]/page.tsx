@@ -1,3 +1,11 @@
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { scholarships } from "@/db/schema";
+import { deadlineStateOf, todayYmd } from "@/lib/catalogueOrder";
+import { PublicStructuredData } from "@/components/PublicStructuredData";
+import { PublicBudgetGap } from "@/components/PublicBudgetGap";
+import { normalizeDegreeLevel } from "@/lib/degreeLevels";
+import { cache } from "react";
 import {resolveAcademicRequirements} from "@/lib/universityDetailRequirements";
 import {EvidenceNote} from "@/components/EvidenceNote";
 import type { Metadata } from "next";
@@ -25,7 +33,7 @@ import {
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
+import { publicMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
@@ -83,11 +91,13 @@ function listValues(raw: string | null | undefined): string[] {
   return trimmed.split(",").map((v) => v.trim()).filter(Boolean);
 }
 
+const universityBundleForRequest = cache(() => getCachedUniversitiesBundle().catch(() => null));
+
 export async function generateMetadata({ params }: DetailPageProps): Promise<Metadata> {
   const { id } = await params;
   const locale = await getPageLocale();
   const t = dictionaries[locale].universityDetail;
-  const bundle = await getCachedUniversitiesBundle().catch(() => null);
+  const bundle = await universityBundleForRequest();
   const university = bundle?.unis.find((u) => u.id === Number(id) && u.isActive !== false);
   if (!university) return { title: t.notFoundTitle };
 
@@ -123,9 +133,24 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   const catalog = copy.publicCatalog;
 
   const numericId = Number.parseInt(id, 10);
-  const bundle = Number.isFinite(numericId)
-    ? await getCachedUniversitiesBundle().catch(() => null)
-    : null;
+  const [bundle, awards] = Number.isSafeInteger(numericId) && numericId > 0 && numericId <= 2_147_483_647
+    ? await Promise.all([
+      universityBundleForRequest(),
+      db.select({
+        id: scholarships.id,
+        title: scholarships.title,
+        coverage: scholarships.coverageType,
+        deadlineDate: scholarships.deadlineDate,
+        deadline: scholarships.deadline,
+        deadlineType: scholarships.deadlineType,
+        applicationStatus: scholarships.applicationStatus,
+      }).from(scholarships).where(and(
+        eq(scholarships.universityId, numericId),
+        eq(scholarships.verificationStatus, "verified"),
+        eq(scholarships.isActive, true),
+      )).limit(100).catch(() => []),
+    ])
+    : [null, []] as const;
   const university = bundle?.unis.find((u) => u.id === numericId && u.isActive !== false) ?? null;
 
   // A real 404 (not a 200 with "not found" text): unknown ids and unpublished
@@ -137,7 +162,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
   // keep their identity (name, city, links) and lose their numbers.
   const verified = u.verificationStatus === "verified";
   const academic=resolveAcademicRequirements(bundle?.facts?.get(u.id)??[],{});
-  const academicValue=(key:"gpa"|"ielts"|"sat")=>{const value=academic.summary[key];return value?`${value.single}${key==="gpa"?` / ${value.unit}`:""}`:copy.university.notSpecified;};
+  const academicValue=(key:"gpa"|"ielts"|"sat")=>{const value=academic.summary[key];return value?`${value.single}${key==="gpa"?` / ${value.unit}`:""}`:null;};
   // Phase AD — the one QS position this page may state: `null` when the row
   // records no edition (`qs_rank_year`), when the number is broken, or when the
   // row is unverified. Every rank below, and the prose reconciliation, reads it.
@@ -276,8 +301,23 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
     },
   ];
 
+  const programmeGroups = Map.groupBy(publishedProgrammes, (program) =>
+    normalizeDegreeLevel(program.degreeLevel) ?? program.degreeLevel ?? t.fields,
+  );
+  const pennCost = u.id === 11 && Number(u.annualTuition) === 65_670 &&
+    u.tuitionCurrency === "USD" && u.verificationStatus === "verified";
+  const pennScope = { en: "2026–27 · traditional undergraduate, living on campus", uz: "2026–27 · bakalavriat, kampusda yashash", ru: "2026–27 · бакалавриат, проживание в кампусе" }[locale];
+  const planLabel = { en: "Add to my plan", uz: "Rejamga qo‘shish", ru: "Добавить в план" }[locale];
+  const awardTitle = { en: "University-linked scholarships", uz: "Universitetga bog‘langan grantlar", ru: "Стипендии, связанные с университетом" }[locale];
+  const today = todayYmd();
+  const relatedAwards = awards.filter((award) => deadlineStateOf(award, today) !== "passed").slice(0, 3);
   return (
-    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
+    <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale, "evidence", "degrees", "disclaimers")}>
+      <PublicStructuredData entry={{
+        "@type": "CollegeOrUniversity",
+        name: u.name,
+        ...(u.officialWebsiteUrl ? { url: u.officialWebsiteUrl } : {}),
+      }} />
       <PublicCatalogHeader />
       <main className="mx-auto max-w-5xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <Link
@@ -287,6 +327,7 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
           {t.backToCatalog}
         </Link>
+        <Link href={`/?start=1&save=university:${u.id}`} className="ml-3 inline-flex min-h-11 items-center rounded-control border border-slate-300 px-3 text-sm font-semibold">{planLabel}</Link>
 
         <header className="mt-3 rounded-overlay border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
           <div className="flex items-start justify-between gap-3">
@@ -391,8 +432,8 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
 
             <Section id="costs" title={t.costs} icon={<Wallet className="h-4 w-4" aria-hidden />}>
               <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
-                {facts.map((fact) => (
-                  <Fact key={fact.label} icon={fact.icon} label={fact.label} value={fact.value ?? catalog.notPublished} />
+                {facts.filter((fact) => fact.value != null).map((fact) => (
+                  <Fact key={fact.label} icon={fact.icon} label={fact.label} value={fact.value ?? ""} />
                 ))}
               </dl>
               {tuitionLocal && tuitionUsd && (
@@ -402,10 +443,22 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
               )}
             </Section>
 
+            {pennCost && <PublicBudgetGap locale={locale} total={99_082} scope={pennScope}
+              source="https://srfs.upenn.edu/costs-budgeting/undergraduate-cost-attendance" />}
+            {relatedAwards.length > 0 && <section className="rounded-overlay border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+              <h2 className="mb-2 text-lg font-bold">{awardTitle}</h2>
+              <ul>
+                {relatedAwards.map((award) => <li key={award.id}>
+                  <Link href={`/scholarships/${award.id}`} className="inline-flex min-h-11 items-center text-blue-700 underline dark:text-blue-300">
+                    {award.title}
+                  </Link>
+                </li>)}
+              </ul>
+            </section>}
             <Section id="admission" title={t.admission} icon={<GraduationCap className="h-4 w-4" aria-hidden />}>
               <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
-                {admissionFacts.map((fact) => (
-                  <Fact key={fact.label} icon={fact.icon} label={fact.label} value={fact.value ?? catalog.notPublished} />
+                {admissionFacts.filter((fact) => fact.value != null).map((fact) => (
+                  <Fact key={fact.label} icon={fact.icon} label={fact.label} value={fact.value ?? ""} />
                 ))}
               </dl>
               <p className="mt-3 text-sm text-slate-500">{copy.university.requirementScopeHint}</p>
@@ -417,15 +470,14 @@ export default async function UniversityDetailPage({ params }: DetailPageProps) 
               {publishedProgrammes.length > 0 ? (
                 <>
                   <p className="mb-2 text-sm font-semibold text-emerald-700">{copy.university.exVerifiedProgramme} · {publishedProgrammes.length}</p>
-                  <ul className="grid gap-2 sm:grid-cols-2">{publishedProgrammes.slice(0, 6).map(programmeCard)}</ul>
-                  {publishedProgrammes.length > 6 && (
-                    <details className="mt-3">
-                      <summary className="cursor-pointer text-sm font-semibold text-indigo-700">
-                        {formatMessage(copy.university.viewAllPrograms, {count: publishedProgrammes.length})}
+                  {[...programmeGroups].map(([level, programmes]) => (
+                    <details key={level} className="mt-2 rounded-control border border-slate-200 p-3 dark:border-slate-700">
+                      <summary className="flex min-h-11 cursor-pointer items-center font-semibold">
+                        {localizeDegreeLevel(level, locale)} · {programmes.length}
                       </summary>
-                      <ul className="mt-2 grid gap-2 sm:grid-cols-2">{publishedProgrammes.slice(6).map(programmeCard)}</ul>
+                      <ul className="grid gap-2 sm:grid-cols-2">{programmes.map(programmeCard)}</ul>
                     </details>
-                  )}
+                  ))}
                 </>
               ) : (
                 <p className="text-sm text-slate-600">{t.fieldsNotPublished}</p>
@@ -535,7 +587,7 @@ function Section({
 }) {
   return (
     <section id={id} className="scroll-mt-20 rounded-overlay border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
-      <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 sm:text-base">
+      <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100 sm:text-base">
         <span className="text-slate-500">{icon}</span>
         {title}
       </h2>

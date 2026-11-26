@@ -56,8 +56,10 @@ async function check(name: string, fn: () => void | Promise<void>) {
 let pg: EmbeddedPostgres | null = null;
 let client: Client | null = null;
 type Route = typeof import("../src/app/api/admin/review-queue/route");
+type Store = typeof import("../src/lib/reviewQueueStore.server");
 type Model = typeof import("../src/lib/reviewQueue");
 let route!: Route;
+let store!: Store;
 let model!: Model;
 
 async function main() {
@@ -112,9 +114,10 @@ async function main() {
 
   route = await import("../src/app/api/admin/review-queue/route");
   model = await import("../src/lib/reviewQueue");
+  store = await import("../src/lib/reviewQueueStore.server");
 
   await check("the real migration applies and the loader sees all four sources", async () => {
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     assert.equal(q.migrationPending, false, "catalogue_facts exists");
     assert.deepEqual(q.partialFailures, [], "no source query failed on the real schema");
     assert.ok(q.facts.length >= 7, `seeded facts visible (${q.facts.length})`);
@@ -122,7 +125,7 @@ async function main() {
   });
 
   await check("migration value_type/status values survive the mapping", async () => {
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     const yenching = q.facts.find((f) => f.entityId === 894 && f.fieldKey === "min_ielts");
     assert.ok(yenching, "seeded Yenching IELTS fact is loaded");
     assert.equal(yenching.valueType, "official_requirement", "the migration's real CHECK value is not dropped to null");
@@ -145,7 +148,7 @@ async function main() {
       VALUES ('university', 9901, 'min_gpa', 3.9, '3.9', 'review_needed',
               'official_requirement', NULL, NULL, NULL, TRUE)
     `);
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     const f = q.facts.find((x) => x.entityId === 9901);
     assert.ok(f && f.valueType === "official_requirement", "row mapped with its real type");
     const items = model.buildReviewItems({ ...q, nowIso: NOW }).filter((i) => i.entityId === 9901);
@@ -164,7 +167,7 @@ async function main() {
       VALUES ('university', 9902, 'min_sat', 1400, 'failed_verification',
               'unverified', 'https://example.org/tests', '2026-27', TRUE)
     `);
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     const f = q.facts.find((x) => x.entityId === 9902);
     assert.ok(f);
     assert.equal(f.verificationStatus, "failed_verification");
@@ -180,7 +183,7 @@ async function main() {
       INSERT INTO public.refresh_jobs (job_type, status, error, failed_verification)
       VALUES ('university', 'failed', 'official fetch timed out', TRUE);
     `);
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     assert.deepEqual(q.partialFailures, []);
     const items = model.buildReviewItems({ ...q, nowIso: NOW });
     assert.ok(items.some((i) => i.category === "failed_job" && i.fieldKey === "min_gpa" && i.entityId === 9903));
@@ -213,7 +216,7 @@ async function main() {
       VALUES (777, ${dupId});
       SET session_replication_role = DEFAULT;
     `);
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     assert.deepEqual(q.partialFailures, [], "title/provider query does not fail on a missing column");
     const d = q.duplicates.find((x) => x.name === "Disposable MBA Fellowship");
     assert.ok(d, "duplicate pair is found by title+provider, never by a hardcoded id");
@@ -227,7 +230,7 @@ async function main() {
   });
 
   await check("a human decision writes only the queue item, never a verification status/date", async () => {
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     const items = model.buildReviewItems({ ...q, nowIso: NOW });
     const target = items.find((i) => i.entityId === 9901 && i.category === "conflicting_facts");
     assert.ok(target);
@@ -240,7 +243,7 @@ async function main() {
     });
     assert.equal(decision.ok, true);
     assert.equal(decision.item.status, "in_review");
-    const persisted = await route.persistDecision(decision.item);
+    const persisted = await store.persistDecision(decision.item);
     assert.equal(persisted, true, "decision row is written");
     const row = await client!.query(
       `SELECT status, decision_reason, decided_by FROM public.review_queue_items WHERE item_key = $1`,
@@ -257,7 +260,7 @@ async function main() {
 
   await check("ONE failing source no longer hides the other three", async () => {
     await client!.query(`DROP TABLE public.refresh_jobs`);
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     assert.equal(q.migrationPending, false, "a single missing source is NOT 'migration pending'");
     assert.deepEqual(q.partialFailures, ["refresh_jobs"], "the failed source is NAMED");
     assert.ok(q.facts.length >= 7, `typed facts still load (${q.facts.length})`);
@@ -267,7 +270,7 @@ async function main() {
 
   await check("the primary table missing is the only migrationPending case", async () => {
     await client!.query(`DROP TABLE public.catalogue_facts`);
-    const q = await route.loadQueueInput();
+    const q = await store.loadQueueInput();
     assert.equal(q.migrationPending, true);
     assert.equal(q.facts.length, 0);
     assert.ok(q.partialFailures.includes("catalogue_facts"));

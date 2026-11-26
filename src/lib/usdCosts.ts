@@ -149,7 +149,7 @@ export function normalizeCurrency(currency: string | null | undefined): string |
 
 function annualize(amount: number, period: string | null | undefined): number | null {
   const normalized = period?.trim().toLowerCase().replace(/[\s_-]+/g, " ") || "year";
-  if (["year", "yearly", "annual", "annually", "per year"].includes(normalized)) return amount;
+  if (["year", "yearly", "annual", "annually", "per year", "academic year", "per academic year"].includes(normalized)) return amount;
   if (["month", "monthly", "per month"].includes(normalized)) return amount * 12;
   return null;
 }

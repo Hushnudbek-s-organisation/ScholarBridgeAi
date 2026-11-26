@@ -77,6 +77,7 @@ interface ScholarshipLike {
   expectedOpeningPeriod: string | null;
   expectedDeadlinePeriod: string | null;
   isActive: boolean | null;
+  applicationStatus?: string | null;
 }
 
 /**
@@ -110,7 +111,7 @@ export function computeScholarshipStatus(
   const rangeEndIn = daysUntil(today, s.deadlineRangeEnd);
 
   if (s.deadlineType === "rolling") return "rolling";
-  if (s.deadlineType === "not_announced") return "not_announced";
+  if (s.deadlineType === "not_announced") return s.applicationStatus === "upcoming" || (openingIn != null && openingIn > 0) ? "upcoming" : "not_announced";
 
   // Exact deadline known. The deadline day itself is still open.
   if (deadlineIn != null) {
@@ -145,6 +146,8 @@ export function computeScholarshipStatus(
       // ignore malformed rounds
     }
   }
+
+  if (s.applicationStatus === "closed") return "closed";
 
   // Recurring with expected period only.
   if (s.recurrence === "annual" && (s.expectedOpeningPeriod || s.expectedDeadlinePeriod)) {

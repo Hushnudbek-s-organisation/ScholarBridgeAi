@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
+import { publicMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { configuredAppUrl } from "@/lib/appUrl";
 import { mailConfigured } from "@/lib/mail";
@@ -25,7 +25,7 @@ async function getPageLocale(): Promise<Locale> {
 
 export async function generateMetadata(): Promise<Metadata> {
   const copy = dictionaries[await getPageLocale()].passwordReset;
-  return { title: copy.forgotMetaTitle, description: copy.forgotMetaDescription, robots: { index: false, follow: true } };
+  return { title: copy.forgotMetaTitle.replace(/\s*\|\s*ScholarBridge(?:AI)?$/i, ""), description: copy.forgotMetaDescription, robots: { index: false, follow: true } };
 }
 
 export default async function ForgotPasswordPage() {
@@ -34,7 +34,7 @@ export default async function ForgotPasswordPage() {
   const emailRecoveryAvailable = Boolean(configuredAppUrl()) && mailConfigured();
 
   return (
-    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
+    <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale, "passwordReset")}>
       <div className="min-h-screen bg-slate-50">
         <PublicCatalogHeader />
         <main className="mx-auto max-w-lg px-4 py-10 sm:px-6 sm:py-14">

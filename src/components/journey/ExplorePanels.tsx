@@ -125,67 +125,13 @@ export function CareerExplorerPanel({
     };
     (async () => {
       try {
-        // Prefer server-side major filtering (uses programs table + programMajor + subjectAffinity).
-        // If the server doesn't yet support `major`, it will ignore the param and return all — we detect and do client filtering.
-        const params = new URLSearchParams();
-        params.set("major", major);
-        // No perPage/page → server returns full filtered list (important for the 200-university case).
-        const res = await fetch(`/api/universities?${params.toString()}`, { cache: "no-store" });
-        const json = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (!res.ok) {
-          // Server error — try client-side fallback by fetching all
-          const fallbackRes = await fetch(`/api/universities`, { cache: "no-store" });
-          const fallbackJson = await fallbackRes.json().catch(() => ({}));
-          if (cancelled || !fallbackRes.ok) {
-            return finish([], json?.error || fallbackJson?.error || t("ceEmptyHint"));
-          }
-          const all: any[] = fallbackJson.universities ?? [];
-          const filtered = all.filter((u) => universityOffersMajor(u, major));
-          filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
-          return finish(filtered.slice(0, 12));
-        }
-        let list: any[] = json.universities ?? [];
-        // If server returned an unfiltered list (doesn't support major yet), filter client-side.
-        // Heuristic: if list is large and contains universities that clearly don't offer this major via affinity, do client filter.
-        // We always run client affinity verification when programFields are present to guarantee correctness.
-        const hasProgramFields = list.some((u: any) => Array.isArray(u.programFields));
-        if (hasProgramFields && list.length > 0) {
-          const clientFiltered = list.filter((u) => universityOffersMajor(u, major));
-          clientFiltered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
-          // If server claimed to filter but client finds no matches while server returned many, server didn't filter — use client result.
-          // If server returned a small filtered set, clientFiltered should equal list; we keep the intersection to be safe.
-          if (clientFiltered.length > 0 && clientFiltered.length < list.length) {
-            list = clientFiltered;
-          } else if (clientFiltered.length === 0 && list.length >= 12) {
-            // Server returned all 200 unfiltered but client finds some matches — need full dataset to find all matches
-            // Fetch all without major param and filter properly
-            const allRes = await fetch(`/api/universities`, { cache: "no-store" });
-            const allJson = await allRes.json().catch(() => ({}));
-            if (!cancelled && allRes.ok) {
-              const all: any[] = allJson.universities ?? [];
-              const filtered = all.filter((u) => universityOffersMajor(u, major));
-              filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
-              return finish(filtered.slice(0, 12));
-            } else {
-              // Keep clientFiltered (empty) — honest empty state
-              list = clientFiltered;
-            }
-          }
-        } else if (!hasProgramFields && list.length > 0) {
-          // Older server without programFields — fetch full list and filter client-side for accuracy
-          const allRes = await fetch(`/api/universities`, { cache: "no-store" });
-          const allJson = await allRes.json().catch(() => ({}));
-          if (!cancelled && allRes.ok) {
-            const all: any[] = allJson.universities ?? [];
-            // Need programFields for accurate matching; if still missing, use programMajor only fallback
-            const filtered = all.filter((u) => universityOffersMajor(u, major));
-            filtered.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
-            if (filtered.length > 0) {
-              return finish(filtered.slice(0, 12));
-            }
-          }
-        }
+        const params = new URLSearchParams({ major, perPage: "24", view: "expanded" });
+        const response = await fetch(`/api/universities?${params}`, { cache: "no-store" });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) return finish([], data?.error || t("ceEmptyHint"));
+        const list: any[] = (data?.universities ?? []).filter((university: any) =>
+          universityOffersMajor(university, major),
+        );
         // Ensure result is ranked by affinity before showing
         list.sort((a: any, b: any) => majorAffinityScore(b, major) - majorAffinityScore(a, major) || (a.worldRanking ?? 9999) - (b.worldRanking ?? 9999));
         finish(list.slice(0, 12));

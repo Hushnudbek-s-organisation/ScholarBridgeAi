@@ -3,7 +3,7 @@
  * Existing routes call `callAI(prompt, systemInstruction)` — this delegates
  * to the provider router and logs usage (spec §16).
  */
-import { aiGenerate } from "@/lib/ai/index";
+import { aiGenerate, type AIRequest } from "@/lib/ai/index";
 import { normalizeAiReply } from "@/lib/ai/format-reply";
 export { isAiConfigured } from "@/lib/ai/index";
 
@@ -15,7 +15,7 @@ export { isAiConfigured } from "@/lib/ai/index";
 export async function callAI(
   prompt: string,
   systemInstruction?: string,
-  opts: { taskType?: string; profileId?: number | null } = {}
+  opts: { taskType?: string; profileId?: number | null; stream?: AIRequest["stream"] } = {}
 ): Promise<string> {
   const taskType = opts.taskType || "general";
   const response = await aiGenerate({
@@ -23,6 +23,7 @@ export async function callAI(
     systemInstruction,
     taskType,
     profileId: opts.profileId ?? null,
+    stream: opts.stream,
   });
 
   if (!response) return "";

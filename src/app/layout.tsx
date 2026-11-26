@@ -39,8 +39,14 @@ const interCyrillic = localFont({
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { logo, favicon } = await getBranding();
-  const SITE_URL = await siteUrlForRequest();
+  const [{ logo, favicon }, SITE_URL, requestHeaders] = await Promise.all([getBranding(), siteUrlForRequest(), headers()]);
+  const rawLocale = requestHeaders.get("x-sb-locale");
+  const locale = rawLocale === "uz" || rawLocale === "ru" ? rawLocale : "en";
+  const localized = {
+    uz: { title: "ScholarBridgeAI — Xorijda o‘qish, universitetlar va grantlar", description: "Universitet va grantlarni saralang, rasmiy talablarni tekshiring va ariza rejangizni tuzing.", og: "uz_UZ" },
+    ru: { title: "ScholarBridgeAI — университеты и стипендии за рубежом", description: "Найдите университеты и стипендии, проверьте официальные требования и составьте план подачи заявок.", og: "ru_RU" },
+    en: { title: "ScholarBridgeAI — Universities and scholarships abroad", description: "Find universities and scholarships, check official requirements and build your application plan.", og: "en_US" },
+  }[locale];
   // Search Console ownership token belongs to whoever owns the domain, so it
   // is configuration (GOOGLE_SITE_VERIFICATION), not code.
   const googleVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
@@ -51,11 +57,11 @@ export async function generateMetadata(): Promise<Metadata> {
   // <meta name="google-site-verification" .../> tag in <head>).
   ...(googleVerification ? { verification: { google: googleVerification } } : {}),
   title: {
-    default: "ScholarBridgeAI — Xorijda O'qish, Grant va Universitet Tanlash",
+    default: localized.title,
     template: "%s | ScholarBridgeAI",
   },
   description:
-    "ScholarBridgeAI — GPA, IELTS va byudjetga mos xorijiy universitetlar va grantlarni toping. Universitet tanlash, SOP yozish va ariza topshirishda AI yordami.",
+    localized.description,
   keywords: [
     "xorijda o'qish",
     "grant",
@@ -77,12 +83,12 @@ export async function generateMetadata(): Promise<Metadata> {
   ],
   openGraph: {
     type: "website",
-    locale: "uz_UZ",
+    locale: localized.og,
     url: SITE_URL,
     siteName: "ScholarBridgeAI",
-    title: "ScholarBridgeAI — Xorijda O'qish, Grant va Universitet Tanlash",
+    title: localized.title,
     description:
-      "ScholarBridgeAI — GPA, IELTS va byudjetga mos xorijiy universitetlar va grantlarni toping. Universitet tanlash, SOP yozish va ariza topshirishda AI yordami.",
+      localized.description,
     images: [
       {
         url: logo,
@@ -94,9 +100,9 @@ export async function generateMetadata(): Promise<Metadata> {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ScholarBridgeAI — Xorijda O'qish, Grant va Universitet Tanlash",
+    title: localized.title,
     description:
-      "ScholarBridgeAI — GPA, IELTS va byudjetga mos xorijiy universitetlar va grantlarni toping. Universitet tanlash, SOP yozish va ariza topshirishda AI yordami.",
+      localized.description,
     images: [logo],
   },
   robots: {

@@ -140,7 +140,7 @@ export function ScholarshipsManager({ adminProfileId }: ScholarshipsManagerProps
 
   const fetchScholarships = useCallback(async () => {
     try {
-      const res = await fetch("/api/scholarships");
+      const res = await fetch("/api/admin/scholarships");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch scholarships");
       setScholarships(data.scholarships || []);

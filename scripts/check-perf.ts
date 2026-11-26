@@ -147,16 +147,15 @@ check("theme switching does not animate every descendant and SVG", () => {
   assert.match(css, /html\.theme-transition :where\(body, header, main, nav, aside, footer\)/);
 });
 
-check("below-fold landing images are lazy and scroll animation cleans up after navigation", () => {
+check("below-fold landing images are lazy and controls tear down after navigation", () => {
   const markup = read("src/components/landing/flight-markup.html");
   const landing = read("src/components/landing/FlightLanding.tsx");
   const interactions = read("src/components/landing/flight-interactions.js");
   assert.equal((markup.match(/id="bentoImg\d"[^>]*loading="lazy"/g) ?? []).length, 4);
   assert.doesNotMatch(markup, /data:image\/[^;]+;base64,/);
   assert.match(landing, /import\("\.\/flight-interactions"\)/);
-  assert.match(interactions, /requestAnimationFrame\(updateScroll\)/);
+  assert.doesNotMatch(interactions, /requestAnimationFrame|setInterval|constellationCanvas/);
   assert.match(interactions, /controller\.abort\(\)/);
-  assert.match(interactions, /cancelAnimationFrame\(scrollFrame\)/);
 });
 
 check("destination changes never wait for outgoing nested animations", () => {

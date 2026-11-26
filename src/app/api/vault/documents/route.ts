@@ -28,7 +28,7 @@ function applicationLinkIds(value:unknown):number[]|null {
 
 
 /** The document types the vault understands (spec §7). */
-export const DOC_TYPES = [
+const DOC_TYPES = [
   "passport",
   "transcript",
   "diploma",

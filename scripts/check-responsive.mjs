@@ -36,7 +36,8 @@ const source = {
   university: read("src/components/UniversityDetail.tsx"),
   tasks: read("src/components/TaskRoadmap.tsx"),
   growthUi: read("src/components/ui/growth.tsx"),
-  landing: read("src/components/LandingPage.tsx"),
+  landing: read("src/components/landing/flight-markup.html"),
+  landingCss: read("src/components/landing/flight-landing.css"),
   faq: read("src/components/FaqSection.tsx"),
   appErrorFallback: read("src/components/AppErrorFallback.tsx"),
   pointsBadge: read("src/components/PointsBadge.tsx"),
@@ -57,17 +58,16 @@ function check(label, condition) {
   console.log(`  ✓ ${label}`);
 }
 
-const landingHeaderStart = source.landing.indexOf("{/* ===== Header ===== */}");
-const landingHeroStart = source.landing.indexOf("{/* ===== Hero ===== */}");
-const landingHeader = source.landing.slice(landingHeaderStart, landingHeroStart);
+const landingHeader = source.landing.split("</header>")[0];
 const mobileAppLabels = Object.fromEntries(["en", "uz", "ru"].map((locale) => [
   locale,
   JSON.parse(read(`src/i18n/messages/${locale}.json`)).nav?.tabApps,
 ]));
 
 console.log("\nResponsive source-level regressions");
-check("landing wordmark wraps rather than truncates on narrow screens", landingHeader.includes("min-w-0 break-words whitespace-normal text-sm"));
-check("landing header actions have 44px targets and no forced nowrap", /min-h-11/.test(landingHeader) && !/whitespace-nowrap/.test(landingHeader));
+check("landing navigation exposes the public catalogue on small screens", landingHeader.includes('id="flight-page-sections"') &&
+  landingHeader.includes('href="/universities"') && landingHeader.includes('href="/scholarships"'));
+check("landing header actions have 44px targets", /flight-mobile-menu[\s\S]+min-width: 44px/.test(source.landingCss));
 check("theme switch and theme choices meet 44px touch targets", /min-h-11 min-w-11/.test(source.themeToggle));
 check("theme controls use translated mode names and switch labels", /useTranslations\("theme"\)/.test(source.themeToggle) && /aria-label=\{t\(value\)\}/.test(source.themeToggle) && /targetModeLabel/.test(source.themeToggle));
 check("pre-paint theme bootstrap treats explicit light as false and dark as true", source.themeScript.includes('t==="system"?window.matchMedia("(prefers-color-scheme: dark)").matches:t==="dark"'));

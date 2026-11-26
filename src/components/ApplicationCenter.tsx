@@ -119,7 +119,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
       try {
         const [dlRes, schRes] = await Promise.all([
           fetch(`/api/deadlines?profileId=${activeProfile.id}`),
-          fetch(`/api/scholarships?profileId=${activeProfile.id}&limit=200`),
+          fetch(`/api/scholarships?profileId=${activeProfile.id}&summary=match-count`),
         ]);
         if (cancelled) return;
         if (dlRes.ok) {
@@ -129,11 +129,7 @@ export function ApplicationCenter({ activeProfile, onOpenWorkspace }: Applicatio
         }
         if (schRes.ok) {
           const sch = await schRes.json();
-          if (Array.isArray(sch.scholarships)) {
-            setScholarshipMatchCount(
-              sch.scholarships.filter((x: { matchScore?: number | null }) => (x.matchScore ?? 0) >= 60).length
-            );
-          }
+          if (typeof sch.matchCount === "number") setScholarshipMatchCount(sch.matchCount);
         }
       } catch {
         // Leave the stats as "—" rather than showing a wrong number.

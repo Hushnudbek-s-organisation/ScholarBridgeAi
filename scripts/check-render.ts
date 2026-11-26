@@ -27,7 +27,7 @@ import { PremiumGate } from "../src/components/PremiumGate";
 import { ParentDashboard } from "../src/components/ParentDashboard";
 import { ParentShareView } from "../src/components/ParentShareView";
 import { LocaleProvider } from "../src/i18n/LocaleProvider";
-import { LandingPage } from "../src/components/LandingPage";
+import { localizedFlightMarkup } from "../src/components/landing/flightMarkup.server";
 import { UniversityExplorer } from "../src/components/UniversityExplorer";
 import { ScholarshipHub } from "../src/components/ScholarshipHub";
 import { UniversityDetail } from "../src/components/UniversityDetail";
@@ -252,107 +252,16 @@ const b = render(components[0][1](profile)).html;
 check("the same props give the same markup", a === b);
 
 // ---------------------------------------------------------------------------
-section("6. LandingPage renders (i18n-wrapped) and stays honest");
+section("6. Public landing renders accessible, source-linked catalogue entry points");
 
-const renderLanding = (locale: string) =>
-  render(
-    // react-intl types NextIntlClientProvider as IntlConfig & { children: ReactNode },
-    // i.e. `children` is a REQUIRED PROP for this component (not a rest argument),
-    // so the 2-arg form with children-in-props is the only form that type-checks.
-    // eslint-disable-next-line react/no-children-prop
-    React.createElement(NextIntlClientProvider, {
-      locale,
-      messages: loadMessages(locale),
-      timeZone: "UTC",
-      children: React.createElement(LandingPage, { onStart: () => {}, onSignIn: () => {} }),
-    })
-  );
-
-const demoBadge: Record<string, string> = {
-  en: "Demo · sample data",
-  uz: "Demo · namunaviy ma'lumot",
-  ru: "Демо · данные-пример",
-};
-
-for (const locale of ["en", "uz", "ru"]) {
-  const { html, error } = renderLanding(locale);
-  check(`LandingPage renders in ${locale}`, error === null, error ?? "");
-  check(`LandingPage produces substantial markup in ${locale}`, html.length > 3000, `only ${html.length} chars`);
-  // React escapes ' as &#x27; in static markup; normalize before comparing.
-  const normalized = html.replace(/&#x27;/g, "'");
-  check(
-    `landing dashboard mock is labeled as demo (${locale})`,
-    normalized.includes(demoBadge[locale]),
-    demoBadge[locale]
-  );
-}
-
-const landingHtml = renderLanding("en").html;
-check("landing has a Sign in button (not 'Log in')", /Sign in/.test(landingHtml) && !/Log in/.test(landingHtml));
-check("landing has the hero heading", /Your path to university/.test(landingHtml));
-check("landing lists the how-it-works steps", /Build your profile/.test(landingHtml) && /Find your fit/.test(landingHtml));
-const landingText = landingHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-const admissionProbabilityIndex = landingText.indexOf("Admission probability");
-const admissionProbabilityRow = admissionProbabilityIndex >= 0
-  ? landingText.slice(admissionProbabilityIndex, admissionProbabilityIndex + 80)
-  : "";
-check(
-  "landing labels fit separately and leaves admission probability unestimated",
-  landingText.includes("Example profile fit") &&
-    admissionProbabilityRow.includes("Not estimated") &&
-    !/\d+\s*%/.test(admissionProbabilityRow),
-  admissionProbabilityRow
-);
-check("landing footer links to privacy and terms", /\/privacy/.test(landingHtml) && /\/terms/.test(landingHtml));
-// The footer carries the honest small print the app itself shows above its
-// Terms / Privacy links — the marketing page must not be more confident than
-// the product.
-check(
-  "landing footer explains that the guide is independent and can be wrong",
-  /independent guide/i.test(landingHtml) &&
-    /not affiliated with any university/i.test(landingHtml) &&
-    /can be wrong or out of date/i.test(landingHtml)
-);
-check(
-  "landing dashboard preview uses the current production screenshot and labels it as illustrative",
-  /dashboard-current\.webp/.test(landingHtml) && /Demo · sample data/.test(landingHtml)
-);
-check(
-  "landing dashboard preview no longer shows the old flat sidebar links",
-  !/Tasks &amp; Roadmap/.test(landingHtml) && !/mockSidebar/.test(landingHtml)
-);
-
-// Landing-page self-check (2026-10): the marketing page must be as honest and
-// as consistent as the product it advertises.
-const anchorIds = ["how", "features", "chancing", "roadmap"];
-check(
-  "every landing anchor link has a matching section id",
-  anchorIds.every((id) => landingHtml.includes(`id="${id}"`)),
-  anchorIds.filter((id) => !landingHtml.includes(`id="${id}"`)).join(", ")
-);
-check(
-  "landing demo shows fit as an example, not as an admission probability",
-  landingText.includes("Fit — not a probability") &&
-    admissionProbabilityIndex >= 0 &&
-    !/\d+\s*%/.test(admissionProbabilityRow)
-);
-
-// The dashboard text lives in the screenshot; verify the localized badge and
-// screenshot source rather than searching the raster preview for text.
-const noRawKeys: Record<string, boolean> = {};
-for (const locale of ["en", "uz", "ru"]) {
-  const { html } = renderLanding(locale);
-  const text = html.replace(/<[^>]+>/g, " ");
-  // A missing message renders as "landing.someKey" — a raw key in the visible
-  // text means the page ships with placeholder copy.
-  noRawKeys[locale] = !/\b(landing|dashboard|nav|meta|hubs|degrees)\.[a-z][A-Za-z0-9]*/.test(text);
-  check(`landing leaks no unresolved message keys (${locale})`, noRawKeys[locale]);
-  check(
-    `landing dashboard screenshot uses the localized demo label (${locale})`,
-    html.includes("dashboard-current.webp") && html.replace(/&#x27;/g, "'").includes(demoBadge[locale]),
-    demoBadge[locale]
-  );
-  check(`landing no longer advertises an "Admissions Index" (${locale})`, !/Admissions Index/.test(html));
+for (const locale of ["en", "uz", "ru"] as const) {
+  const markup = localizedFlightMarkup(locale);
+  check(`landing has a hero heading (${locale})`, /<h1[\s>]/.test(markup));
+  check(`landing offers guest navigation (${locale})`, /href="\/universities"/.test(markup) && /href="\/scholarships"/.test(markup));
+  check(`landing includes legal and methodology links (${locale})`, ["/terms", "/privacy", "/about"].every((path) => markup.includes(`href="${path}"`)));
+  check(`landing links target an existing section (${locale})`,
+    [...markup.matchAll(/href="#([a-z-]+)"/g)].every((match) => markup.includes(`id="${match[1]}"`)));
+  check(`landing has no fake admission percentage (${locale})`, !/TU Munich\s+\d+%|id="liveFitScore"/.test(markup));
 }
 
 // ---------------------------------------------------------------------------
@@ -1113,18 +1022,20 @@ const universitiesPageSource = readFileSync(new URL("../src/app/universities/pag
 const scholarshipsPageSource = readFileSync(new URL("../src/app/scholarships/page.tsx", import.meta.url), "utf8");
 const paginationSource = readFileSync(new URL("../src/components/Pagination.tsx", import.meta.url), "utf8");
 const catalogHeaderSource = readFileSync(new URL("../src/components/PublicCatalogHeader.tsx", import.meta.url), "utf8");
-const activeUniversitiesPredicates = universitiesPageSource.match(/from\(universitiesTable\)\s*\.where\(eq\(universitiesTable\.isActive, true\)\)/g) ?? [];
-const activeScholarshipsPredicates = scholarshipsPageSource.match(/from\(scholarshipsTable\)\s*\.where\(eq\(scholarshipsTable\.isActive, true\)\)/g) ?? [];
+const catalogueCacheSource = readFileSync(new URL("../src/lib/catalogCache.ts", import.meta.url), "utf8");
 // The provider must receive the server-resolved dictionary, not only the
 // locale: the promo strip on these pages is a client component, so without the
 // messages it painted English until hydration finished.
-const providerWithMessages = /<LocaleProvider initialLocale=\{locale\} initialMessages=\{clientMessagesFor\(locale\)\}>/;
+const providerWithMessages = /<LocaleProvider initialLocale=\{locale\} initialMessages=\{(?:clientMessagesFor|publicMessagesFor)\(locale[^}]*\)\}>/;
 check("universities page resolves locale and wraps its client controls", /getPageLocale/.test(universitiesPageSource) && providerWithMessages.test(universitiesPageSource));
 check("scholarships page resolves locale and wraps its client controls", /getPageLocale/.test(scholarshipsPageSource) && providerWithMessages.test(scholarshipsPageSource));
 check("both public catalog pages share language/theme navigation", /<PublicCatalogHeader\s*\/>/.test(universitiesPageSource) && /<PublicCatalogHeader\s*\/>/.test(scholarshipsPageSource) && /LanguageSwitcher/.test(catalogHeaderSource) && /ThemeToggle/.test(catalogHeaderSource));
-check("public scholarship awards resolve to USD or stay unknown", /resolvedUsdScholarshipAmount\(scholarship\)/.test(scholarshipsPageSource) && /awardCurrency: scholarshipsTable\.awardCurrency/.test(scholarshipsPageSource));
-check("university total and page data both filter to active rows", activeUniversitiesPredicates.length >= 2, `found ${activeUniversitiesPredicates.length}`);
-check("scholarship total and page data both filter to active rows", activeScholarshipsPredicates.length >= 2, `found ${activeScholarshipsPredicates.length}`);
+check("public scholarship awards resolve to USD or stay unknown", /resolvedUsdScholarshipAmount\(scholarship\)/.test(scholarshipsPageSource) &&
+  /getCachedScholarshipsBundle\(\)/.test(scholarshipsPageSource));
+check("the university list paginates the filtered active projection", /\.filter\(\(university\) => university\.isActive !== false\)/.test(universitiesPageSource) &&
+  /paginateArray\(projected, requestedPage, ITEMS_PER_PAGE\)/.test(universitiesPageSource));
+check("the scholarship list only paginates active cached awards", /from\(scholarships\)\.where\(eq\(scholarships\.isActive, true\)\)/.test(catalogueCacheSource) &&
+  /paginateArray\(orderForBrowsing\(found, today\), requestedPage, ITEMS_PER_PAGE\)/.test(scholarshipsPageSource));
 check("public error states do not render raw exception messages", !/\{message\}/.test(universitiesPageSource) && !/\{message\}/.test(scholarshipsPageSource));
 check("both public catalog grids use one mobile column with readable wrapping", /grid-cols-1 gap-4 sm:grid-cols-2/.test(universitiesPageSource) && /grid-cols-1 gap-4 sm:grid-cols-2/.test(scholarshipsPageSource));
 check("pagination copy comes from messages and its controls meet the 44px target", /useTranslations\(\"pagination\"\)/.test(paginationSource) && /h-11 min-w-11/.test(paginationSource));

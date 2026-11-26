@@ -370,7 +370,7 @@ export function ScholarshipHub({
   }, [profileFingerprint]);
 
   const fetchScholarships = async (signal?: AbortSignal) => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ view: "expanded" });
     if (activeProfile?.id) params.set("profileId", activeProfile.id.toString());
     if (filters.country !== "All") params.set("country", filters.country);
     if (filters.degrees.length > 0) params.set("degree", filters.degrees.join(","));

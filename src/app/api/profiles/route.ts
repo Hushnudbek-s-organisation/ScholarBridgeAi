@@ -215,6 +215,7 @@ export async function POST(req: Request) {
         // step 1 was sent back to step 1 with the form empty, even though the
         // account already existed. Clamped to the wizard's 8 steps.
         onboardingStep: Math.min(Math.max(Number(body.onboardingStep) || 0, 0), 3),
+        onboardingCompleted: body.onboardingCompleted === true && body.onboardingStep === 3,
       // Sign-up password: stored ONLY as a scrypt hash (never plain text).
         passwordHash: plainPassword ? hashPassword(plainPassword) : null,
         passwordChangedAt: plainPassword ? new Date() : null,

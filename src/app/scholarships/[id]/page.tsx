@@ -1,3 +1,5 @@
+import { PublicStructuredData } from "@/components/PublicStructuredData";
+import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,7 +22,7 @@ import { parseEligibilityScope } from "@/lib/eligibilityScope";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { PublicFeaturePromo } from "@/components/PublicFeaturePromo";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { dictionaries, clientMessagesFor, messagesFor } from "@/i18n/messages.server";
+import { dictionaries, publicMessagesFor, messagesFor } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { formatMessage } from "@/i18n/formatMessage";
 import { getCachedScholarshipsBundle, getCachedUniversitiesBundle } from "@/lib/catalogCache";
@@ -78,11 +80,13 @@ function formatDate(value: string | Date | null | undefined, locale: Locale): st
   return new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(parsed);
 }
 
+const scholarshipBundleForRequest = cache(() => getCachedScholarshipsBundle().catch(() => null));
+
 export async function generateMetadata({ params }: DetailPageProps): Promise<Metadata> {
   const { id } = await params;
   const locale = await getPageLocale();
   const t = dictionaries[locale].scholarshipDetail;
-  const bundle = await getCachedScholarshipsBundle().catch(() => null);
+  const bundle = await scholarshipBundleForRequest();
   const scholarship = bundle?.entries.find((entry) => entry.id === Number(id));
   if (!scholarship) return { title: t.notFoundTitle };
   const title = localizeScholarshipTitle(scholarship.title, locale);
@@ -113,14 +117,14 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   const copy = dictionaries[locale];
   const t = copy.scholarshipDetail;
 
-  const bundle = await getCachedScholarshipsBundle().catch(() => null);
+  const bundle = await scholarshipBundleForRequest();
   const scholarship = Number.isFinite(numericId)
     ? bundle?.entries.find((entry) => entry.id === numericId) ?? null
     : null;
 
   if (!scholarship) {
     return (
-      <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
+      <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale, "evidence", "degrees", "disclaimers")}>
         <PublicCatalogHeader />
         <main className="mx-auto max-w-3xl px-4 py-16 text-slate-900 sm:px-6 lg:px-8">
           <h1 className="text-2xl font-bold">{t.notFoundTitle}</h1>
@@ -236,6 +240,8 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   // dedicated application URL we use it; otherwise we send the student to the
   // official page (source first), and the label says exactly that - we never
   // invent an /apply deep link.
+  const planLabel = { en: "Add to my plan", uz: "Rejamga qo‘shish", ru: "Добавить в план" }[locale];
+  const reminderLabel = { en: "Telegram deadline reminders", uz: "Telegram’da muddat eslatmalari", ru: "Напоминания о сроках в Telegram" }[locale];
   const applyHref = s.applicationUrl ?? s.sourceUrl ?? s.websiteUrl ?? null;
   const applyLabel = s.applicationUrl ? t.applyNow : t.applyOnOfficialPage;
   // A stored 0 means "no fee"; a NULL means the source did not say.
@@ -271,7 +277,12 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
   ].filter((section) => section.show);
 
   return (
-    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
+    <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale, "evidence", "degrees", "disclaimers")}>
+      {s.verificationStatus === "verified" && <PublicStructuredData entry={{
+        "@type": "Grant",
+        name: title,
+        ...(s.sourceUrl ? { url: s.sourceUrl } : {}),
+      }} />}
       <PublicCatalogHeader />
       <main className="mx-auto max-w-7xl px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
         <Link
@@ -391,6 +402,9 @@ export default async function ScholarshipDetailPage({ params, searchParams }: De
               <p className="mt-4 text-sm text-slate-500">{t.applyNote}</p>
 
               <div className="mt-3 flex flex-wrap gap-2">
+                <Link href={`/?start=1&save=scholarship:${s.id}`} className="inline-flex min-h-12 items-center rounded-control border border-slate-300 px-3 text-sm font-semibold">{planLabel}</Link>
+                <Link href="/?start=1#notifications" className="inline-flex min-h-12 items-center rounded-control border border-slate-300 px-3 text-sm font-semibold">{reminderLabel}</Link>
+
                 {applyHref && (
                   <a
                     href={applyHref}

@@ -56,7 +56,6 @@ const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard").t
 const JourneyControlCenter = dynamic(() => import("@/components/journey/JourneyControlCenter").then((m) => m.JourneyControlCenter), { loading: panelLoading });
 const PaymentsSection = dynamic(() => withFeatureMessages(import("@/components/PaymentsSection").then((m) => m.PaymentsSection)), { loading: panelLoading });
 const RewardsSection = dynamic(() => withFeatureMessages(import("@/components/RewardsSection").then((m) => m.RewardsSection)), { loading: panelLoading });
-const StudyMap = dynamic(() => import("@/components/StudyMap").then(m => m.StudyMap), { loading: panelLoading });
 const ParentDashboard = dynamic(() => withFeatureMessages(import("@/components/ParentDashboard").then((m) => m.ParentDashboard)), { loading: panelLoading });
 const AdminPanel = dynamic(() => withFeatureMessages(import("@/components/AdminPanel").then((m) => m.AdminPanel)), { loading: panelLoading });
 const GuidedJourneyBar = dynamic(() => import("@/components/GuidedJourneyBar").then((m) => m.GuidedJourneyBar), { loading: () => null });
@@ -225,8 +224,10 @@ function ParentDashboardGate({
 export function Home({
   hasSessionCookie = false,
   startNow = false,
+  saveIntent = null,
   initialLocale = defaultLocale,
   initialMessages = null,
+  deferredMessages = false,
   flightMarkup,
 }: {
   hasSessionCookie?: boolean;
@@ -242,10 +243,12 @@ export function Home({
    * already the wizard and hydration matches.
    */
   startNow?: boolean;
+  saveIntent?: { kind: "university" | "scholarship"; id: number } | null;
   /** Locale the server resolved from the cookie — keeps SSR and hydration in one language. */
   initialLocale?: Locale;
   /** That locale's dictionary when it is not English (English is bundled). */
   initialMessages?: Messages | null;
+  deferredMessages?: boolean;
   flightMarkup: string;
 }) {
   // The open destination (one of the fourteen) and, inside a multi-tab
@@ -282,6 +285,7 @@ export function Home({
     // goes straight into the wizard.
     hasSessionCookie ? "restoring" : startNow ? "wizard" : "landing"
   );
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
   // Profile management — the app works with ONE signed-in profile per browser.
@@ -1017,6 +1021,33 @@ export function Home({
   // "Start for free" → step-by-step onboarding wizard.
   const startOnboarding = () => setView("wizard");
 
+  const confirmCatalogueSave = async () => {
+    if (!saveIntent || !activeProfile || saveState === "saving") return;
+    setSaveState("saving");
+    try {
+      const { kind, id } = saveIntent;
+      const response = await fetch(`/api/saved-${kind === "university" ? "universities" : "scholarships"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: activeProfile.id, [`${kind}Id`]: id }),
+      });
+      if (!response.ok) throw new Error("save_failed");
+      setSaveState("saved");
+      const url = new URL(location.href);
+      url.searchParams.delete("save");
+      history.replaceState(history.state, "", url);
+      invalidateClientCache();
+      hydrateProfileData(activeProfile.id);
+    } catch {
+      setSaveState("error");
+    }
+  };
+  const saveCopy = {
+    en: ["Save selected catalogue item", "Saving…", "Saved to your plan", "Could not save. Try again."],
+    uz: ["Tanlangan kartani saqlash", "Saqlanmoqda…", "Rejangizga saqlandi", "Saqlashda xato. Qayta urinib ko‘ring."],
+    ru: ["Сохранить выбранную карточку", "Сохранение…", "Добавлено в план", "Не удалось сохранить. Попробуйте ещё раз."],
+  }[initialLocale];
+
   const profilePicker = isPickerOpen ? (
     <ProfilePicker
       key={isPickerOpen ? "open" : "closed"}
@@ -1033,7 +1064,7 @@ export function Home({
 
   // ---- Restore a returning student's session before showing the landing page ----
   if (view === "restoring") {
-    return <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}><SessionRestoreLoader /></LocaleProvider>;
+    return <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages} loadFullMessages={deferredMessages}><SessionRestoreLoader /></LocaleProvider>;
   }
 
   // ---- First visit: English landing page ----
@@ -1059,12 +1090,10 @@ export function Home({
     );
   }
 
-  // ---- Brand-new visitor: step-by-step onboarding (creates the profile on
-  // step 1 via POST /api/profiles with the referral code, saves every step,
-  // resumes where they left off) ----
+  // ---- Brand-new visitor: explore before creating a profile ----
   if (view === "wizard") {
     return (
-      <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}>
+      <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages} loadFullMessages={deferredMessages}>
         <div className="min-h-screen bg-slate-50 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:py-10">
           <OnboardingWizard
             profile={null}
@@ -1078,7 +1107,7 @@ export function Home({
   }
 
   return (
-    <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages}>
+    <LocaleProvider initialLocale={initialLocale} initialMessages={initialMessages} loadFullMessages={deferredMessages}>
       {/* Full-width content below the top bar; grouped dock floats above the safe area. */}
       <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Navbar
@@ -1145,6 +1174,13 @@ export function Home({
             resetKey={`${activeProfile?.id ?? "none"}:${activeTab}:${activePane ?? ""}`}
             section={activeTab}
           >
+
+          {activeProfile && saveIntent && (
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-surface border border-blue-200 p-3 dark:border-blue-800">
+              {saveState !== "saved" && <Button type="button" disabled={saveState === "saving"} onClick={() => void confirmCatalogueSave()}>{saveCopy[saveState === "saving" ? 1 : 0]}</Button>}
+              <span role="status">{saveState === "saved" ? saveCopy[2] : saveState === "error" ? saveCopy[3] : ""}</span>
+            </div>
+          )}
 
           {/* Onboarding wizard — shown for profiles that haven't completed
               the step-by-step setup yet. Resumes from the saved step. */}
@@ -1348,7 +1384,6 @@ export function Home({
 
           {activeTab === "rewards" && <RewardsSection activeProfile={activeProfile} />}
 
-          {activeTab === "study-map" && activeProfile && <StudyMap key={activeProfile.id} onNavigate={handleNavigateTab} onLock={handleLogout} />}
 
 
           {activeTab === "notifications" && (

@@ -209,6 +209,9 @@ export function proxy(request: NextRequest) {
 
     const url = request.nextUrl.clone();
     url.pathname = rest;
+    request.cookies.set(LOCALE_COOKIE, locale);
+    requestHeaders.set("cookie", request.headers.get("cookie") ?? "");
+    requestHeaders.set("x-sb-locale", locale);
     const response = NextResponse.rewrite(url, { request: { headers: requestHeaders } });
     response.cookies.set(LOCALE_COOKIE, locale, {
       path: "/",
@@ -221,6 +224,7 @@ export function proxy(request: NextRequest) {
 
   // For unprefixed requests, seed the default locale cookie if it is missing.
   const existing = request.cookies.get(LOCALE_COOKIE)?.value;
+  requestHeaders.set("x-sb-locale", existing && isLocale(existing) ? existing : defaultLocale);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   if (!existing) {
     response.cookies.set(LOCALE_COOKIE, defaultLocale, {

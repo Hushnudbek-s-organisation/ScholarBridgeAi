@@ -1,3 +1,4 @@
+import { readSseData } from "@/lib/sseData";
 import { fetchBoundedResponse } from "@/lib/boundedBody";
 /**
  * AI provider abstraction — the ONE path every AI feature uses
@@ -77,6 +78,7 @@ export interface AIChatMessage {
 
 export interface AIRequest {
   prompt: string;
+  stream?: { signal: AbortSignal; onDelta: (text: string) => void; onReset: () => void };
   systemInstruction?: string;
   /** Multi-turn history; when set it is sent instead of prompt/systemInstruction. */
   messages?: AIChatMessage[];
@@ -253,6 +255,41 @@ async function timedFetch(provider: string, url: string, init: RequestInit, time
 // Provider adapters
 // ---------------------------------------------------------------------------
 
+async function readOpenAIStream(
+  response: Response,
+  stream: NonNullable<AIRequest["stream"]>,
+  name: AIProviderName,
+) {
+  if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream")) {
+    throw new AIProviderError(name, "provider_unavailable", "Provider did not return a text stream");
+  }
+  let text = "";
+  let model: string | undefined;
+  let usage: unknown;
+  let finished = false;
+  stream.onReset();
+  for await (const data of readSseData(response.body)) {
+    if (data === "[DONE]") {
+      finished = true;
+      break;
+    }
+    const event = JSON.parse(data);
+    if (event.error || event.choices?.[0]?.finish_reason === "error") {
+      throw new AIProviderError(name, "provider_unavailable", "Provider stream ended with an error");
+    }
+    if (event.choices?.[0]?.finish_reason) finished = true;
+    if (typeof event.model === "string") model = event.model;
+    usage = event.usage ?? event.x_groq?.usage ?? usage;
+    const delta = event.choices?.[0]?.delta?.content;
+    if (typeof delta === "string" && delta) {
+      text += delta;
+      stream.onDelta(delta);
+    }
+  }
+  if (!finished) throw new AIProviderError(name, "provider_unavailable", "Provider stream ended early");
+  return { choices: [{ message: { content: text } }], model, usage };
+}
+
 /**
  * One adapter for every OpenAI-compatible API (OpenRouter, OpenAI, Groq,
  * Google Gemini, custom/self-hosted). Differences are data, not code:
@@ -288,7 +325,9 @@ function openAICompatible(name: AIProviderName): AIProviderAdapter {
         const remaining = deadline - Date.now();
         if (remaining <= 0) throw new AIProviderError(name, "timeout", "AI request deadline exceeded");
         const candidateModel = candidates[index];
-        const res = await timedFetch(name, `${base}/chat/completions`, {
+        const stream = name === "custom" ? undefined : req.stream;
+        stream?.signal.throwIfAborted();
+        const request: RequestInit = {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -298,16 +337,21 @@ function openAICompatible(name: AIProviderName): AIProviderAdapter {
             max_tokens: req.maxTokens ?? 4096,
             ...(req.jsonMode && supportsCapability(name, "structured") ? { response_format: { type: "json_object" } } : {}),
             ...(req.reasoningEffort && acceptsReasoningEffort(name, candidateModel) ? { reasoning_effort: req.reasoningEffort } : {}),
-            // OpenRouter returns the billed USD amount only when asked (usage accounting).
             ...(name === "openrouter" ? { usage: { include: true } } : {}),
+            ...(stream ? { stream: true, ...(name === "openai" || name === "google" ? { stream_options: { include_usage: true } } : {}) } : {}),
           }),
-        }, remaining);
+        };
+        const url = `${base}/chat/completions`;
+        const res = stream
+          ? await fetch(url, { ...request, redirect: "error", signal: AbortSignal.any([stream.signal, AbortSignal.timeout(Math.ceil(remaining))]) })
+          : await timedFetch(name, url, request, remaining);
         if (res.ok) {
-          data = await res.json();
+          data = stream ? await readOpenAIStream(res, stream, name) : await res.json();
           usedModel = candidateModel;
           break;
         }
-        const error = await readError(name, res, cfg.apiKey);
+        const error = stream ? new AIProviderError(name, categorizeStatus(res.status), `HTTP ${res.status}`, res.status) : await readError(name, res, cfg.apiKey);
+        if (stream) await res.body?.cancel().catch(() => {});
         const retryableFreeModelStatus = [402, 404, 429, 503].includes(error.status ?? 0);
         if (!shouldTryFreeChatModels || !retryableFreeModelStatus || index === candidates.length - 1) throw error;
         fallbackError = error;
@@ -711,9 +755,9 @@ export async function aiChat(req: AIRequest, opts: AIChatOptions = {}): Promise<
   // bad_request would most likely fail the same way elsewhere; budget_exhausted
   // must not be bypassed by another paid provider unless the admin chose one.
   // Everything else may go to the fallback — but only one the admin chose explicitly.
-  let fb = remainingBudgetMs(req) > 0 ? cfg.fallback : null;
+  let fb = remainingBudgetMs(req) > 0 && !req.stream?.signal.aborted ? cfg.fallback : null;
   const openRouterModelUnavailable = error.category === "payment_required" || error.category === "model_not_found";
-  if (!fb && remainingBudgetMs(req) > 0 && primary.name === "openrouter" && (isTransientCategory(error.category) || openRouterModelUnavailable) && !cfg.disabled.includes("groq")) {
+  if (!fb && !req.stream?.signal.aborted && remainingBudgetMs(req) > 0 && primary.name === "openrouter" && (isTransientCategory(error.category) || openRouterModelUnavailable) && !cfg.disabled.includes("groq")) {
     const groqCredential = await usableCredential("groq", cfg.disabled);
     if (groqCredential) fb = "groq";
   }

@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { createPortal } from "react-dom";
-import { Button } from "@/components/ui/Button";
-import { SchollyModel } from "@/components/SchollyModel";
 import { useTranslations } from "next-intl";
 import { isLocale, type Locale } from "@/i18n/config";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
@@ -37,18 +34,6 @@ export function FlightLanding({ markup, onStart, onSignIn }: {
     ru: { menu: "Открыть меню навигации", signIn: "Войти" },
   });
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mascot, setMascot] = useState<Element | null>(null);
-  const [waving, setWaving] = useState(false);
-  const waveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setMascot(root.current?.querySelector("[data-flight-scholly]") ?? null));
-    return () => { cancelAnimationFrame(frame); if (waveTimer.current) clearTimeout(waveTimer.current); };
-  }, []);
-  function wave() {
-    setWaving(true);
-    if (waveTimer.current) clearTimeout(waveTimer.current);
-    waveTimer.current = setTimeout(() => setWaving(false), 1100);
-  }
   const switchLanguage = useRef(setLocale);
   useEffect(() => { switchLanguage.current = setLocale; }, [setLocale]);
   useEffect(() => {
@@ -96,13 +81,6 @@ export function FlightLanding({ markup, onStart, onSignIn }: {
   }
 
   // Build-owned markup from the supplied design. Incoming content never enters this HTML.
-  return <>
-    <div ref={root} className="sb-flight-landing" data-flight-actions={menuOpen}
-      onClick={activate} dangerouslySetInnerHTML={html} />
-    {mascot && createPortal(
-      <Button variant="unstyled" type="button" className="flight-scholly-wave" onClick={wave}
-        aria-label={locale === "uz" ? "Scholly bilan salomlashish" : locale === "ru" ? "Помахать Scholly" : "Wave to Scholly"}>
-        <SchollyModel motion={waving ? "wave" : "idle"} />
-      </Button>, mascot)}
-  </>;
+  return <div ref={root} className="sb-flight-landing" data-flight-actions={menuOpen}
+    onClick={activate} dangerouslySetInnerHTML={html} />;
 }

@@ -183,7 +183,7 @@ export async function DELETE(req: Request) {
  * One round trip answers every counter, so the plan costs the same as one
  * `SELECT COUNT(*)` would.
  */
-export async function phaseProgress(profileId: number) {
+async function phaseProgress(profileId: number) {
   const [row] = await db
     .select({
       testPlans: sql<number>`(SELECT COUNT(*)::int FROM test_plans tp WHERE tp.profile_id = ${profileId})`,

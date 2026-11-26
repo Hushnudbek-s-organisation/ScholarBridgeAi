@@ -1,3 +1,5 @@
+import { catalogueTuition } from "@/lib/catalogueTuition";
+import { findCatalogueMatches } from "@/lib/catalogueSearch";
 import {reportReadFailure} from "@/lib/readFailure.server";
 import {resolveAcademicRequirements,academicDecisionEnvelope} from "@/lib/universityDetailRequirements";
 import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
@@ -36,7 +38,7 @@ export async function GET(req: Request) {
     const profileIdStr = searchParams.get("profileId");
     const search = searchParams.get("search")?.trim().slice(0, 200).toLowerCase();
     const country = searchParams.get("country")?.trim().slice(0, 100);
-    const degreeLevel = searchParams.get("degreeLevel")?.trim().slice(0, 50);
+    const degreeLevel = (searchParams.get("degreeLevel") ?? searchParams.get("degree"))?.trim().slice(0, 50);
     const maxTuition = searchParams.get("maxTuition")?.slice(0, 24);
     const sort = searchParams.get("sort")?.slice(0, 24);
     const uniType = searchParams.get("type")?.trim().slice(0, 24); // Public | Private
@@ -49,6 +51,7 @@ export async function GET(req: Request) {
       const value = Number(raw);
       return Number.isSafeInteger(value) && value > 0 && value <= 1_000_000 ? value : null;
     };
+    const qsYear = rank("qsYear");
     const minRank = rank("minRank");
     const maxRank = rank("maxRank");
 
@@ -60,7 +63,9 @@ export async function GET(req: Request) {
     // ordering, or chancing inputs. Preserve the database row; sanitize only
     // this response-local copy. Institution type is handled separately and
     // remains unknown unless its own evidence says otherwise.
-    let allUnis = bundle.unis.filter((uni) => uni.isActive !== false).map((uni) => {
+    const idsParam = searchParams.get("ids");
+    const ids = new Set((idsParam ?? "").slice(0, 120).split(",").slice(0, 3).map(Number).filter((id) => Number.isSafeInteger(id) && id > 0));
+    let allUnis = bundle.unis.filter((uni) => uni.isActive !== false && (idsParam == null || ids.has(uni.id))).map((uni) => {
       const qsRanking = bundle.qsRankings.get(uni.id) ?? null;
       const ranking = {
         qsRanking,
@@ -128,7 +133,7 @@ export async function GET(req: Request) {
     // canonical keywords ("germaniya"→"germany", "kompyuter"→"computer science").
     const searchTerms = search ? expandMultilingualSearchTerms(search) : [];
     if (searchTerms.length > 0) {
-      allUnis = allUnis.filter(u =>
+      allUnis = findCatalogueMatches(allUnis, search ?? "", u =>
         searchTerms.some(term =>
           u.name.toLowerCase().includes(term) ||
           (u.programMajor ?? "").toLowerCase().includes(term) ||
@@ -136,7 +141,7 @@ export async function GET(req: Request) {
           u.country.toLowerCase().includes(term) ||
           countriesMatch(u.country, term) ||
           (programFieldsByUni.get(u.id)?.some((f) => f.toLowerCase().includes(term)) ?? false)
-        )
+        ), u => [u.name, u.city, u.country, u.programMajor, ...(programFieldsByUni.get(u.id) ?? [])],
       );
     }
 
@@ -160,6 +165,10 @@ export async function GET(req: Request) {
       allUnis = allUnis.filter((u) => supportsDegreeLevel(u.degreeLevel, requestedDegree));
     }
 
+    const tuitionFor = (row: (typeof allUnis)[number]) => catalogueTuition(
+      row, bundle.cardEvidence.programmes.get(row.id) ?? [], requestedDegree, searchParams.get("major")?.slice(0, 120),
+    );
+
     // Tuition filter: only universities with VERIFIED tuition (NULL excluded, spec §16).
     if (maxTuition != null && maxTuition !== "") {
       const requestedMax = Number(maxTuition);
@@ -168,7 +177,7 @@ export async function GET(req: Request) {
       const maxT = Number.isFinite(requestedMax)
         ? Math.max(0, Math.min(requestedMax, 150_000))
         : 150_000;
-      allUnis = allUnis.filter(u => u.annualTuitionUsd != null && u.annualTuitionUsd <= maxT);
+      allUnis = allUnis.filter((university) => { const tuition = tuitionFor(university); return tuition != null && tuition.amount <= maxT; });
     }
 
     if (ieltsFilter != null && ieltsFilter !== "") {
@@ -178,6 +187,7 @@ export async function GET(req: Request) {
       }
     }
 
+    if (qsYear) allUnis = allUnis.filter((university) => university.qsRankYear === qsYear);
     if (minRank) allUnis = allUnis.filter(u => u.worldRanking != null && (u.qsRanking?.upperRank ?? u.worldRanking) >= minRank);
     if (maxRank) allUnis = allUnis.filter(u => u.worldRanking != null && u.worldRanking <= maxRank);
 
@@ -195,7 +205,7 @@ export async function GET(req: Request) {
     // Checks both the legacy `programMajor` summary and the detailed `programs` catalogue,
     // so universities added via either path are found. Uses subjectAffinity (same engine
     // as matching/recommender) so "Computer Science" also matches "Informatics", "IT", "Software Engineering", etc.
-    const majorFilter = searchParams.get("major");
+    const majorFilter = searchParams.get("major")?.trim().slice(0, 120);
     if (majorFilter && majorFilter !== "All" && majorFilter.trim()) {
       const major = majorFilter.trim();
       allUnis = allUnis.filter((u) => {
@@ -321,8 +331,7 @@ export async function GET(req: Request) {
       }
     }
 
-    // Opt-in `?page=` / `?perPage=` pagination (after filtering + sorting).
-    // Without those params the full list is returned (admin tools, ...).
+    // Paginate after filtering and sorting.
     // Rows are localized LAST — every filter/match above ran on canonical
     // English data, so canonical dropdown values never break (spec §3 STEP 3.1).
     //
@@ -334,12 +343,23 @@ export async function GET(req: Request) {
     payload.sortApplied = ordering.applied;
     payload.sortFellBackToRank = ordering.fellBackToRank;
     const rows = payload.universities as typeof results;
+    if (!profileData && searchParams.get("view") !== "expanded") {
+      payload.universities = rows.map((university) => ({
+        id: university.id, name: university.name, country: university.country, city: university.city,
+        degreeLevel: university.degreeLevel, worldRanking: university.worldRanking, qsRankYear: university.qsRankYear,
+        verificationStatus: university.verificationStatus, officialWebsiteUrl: university.officialWebsiteUrl,
+        annualTuitionUsd: university.annualTuitionUsd, catalogueTuition: tuitionFor(university),
+        minIelts: resolveAcademicRequirements(bundle.facts?.get(university.id) ?? [], academicContext).summary.ielts?.single ?? null,
+      }));
+      return privateNoStoreJson(payload);
+    }
     // §4: every catalog row carries a field-level evidence envelope. Legacy
     // numbers are KEPT but never promoted to a verified official minimum by
     // the entity-level `verified` flag. Clients/UI/Telegram consume the same
     // shape instead of re-interpreting raw columns.
     payload.universities = rows.map((u) => ({
       ...localizeUniversityRow(u, locale),
+      catalogueTuition: tuitionFor(u),
       cardSummary: selectUniversityCardSummary(u, bundle.cardEvidence.programmes.get(u.id) ?? [], bundle.cardEvidence.deadlines.get(u.id) ?? [], {
         degreeLevel: degreeLevel && degreeLevel !== "All" ? degreeLevel : profileData?.degreeLevel,
         targetMajor: majorFilter && majorFilter !== "All" ? majorFilter : profileData?.targetMajor,

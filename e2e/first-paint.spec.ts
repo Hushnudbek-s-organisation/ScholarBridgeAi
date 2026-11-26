@@ -8,7 +8,7 @@ test("landing hero and primary actions paint even before JavaScript runs", async
     const hero = page.locator("main #hero");
     await expect(hero.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(hero.getByRole("heading", { level: 1 })).toHaveCSS("opacity", "1");
-    await expect(hero.getByRole("button").first()).toBeVisible();
+    await expect(hero.locator("a[href='/universities']").first()).toBeVisible();
   } finally { await context.close(); }
 });
 
@@ -24,4 +24,20 @@ test("landing guide photos load when a visitor reaches the steps", async ({ page
   await lastPhoto.scrollIntoViewIfNeeded();
   await expect(lastPhoto).toHaveAttribute("src", /^\/landing\/flight\/step[1-4]\.webp$/);
   await expect.poll(() => lastPhoto.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+});
+
+test("landing university and scholarship discovery work without signing up", async ({ page }) => {
+  const failures: string[] = [];
+  page.on("pageerror", (error) => failures.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" && message.text().includes("Landing interactions unavailable")) failures.push(message.text());
+  });
+  await page.goto("/uz", { waitUntil: "domcontentloaded" });
+  const results = page.locator("#liveMatchList a");
+  await expect(results).toHaveCount(3);
+  await expect(results.first()).toHaveAttribute("href", /^\/(universities|scholarships)\/\d+$/);
+  await page.locator("#fitDegree").selectOption("Master");
+  await expect(page.locator("#fitUniversityLink")).toHaveAttribute("href", /degree=Master/);
+  await expect(page.locator("#fitScholarshipLink")).toHaveAttribute("href", /^\/scholarships\?/);
+  expect(failures).toEqual([]);
 });

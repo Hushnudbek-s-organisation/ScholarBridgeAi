@@ -14,11 +14,13 @@ import { dictionaries, englishMessages, loadMessages, registerMessages, subscrib
 import { getLocaleCookie, setLocaleCookie } from "./locale";
 
 interface LocaleContextValue {
+  messages: Messages;
   locale: Locale;
   setLocale: (locale: Locale) => void;
 }
 
 const LocaleContext = createContext<LocaleContextValue>({
+  messages: englishMessages,
   locale: defaultLocale,
   setLocale: () => {},
 });
@@ -33,14 +35,14 @@ export function useLocaleContext() {
  * Telegram mini app) can use it right after render.
  */
 export function useMessages(): Messages {
-  const { locale } = useLocaleContext();
-  return dictionaries[locale] ?? englishMessages;
+  return useLocaleContext().messages;
 }
 
 export function LocaleProvider({
   children,
   initialLocale = defaultLocale,
   initialMessages = null,
+  loadFullMessages = false,
 }: {
   children: React.ReactNode;
   /**
@@ -58,14 +60,26 @@ export function LocaleProvider({
    * Uzbek/Russian — a visitor downloads one language, never three.
    */
   initialMessages?: Messages | null;
+  loadFullMessages?: boolean;
 }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
   const [messages, setMessages] = useState<Messages>(() => {
-    registerMessages(initialLocale, initialMessages);
+    if (typeof window !== "undefined" && initialMessages?.journey) registerMessages(initialLocale, initialMessages);
     return initialMessages ?? dictionaries[initialLocale] ?? englishMessages;
   });
 
   useEffect(()=>subscribeMessages((changedLocale,loaded)=>{if(changedLocale===locale)setMessages(loaded);}),[locale]);
+
+  useEffect(() => {
+    if (!loadFullMessages) return;
+    let live = true;
+    void loadMessages(locale).then((loaded) => {
+      if (!live) return;
+      registerMessages(locale, loaded);
+      setMessages(loaded);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [loadFullMessages, locale]);
 
   // Read the persisted choice on mount (no-op when the server already did) and
   // fetch that language's dictionary if it is not the one we shipped.
@@ -111,8 +125,8 @@ export function LocaleProvider({
   }, [locale]);
 
   const contextValue = useMemo(
-    () => ({ locale, setLocale }),
-    [locale, setLocale]
+    () => ({ locale, setLocale, messages }),
+    [locale, setLocale, messages]
   );
 
   return (

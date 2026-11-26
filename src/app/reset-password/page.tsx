@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { PublicCatalogHeader } from "@/components/PublicCatalogHeader";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
-import { clientMessagesFor, dictionaries } from "@/i18n/messages.server";
+import { publicMessagesFor, dictionaries } from "@/i18n/messages.server";
 import { defaultLocale, isLocale, LOCALE_COOKIE, type Locale } from "@/i18n/config";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 
@@ -26,7 +26,7 @@ async function getPageLocale(): Promise<Locale> {
 
 export async function generateMetadata(): Promise<Metadata> {
   const copy = dictionaries[await getPageLocale()].passwordReset;
-  return { title: copy.resetMetaTitle, description: copy.resetMetaDescription, robots: { index: false, follow: false } };
+  return { title: copy.resetMetaTitle.replace(/\s*\|\s*ScholarBridge(?:AI)?$/i, ""), description: copy.resetMetaDescription, robots: { index: false, follow: false } };
 }
 
 export default async function ResetPasswordPage() {
@@ -34,7 +34,7 @@ export default async function ResetPasswordPage() {
   const copy = dictionaries[locale].passwordReset;
 
   return (
-    <LocaleProvider initialLocale={locale} initialMessages={clientMessagesFor(locale)}>
+    <LocaleProvider initialLocale={locale} initialMessages={publicMessagesFor(locale, "passwordReset")}>
       <div className="min-h-screen bg-slate-50">
         <PublicCatalogHeader />
         <main className="mx-auto max-w-lg px-4 py-10 sm:px-6 sm:py-14">
