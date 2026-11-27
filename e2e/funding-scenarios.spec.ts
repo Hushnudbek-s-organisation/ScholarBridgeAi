@@ -35,32 +35,40 @@ test("funding defaults to confirmed, keeps restricted gaps, and fences optimisti
   await db.query("UPDATE scholarships SET award_currency='USD',award_period='year' WHERE id=$1",[f.scholarshipId]);expect((await read()).gapActions.scholarships.find((value:{id:number})=>value.id===f.scholarshipId).annualComparable).toBe(true);
 
   await page.setViewportSize({width:390,height:844});await page.goto("/#funding");
-  const select=page.locator("#funding-scenario");await expect(select).toBeVisible();await expect(page.locator('[data-funding-scenario="confirmed"]')).toHaveAttribute("data-funding-gap",String(initial.annualCost));
+  const confirmedChoice=page.getByRole("button",{name:en.journey.fpConfirmedView,exact:true});
+  const possibleChoice=page.getByRole("button",{name:en.journey.fpPossibleView,exact:true});
+  const openForm=()=>page.getByRole("button",{name:en.journey.fpAddFundingTitle,exact:true}).click();
+  await expect(confirmedChoice).toHaveAttribute("aria-pressed","true");
+  await expect(page.locator('[data-funding-scenario="confirmed"]')).toHaveAttribute("data-funding-gap",String(initial.annualCost));
+  await expect(page.getByText(en.journey.fpCoveragePercent.replace("{pct}","0"),{exact:true})).toBeVisible();
+  await expect(page.getByRole("heading",{name:en.journey.fpOneOffTitle})).toBeVisible();
+  await openForm();
   const draft=page.getByPlaceholder(en.journey.fpNamePlaceholder);await draft.fill("FICTIONAL unsaved draft");
-  await select.focus();await select.selectOption("optimistic");await expect(page.locator('[data-funding-scenario="optimistic"]')).toHaveAttribute("data-funding-gap","0");await expect(select).toBeFocused();await expect(draft).toHaveValue("FICTIONAL unsaved draft");
-  await select.selectOption("confirmed");await expect(page.locator('[data-funding-scenario="confirmed"]')).toBeVisible();
+  await possibleChoice.focus();await page.keyboard.press("Space");await expect(page.locator('[data-funding-scenario="optimistic"]')).toHaveAttribute("data-funding-gap","0");await expect(possibleChoice).toBeFocused();await expect(draft).toHaveValue("FICTIONAL unsaved draft");
+  await confirmedChoice.click();await expect(page.locator('[data-funding-scenario="confirmed"]')).toBeVisible();
   // Hold only a REAL outgoing request. No numeric response is mocked. A late
   // optimistic response cannot overwrite the newer confirmed selection.
   let started!:()=>void;const requested=new Promise<void>(resolve=>{started=resolve;});const held=new Promise<void>(resolve=>{release=resolve;});
   await page.route("**/api/funding?**",async route=>{if(new URL(route.request().url()).searchParams.get("scenario")==="optimistic"){started();await held;}await route.continue();});
   // Force a fresh read rather than a legitimate same-key client-cache hit.
   await page.reload();await expect(page.locator('[data-funding-scenario="confirmed"]')).toBeVisible();
+  await openForm();
   await page.getByPlaceholder(en.journey.fpNamePlaceholder).fill("FICTIONAL unsaved draft");
-  await select.selectOption("optimistic");await requested;await expect(page.locator('[data-funding-scenario="confirmed"]')).toHaveCount(0);await expect(select).toBeEnabled();
-  await select.selectOption("confirmed");await expect(page.locator('[data-funding-scenario="confirmed"]')).toBeVisible();
+  await possibleChoice.click();await requested;await expect(page.locator('[data-funding-scenario="confirmed"]')).toHaveCount(0);await expect(possibleChoice).toBeEnabled();
+  await confirmedChoice.click();await expect(page.locator('[data-funding-scenario="confirmed"]')).toBeVisible();
   const late=page.waitForResponse(response=>response.url().includes("/api/funding?")&&new URL(response.url()).searchParams.get("scenario")==="optimistic");release!();await late;
-  await expect(select).toHaveValue("confirmed");await expect(page.locator('[data-funding-scenario="confirmed"]')).toHaveAttribute("data-funding-gap",String(initial.annualCost));await expect(page.getByPlaceholder(en.journey.fpNamePlaceholder)).toHaveValue("FICTIONAL unsaved draft");
+  await expect(confirmedChoice).toHaveAttribute("aria-pressed","true");await expect(page.locator('[data-funding-scenario="confirmed"]')).toHaveAttribute("data-funding-gap",String(initial.annualCost));await expect(page.getByPlaceholder(en.journey.fpNamePlaceholder)).toHaveValue("FICTIONAL unsaved draft");
   await page.unroute("**/api/funding?**");
   // One explicit HTTP fault (not a fabricated finance payload) clears the
   // success state and keeps scenario controls/draft/retry available.
   await page.reload();await expect(page.locator('[data-funding-scenario="confirmed"]')).toBeVisible();
   await page.route("**/api/funding?**",route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({error:"FICTIONAL one-shot funding read fault"})}),{times:1});
-  await select.selectOption("optimistic");await expect(page.getByText("FICTIONAL one-shot funding read fault",{exact:true})).toBeVisible();
-  await expect(page.locator("[data-funding-scenario]")).toHaveCount(0);await expect(select).toBeEnabled();
+  await possibleChoice.click();await expect(page.getByText("FICTIONAL one-shot funding read fault",{exact:true})).toBeVisible();
+  await expect(page.locator("[data-funding-scenario]")).toHaveCount(0);await expect(possibleChoice).toBeEnabled();
   await page.getByRole("button",{name:en.journey.fpRetry,exact:true}).click();await expect(page.locator('[data-funding-scenario="optimistic"]')).toHaveAttribute("data-funding-gap","0");
   for(const [locale,copy] of [["uz",uz],["ru",ru]] as const){
    await page.context().addCookies([{name:"scholarbridge_locale",value:locale,url:process.env.E2E_BASE_URL!}]);await page.reload();
-   await expect(page.getByRole("combobox",{name:copy.journey.fpScenario,exact:true})).toHaveValue("confirmed");await expect(page.locator('[data-funding-scenario="confirmed"]')).toBeVisible();
+   await expect(page.getByRole("button",{name:copy.journey.fpConfirmedView,exact:true})).toHaveAttribute("aria-pressed","true");await expect(page.locator('[data-funding-scenario="confirmed"]')).toBeVisible();
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   }
  }finally{

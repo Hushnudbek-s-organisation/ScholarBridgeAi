@@ -38,7 +38,7 @@ import {
   formatCurrencyAmount,
 } from "@/lib/countryCostBenchmarks";
 import { Button } from "@/components/ui/Button";
-import {parseRecordedFundingUsd,type PostAdmissionFunding} from "@/lib/journey/funding";
+import { COST_LINES, parseRecordedFundingUsd, type FundingScenario, type PostAdmissionFunding } from "@/lib/journey/funding";
 
 // ===========================================================================
 // OFFERS & DECISIONS (spec §23) + POST-ADMISSION FUNDING (spec §24)
@@ -656,17 +656,16 @@ interface FundingLine {
 }
 interface FundingData {
   costLines: { key: string; label: string }[];
-  kindLabels: Record<string, string>;
+  oneOffCosts: { key: string; label: string; amountUsd: number | null; estimated: boolean }[];
   application: { id: number; universityName: string; programName: string } | null;
   university: { id: number; name: string; country: string; city: string; sourceUrl: string | null; lastVerifiedAt: string | null } | null;
   annualCost: number | null;
   estimatedLines: string[];
   unknownLines: string[];
   plan: {
-    scenario?:"confirmed"|"optimistic";
-    securedAllocatedTotal?:number;
-    repayableTotal?:number;
-    upfrontGap?:number|null;
+    scenario: FundingScenario;
+    securedAllocatedTotal: number;
+    repayableTotal: number;
     annualCost: number | null;
     currency: string;
     scholarshipTotal: number;
@@ -687,17 +686,19 @@ interface FundingData {
 }
 
 const FUNDING_KINDS = ["scholarship", "aid", "family", "savings", "loan", "other"];
-const FUNDING_STATUSES = ["planned", "applied", "awarded", "confirmed", "declined"];
+const FUNDING_STATUSES = ["planned", "applied", "awarded", "confirmed", "declined"] as const;
+const FUNDING_SCENARIOS = ["confirmed", "optimistic"] as const;
 const FUNDING_CURRENCY_CODES = Object.keys(CURRENCY_RATES_TO_USD);
 const FUNDING_COUNTRIES = Object.keys(COUNTRY_COST_BENCHMARKS);
 
 export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: { profileId: number; applicationId?: number | null; onNavigateTab: (t: string) => void }) {
   const t = useTranslations("journey");
-  const amountDescriptionId=React.useId();
+  const amountDescriptionId = React.useId();
+  const formId = React.useId();
   const [countryOverride, setCountryOverride] = useState<string>("");
   const [displayCurrency, setDisplayCurrency] = useState<string>("USD");
-  const [scenarioChoice,setScenarioChoice]=useState<{profileId:number;value:"confirmed"|"optimistic"}>({profileId,value:"confirmed"});
-  const scenario=scenarioChoice.profileId===profileId?scenarioChoice.value:"confirmed";
+  const [scenarioChoice, setScenarioChoice] = useState<{ profileId: number; value: FundingScenario }>({ profileId, value: "confirmed" });
+  const scenario = scenarioChoice.profileId === profileId ? scenarioChoice.value : "confirmed";
   const { data, loading, error, reload } = useResource<FundingData>(
     useCallback(() => {
       const params = new URLSearchParams({ profileId: String(profileId) });
@@ -711,14 +712,16 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
     {
       initial: {
         costLines: [],
-        kindLabels: {},
+        oneOffCosts: [],
         application: null,
         university: null,
         annualCost: null,
         estimatedLines: [],
         unknownLines: [],
         plan: {
-          scenario:"confirmed",
+          scenario: "confirmed",
+          securedAllocatedTotal: 0,
+          repayableTotal: 0,
           annualCost: null,
           currency: "USD",
           scholarshipTotal: 0,
@@ -739,384 +742,397 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
   );
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ kind: "scholarship", name: "", amountUsd: "", status: "planned", covers: [] as string[], notes: "" });
-  // Scratchpad for the gap card: ticking saved awards previews how much of
-  // the shortfall they would close, without touching the plan itself.
   const [gapPicks, setGapPicks] = useState<Record<number, boolean>>({});
 
-  const add = async () => {
-    if (!form.name.trim() || !form.amountUsd) return;
-    const amount=parseRecordedFundingUsd(form.amountUsd);
-    if(amount==null){setActionError(t("fpUsdAmountInvalid"));return;}
-    setActionError("");
+  const mutate = async (action: () => Promise<unknown>) => {
+    if (busy) return;
     setBusy(true);
+    setActionError("");
     try {
-      await sendJson(
-        "/api/funding",
-        { method: "POST", body: JSON.stringify({ profileId, ...form, amountUsd: Number(form.amountUsd), applicationId: applicationId ?? null }) },
-        t("tpSaveError")
-      );
-      setForm({ kind: "scholarship", name: "", amountUsd: "", status: "planned", covers: [], notes: "" });
+      await action();
       await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : t("tpSaveError"));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t("fpSaveError"));
     } finally {
       setBusy(false);
     }
+  };
+
+  const add = async () => {
+    if (!form.name.trim()) return;
+    const amount = parseRecordedFundingUsd(form.amountUsd);
+    if (amount == null) {
+      setActionError(t("fpUsdAmountInvalid"));
+      return;
+    }
+    await mutate(async () => {
+      await sendJson(
+        "/api/funding",
+        { method: "POST", body: JSON.stringify({ profileId, ...form, amountUsd: amount, applicationId: applicationId ?? null }) },
+        t("fpSaveError")
+      );
+      setForm({ kind: "scholarship", name: "", amountUsd: "", status: "planned", covers: [], notes: "" });
+      setAddOpen(false);
+    });
   };
 
   const addGapScholarship = async (scholarship: FundingData["gapActions"]["scholarships"][number]) => {
-    if(!scholarship.annualComparable){setActionError(t("fpAnnualUnknown"));return;}
-    if (data.items.some((item) => item.kind === "scholarship" && item.name === scholarship.title)) return;
-    setBusy(true);
-    setActionError("");
-    try {
-      await sendJson("/api/funding", { method: "POST", body: JSON.stringify({ profileId, applicationId: applicationId ?? null, kind: "scholarship", name: scholarship.title, amountUsd: scholarship.amountUsdValue, status: "planned", covers: ["tuition"] }) }, t("tpSaveError"));
-      await reload();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : t("tpSaveError"));
-    } finally {
-      setBusy(false);
+    if (!scholarship.annualComparable) {
+      setActionError(t("fpAnnualUnknown"));
+      return;
     }
-  };
-
-  const patch = async (payload: Record<string, unknown>) => {
-    await sendJson("/api/funding", { method: "PATCH", body: JSON.stringify({ profileId, applicationId: applicationId ?? null, ...payload }) }, t("dvUpdateError"));
-    await reload();
+    if (data.items.some((item) => item.kind === "scholarship" && item.name === scholarship.title)) return;
+    await mutate(() => sendJson("/api/funding", {
+      method: "POST",
+      body: JSON.stringify({ profileId, applicationId: applicationId ?? null, kind: "scholarship", name: scholarship.title, amountUsd: scholarship.amountUsdValue, status: "planned", covers: ["tuition"] }),
+    }, t("fpSaveError")));
   };
 
   const remove = async (id: number) => {
     const params = new URLSearchParams({ profileId: String(profileId), id: String(id) });
     if (applicationId != null) params.set("applicationId", String(applicationId));
-    await fetch(`/api/funding?${params.toString()}`, { method: "DELETE" });
-    await reload();
+    await mutate(() => sendJson(`/api/funding?${params}`, { method: "DELETE" }, t("fpUpdateError")));
   };
 
-  const pct = data.annualCost == null
-    ? null
-    : data.annualCost > 0
-      ? Math.min(100,Math.round(((data.plan.securedAllocatedTotal??0) / data.annualCost) * 100))
-      : 0;
-  const scenarioReady=!loading&&data.plan.scenario===scenario&&!error;
+  const scenarioReady = !loading && data.plan.scenario === scenario && !error;
+  const annualCost = data.annualCost;
+  const gap = data.plan.fundingGap;
+  const trackedScholarships = new Set(data.items.filter((item) => item.kind === "scholarship").map((item) => item.name));
+  const previewedAwards = data.gapActions.scholarships.filter((award) => award.annualComparable && gapPicks[award.id] && !trackedScholarships.has(award.title));
+  const nominalGap = gap == null ? null : Math.max(0, gap - previewedAwards.reduce((sum, award) => sum + award.amountUsdValue, 0));
+  const secured = data.plan.securedAllocatedTotal;
+  const covered = annualCost != null && gap != null ? Math.max(0, annualCost - gap) : null;
+  const confirmedCoverage = covered == null ? null : Math.min(secured, covered);
+  const conditionalCoverage = covered == null ? 0 : Math.max(0, covered - secured);
+  const coveragePct = covered != null && annualCost != null && annualCost > 0
+    ? Math.round(covered / annualCost * 100)
+    : null;
   const activeCountry = countryOverride || data.benchmarkSource?.country || data.university?.country || "United States";
+  const money = (value: number | null) => value == null
+    ? t("fpAmountUnknown")
+    : `${displayCurrency === "USD" ? "" : "≈ "}${formatCurrencyAmount(value, displayCurrency)}`;
+  const costLabel = (key: string, fallback: string) => t.has(`fpCosts.${key}` as never) ? t(`fpCosts.${key}` as never) : fallback;
+  const kindLabel = (key: string, fallback: string) => t.has(`fpKinds.${key}` as never) ? t(`fpKinds.${key}` as never) : fallback;
 
   return (
     <div className="space-y-4">
       <InlineAlert message={actionError} onDismiss={() => setActionError("")} />
       <JourneyCard
-        title={t("fpTitle")}
-        subtitle={data.application ? `${data.application.universityName}${data.application.programName ? ` · ${data.application.programName}` : ""}` : t("fpNoApplication")}
+        tone="hero"
+        title={t("fpAnnualBudget")}
+        subtitle={data.application
+          ? [data.application.universityName, data.application.programName].filter(Boolean).join(" · ")
+          : data.university?.name ?? t("fpCountryBasis", { country: activeCountry })}
         action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="text-right">
-              <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">
-                {data.annualCost == null ? t("fpAmountUnknown") : formatCurrencyAmount(data.annualCost, displayCurrency)}
-              </p>
-              <p className="text-sm font-bold uppercase text-slate-500">
-                {displayCurrency !== "USD" && data.annualCost != null
-                  ? `$${data.annualCost.toLocaleString()} · ${t("fpPerYear")}`
-                  : t("fpPerYear")}
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="print:hidden min-h-11"
-              onClick={() => window.print()}
-              disabled={!scenarioReady}
-              title={t("fpPrintSummaryHint")}
-            >
-              <Printer className="h-3.5 w-3.5" aria-hidden />
-              {t("fpPrintSummary")}
-            </Button>
-          </div>
+          <Button size="sm" variant="outline" className="min-h-11 print:hidden" onClick={() => window.print()} disabled={!scenarioReady} title={t("fpPrintSummaryHint")}>
+            <Printer className="h-4 w-4" aria-hidden />
+            {t("fpPrintSummary")}
+          </Button>
         }
       >
-        {error && <><ErrorNote message={error} /><Button variant="outline" onClick={()=>void reload()}>{t("fpRetry")}</Button></>}
-        <label className="mb-3 block text-sm font-bold" htmlFor="funding-scenario">{t("fpScenario")}
-          <select id="funding-scenario" className={`${inputClass} mt-1`} value={scenario} onChange={event=>setScenarioChoice({profileId,value:event.target.value as "confirmed"|"optimistic"})}>
-            <option value="confirmed">{t("fpScenarioConfirmed")}</option>
-            <option value="optimistic">{t("fpScenarioOptimistic")}</option>
-          </select>
-        </label>
-        <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t("fpScenarioNote")}</p>
-        <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t("fpUpfrontUnknown")}</p>
-        {scenarioReady&&Boolean(data.plan.repayableTotal)&&<p className="mb-3 text-sm text-amber-700 dark:text-amber-300">{t("fpLoanNote",{amount:formatMoney(data.plan.repayableTotal!,"USD")})}</p>}
-        {!scenarioReady&&!error&&<Loading label={t("fpScenarioLoading")} />}
-
-        <div className="mb-3 grid gap-2 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
-              {t("fpBenchmarkCountry")}
-            </label>
-            <select
-              aria-label={t("fpBenchmarkCountry")}
-              className={inputClass}
-              value={activeCountry}
-              onChange={(e) => setCountryOverride(e.target.value)}
+        <div role="group" aria-label={t("fpScenario")} className="flex flex-wrap gap-2">
+          {FUNDING_SCENARIOS.map((value) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={scenario === value ? "secondary" : "outline"}
+              className="min-h-11"
+              aria-pressed={scenario === value}
+              data-scenario-choice={value}
+              onClick={() => setScenarioChoice({ profileId, value })}
             >
-              {(data.countries ?? FUNDING_COUNTRIES).map((c) => (
-                <option key={c} value={c}>
-                  {c} ({COUNTRY_COST_BENCHMARKS[c]?.defaultCurrency ?? "USD"})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-bold uppercase tracking-wide text-slate-500">
-              {t("fpDisplayCurrency")}
-            </label>
-            <select
-              aria-label={t("fpDisplayCurrency")}
-              className={inputClass}
-              value={displayCurrency}
-              onChange={(e) => setDisplayCurrency(e.target.value)}
-            >
-              {FUNDING_CURRENCY_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {CURRENCY_RATES_TO_USD[code].label}
-                </option>
-              ))}
-            </select>
-          </div>
+              {t(value === "confirmed" ? "fpConfirmedView" : "fpPossibleView")}
+            </Button>
+          ))}
         </div>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          {t(scenario === "confirmed" ? "fpConfirmedViewHint" : "fpPossibleViewHint")}
+        </p>
 
-        {data.university && (
-          <p className="mb-3 text-sm text-slate-500">
-            {t("fpPublishedCosts", { university: data.university.name, city: data.university.city, country: data.university.country })} ·{" "}
-            <SourceTag url={data.university.sourceUrl} name={t("fpUnivSource")} lastVerified={data.university.lastVerifiedAt} />
-          </p>
+        {error && (
+          <div className="mt-3 space-y-2">
+            <ErrorNote message={error} />
+            <Button variant="outline" onClick={() => void reload()}>{t("fpRetry")}</Button>
+          </div>
         )}
-        {data.benchmarkSource && (
-          <p className="mb-3 text-sm text-slate-500">
-            {t("fpOfficialBenchmark", { country: data.benchmarkSource.country })}{" "}
-            <SourceTag url={data.benchmarkSource.url} name={data.benchmarkSource.name} lastVerified="2026-10-01" />{" "}
-            — {data.benchmarkSource.notes}
-          </p>
-        )}
-        {data.estimatedLines.length > 0 && (
-          <p className="mb-3 rounded-control bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-            {t("fpBenchmarkDisclaimer", { lines: data.estimatedLines.join(", ") })}
-          </p>
-        )}
-        {data.unknownLines.length > 0 && (
-          <p className="mb-3 rounded-control bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-            {t("fpUnknownCostsMessage", { lines: data.unknownLines.join(", ") })}
-          </p>
+        {!scenarioReady && !error && <div className="mt-4"><Loading label={t("fpScenarioLoading")} /></div>}
+
+        {scenarioReady && (
+          <div className="mt-4 space-y-4" data-funding-scenario={scenario} data-funding-gap={gap ?? "unknown"}>
+            <dl className="grid gap-2 sm:grid-cols-3">
+              <FundingMetric label={t(annualCost != null && data.estimatedLines.length > 0 ? "fpEstimatedYearlyCost" : "fpYearlyCost")} value={money(annualCost)} />
+              <FundingMetric label={t("fpConfirmedCoverage")} value={money(confirmedCoverage)} tone="good" />
+              <FundingMetric
+                label={t(scenario === "confirmed" ? "fpStillNeeded" : "fpPossibleGap")}
+                value={money(gap)}
+                tone={gap == null ? "neutral" : gap > 0 ? "warn" : "good"}
+              />
+            </dl>
+
+            {coveragePct != null && annualCost != null && gap != null ? (
+              <div>
+                <div className="flex flex-wrap justify-between gap-x-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  <span>{t("fpAnnualCoverage")}</span>
+                  <span className="tabular-nums">{t("fpCoveragePercent", { pct: coveragePct })}</span>
+                </div>
+                <div aria-hidden="true" className="mt-2 flex h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                  <div className="bg-emerald-600 dark:bg-emerald-500" style={{ width: `${((confirmedCoverage ?? 0) / annualCost) * 100}%` }} />
+                  <div className="bg-indigo-500 dark:bg-indigo-400" style={{ width: `${(conditionalCoverage / annualCost) * 100}%` }} />
+                  <div className="bg-amber-500 dark:bg-amber-400" style={{ width: `${(gap / annualCost) * 100}%` }} />
+                </div>
+                <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-700 dark:text-slate-200">
+                  <li><span aria-hidden className="mr-1.5 inline-block size-2.5 rounded-full bg-emerald-600 dark:bg-emerald-500" />{t("fpConfirmedCoverage")}</li>
+                  {scenario === "optimistic" && <li><span aria-hidden className="mr-1.5 inline-block size-2.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />{t("fpPossibleCoverage", { amount: money(conditionalCoverage) })}</li>}
+                  <li><span aria-hidden className="mr-1.5 inline-block size-2.5 rounded-full bg-amber-500 dark:bg-amber-400" />{t("fpStillNeeded")}</li>
+                </ul>
+              </div>
+            ) : annualCost === 0 ? (
+              <p className="text-sm text-slate-600 dark:text-slate-300">{t("fpZeroCost")}</p>
+            ) : (
+              <p className="rounded-control bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                {data.unknownLines.length > 0
+                  ? t("fpUnknownCostsMessage", { lines: data.plan.byLine.filter((line) => line.cost == null).map((line) => costLabel(line.key, line.label)).join(", ") })
+                  : t("fpGapUnavailable")}
+              </p>
+            )}
+            {Boolean(data.plan.repayableTotal) && <p className="text-sm text-amber-800 dark:text-amber-300">{t("fpLoanNote", { amount: money(data.plan.repayableTotal) })}</p>}
+            {displayCurrency !== "USD" && <p className="text-sm text-slate-600 dark:text-slate-300">{t("fpCurrencyEstimate", { currency: displayCurrency })}</p>}
+          </div>
         )}
 
-        {scenarioReady&&<div data-funding-scenario={data.plan.scenario} data-funding-gap={data.plan.fundingGap??"unknown"}>
-        <div className="mb-3">
-          {pct == null ? (
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{t("fpGapUnavailable")}</p>
-          ) : (
-            <ProgressBar
-              pct={pct}
-              size="lg"
-              tone={data.plan.securedGap===0 ? "good" : "warn"}
-              label={t("fpSecuredPct", { pct })}
-            />
+        <details className="mt-4 border-t border-slate-200 pt-1 dark:border-slate-700">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{t("fpSettingsSources")}</summary>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={t("fpBenchmarkCountry")}>
+              <select className={inputClass} value={activeCountry} onChange={(event) => setCountryOverride(event.target.value)}>
+                {!FUNDING_COUNTRIES.includes(activeCountry) && <option value={activeCountry}>{activeCountry}</option>}
+                {(data.countries ?? FUNDING_COUNTRIES).map((country) => (
+                  <option key={country} value={country}>{country} ({COUNTRY_COST_BENCHMARKS[country]?.defaultCurrency ?? "USD"})</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t("fpDisplayCurrency")}>
+              <select className={inputClass} value={displayCurrency} onChange={(event) => setDisplayCurrency(event.target.value)}>
+                {FUNDING_CURRENCY_CODES.map((code) => <option key={code} value={code}>{CURRENCY_RATES_TO_USD[code].label}</option>)}
+              </select>
+            </Field>
+          </div>
+          {scenarioReady && (
+            <div className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              {data.university && (
+                <p>
+                  {t("fpPublishedCosts", { university: data.university.name, city: data.university.city, country: data.university.country })}{" "}
+                  <SourceTag url={data.university.sourceUrl} name={t("fpUnivSource")} lastVerified={data.university.lastVerifiedAt} />
+                </p>
+              )}
+              {data.benchmarkSource && (
+                <p>
+                  {t("fpOfficialBenchmark", { country: data.benchmarkSource.country })}{" "}
+                  <SourceTag url={data.benchmarkSource.url} name={data.benchmarkSource.name} lastVerified="2026-10-01" />{" "}
+                  {data.benchmarkSource.notes}
+                </p>
+              )}
+              {data.estimatedLines.length > 0 && (
+                <p>{t("fpBenchmarkDisclaimer", { lines: data.plan.byLine.filter((line) => data.estimatedLines.includes(line.label)).map((line) => costLabel(line.key, line.label)).join(", ") })}</p>
+              )}
+            </div>
+          )}
+        </details>
+      </JourneyCard>
+
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-4">
+          <JourneyCard title={t("fpAnnualBreakdown")} subtitle={t("fpMoneySubtitle")}>
+            {scenarioReady ? (
+              <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+                {data.plan.byLine.map((line) => (
+                  <li key={line.key} className="space-y-2 py-3 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">
+                        {costLabel(line.key, line.label)}{" "}
+                        {data.estimatedLines.includes(line.label) && <Pill tone="warn">{t("fpEstimated")}</Pill>}
+                      </span>
+                      <span className="font-semibold tabular-nums text-slate-900 dark:text-white">{money(line.cost)}</span>
+                    </div>
+                    {line.cost != null && line.covered != null && (
+                      <>
+                        {line.cost > 0 && <ProgressBar pct={line.covered / line.cost * 100} size="sm" tone={line.gap === 0 ? "good" : "brand"} />}
+                        <div className="flex flex-wrap justify-between gap-x-2 text-sm text-slate-600 dark:text-slate-300">
+                          <span>{t("fpLineCovered", { amount: money(line.covered) })}</span>
+                          {line.gap != null && line.gap > 0 && <span>{t("fpLineRemaining", { amount: money(line.gap) })}</span>}
+                        </div>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-sm text-slate-500 dark:text-slate-400">{t(error ? "fpLoadError" : "fpScenarioLoading")}</p>}
+          </JourneyCard>
+          {scenarioReady && data.oneOffCosts.length > 0 && (
+            <JourneyCard title={t("fpOneOffTitle")} subtitle={t("fpOneOffHint")}>
+              <dl className="grid gap-2 sm:grid-cols-2">
+                {data.oneOffCosts.map((fee) => (
+                  <div key={fee.key} className="min-w-0 rounded-control bg-slate-50 p-3 dark:bg-slate-800/70">
+                    <dt className="text-sm text-slate-700 dark:text-slate-200">{costLabel(fee.key, fee.label)} {fee.estimated && fee.amountUsd != null && <Pill tone="warn">{t("fpEstimated")}</Pill>}</dt>
+                    <dd className="mt-1 font-bold tabular-nums text-slate-900 dark:text-white">{money(fee.amountUsd)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{t("fpUpfrontUnknown")}</p>
+            </JourneyCard>
           )}
         </div>
-
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric label={t("fpSecured")} value={data.plan.securedTotal} tone="good" hint={t("fpSecuredHint")} />
-          <Metric label={t("fpStillPossible")} value={data.plan.projectedTotal} tone="brand" hint={t("fpStillPossibleHint")} />
-          <Metric
-            label={t("fpGapNothing")}
-            value={data.plan.fundingGap == null ? t("fpAmountUnknown") : data.plan.fundingGap}
-            tone={data.plan.fundingGap == null ? "neutral" : data.plan.fundingGap > 0 ? "bad" : "good"}
-          />
-          <Metric
-            label={t("fpGapSecured")}
-            value={data.plan.securedGap == null ? t("fpAmountUnknown") : data.plan.securedGap}
-            tone={data.plan.securedGap == null ? "neutral" : data.plan.securedGap > 0 ? "warn" : "good"}
-          />
-        </div>
-        </div>}
-      </JourneyCard>
-
-      <JourneyCard title={t("fpMoneyTitle")} subtitle={t("fpMoneySubtitle")}>
-        {!scenarioReady?<p className="text-sm text-slate-500">{t(error?"fpGapUnavailable":"fpScenarioLoading")}</p>:<div className="space-y-2">
-          {data.plan.byLine.map((l) => (
-            <div key={l.key}>
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-700 dark:text-slate-200">
-                  {l.label}
-                  {data.estimatedLines.includes(l.label) && <span className="ml-1 font-normal text-slate-500">{t("fpEstimated")}</span>}
-                </span>
-                <span className="tabular-nums text-slate-500">
-                  {l.covered == null ? t("fpAmountUnknown") : `$${l.covered.toLocaleString()}`}
-                  {" / "}
-                  {l.cost == null ? t("fpAmountUnknown") : `$${l.cost.toLocaleString()}`}
-                  {l.gap != null && l.gap > 0 && <span className="ml-1 font-bold text-rose-500">−${l.gap.toLocaleString()}</span>}
-                </span>
-              </div>
-              <div className="mt-1">
-                {l.cost == null || l.covered == null ? (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{t("fpGapUnavailable")}</p>
-                ) : (
-                  <ProgressBar
-                    pct={l.cost > 0 ? (l.covered / l.cost) * 100 : 0}
-                    size="sm"
-                    tone={l.gap === 0 ? "good" : "warn"}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>}
-      </JourneyCard>
-
-      <JourneyCard title={t("fpAddFundingTitle")} subtitle={t("fpAddFundingSubtitle")}>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <Field label={t("fpFieldKind")}>
-            <select className={inputClass} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-              {FUNDING_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {data.kindLabels[k] ?? k}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={t("rmFieldName")}>
-            <input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("fpNamePlaceholder")} />
-          </Field>
-          <Field label={t("fpFieldAmount")}>
-            <input className={inputClass} type="number" min="0" step="any" aria-label={t("fpFieldAmount")} aria-describedby={amountDescriptionId} value={form.amountUsd} onChange={(e) => setForm({ ...form, amountUsd: e.target.value })} />
-            <p id={amountDescriptionId} className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{t("fpUsdRounding")}</p>
-          </Field>
-          <Field label={t("fpFieldStatus")}>
-            <select className={inputClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-              {FUNDING_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {t(`fpStatus_${s}` as never)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={t("fpFieldCovers")}>
-            <select
-              className={inputClass}
-              value={form.covers[0] ?? ""}
-              onChange={(e) => setForm({ ...form, covers: e.target.value ? [e.target.value] : [] })}
+        <div className="min-w-0 space-y-4">
+          <JourneyCard
+            title={t("fpSourcesTitle")}
+            subtitle={t("fpSourcesHint")}
+            action={
+              <Button size="sm" className="min-h-11 print:hidden" aria-expanded={addOpen} aria-controls={formId} onClick={() => setAddOpen(!addOpen)}>
+                <Plus className="h-4 w-4" aria-hidden />{t("fpAddFundingTitle")}
+              </Button>
+            }
+          >
+            <form
+              id={formId}
+              hidden={!addOpen}
+              className="mb-4 space-y-3 rounded-surface border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50 print:hidden"
+              onSubmit={(event) => { event.preventDefault(); void add(); }}
             >
-              <option value="">{t("fpEverything")}</option>
-              {(data.costLines.length ? data.costLines : [{ key: "tuition", label: t("lineTuition") }]).map((l) => (
-                <option key={l.key} value={l.key}>
-                  {l.label} {t("fpOnly")}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-        <Button className="mt-3" onClick={add} disabled={busy || !form.name.trim() || !form.amountUsd}>
-          <Plus className="h-3.5 w-3.5" />{t("fpAdd")}</Button>
-      </JourneyCard>
-
-      {data.items.length > 0 && (
-        <JourneyCard title={t("fpItemsTitle")}>
-          <ul className="space-y-2">
-            {data.items.map((i) => (
-              <li key={i.id} className="sb-card-hover flex flex-wrap items-center gap-2 rounded-surface border border-slate-200 p-3 dark:border-slate-700">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{i.name}</p>
-                  <p className="text-sm text-slate-500">
-                    {i.kindLabel} · ${i.amountUsd.toLocaleString()} · {t(`fpStatus_${i.status}` as never)}
-                  </p>
-                </div>
-                <select className={`${inputClass} w-auto`} value={i.status} onChange={(e) => void patch({ id: i.id, status: e.target.value })}>
-                  {FUNDING_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {t(`fpStatus_${s}` as never)}
-                    </option>
-                  ))}
-                </select>
-                <Button size="sm" variant="danger" onClick={() => void remove(i.id)} aria-label={`Delete ${i.name}`}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </li>
+              <Field label={t("fpFieldName")}>
+                <input className={inputClass} value={form.name} required maxLength={200} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder={t("fpNamePlaceholder")} />
+              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label={t("fpFieldAmount")}>
+                  <input className={inputClass} type="number" min="0" max="2147483647" step="any" required aria-describedby={amountDescriptionId} value={form.amountUsd} onChange={(event) => setForm({ ...form, amountUsd: event.target.value })} />
+                  <span id={amountDescriptionId} className="mt-1 block text-xs text-slate-600 dark:text-slate-300">{t("fpUsdRounding")}</span>
+                </Field>
+                <Field label={t("fpFieldStatus")}>
+                  <select className={inputClass} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+                    {FUNDING_STATUSES.map((status) => <option key={status} value={status}>{t(`fpStatus_${status}`)}</option>)}
+                  </select>
+                </Field>
+                <Field label={t("fpFieldKind")}>
+                  <select className={inputClass} value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}>
+                    {FUNDING_KINDS.map((kind) => <option key={kind} value={kind}>{kindLabel(kind, kind)}</option>)}
+                  </select>
+                </Field>
+                <Field label={t("fpFieldCovers")}>
+                  <select className={inputClass} value={form.covers[0] ?? ""} onChange={(event) => setForm({ ...form, covers: event.target.value ? [event.target.value] : [] })}>
+                    <option value="">{t("fpEverything")}</option>
+                    {(data.costLines.length ? data.costLines : COST_LINES).map((line) => <option key={line.key} value={line.key}>{costLabel(line.key, line.label)}</option>)}
+                  </select>
+                </Field>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => setAddOpen(false)}>{t("fpCancelAdd")}</Button>
+                <Button type="submit" disabled={busy || !form.name.trim() || !form.amountUsd}>{t("fpSaveSource")}</Button>
+              </div>
+            </form>
+            {scenarioReady && (data.items.length === 0 ? (
+              <p className="rounded-control bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">{t("fpSourcesEmpty")}</p>
+            ) : (
+              <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+                {data.items.map((item) => (
+                  <li key={item.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                      <p className="min-w-0 break-words text-sm font-semibold text-slate-800 dark:text-slate-100">{item.name}</p>
+                      <p className="min-w-0 break-words text-sm font-bold tabular-nums text-slate-900 dark:text-white">{money(item.amountUsd)}</p>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">{kindLabel(item.kind, item.kindLabel)} · {t(`fpStatus_${item.status}` as never)}</p>
+                    <div className="flex items-center gap-2 print:hidden">
+                      <select className={inputClass} aria-label={t("fpStatusAria", { name: item.name })} disabled={busy} value={item.status} onChange={(event) => { const status = event.target.value; void mutate(() => sendJson("/api/funding", { method: "PATCH", body: JSON.stringify({ profileId, applicationId: applicationId ?? null, id: item.id, status }) }, t("fpUpdateError"))); }}>
+                        {FUNDING_STATUSES.map((status) => <option key={status} value={status}>{t(`fpStatus_${status}`)}</option>)}
+                      </select>
+                      <Button variant="outline" size="icon" disabled={busy} onClick={() => void remove(item.id)} aria-label={t("fpDeleteAria", { name: item.name })}>
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             ))}
-          </ul>
-        </JourneyCard>
-      )}
-
-      {scenarioReady&&data.gapActions.gap != null && data.gapActions.gap > 0 &&
-        (() => {
-          const gapValue = data.gapActions.gap ?? 0;
-          const chosen = data.gapActions.scholarships.filter((s) => s.annualComparable&&gapPicks[s.id]);
-          const remaining = Math.max(0, gapValue - chosen.reduce((sum, s) => sum + s.amountUsdValue, 0));
-          return (
+          </JourneyCard>
+          {scenarioReady && gap != null && gap > 0 && (
             <JourneyCard title={t("fpGapTitle")}>
-              <p className="mb-2 text-sm text-slate-600 dark:text-slate-300">{t("fpDiscoveryOnly")}</p>
-              <p className="text-sm text-slate-700 dark:text-slate-200">
-                {t("fpGapShort", { amount: `$${gapValue.toLocaleString()}` })}
-              </p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("fpGapShort", { amount: money(gap) })}</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{t("fpDiscoveryOnly")}</p>
               {data.gapActions.scholarships.length > 0 ? (
                 <>
-                  <ul className="mt-2 space-y-1">
-                    {data.gapActions.scholarships.map((s) => (
-                      <li key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          className="h-3.5 w-3.5 accent-indigo-600"
-                          checked={Boolean(gapPicks[s.id])}
-                          disabled={!s.annualComparable}
-                          title={!s.annualComparable?t("fpAnnualUnknown"):undefined}
-                          onChange={(e) => setGapPicks((prev) => ({ ...prev, [s.id]: e.target.checked }))}
-                          aria-label={t("fpGapCheckAria", { title: s.title })}
-                        />
-                        <span className="font-semibold text-slate-700 dark:text-slate-200">{s.title}</span>
-                        <Pill tone="brand">${s.amountUsdValue.toLocaleString()}</Pill>
-                        {s.coversGap && <Pill tone="brand">{t("fpGapCloses")}</Pill>}
-                        <Pill tone="slate">{t("fpTuitionCoverage", { coverage: s.tuitionCoverage })}</Pill>
-                        {s.deadlineDate && (
-                          <span className="text-slate-500">{t("fpCloses", { date: s.deadlineDate })}</span>
-                        )}
-                        <span className="text-slate-500">{t("fpAwardOriginal",{amount:s.awardAmount??t("fpAmountUnknown"),currency:s.awardCurrency??"?",period:s.awardPeriod??t("fpAmountUnknown")})}</span>
-                        {!s.annualComparable?<Button size="sm" variant="outline" onClick={()=>window.dispatchEvent(new CustomEvent("scholarbridge:focus-record",{detail:{kind:"scholarship",id:s.id,title:s.title}}))}>{t("fpReviewAwardTerms")}</Button>:
-                        data.items.some((item) => item.kind === "scholarship" && item.name === s.title) ? <Pill tone="good">{t("fpAlreadyAdded")}</Pill> : <Button size="sm" variant="outline" disabled={busy} onClick={() => void addGapScholarship(s)}>{t("fpAddToPlan")}</Button>}
-                      </li>
-                    ))}
+                  <ul className="mt-3 divide-y divide-slate-200 dark:divide-slate-700">
+                    {data.gapActions.scholarships.map((award) => {
+                      const tracked = trackedScholarships.has(award.title);
+                      return (
+                        <li key={award.id} className="space-y-2 py-3">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            <span className="min-w-0 break-words">{award.title}</span>
+                            {award.annualComparable && <span className="tabular-nums">{money(award.amountUsdValue)}</span>}
+                          </div>
+                          <p className="text-sm text-slate-600 dark:text-slate-300">
+                            {t("fpAwardOriginal", { amount: award.awardAmount ?? t("fpAmountUnknown"), currency: award.awardCurrency ?? "?", period: award.awardPeriod ?? t("fpAmountUnknown") })}
+                            {award.deadlineDate && ` · ${t("fpCloses", { date: award.deadlineDate })}`}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Pill tone="slate">{t("fpTuitionCoverage", { coverage: award.tuitionCoverage })}</Pill>
+                            {award.coversGap && <Pill tone="brand">{t("fpGapCloses")}</Pill>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
+                            {tracked ? <Pill tone="good">{t("fpAlreadyAdded")}</Pill> : award.annualComparable ? (
+                              <>
+                                <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                                  <input
+                                    type="checkbox"
+                                    className="size-4 accent-indigo-600"
+                                    checked={Boolean(gapPicks[award.id])}
+                                    onChange={(event) => {
+                                      const checked = event.target.checked;
+                                      setGapPicks((previous) => ({ ...previous, [award.id]: checked }));
+                                    }}
+                                    aria-label={t("fpGapCheckAria", { title: award.title })}
+                                  />
+                                  {t("fpPreviewAward")}
+                                </label>
+                                <Button size="sm" variant="outline" disabled={busy} onClick={() => void addGapScholarship(award)}>{t("fpAddToPlan")}</Button>
+                              </>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => window.dispatchEvent(new CustomEvent("scholarbridge:focus-record", { detail: { kind: "scholarship", id: award.id, title: award.title } }))}>
+                                {t("fpReviewAwardTerms")}
+                              </Button>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
-                  <p className="mt-2 text-sm text-slate-500">{t("fpGapCheckHint")}</p>
-                  {chosen.length > 0 && (
-                    <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                      {remaining === 0
-                        ? t("fpGapClosed")
-                        : t("fpGapRemaining", { amount: `$${remaining.toLocaleString()}` })}
-                    </p>
+                  {previewedAwards.length > 0 && nominalGap != null && (
+                    <div className="rounded-control bg-slate-50 p-3 text-sm dark:bg-slate-800/70">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100">{nominalGap === 0 ? t("fpGapClosed") : t("fpGapRemaining", { amount: money(nominalGap) })}</p>
+                      <p className="mt-1 text-slate-600 dark:text-slate-300">{t("fpGapCheckHint")}</p>
+                    </div>
                   )}
                 </>
-              ) : (
-                <p className="mt-1 text-sm text-slate-500">{t("fpNoScholarshipCloses")}</p>
-              )}
-              <Button size="sm" className="mt-3" onClick={() => onNavigateTab(data.gapActions.tab)}>
-                {data.gapActions.cta}
-              </Button>
+              ) : <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t("fpNoScholarshipCloses")}</p>}
+              <Button size="sm" variant="outline" className="mt-3 print:hidden" onClick={() => onNavigateTab(data.gapActions.tab)}>{t("fpFindScholarships")}</Button>
             </JourneyCard>
-          );
-        })()}
-      {/* Standing small print: this panel can be wrong — say so where it is read. */}
-      <AppNote kind="money" variant="inline" compact className="mt-6" />
+          )}
+        </div>
+      </div>
+      <AppNote kind="money" variant="inline" compact />
     </div>
   );
 }
 
-function Metric({ label, value, hint, tone }: { label: string; value: number | string; hint?: string; tone: "good" | "warn" | "bad" | "brand" | "neutral" }) {
+function FundingMetric({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "good" | "warn" }) {
   const tones = {
-    good: "text-emerald-600 dark:text-emerald-400",
-    warn: "text-amber-600 dark:text-amber-400",
-    bad: "text-rose-600 dark:text-rose-400",
-    brand: "text-indigo-600 dark:text-indigo-400",
-    neutral: "text-slate-600 dark:text-slate-300",
-  } as const;
-  const formattedValue = typeof value === "number" ? `$${value.toLocaleString()}` : value;
+    neutral: "text-slate-900 dark:text-white",
+    good: "text-emerald-700 dark:text-emerald-300",
+    warn: "text-amber-800 dark:text-amber-300",
+  };
   return (
-    <div className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
-      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`text-lg font-extrabold tabular-nums ${tones[tone]}`}>{formattedValue}</p>
-      {hint && <p className="text-sm text-slate-500">{hint}</p>}
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-center gap-x-2 rounded-surface border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900 sm:block">
+      <dt className="text-sm font-medium text-slate-600 dark:text-slate-300">{label}</dt>
+      <dd className={`min-w-0 break-words text-lg font-extrabold tabular-nums sm:mt-1 sm:text-2xl ${tones[tone]}`}>{value}</dd>
     </div>
   );
 }

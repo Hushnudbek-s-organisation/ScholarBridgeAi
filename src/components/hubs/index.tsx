@@ -450,7 +450,7 @@ export function FundingHub({ profile, navigate }: HubProps) {
       intro={t("introFunding")}
       primaryLabel={t("primaryScholarships")}
       onPrimary={() => navigate("scholarships")}
-      note={{ tone: "warn", text: td("money"), compact: true }}
+      note={fundTool === "plan" ? undefined : { tone: "warn", text: td("money"), compact: true }}
     >
       <SubPills
         ariaLabel={label}
