@@ -88,9 +88,8 @@ export function AppNote({
   variant?: "block" | "inline";
   compact?: boolean;
 }) {
-  const { locale } = useLocaleContext();
-  const messages = dictionaries[locale] ?? dictionaries[defaultLocale];
-  const text = messages?.disclaimers?.[kind] ?? dictionaries[defaultLocale].disclaimers[kind];
+  const { messages } = useLocaleContext();
+  const text = messages.disclaimers?.[kind] ?? dictionaries[defaultLocale].disclaimers[kind];
   return (
     <p
       role="note"
