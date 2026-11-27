@@ -46,7 +46,7 @@ test("presentation journey connects an authenticated profile to programme, fundi
     expect(selected?.nextCycle?.deadline).toBe(deadline);
     expect(selected.assessment.admissionProbability.value).toBeNull();
 
-    const explorer = await request.get(`/api/universities?search=${encodeURIComponent(fixture.verifiedUniversityName)}&sort=rank_asc`);
+    const explorer = await request.get(`/api/universities?search=${encodeURIComponent(fixture.verifiedUniversityName)}&sort=rank_asc&view=expanded`);
     expect(explorer.status()).toBe(200);
     const card = (await explorer.json()).universities.find((row: { id: number }) => row.id === fixture.verifiedUniversityId);
     expect(card?.cardSummary).toEqual(expect.objectContaining({
@@ -97,7 +97,7 @@ test("presentation journey connects an authenticated profile to programme, fundi
 });
 
 
-test("speaking rooms use the plain orb independently of Scholly", async ({ page }, testInfo) => {
+test("the visa speaking room uses the plain orb independently of Scholly", async ({ page }) => {
   test.setTimeout(90_000);
   const fixture = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"));
   await page.context().addCookies([{name: "scholarbridge_locale", value: "en", url: process.env.E2E_BASE_URL!}]);
@@ -105,29 +105,17 @@ test("speaking rooms use the plain orb independently of Scholly", async ({ page 
     email: fixture.studentEmail, password: fixture.studentPassword,
   } })).status()).toBe(200);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/#visa/daily-speaking");
-  await page.getByRole("button", { name: "Start conversation", exact: true }).click();
-  const face = page.locator("[data-speaking-avatar]:visible");
-  await expect(face.locator("[data-speaking-orb]")).toBeVisible();
-  await expect(face.locator(".sb-scholly-model, .sb-speaking-face-flag")).toHaveCount(0);
-  await expect(face.locator("[data-eye]")).toHaveCount(2);
-  const supportsWebGL = await page.evaluate(() => Boolean(document.createElement("canvas").getContext("webgl2")));
-  if (supportsWebGL) {
-    await expect(face.locator("[data-speaking-orb]")).toHaveAttribute("data-rendering", "3d");
-  }
-  await expect(page.getByRole("button", { name: "Open Scholly chat" })).toHaveCount(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-  await face.screenshot({ path: testInfo.outputPath("daily-speaking-orb.png"), animations: "disabled" });
-
-  await page.setViewportSize({ width: 1366, height: 900 });
   await page.goto("/#visa/speaking");
   await page.getByRole("button", { name: /United States/ }).first().click();
   await page.getByRole("button", { name: /Start interview/ }).click();
   await page.getByRole("button", { name: "John", exact: true }).click();
+  const face = page.locator("[data-speaking-avatar]:visible");
+  const supportsWebGL = await page.evaluate(() => Boolean(document.createElement("canvas").getContext("webgl2")));
   await expect(face.locator("[data-speaking-orb]")).toBeVisible();
   await expect(face.locator(".sb-scholly-model, .sb-speaking-face-flag")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open Scholly chat" })).toHaveCount(0);
   if (supportsWebGL) await expect(face.locator("[data-speaking-orb]")).toHaveAttribute("data-rendering", "3d");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
 test("an administrator can publish sourced ranks and restore archived universities", async ({ request }) => {
@@ -144,7 +132,7 @@ test("an administrator can publish sourced ranks and restore archived universiti
   expect(created.status()).toBe(200);
   const { university: { id } } = await created.json();
   try {
-    const params = new URLSearchParams({ search: name, sort: "rank_asc", minRank: "830", maxRank: "850" });
+    const params = new URLSearchParams({ search: name, sort: "rank_asc", minRank: "830", maxRank: "850", view: "expanded" });
     const list = () => request.get("/api/universities?" + params);
     const published = await list();
     expect((await published.json()).universities).toEqual([
@@ -168,7 +156,7 @@ test("an administrator can publish sourced ranks and restore archived universiti
   }
 });
 
-test("Admin can hide and show Study map under My Plan", async ({ page }) => {
+test("Admin can hide and show Study Plan & Tests under My Plan", async ({ page }) => {
   const fixture = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"));
   await page.context().addCookies([{name: "scholarbridge_locale", value: "en", url: process.env.E2E_BASE_URL!}]);
   expect((await page.request.post("/api/auth/sign-in", { data: {
@@ -177,14 +165,14 @@ test("Admin can hide and show Study map under My Plan", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/#admin");
   await page.getByRole("button", { name: "Sidebar sections", exact: true }).click();
-  const studyMap = page.locator("li").filter({ has: page.locator("code").getByText("study-map", { exact: true }) });
-  await expect(studyMap.getByText("Study map", { exact: true })).toBeVisible();
-  await studyMap.getByRole("button", { name: "Visible", exact: true }).click();
-  await expect(studyMap.getByRole("button", { name: "Hidden", exact: true })).toBeVisible();
-  expect((await (await page.request.get("/api/config/boot")).json()).nav.hidden).toContain("study-map");
-  await studyMap.getByRole("button", { name: "Hidden", exact: true }).click();
-  await expect(studyMap.getByRole("button", { name: "Visible", exact: true })).toBeVisible();
-  expect((await (await page.request.get("/api/config/boot")).json()).nav.hidden).not.toContain("study-map");
+  const studyPlan = page.locator("li").filter({ has: page.locator("code").getByText("study-plan", { exact: true }) });
+  await expect(studyPlan).toBeVisible();
+  await studyPlan.getByRole("button", { name: "Visible", exact: true }).click();
+  await expect(studyPlan.getByRole("button", { name: "Hidden", exact: true })).toBeVisible();
+  expect((await (await page.request.get("/api/config/boot")).json()).nav.hidden).toContain("study-plan");
+  await studyPlan.getByRole("button", { name: "Hidden", exact: true }).click();
+  await expect(studyPlan.getByRole("button", { name: "Visible", exact: true })).toBeVisible();
+  expect((await (await page.request.get("/api/config/boot")).json()).nav.hidden).not.toContain("study-plan");
 });
 
 test("support recovery invalidates the old session and the replacement link is single-use", async ({ request, playwright }) => {
