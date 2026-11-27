@@ -1,5 +1,7 @@
 import I18N from "./flight-copy.json";
 
+const SCHOLLY_THUMBNAIL = "/landing/flight/scholly.webp";
+
 // Interactions from the public landing design. Inputs and card content are local examples.
 export function mountFlightLanding(root, initialLocale, switchLocale, authLabels) {
   const controller = new AbortController();
@@ -180,7 +182,7 @@ export function mountFlightLanding(root, initialLocale, switchLocale, authLabels
                     “Which CS programmes in Germany accept IELTS 7.0?”
                   </div>
                   <div style="padding:9px 12px;border-radius:12px;background:rgba(52,211,153,0.12);color:var(--emerald);display:flex;align-items:center;gap:8px">
-                    <img src="${LOCAL_ASSETS.scholly}" alt="Scholly" style="width:24px;height:24px" />
+                    <img src="${SCHOLLY_THUMBNAIL}" alt="Scholly" style="width:24px;height:24px" />
                     <span>Compare language and funding requirements in the catalogue.</span>
                   </div>
                 </div>
@@ -270,7 +272,7 @@ export function mountFlightLanding(root, initialLocale, switchLocale, authLabels
                     «Какие IT-программы в Германии доступны с IELTS 7.0?»
                   </div>
                   <div style="padding:9px 12px;border-radius:12px;background:rgba(52,211,153,0.12);color:var(--emerald);display:flex;align-items:center;gap:8px">
-                    <img src="${LOCAL_ASSETS.scholly}" alt="Scholly" style="width:24px;height:24px" />
+                    <img src="${SCHOLLY_THUMBNAIL}" alt="Scholly" style="width:24px;height:24px" />
                     <span>TU Munich, RWTH Aachen и Saarland — по официальным правилам.</span>
                   </div>
                 </div>
@@ -359,7 +361,7 @@ export function mountFlightLanding(root, initialLocale, switchLocale, authLabels
                   “IELTS 7.0 bilan Germaniyada qaysi IT dasturlar bor?”
                 </div>
                 <div style="padding:9px 12px;border-radius:12px;background:rgba(52,211,153,0.12);color:var(--emerald);display:flex;align-items:center;gap:8px">
-                  <img src="${LOCAL_ASSETS.scholly}" alt="Scholly" style="width:24px;height:24px" />
+                  <img src="${SCHOLLY_THUMBNAIL}" alt="Scholly" style="width:24px;height:24px" />
                   <span>TU Munich, RWTH Aachen va Saarland — rasmiy talablar asosida.</span>
                 </div>
               </div>
