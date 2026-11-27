@@ -316,6 +316,7 @@ export const NAV_UTILITY_SECTIONS: NavUtilityMeta[] = [
   { id: "payments", label: "Premium", description: "Premium subscription, plans and payment history." },
   { id: "notifications", label: "Telegram & alerts", description: "Connect the Telegram bot, choose your alerts, and review active sign-in sessions.", isNew: true },
   { id: "rewards", label: "Rewards & referrals", description: "Referral program, points and rewards." },
+  { id: "study-map", label: "Study map", description: "See your profile, goals, applications and learning notes as a connected map.", premium: true },
   { id: "parent", label: "Parents", description: "Share a read-only progress page with your family.", premium: true },
   { id: "admin", label: "Admin panel", description: "Platform administration.", adminOnly: true },
 ];
@@ -417,7 +418,6 @@ export const LEGACY_SECTION_ALIASES: Record<string, { section: string; pane?: st
   autopilot: { section: "scholarships", pane: "recommended" },
   opportunities: { section: "scholarships", pane: "opportunities" },
   // My Plan
-  "study-map": { section: "study-plan", pane: "plan" },
   planning: { section: "study-plan", pane: "tools" },
   tests: { section: "study-plan", pane: "tests" },
   "study-plan": { section: "study-plan", pane: "plan" },

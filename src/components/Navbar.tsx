@@ -54,6 +54,7 @@ import {
 import { BrandingImage } from "./BrandingImage";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { NotificationBell } from "./NotificationBell";
+import { SchollyStreakChip } from "./SchollyStreakChip";
 import { ThemeSwitch, ThemeToggle } from "./ThemeToggle";
 import { CommandPalette, type PaletteItem } from "./CommandPalette";
 import {
@@ -72,8 +73,8 @@ import { isTelegramPlaceholderEmail } from "@/lib/telegram/placeholder";
 import { loadBootConfig } from "@/lib/bootConfig";
 import { Button } from "@/components/ui/Button";
 import { GroupedDock } from "./GroupedDock";
-import { SchollyCompanion } from "./SchollyCompanion";
 import { setGuidedJourneyHidden, useGuidedJourneyHidden } from "@/lib/guided-journey-visibility";
+import { SchollyCompanion } from "./SchollyCompanion";
 
 export interface StudentProfile {
   applicantContext?:import("@/lib/applicantContext").ApplicantContext|null;
@@ -538,7 +539,7 @@ export function Navbar({
 
   const visibleDestinations = useMemo(
     () =>
-      NAV_SECTIONS.filter((s) => s.id !== "community" && !hiddenItems.includes(s.id)).map((s) => ({
+      NAV_SECTIONS.filter((s) => !hiddenItems.includes(s.id)).map((s) => ({
         id: s.id,
         label: labelFor(s.id),
         icon: ICONS[s.id] ?? Sparkles,
@@ -550,7 +551,7 @@ export function Navbar({
   );
 
   const utilityItems = useMemo(() => {
-    const list: NavItem[] = NAV_UTILITY_SECTIONS.filter((u) => u.id !== "study-map" && !hiddenItems.includes(u.id) && (!u.adminOnly || isAdmin)).map((u) => ({
+    const list: NavItem[] = NAV_UTILITY_SECTIONS.filter((u) => !hiddenItems.includes(u.id) && (!u.adminOnly || isAdmin)).map((u) => ({
       id: u.id,
       label: labelFor(u.id),
       icon: ICONS[u.id] ?? Sparkles,
@@ -699,29 +700,11 @@ export function Navbar({
     );
   };
 
-  const workspaceLabels = ({
-    en: { applications: "Applications & deadlines", materials: "AI Studio", more: "More tools", advisor: "Open Scholly advisor" },
-    uz: { applications: "Arizalar va muddatlar", materials: "AI Studio", more: "Boshqa vositalar", advisor: "Scholly maslahatchisini ochish" },
-    ru: { applications: "Заявки и сроки", materials: "AI Studio", more: "Другие инструменты", advisor: "Открыть помощника Scholly" },
-  } as const)[locale === "uz" || locale === "ru" ? locale : "en"];
-  const primaryIds = ["dashboard", "universities", "scholarships", "applications", "materials"];
-  const primaryItems = primaryIds.flatMap((id) => {
-    const item = visibleDestinations.find((destination) => destination.id === id);
-    if (!item) return [];
-    const label = id === "applications" || id === "materials" ? workspaceLabels[id] : item.label;
-    return [{ ...item, label }];
-  });
-  const secondaryItems = visibleDestinations.filter((item) => !primaryIds.includes(item.id));
   const renderGroups = (layoutId: string) => (
     <div className="space-y-3">
-      <div className="space-y-0.5">{primaryItems.map((item) => renderItem(item, layoutId))}</div>
-      <details open={secondaryItems.some((item) => item.id === activeTab) || undefined}>
-        <summary className="min-h-11 cursor-pointer px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">{workspaceLabels.more}</summary>
-        {NAV_GROUPS.map((g) => ({ g, items: secondaryItems.filter((item) => item.group === g) }))
-          .filter(({ items }) => items.length > 0)
-          .map(({ g, items }) => renderGroup(g, items, layoutId))}
-        <a href="https://t.me/scholarbridge_uz" className="inline-flex min-h-11 items-center px-3 text-sm text-blue-700 dark:text-blue-300">Telegram ↗</a>
-      </details>
+      {NAV_GROUPS.map((g) => ({ g, items: visibleDestinations.filter((i) => i.group === g) }))
+        .filter((x) => x.items.length > 0)
+        .map(({ g, items }) => renderGroup(g, items, layoutId))}
     </div>
   );
 
@@ -878,7 +861,7 @@ export function Navbar({
               <Search className="h-[18px] w-[18px]" />
             </Button>
             {activeTab === "dashboard" && <div className="sb-home-language"><LanguageSwitcher onLocaleChange={onLocaleChange} compact /></div>}
-
+            {activeProfileId && <SchollyStreakChip key={activeProfileId} profileId={activeProfileId} />}
             <NotificationBell profileId={activeProfileId ?? null} />
             <span className="sb-shell-theme hidden sm:inline-flex">
               <ThemeSwitch />
@@ -888,21 +871,16 @@ export function Navbar({
         </div>
       </header>
 
-      <GroupedDock dashboardShortLabel={t("tabHome")} dashboardLabel={labelFor("dashboard")} dashboardActive={activeTab === "dashboard"} onDashboard={() => go("dashboard")} moreLabel={t("tabMore")} onMore={() => setDrawerOpen(true)} groups={
-        primaryItems.filter((item) => item.id !== "dashboard").map((item) => {
-          const Icon = item.icon;
-          return {
-            id: item.id,
-            label: item.label,
-            shortLabel: item.id === "applications" ? t("dockShort.applications") : item.label,
-            icon: <Icon className="h-5 w-5" aria-hidden />,
-            active: activeTab === item.id,
-            count: 0,
-            content: null,
-            onSelect: () => go(item.id),
-          };
-        })
-      } />
+      <GroupedDock dashboardShortLabel={t("tabHome")} dashboardLabel={labelFor("dashboard")} dashboardActive={activeTab === "dashboard"} onDashboard={() => go("dashboard")} moreLabel={t("tabMore")} onMore={() => setDrawerOpen(true)} groups={[
+        ...NAV_GROUPS.filter(g=>g!=="home").map(g=>{
+          const items = visibleDestinations.filter(i => i.group === g);
+          const studyMap = utilityItems.find(i => i.id === "study-map");
+          if (g === "plan" && studyMap) items.unshift(studyMap);
+          const Icon = GROUP_ICONS_LUCIDE[g];
+          return {id:g,label:t(NAV_GROUP_I18N[g]),shortLabel:t(`dockShort.${g}` as never),icon:<Icon aria-hidden className="h-5 w-5"/>,active:activeGroup===g || (g === "plan" && activeTab === "study-map"),count:items.length,content:items.map(i=>renderItem(i,`dock-${g}`))};
+        }).filter(g=>g.count>0),
+        {id:"account",label:t("dockAccount"),shortLabel:t("dockShort.account"),icon:<Users aria-hidden className="h-5 w-5"/>,active:utilityItems.some(i=>i.id !== "study-map" && isDestinationActive(i.id)),count:utilityItems.filter(i => i.id !== "study-map").length,content:<div className="space-y-3">{utilityItems.filter(i => i.id !== "study-map").map(i=>renderItem(i,"dock-account"))}{renderProfileCard()}{SettingsRow}</div>}
+      ]}/>
 
       <SchollyCompanion
         key={activeProfileId ?? activeProfile?.id ?? "guest"}

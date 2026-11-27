@@ -21,7 +21,6 @@ export interface DockGroup {
   active: boolean;
   count: number;
   content: ReactNode;
-  onSelect?: () => void;
 }
 const focusable = 'a[href],button:not([disabled]),[tabindex="0"]';
 
@@ -222,14 +221,7 @@ export function GroupedDock({
           <House aria-hidden className="h-5 w-5"/>
           <span>{dashboardShortLabel??dashboardLabel}</span>
         </a>
-        {groups.map((group, index) => group.onSelect ? (
-          <Button key={group.id} variant="unstyled" type="button" aria-label={group.label}
-            aria-current={group.active ? "page" : undefined} className="sb-dock-trigger"
-            onClick={() => { close(); group.onSelect?.(); }}>
-            {group.icon}
-            <span>{group.shortLabel ?? group.label}</span>
-          </Button>
-        ) : (
+        {groups.map((group, index) => (
           <Button
             key={group.id}
             ref={(element) => {

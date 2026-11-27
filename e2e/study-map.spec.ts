@@ -6,7 +6,7 @@ const fixtures = JSON.parse(readFileSync(process.env.E2E_FIXTURE_FILE!, "utf8"))
   studentId: number; studentPassword: string;
 };
 
-test("the legacy study-map link opens Study Plan and saved notes remain private", async ({ page }) => {
+test("the restored My Plan dock opens Study Map and saved notes remain private", async ({ page }) => {
   test.setTimeout(150_000);
   const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL });
   const email = "e2e-study-map@example.test";
@@ -67,10 +67,21 @@ test("the legacy study-map link opens Study Plan and saved notes remain private"
 
     await page.context().addCookies([{ name: "scholarbridge_locale", value: "en", url: process.env.E2E_BASE_URL! }]);
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/#study-map");
-    await expect(page.getByRole("tab", { name: "Study plan", exact: true })).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("tab", { name: "Tests & preparation", exact: true })).toBeVisible();
+    await page.goto("/#dashboard");
+    const dock = page.getByTestId("grouped-dock");
+    await expect(dock).toBeVisible();
+    const plan = dock.getByRole("button", { name: /my plan/i });
+    await plan.click();
+    await expect(plan).toHaveAttribute("aria-expanded", "true");
+    await page.getByRole("button", { name: /study map/i }).click();
+    await expect(page.getByRole("heading", { name: "Study map PRO" })).toBeVisible();
+    await expect(page.locator(".sb-study-3d[data-webgl=ready] canvas")).toBeVisible();
+    await expect(page).toHaveURL(/#study-map$/);
     await page.setViewportSize({ width: 390, height: 820 });
+    await plan.click();
+    await expect(page.getByRole("button", { name: /financial plan/i })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(plan).toHaveAttribute("aria-expanded", "false");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
 
     const own = await (await page.request.get(map)).json();
