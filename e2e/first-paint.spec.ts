@@ -8,7 +8,7 @@ test("landing hero and primary actions paint even before JavaScript runs", async
     const hero = page.locator("main #hero");
     await expect(hero.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(hero.getByRole("heading", { level: 1 })).toHaveCSS("opacity", "1");
-    await expect(hero.locator("a[href='/universities']").first()).toBeVisible();
+    await expect(hero.locator("[data-preset=aziza]")).toBeVisible();
   } finally { await context.close(); }
 });
 
@@ -32,12 +32,18 @@ test("landing university and scholarship discovery work without signing up", asy
   page.on("console", (message) => {
     if (message.type() === "error" && message.text().includes("Landing interactions unavailable")) failures.push(message.text());
   });
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/uz", { waitUntil: "domcontentloaded" });
-  const results = page.locator("#liveMatchList a");
-  await expect(results).toHaveCount(3);
-  await expect(results.first()).toHaveAttribute("href", /^\/(universities|scholarships)\/\d+$/);
-  await page.locator("#fitDegree").selectOption("Master");
-  await expect(page.locator("#fitUniversityLink")).toHaveAttribute("href", /degree=Master/);
-  await expect(page.locator("#fitScholarshipLink")).toHaveAttribute("href", /^\/scholarships\?/);
+  await expect(page.locator("#liveMatchList .match-row").first()).toBeVisible();
+  await page.locator("[data-preset=jasur]").click();
+  await expect(page.locator("#gpaSlider")).toHaveValue("4.5");
+  await expect(page.locator("#ieltsSlider")).toHaveValue("7");
+  await expect(page.locator("#budgetSlider")).toHaveValue("0");
+  const nav = page.locator("#flight-page-sections");
+  await page.locator("[data-flight-menu]").click();
+  await expect(nav.locator('a[href="/scholarships"]')).toBeVisible();
+  await nav.locator('a[href="/universities"]').click();
+  await expect(page).toHaveURL(/\/universities(?:[?#]|$)/);
+  await expect(page.getByRole("main")).toBeVisible();
   expect(failures).toEqual([]);
 });
