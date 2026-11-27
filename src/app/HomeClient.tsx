@@ -1171,9 +1171,10 @@ export function Home({
           {/* A failed dynamic import (an old tab after a deploy swap) must not
               replace the whole cabinet. This boundary contains it to the
               current destination; the sidebar, session and every other tab
-              stay usable. Changing tab/pane/profile is a fresh attempt. */}
+              stay usable. Materials handles pane recovery inside HubPage so
+              its selected tools, keyboard focus and scoped notes survive a tab change. */}
           <ChunkErrorBoundary
-            resetKey={`${activeProfile?.id ?? "none"}:${activeTab}:${activeTab === "profile" && activePane === "similar" ? "stories" : activePane ?? ""}`}
+            resetKey={`${activeProfile?.id ?? "none"}:${activeTab}:${activeTab === "materials" ? "" : activeTab === "profile" && activePane === "similar" ? "stories" : activePane ?? ""}`}
             section={activeTab}
           >
 

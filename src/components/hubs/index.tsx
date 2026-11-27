@@ -12,7 +12,8 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { ArrowRight, BookOpen, ClipboardList, FileText, Folder, GraduationCap, Mail, MessageSquare, Mic, PenLine, type LucideIcon } from "lucide-react";
 import { Empty } from "@/components/ui/journey";
 import { PremiumGate } from "@/components/PremiumGate";
 import { HubPage, HubEmpty, PanelSkeleton, usePaneSelection, type HubPaneDef } from "@/components/ui/hubs";
@@ -534,12 +535,58 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
 /* =========================================================================
  * APPLICATIONS → Application Materials
  * ====================================================================== */
+const MATERIALS_PANES: Record<string, { icon: LucideIcon; hint: string }> = {
+  requirements: { icon: ClipboardList, hint: "requirementsHint" },
+  documents: { icon: Folder, hint: "documentsHint" },
+  essays: { icon: BookOpen, hint: "essaysHint" },
+  interviews: { icon: Mic, hint: "interviewsHint" },
+};
+
+function MaterialToolPicker<T extends string>({ label, value, onChange, tools }: {
+  label: string;
+  value: T;
+  onChange: (id: T) => void;
+  tools: { id: T; title: string; hint: string; icon: LucideIcon }[];
+}) {
+  return (
+    <div role="group" aria-label={label} className={`grid gap-2 min-[400px]:grid-cols-2 ${tools.length > 2 ? "xl:grid-cols-4" : ""}`}>
+      {tools.map(({ id, title, hint, icon: Icon }) => (
+        <Button
+          key={id}
+          variant="unstyled"
+          type="button"
+          aria-pressed={value === id}
+          onClick={() => onChange(id)}
+          className={`flex min-h-16 min-w-0 items-start gap-2.5 rounded-surface border p-3 text-left hover:border-indigo-400 ${value === id
+            ? "border-indigo-300 bg-indigo-50 text-indigo-950 dark:border-indigo-400/60 dark:bg-indigo-400/15 dark:text-indigo-100"
+            : "border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"}`}
+        >
+          <span className="grid size-8 shrink-0 place-items-center rounded-control bg-indigo-100 text-indigo-700 dark:bg-indigo-400/20 dark:text-indigo-200">
+            <Icon className="size-4" aria-hidden />
+          </span>
+          <span className="min-w-0 break-words">
+            <span className="block text-sm font-bold">{title}</span>
+            <span className="mt-0.5 block text-xs leading-relaxed opacity-90">{hint}</span>
+          </span>
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspaceId, setWorkspaceId }: HubProps) {
   const t = useTranslations("hubs");
   const tp = useTranslations("navPanes");
+  const tm = useTranslations("materials");
+  const locale = useLocale();
   const td = useTranslations("disclaimers");
   const { panes, visible, label } = usePanes("materials");
   const active = useActivePane(pane, visible, hidden);
+  const canOpenPane = (id: string) => visible.some((item) => item.id === id) && !hidden.includes(id);
+  const materialsPanes = panes.map((item) => {
+    const presentation = MATERIALS_PANES[item.id];
+    return presentation ? { ...item, icon: presentation.icon, description: tm(presentation.hint) } : item;
+  });
   const profileId = profile?.id ?? null;
 
   // The list of applications the student can attach materials to is a VIEW of
@@ -564,6 +611,8 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
   // ONE tool at a time. View state only — never a second source of truth.
   const [docsView, setDocsView] = useState<"vault" | "answers">("vault");
   const [essayTool, setEssayTool] = useState<"sop" | "rubric" | "recommendations" | "outreach">("sop");
+
+  const [sopNotes, setSopNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!profileId) return;
@@ -602,14 +651,30 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
     };
   }, [profileId, loadAttempt]);
 
-  const effectiveId = workspaceId !== undefined ? workspaceId : current.applications[0]?.id ?? null;
-  const selectedApplication = current.applications.find((application) => application.id === effectiveId) ?? null;
-  const selectApplication = useCallback(
-    (id: number | null) => {
-      setWorkspaceId?.(id);
-    },
-    [setWorkspaceId]
-  );
+  const selectedApplication = workspaceId === undefined
+    ? current.applications[0] ?? null
+    : current.applications.find((application) => application.id === workspaceId) ?? null;
+  const effectiveId = selectedApplication?.id ?? null;
+  const draftScope = `${profileId}:${effectiveId ?? "library"}`;
+  const scopeReady = current.state === "success" || current.state === "empty";
+  const deadline = selectedApplication?.deadline?.slice(0, 10);
+  const deadlineDate = deadline ? new Date(`${deadline}T00:00:00Z`) : null;
+  const deadlineLabel = deadlineDate && Number.isFinite(deadlineDate.getTime())
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(deadlineDate)
+    : null;
+  const openWorkspace = (id: number) => {
+    setWorkspaceId?.(id);
+    navigate("applications/workspace");
+  };
+  const openMaterial = (tool: "vault" | "sop" | "recommendations") => {
+    if (tool === "vault") {
+      setDocsView("vault");
+      setPane("documents");
+    } else {
+      setEssayTool(tool);
+      setPane("essays");
+    }
+  };
 
   if (!profile) return <MissingProfile />;
 
@@ -647,33 +712,36 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
         )}
       </div>
     ) : current.applications.length > 0 ? (
-      <div className="flex flex-wrap items-center gap-2 rounded-overlay border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900">
-        <label htmlFor="materials-app" className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          {t("selectedApplication")}
-        </label>
-        <select
-          id="materials-app"
-          value={effectiveId ?? ""}
-          onChange={(e) => selectApplication(e.target.value ? Number(e.target.value) : null)}
-          className="min-h-10 min-w-0 flex-1 rounded-control border border-slate-200 bg-white px-2 py-1.5 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 sm:max-w-md"
-        >
-          <option value="">{t("noApplication")}</option>
-          {current.applications.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.universityName}
-              {a.programName ? ` — ${a.programName}` : ""}
-            </option>
-          ))}
-        </select>
-        {effectiveId && (
-          <Button variant="unstyled"
-            type="button"
-            onClick={() => navigate("applications/workspace")}
-            className="min-h-10 rounded-control border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+      <div className="grid min-w-0 gap-3 rounded-surface border border-indigo-200/80 bg-white/80 p-3 dark:border-indigo-400/25 dark:bg-slate-950/45 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div className="min-w-0">
+          <label htmlFor="materials-app" className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-indigo-100">
+            <GraduationCap className="size-4 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden />
+            {t("selectedApplication")}
+          </label>
+          <select
+            id="materials-app"
+            value={effectiveId ?? ""}
+            onChange={(e) => setWorkspaceId?.(e.target.value ? Number(e.target.value) : null)}
+            className="min-h-11 w-full min-w-0 rounded-control border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-800 focus-visible:outline-2 focus-visible:outline-indigo-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
           >
-            {t("openWorkspace")}
+            <option value="">{tm("library")}</option>
+            {current.applications.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.universityName}{a.programName ? ` — ${a.programName}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        {effectiveId && (
+          <Button variant="outline" type="button" onClick={() => openWorkspace(effectiveId)}>
+            {t("openWorkspace")} <ArrowRight className="size-4 shrink-0" aria-hidden />
           </Button>
         )}
+        <p className="break-words text-sm text-slate-600 dark:text-slate-300 sm:col-span-2">
+          {effectiveId ? (
+            deadlineLabel ? tm("deadline", { date: deadlineLabel }) : tm("deadlineMissing")
+          ) : tm("libraryHint")}
+        </p>
       </div>
     ) : (
       <div data-testid="applications-empty" className="rounded-overlay border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
@@ -686,31 +754,36 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
     <HubPage
       title={label}
       intro={t("introMaterials")}
-      panes={panes}
+      panes={materialsPanes}
       activePane={active || undefined}
       onPaneChange={setPane}
       hiddenPanes={hidden}
-      note={{ tone: "warn", text: td("ai") }}
+      headerContent={context}
+      note={{ tone: "warn", text: td("ai"), compact: true }}
     >
-      {context}
-      {active === "requirements" && (
+      {!scopeReady && active && active !== "interviews" && (
+        current.state === "loading" ? <PanelSkeleton rows={3} /> : <HubEmpty title={tm("scopeUnavailable")} />
+      )}
+      {active === "requirements" && scopeReady && (
         <RequirementsBrowser
+          key={`requirements-${profile.id}-${effectiveId ?? "none"}`}
           profileId={profile.id}
-          onOpenWorkspace={(id) => {
-            setWorkspaceId?.(id);
-            navigate("applications/workspace");
-          }}
+          applications={current.applications}
+          applicationId={effectiveId}
+          onOpenWorkspace={openWorkspace}
+          onOpenMaterial={openMaterial}
+          canOpenMaterial={(tool) => canOpenPane(tool === "vault" ? "documents" : "essays")}
         />
       )}
-      {active === "documents" && (
+      {active === "documents" && scopeReady && (
         <div className="space-y-4">
-          <SubPills
-            ariaLabel={tp("documents")}
+          <MaterialToolPicker
+            label={tp("documents")}
             value={docsView}
-            onChange={(id) => setDocsView(id as "vault" | "answers")}
-            options={[
-              { id: "vault", label: t("pillVault") },
-              { id: "answers", label: t("pillAnswers") },
+            onChange={setDocsView}
+            tools={[
+              { id: "vault", title: tm("vault"), hint: tm("vaultHint"), icon: Folder },
+              { id: "answers", title: tm("answers"), hint: tm("answersHint"), icon: MessageSquare },
             ]}
           />
           {docsView === "vault" ? (
@@ -718,24 +791,31 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
               key={`vault-${profile.id}-${effectiveId ?? "none"}`}
               profileId={profile.id}
               applicationId={effectiveId}
-              onNavigateTab={navigate}
+              onOpenRequirements={canOpenPane("requirements") ? () => setPane("requirements") : undefined}
             />
           ) : (
-            <AnswerVault activeProfile={profile} />
+            <AnswerVault
+              key={profile.id}
+              activeProfile={profile}
+              onUseInSop={canOpenPane("essays") ? (answer) => {
+                setSopNotes((current) => ({ ...current, [draftScope]: [current[draftScope], answer].filter(Boolean).join("\n\n") }));
+                openMaterial("sop");
+              } : undefined}
+            />
           )}
         </div>
       )}
-      {active === "essays" && (
+      {active === "essays" && scopeReady && (
         <div className="space-y-4">
-          <SubPills
-            ariaLabel={tp("essays")}
+          <MaterialToolPicker
+            label={tp("essays")}
             value={essayTool}
-            onChange={(id) => setEssayTool(id as "sop" | "rubric" | "recommendations" | "outreach")}
-            options={[
-              { id: "sop", label: t("pillSop") },
-              { id: "rubric", label: t("pillRubric") },
-              { id: "recommendations", label: t("pillRecommendations") },
-              { id: "outreach", label: t("pillOutreach") },
+            onChange={setEssayTool}
+            tools={[
+              { id: "sop", title: tm("sop"), hint: tm("sopHint"), icon: PenLine },
+              { id: "rubric", title: tm("rubric"), hint: tm("rubricHint"), icon: ClipboardList },
+              { id: "recommendations", title: tm("recommendations"), hint: tm("recommendationsHint"), icon: FileText },
+              { id: "outreach", title: tm("outreach"), hint: tm("outreachHint"), icon: Mail },
             ]}
           />
           {(essayTool === "sop" || essayTool === "rubric") && (
@@ -754,6 +834,8 @@ export function MaterialsHub({ profile, pane, setPane, navigate, hidden, workspa
                   universityId={selectedApplication?.universityId ?? null}
                   universityName={selectedApplication?.universityName ?? null}
                   programName={selectedApplication?.programName ?? null}
+                  reviewDraft={sopNotes[draftScope]}
+                  onReviewDraftChange={(draft) => setSopNotes((current) => ({ ...current, [draftScope]: draft }))}
                 />
               ) : (
                 <EssayRubricStudio

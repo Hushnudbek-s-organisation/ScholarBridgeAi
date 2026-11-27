@@ -15,6 +15,7 @@ export interface ApplicationSummary {
   universityId: number | null;
   universityName: string;
   programName: string | null;
+  deadline?: string | null;
 }
 
 export type ApplicationsState = "loading" | "success" | "empty" | "error";
@@ -46,6 +47,7 @@ export function parseApplicationsResponse(payload: unknown): ApplicationSummary[
         ? item.universityName
         : "Application",
       programName: typeof item.programName === "string" ? item.programName : null,
+      ...(typeof item.deadline === "string" ? { deadline: item.deadline } : {}),
     }];
   });
 }

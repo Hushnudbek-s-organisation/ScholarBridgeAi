@@ -28,6 +28,8 @@ export interface HubPaneDef {
   id: string;
   label: string;
   premium?: boolean;
+  icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  description?: string;
   /** Feature launched recently — badge only, never a destination of its own. */
   isNew?: boolean;
 }
@@ -70,9 +72,10 @@ export function HubTabs({
   );
 
   if (list.length < 2) return null;
+  const cards = list.some((pane) => pane.description);
 
   return (
-    <div role="tablist" aria-label={ariaLabel} className="flex flex-wrap gap-1.5">
+    <div role="tablist" aria-label={ariaLabel} className={cards ? "grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 lg:grid-cols-4" : "flex flex-wrap gap-1.5"}>
       {list.map((pane) => {
         const isActive = pane.id === active;
         return (
@@ -83,21 +86,32 @@ export function HubTabs({
             }}
             role="tab"
             id={`hub-tab-${pane.id}`}
+            aria-label={cards ? pane.label : undefined}
             aria-selected={isActive}
             aria-controls={`hub-panel-${pane.id}`}
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(pane.id)}
             onKeyDown={(e) => onKeyDown(e, pane.id)}
-            className={`inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-surface px-3.5 py-2 text-xs font-semibold transition-colors sm:text-sm ${
+            className={`inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-surface px-3.5 py-2 text-xs font-semibold transition-colors sm:text-sm ${cards ? "min-w-0 items-start gap-2.5 p-3 text-left" : ""} ${
               // Active = royal indigo in BOTH themes, so the selected tab reads
               // as part of the indigo hero instead of a dead-black pill (light)
               // or a washed-out grey one (dark).
-              isActive
+              isActive && cards
+                ? "border border-indigo-300 bg-indigo-50 text-indigo-950 dark:border-indigo-400/60 dark:bg-indigo-400/15 dark:text-indigo-100"
+                : isActive
                 ? "sb-btn-primary border border-indigo-600 bg-indigo-600 text-white"
                 : "border border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"
             }`}
           >
-            {pane.label}
+            {pane.icon && (
+              <span className="grid size-8 shrink-0 place-items-center rounded-control bg-indigo-100 text-indigo-700 dark:bg-indigo-400/20 dark:text-indigo-200">
+                <pane.icon className="size-4" aria-hidden />
+              </span>
+            )}
+            <span className="min-w-0 break-words">
+              {pane.label}
+              {pane.description && <span className="mt-0.5 block text-xs font-normal leading-relaxed opacity-90">{pane.description}</span>}
+            </span>
             {pane.premium && (
               <span
                 className={`rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${
@@ -196,6 +210,7 @@ export function HubPage({
   onPaneChange,
   hiddenPanes = [],
   tabListLabel,
+  headerContent,
   note,
   children,
 }: {
@@ -208,6 +223,7 @@ export function HubPage({
   onPaneChange?: (id: string) => void;
   hiddenPanes?: string[];
   tabListLabel?: string;
+  headerContent?: React.ReactNode;
   note?: { tone: "info" | "warn"; text: string; compact?: boolean };
   children: React.ReactNode;
 }) {
@@ -267,6 +283,8 @@ export function HubPage({
             </Button>
           )}
         </div>
+
+        {headerContent && <div className="mt-4">{headerContent}</div>}
 
         {panes && panes.length > 1 && activePane && onPaneChange && (
           <div className="mt-4 border-t border-slate-200/70 pt-3 dark:border-slate-700/60">

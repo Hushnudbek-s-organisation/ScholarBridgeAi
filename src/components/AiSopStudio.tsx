@@ -34,12 +34,14 @@ interface AiSopStudioProps {
   universityId?: number | null;
   universityName?: string | null;
   programName?: string | null;
+  reviewDraft?: string;
+  onReviewDraftChange?: (draft: string) => void;
 }
 
-export function AiSopStudio({ activeProfile, applicationId, universityId, universityName, programName }: AiSopStudioProps) {
+export function AiSopStudio({ activeProfile, applicationId, universityId, universityName, programName, reviewDraft, onReviewDraftChange }: AiSopStudioProps) {
   const t = useTranslations("ai");
   const ts = useTranslations("samples");
-  const [activeTab, setActiveTab] = useState<"drafter" | "reviewer">("drafter");
+  const [activeTab, setActiveTab] = useState<"drafter" | "reviewer">(reviewDraft ? "reviewer" : "drafter");
 
   // Drafter State. The selected application supplies context, not an inferred
   // programme fact; the student can still edit both fields before generating.
@@ -58,7 +60,9 @@ export function AiSopStudio({ activeProfile, applicationId, universityId, univer
   const [draftError, setDraftError] = useState("");
 
   // Reviewer State
-  const [existingDraft, setExistingDraft] = useState("");
+  const [localReviewDraft, setLocalReviewDraft] = useState("");
+  const existingDraft = reviewDraft ?? localReviewDraft;
+  const setExistingDraft = onReviewDraftChange ?? setLocalReviewDraft;
   const [reviewUni, setReviewUni] = useState(universityName || "");
   const [sopReview, setSopReview] = useState<string | null>(null);
   const [reviewUsedAi, setReviewUsedAi] = useState(false);

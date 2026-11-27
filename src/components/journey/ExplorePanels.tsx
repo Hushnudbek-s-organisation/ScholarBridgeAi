@@ -14,17 +14,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { m as Motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, GraduationCap, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, GraduationCap, Mic, Search, Timer } from "lucide-react";
 import { CAREER_PATHS } from "@/lib/journey/careers";
 import { CareerDiscoveryFlow } from "@/components/journey/CareerDiscoveryFlow";
-import { Empty, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "@/components/ui/journey";
+import { Empty, Field, JourneyCard, Loading, Pill, ProgressBar, inputClass } from "@/components/ui/journey";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { AppNote } from "@/components/AppNote";
 import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
 import { VisaModelAnswers } from "@/components/samples/VisaModelAnswers";
 import { subjectAffinity } from "@/lib/subjectAffinity";
 import { INTERVIEW_TRACKS, interviewText } from "@/lib/journey/interviewTracks";
-import { Mic } from "lucide-react";
 import { cachedFetchJson } from "@/lib/clientCache";
 import { localizeCity, localizeCountry } from "@/lib/catalogLocalizer";
 import CountryFlag from "@/components/CountryFlag";
@@ -483,243 +482,130 @@ export function VisaCenterPanel({
 
 export function InterviewCenterPanel({ onNavigateTab }: { onNavigateTab: (t: string) => void }) {
   const t = useTranslations("journey");
-  const reduceMotion = useReducedMotion();
+  const tm = useTranslations("materials");
   const { locale } = useLocaleContext();
   const [trackId, setTrackId] = useState(INTERVIEW_TRACKS[0].id);
-  const track = INTERVIEW_TRACKS.find((x) => x.id === trackId) ?? INTERVIEW_TRACKS[0];
-  const tx = (v: Parameters<typeof interviewText>[0]) => interviewText(v, locale);
-
-  /*
-   * Timed-video practice. Asynchronous interviews (Kira Talent, Toronto OSP,
-   * Waterloo) give you a fixed prep window then record a fixed answer window,
-   * with no second take — so the only useful way to train is against a clock
-   * that behaves the same way.
-   */
-  const [phase, setPhase] = useState<"idle" | "prep" | "record">("idle");
-  const [secondsLeft, setSecondsLeft] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
-  const prepSec = track.questions[questionIndex]?.prepSeconds ?? 60;
-  const recSec = track.questions[questionIndex]?.responseSeconds ?? 120;
+  const [clock, setClock] = useState<{ started: number; now: number } | null>(null);
+  const track = INTERVIEW_TRACKS.find((item) => item.id === trackId) ?? INTERVIEW_TRACKS[0];
+  const question = track.questions[questionIndex];
+  const tx = (value: Parameters<typeof interviewText>[0]) => interviewText(value, locale);
+  const prep = question.prepSeconds ?? 60;
+  const answer = question.responseSeconds ?? 120;
+  const elapsed = clock ? Math.floor((clock.now - clock.started) / 1000) : 0;
+  const phase = !clock ? "idle" : elapsed < prep ? "prep" : elapsed < prep + answer ? "answer" : "complete";
+  const running = phase === "prep" || phase === "answer";
+  const remaining = phase === "prep" ? prep - elapsed : phase === "answer" ? prep + answer - elapsed : 0;
+  const duration = phase === "prep" ? prep : answer;
+  const questionLabel = tm("questionOf", { current: questionIndex + 1, total: track.questions.length });
 
   useEffect(() => {
-    if (phase === "idle") return;
-    // The tick owns the rollover. Handling expiry inline in the effect body
-    // wrote state during render, which cascades a second render per second and
-    // made this the only place the timer could desync from the clock.
-    const id = window.setTimeout(() => {
-      if (secondsLeft > 1) {
-        setSecondsLeft(secondsLeft - 1);
-      } else if (phase === "prep") {
-        setPhase("record");
-        setSecondsLeft(recSec);
-      } else {
-        setPhase("idle");
-        setSecondsLeft(0);
-      }
-    }, 1000);
-    return () => window.clearTimeout(id);
-  }, [phase, secondsLeft, recSec]);
+    if (!running) return;
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      setClock((current) => current ? { ...current, now } : null);
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [running]);
 
-  const startTimer = () => {
-    setQuestionIndex(0);
-    setPhase("prep");
-    setSecondsLeft(prepSec);
+  const start = () => {
+    const now = performance.now();
+    setClock({ started: now, now });
+  };
+  const selectQuestion = (index: number) => {
+    setQuestionIndex(index);
+    setClock(null);
   };
 
   return (
     <div className="space-y-4">
-      <JourneyCard
-        title={t("icTitle")}
-        subtitle={t("icSubtitle")}
-        action={
-          // The simulator is the one place that scores a spoken answer, so it
-          // stays one click away from every track.
-          <Button onClick={() => onNavigateTab("visa/speaking")}>
-            <Mic className="h-3.5 w-3.5" /> {t("icLaunchSim")}
-          </Button>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t("icStudioIntro")}</p>
+      <JourneyCard title={t("icTitle")} subtitle={t("icSubtitle")} action={
+        <Button size="sm" variant="outline" onClick={() => onNavigateTab("visa/speaking")}>
+          <Mic className="size-4 shrink-0" aria-hidden /> {t("icLaunchSim")}
+        </Button>
+      }>
+        <div className="grid gap-4 lg:grid-cols-[minmax(12rem,0.55fr)_minmax(0,1fr)]">
+          <aside className="min-w-0 space-y-3 rounded-surface border border-indigo-200 bg-indigo-50/70 p-3 dark:border-indigo-400/25 dark:bg-indigo-400/10">
+            <Field label={t("icTracksLabel")}>
+              <select className={inputClass} value={track.id} onChange={(e) => {
+                setTrackId(e.target.value);
+                selectQuestion(0);
+              }}>
+                {INTERVIEW_TRACKS.map((item) => <option key={item.id} value={item.id}>{tx(item.title)}</option>)}
+              </select>
+            </Field>
+            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <p>{tx(track.audience)}</p>
+              <p>{tx(track.format)}</p>
+              {track.institutions.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5">
+                  {track.institutions.map((institution) => <li key={institution}><Pill tone="slate">{institution}</Pill></li>)}
+                </ul>
+              )}
+            </div>
+          </aside>
 
-          {/* Track picker */}
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label={t("icTracksLabel")}>
-            {INTERVIEW_TRACKS.map((tr) => {
-              const active = tr.id === track.id;
-              return (
-                <Button variant="unstyled"
-                  key={tr.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => {
-                    setTrackId(tr.id);
-                    setPhase("idle");
-                    setQuestionIndex(0);
-                  }}
-                  className={`shrink-0 rounded-surface border px-3 py-2 text-left text-xs font-semibold transition-colors ${
-                    active
-                      ? "border-indigo-400 bg-indigo-50 text-indigo-900 dark:border-indigo-500 dark:bg-indigo-950/50 dark:text-indigo-100"
-                      : "border-slate-200 text-slate-600 hover:border-indigo-300 dark:border-slate-700 dark:text-slate-300"
-                  }`}
-                >
-                  <span aria-hidden className="mr-1.5">{tr.emoji}</span>
-                  {tx(tr.title)}
-                </Button>
-              );
-            })}
-          </div>
-
-          {/* Selected track header */}
-          <div className="rounded-surface border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <section className="min-w-0 space-y-3 rounded-surface border border-slate-200 p-3 sm:p-4 dark:border-slate-700">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                <span aria-hidden className="mr-1.5">{track.emoji}</span>
-                {tx(track.title)}
-              </h3>
-              <Pill>{t("icQuestionsCount", { count: track.questions.length })}</Pill>
-              {track.timed && <Pill>{t("icTimedBadge")}</Pill>}
+              <Pill tone="brand">{questionLabel}</Pill>
+              {track.timed && <Pill tone="slate">{t("icTimedBadge")}</Pill>}
             </div>
-            <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300">{tx(track.audience)}</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{tx(track.format)}</p>
-            {track.institutions.length > 0 && (
-              <p className="mt-2 flex flex-wrap gap-1.5">
-                {track.institutions.map((i) => (
-                  <span
-                    key={i}
-                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-                  >
-                    {i}
-                  </span>
-                ))}
-              </p>
-            )}
-          </div>
+            <h3 className="break-words text-lg font-bold text-slate-900 dark:text-slate-100" aria-live="polite">{tx(question.question)}</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">{t("icWhy")} {tx(question.why)}</p>
 
-          {/* Built-in countdown for the timed-video track */}
-          {track.timed && (
-            <div className="rounded-surface border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-800/60 dark:bg-indigo-950/30">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wide text-indigo-900 dark:text-indigo-200">
-                    {t("icTimerTitle")}
-                  </h4>
-                  <p className="mt-0.5 text-sm text-indigo-800/80 dark:text-indigo-200/70">
-                    {t("icTimerHint", { prep: prepSec, record: recSec })}
-                  </p>
+            {track.timed && (
+              <div className="space-y-3 rounded-surface border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-400/25 dark:bg-indigo-400/10">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="flex items-center gap-2 text-sm font-bold text-indigo-950 dark:text-indigo-100">
+                      <Timer className="size-4" aria-hidden /> {t("icTimerTitle")}
+                    </h4>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{t("icTimerHint", { prep, record: answer })}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-200" aria-live="polite">
+                      {phase === "prep" ? t("icPrep") : phase === "answer" ? tm("answerPhase") : phase === "complete" ? tm("timerComplete") : tm("timerReady")}
+                    </p>
+                    <p role="timer" className="font-mono text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                      {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`rounded-surface px-3 py-2 font-mono text-lg font-black tabular-nums ${
-                      phase === "record"
-                        ? "bg-rose-600 text-white"
-                        : phase === "prep"
-                          ? "bg-indigo-600 text-white"
-                          : "bg-white text-slate-500 dark:bg-slate-900 dark:text-slate-300"
-                    }`}
-                    aria-live="polite"
-                  >
-                    {phase === "idle"
-                      ? `${prepSec}s / ${recSec}s`
-                      : `${phase === "prep" ? t("icPrep") : t("icRecord")} ${secondsLeft}s`}
-                  </span>
-                  <Button onClick={startTimer} variant={phase === "idle" ? "primary" : "outline"}>
-                    {phase === "idle" ? t("icStartTimer") : t("icRestartTimer")}
-                  </Button>
+                {running && <ProgressBar pct={(remaining / duration) * 100} animate={false} tone={phase === "answer" ? "warn" : "brand"} />}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={start}>{phase === "idle" ? t("icStartTimer") : t("icRestartTimer")}</Button>
+                  {running && <Button size="sm" variant="outline" onClick={() => setClock(null)}>{tm("stopTimer")}</Button>}
                 </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300">{tm("timerPrivacy")}</p>
               </div>
-              {phase !== "idle" && !reduceMotion && (
-                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/70 dark:bg-slate-800">
-                  <Motion.div
-                    className={`h-full ${phase === "record" ? "bg-rose-500" : "bg-indigo-500"}`}
-                    initial={false}
-                    animate={{
-                      width: `${Math.max(
-                        0,
-                        Math.min(
-                          100,
-                          (secondsLeft / (phase === "prep" ? prepSec : recSec)) * 100,
-                        ),
-                      )}%`,
-                    }}
-                    transition={{ duration: reduceMotion ? 0 : 0.9, ease: "linear" }}
-                  />
-                </div>
-              )}
-              {phase === "idle" && track.rubric && (
-                <div className="mt-3">
-                  <p className="text-sm font-bold uppercase tracking-wide text-indigo-900 dark:text-indigo-200">
-                    {t("icSelfCheck")}
-                  </p>
-                  <ul className="mt-1 space-y-0.5">
-                    {track.rubric.map((r, i) => (
-                      <li key={i} className="text-sm text-indigo-900/90 dark:text-indigo-200/80">
-                        ☐ {tx(r)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+            )}
 
-          {/* Questions + model answers */}
-          <ol className="space-y-3">
-            {track.questions.map((q, qi) => (
-              <li
-                key={q.id}
-                className="rounded-surface border border-slate-200 p-4 dark:border-slate-700"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    <span className="mr-1.5 text-slate-500">{qi + 1}.</span>
-                    {tx(q.question)}
-                  </p>
-                  {q.responseSeconds && (
-                    <Pill>{t("icSecondsChip", { seconds: q.responseSeconds })}</Pill>
-                  )}
-                </div>
-                <p className="mt-1.5 text-sm italic text-slate-500 dark:text-slate-400">
-                  {t("icWhy")} {tx(q.why)}
-                </p>
-                <details className="mt-2">
-                  <summary className="cursor-pointer text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-300">
-                    {t("icShowModel")}
-                  </summary>
-                  <ul className="mt-1.5 space-y-1">
-                    {q.modelAnswer.map((a, ai) => (
-                      <li key={ai} className="flex gap-1.5 text-sm text-slate-600 dark:text-slate-300">
-                        <span aria-hidden className="text-emerald-600 dark:text-emerald-400">✓</span>
-                        <span>{tx(a)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              </li>
-            ))}
-          </ol>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sb-card-hover rounded-surface border border-slate-200 p-4 dark:border-slate-700">
-              <p className="text-base" aria-hidden>🎓</p>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icUniTitle")}</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("icUniText")}</p>
-              <Button className="mt-3" onClick={() => onNavigateTab("visa/speaking")}>
-                {t("icUniBtn")}
+            <details key={question.id} className="rounded-surface border border-slate-200 dark:border-slate-700">
+              <summary className="cursor-pointer rounded-surface p-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-400/10">{t("icShowModel")}</summary>
+              <ul className="list-disc space-y-1 py-2 pl-8 pr-3 text-sm text-slate-600 dark:text-slate-300">
+                {question.modelAnswer.map((point) => <li key={point.en}>{tx(point)}</li>)}
+              </ul>
+            </details>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled={questionIndex === 0} onClick={() => selectQuestion(questionIndex - 1)}>
+                <ArrowLeft className="size-4 shrink-0" aria-hidden /> {tm("previousQuestion")}
+              </Button>
+              <Button size="sm" variant="outline" disabled={questionIndex + 1 === track.questions.length} onClick={() => selectQuestion(questionIndex + 1)}>
+                {tm("nextQuestion")} <ArrowRight className="size-4 shrink-0" aria-hidden />
               </Button>
             </div>
-            <div className="sb-card-hover rounded-surface border border-slate-200 p-4 dark:border-slate-700">
-              <p className="text-base" aria-hidden>🛂</p>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{t("icVisaTitle")}</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t("icVisaText")}</p>
-              <Button className="mt-3" variant="outline" onClick={() => onNavigateTab("visa/speaking")}>
-                {t("icVisaBtn")}
-              </Button>
-            </div>
-          </div>
+          </section>
         </div>
       </JourneyCard>
-
+      <JourneyCard title={t("icSelfCheck")}>
+        <div key={`${track.id}:${question.id}`} className="grid gap-2 sm:grid-cols-2">
+          {(track.rubric?.map(tx) ?? [tm("checkDirect"), tm("checkExample"), tm("checkClosing")]).map((item) => (
+            <label key={item} className="flex min-h-11 items-start gap-2 rounded-surface border border-slate-200 p-2.5 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+              <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-indigo-600" /> {item}
+            </label>
+          ))}
+        </div>
+      </JourneyCard>
       <VisaModelAnswers />
       <AppNote kind="estimate" />
     </div>

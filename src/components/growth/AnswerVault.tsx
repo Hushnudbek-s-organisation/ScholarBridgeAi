@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Archive, Check, ChevronDown, Copy, Lightbulb, Loader2, Save } from "lucide-react";
+import { Archive, Check, ChevronDown, Copy, Lightbulb, Loader2, PenLine, Save } from "lucide-react";
 import type { StudentProfile } from "../Navbar";
 import { AnimatedBar } from "../motion";
 import { useSeedText } from "./useSeedText";
@@ -30,8 +30,9 @@ const countWords = (s: string) => (s.trim().match(/\S+/g) ?? []).length;
  * application, adapted). Questions are managed by the admin; answers autosave
  * and have a one-tap Copy for pasting into official forms.
  */
-export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile | null }) {
+export function AnswerVault({ activeProfile, onUseInSop }: { activeProfile: StudentProfile | null; onUseInSop?: (answer: string) => void }) {
   const t = useTranslations("vault");
+  const tm = useTranslations("materials");
   const ts = useTranslations("samples");
   const tr = useSeedText();
   const { lib: sampleLib } = useSampleLibrary();
@@ -75,6 +76,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
       showToast(ts("unmodified"));
       return;
     }
+    window.clearTimeout(timers.current[promptId]);
     setSaving(promptId);
     try {
       await api("/api/vault", { method: "PUT", body: JSON.stringify({ profileId, promptId, answer }) });
@@ -118,7 +120,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
 
   return (
     <div className="space-y-4">
-      <PageHeader icon={Archive} title={t("title")} subtitle={t("subtitle")} accent="sky" />
+      <PageHeader icon={Archive} title={t("title")} subtitle={t("subtitle")} accent="indigo" />
 
       {error && <ErrorNote message={error} />}
       {!items && !error && <LoadingBlock label={t("loading")} />}
@@ -130,10 +132,10 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
           <div className="rounded-overlay border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
             <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
               <span>{t("progress", { done: answered, total })}</span>
-              <span className="font-black text-sky-600">{total ? Math.round((answered / total) * 100) : 0}%</span>
+              <span className="font-black text-indigo-600">{total ? Math.round((answered / total) * 100) : 0}%</span>
             </div>
             <div className="mt-2">
-              <AnimatedBar value={total ? (answered / total) * 100 : 0} barClassName="bg-sky-500" />
+              <AnimatedBar value={total ? (answered / total) * 100 : 0} barClassName="bg-indigo-500" />
             </div>
             <p className="mt-2 text-sm text-slate-500">{t("tip")}</p>
           </div>
@@ -158,7 +160,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                 ?? null;
               const holdsExample = isUnmodifiedSample(draft, loadedExample[i.promptId]);
               return (
-                <li key={i.promptId} className={`overflow-hidden rounded-overlay border bg-white dark:bg-slate-900 ${isOpen ? "border-sky-300 shadow-sm" : "border-slate-200 dark:border-slate-700"}`}>
+                <li key={i.promptId} className={`overflow-hidden rounded-overlay border bg-white dark:bg-slate-900 ${isOpen ? "border-indigo-300 shadow-sm" : "border-slate-200 dark:border-slate-700"}`}>
                   <Button variant="unstyled"
                     onClick={() => setOpen(isOpen ? null : i.promptId)}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left"
@@ -192,7 +194,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                             type="button"
                             aria-expanded={Boolean(exampleOpen[i.promptId])}
                             onClick={() => setExampleOpen((o) => ({ ...o, [i.promptId]: !o[i.promptId] }))}
-                            className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-sky-200 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-sky-500/30 dark:text-sky-200"
+                            className="inline-flex min-h-11 items-center gap-1.5 rounded-control border border-indigo-200 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-indigo-500/30 dark:text-indigo-200"
                           >
                             <Lightbulb className="h-3.5 w-3.5" aria-hidden />
                             {exampleOpen[i.promptId] ? ts("answerHide") : ts("answerShow")}
@@ -219,7 +221,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                         rows={7}
                         maxLength={6000}
                         placeholder={t("placeholder")}
-                        className="w-full resize-y rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                        className="w-full resize-y rounded-surface border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                       />
                       {holdsExample && (
                         <p className="mt-2 text-sm leading-relaxed text-violet-800 dark:text-violet-200">{ts("unmodified")}</p>
@@ -229,7 +231,7 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                           {i.wordLimit ? t("wordsOf", { n: words, max: i.wordLimit }) : t("words", { n: words })}
                           {over ? ` · ${t("tooLong")}` : ""}
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs text-slate-500">
                             {saving === i.promptId ? (
                               <span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> {t("saving")}</span>
@@ -248,10 +250,20 @@ export function AnswerVault({ activeProfile }: { activeProfile: StudentProfile |
                           <Button variant="unstyled"
                             disabled={!draft.trim()}
                             onClick={() => void copy(draft)}
-                            className="inline-flex items-center gap-1 rounded-control bg-sky-700 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-40"
+                            className="inline-flex items-center gap-1 rounded-control bg-indigo-700 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-800 disabled:opacity-40"
                           >
                             <Copy className="h-3.5 w-3.5" /> {t("copy")}
                           </Button>
+                          {onUseInSop && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!done || holdsExample || draft !== i.answer || saving === i.promptId}
+                              onClick={() => onUseInSop(i.answer.trim())}
+                            >
+                              <PenLine className="size-4" aria-hidden />{tm("useInSop")}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>

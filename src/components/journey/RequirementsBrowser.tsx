@@ -10,9 +10,9 @@
  * point a student reaches from the PREPARE group before they have a
  * workspace open.
  */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ExternalLink } from "lucide-react";
+import { ArrowRight, CircleCheck, ClipboardList, ExternalLink, ScanSearch } from "lucide-react";
 import { useLocaleContext } from "@/i18n/LocaleProvider";
 import { Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, StatusIcon, daysLabel, toneForDays } from "@/components/ui/journey";
 import { AppNote } from "@/components/AppNote";
@@ -23,6 +23,9 @@ import {
   type RequirementSection,
 } from "@/lib/journey/requirements";
 import { Button } from "@/components/ui/Button";
+import { fetchJsonWithTimeout } from "@/lib/clientFetch";
+import type { ApplicationSummary } from "@/lib/applicationsResponse";
+import { useResource } from "./useResource";
 
 interface AppRow {
   id: number;
@@ -51,10 +54,7 @@ interface ReqData {
     lastVerifiedAt: string | null;
     verificationStatus: string;
   }[];
-  progress: { pct: number; done: number; total: number; sections: { key: string; label: string; done: number; total: number; pct: number }[] };
 }
-
-const SECTION_ORDER = ["academic", "english", "testing", "documents", "essays", "recommendations", "finance", "application"];
 
 /**
  * Standard requirements preview (Bachelor / Master / PhD).
@@ -122,15 +122,31 @@ const BLUEPRINT: {
   },
 ];
 
-export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId: number; onOpenWorkspace: (id: number) => void }) {
+type MaterialShortcut = "vault" | "sop" | "recommendations";
+
+export function RequirementsBrowser({ profileId, applications, applicationId, onOpenWorkspace, onOpenMaterial, canOpenMaterial }: {
+  profileId: number;
+  applications: ApplicationSummary[];
+  applicationId: number | null;
+  onOpenWorkspace: (id: number) => void;
+  onOpenMaterial: (tool: MaterialShortcut) => void;
+  canOpenMaterial: (tool: MaterialShortcut) => boolean;
+}) {
   const t = useTranslations("journey");
   const { locale } = useLocaleContext();
-  const [apps, setApps] = useState<AppRow[]>([]);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [loaded, setLoaded] = useState<ReqData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const tm = useTranslations("materials");
+  const [filter, setFilter] = useState<"all" | "required" | "review">("all");
+  const [focusRequest, setFocusRequest] = useState<{ id: number } | null>(null);
+  const [startError, setStartError] = useState("");
+  const loadError = t("rbLoadError");
+  const { data, loading, error, reload } = useResource<ReqData | null>(
+    useCallback(() => fetchJsonWithTimeout<ReqData>(
+      `/api/requirements?profileId=${profileId}&applicationId=${applicationId}`,
+      { timeoutMs: 12_000, fallbackMessage: loadError },
+    ), [profileId, applicationId, loadError]),
+    [profileId, applicationId],
+    { initial: null, enabled: applicationId != null, errorFallback: loadError },
+  );
   const [blueprintDegree, setBlueprintDegree] = useState<"bachelor" | "master" | "phd">("master");
   /**
    * Highest-fit university from the dashboard ranking. The blueprint's "start
@@ -141,6 +157,7 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
+    if (applicationId != null || applications.length > 0) return;
     // Ranked by the same hybrid fit + positioning score the explorer uses —
     // ONE row from /api/universities instead of the dashboard's 25+ queries.
     let cancelled = false;
@@ -160,49 +177,23 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
     return () => {
       cancelled = true;
     };
-  }, [profileId]);
+  }, [profileId, applicationId, applications.length]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`/api/applications?profileId=${profileId}`, { credentials: "same-origin", cache: "no-store" });
-        const json = await res.json().catch(() => ({}));
-        if (res.ok) {
-          setApps(json.applications ?? []);
-          if (json.applications?.length) setSelected(json.applications[0].id);
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [profileId]);
+    if (!focusRequest) return;
+    const details = document.getElementById(`material-requirement-${focusRequest.id}`);
+    if (details instanceof HTMLDetailsElement) {
+      details.open = true;
+      details.querySelector("summary")?.focus();
+    }
+  }, [focusRequest]);
 
-  useEffect(() => {
-    if (!selected) return;
-    (async () => {
-      setDetailLoading(true);
-      try {
-        const res = await fetch(`/api/requirements?profileId=${profileId}&applicationId=${selected}`, { cache: "no-store" });
-        const json = await res.json().catch(() => ({}));
-        if (res.ok) setLoaded(json as ReqData);
-        else setError(json.error ?? t("rbLoadError"));
-      } finally {
-        setDetailLoading(false);
-      }
-    })();
-  }, [selected, profileId, t]);
-
-  // Nothing selected → no checklist, without a state write.
-  const data = selected ? loaded : null;
-
-  if (loading) return <Loading label={t("rbLoadingApps")} />;
-
-  if (apps.length === 0) {
+  if (applicationId == null) {
     const degree = blueprintDegree;
     const plan = BLUEPRINT.find((b) => b.degree === degree) ?? BLUEPRINT[1];
     return (
       <div className="space-y-4">
-        <JourneyCard title={t("rbTitle")} subtitle={t("rbSubtitle1")}>
+        {applications.length === 0 && <JourneyCard title={t("rbTitle")} subtitle={t("rbSubtitle1")}>
           <Empty title={t("rbEmptyTitle")} hint={t("rbEmptyHint")} />
           {onOpenWorkspace && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -215,13 +206,9 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
                   const best = topMatch;
                   if (!best || starting) return;
                   setStarting(true);
+                  setStartError("");
                   void (async () => {
                     try {
-                      const existing = apps.find((a) => a.universityId === best.id);
-                      if (existing) {
-                        onOpenWorkspace(existing.id);
-                        return;
-                      }
                       const res = await fetch("/api/applications", {
                         method: "POST",
                         credentials: "same-origin",
@@ -234,9 +221,9 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
                         notifyApplicationsChanged(profileId);
                         onOpenWorkspace(appId);
                       }
-                      else setError(typeof json.error === "string" ? json.error : t("rbStartFromFailed"));
+                      else setStartError(typeof json.error === "string" ? json.error : t("rbStartFromFailed"));
                     } catch {
-                      setError(t("rbStartFromFailed"));
+                      setStartError(t("rbStartFromFailed"));
                     } finally {
                       setStarting(false);
                     }
@@ -250,7 +237,8 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
               </Button>
             </div>
           )}
-        </JourneyCard>
+          {startError && <p role="alert" className="mt-2 text-sm text-rose-700 dark:text-rose-300">{startError}</p>}
+        </JourneyCard>}
 
         {/*
           The standard blueprint. Students arrive here not knowing what an
@@ -342,114 +330,135 @@ export function RequirementsBrowser({ profileId, onOpenWorkspace }: { profileId:
     );
   }
 
+  if (loading) return <Loading label={t("rbLoadingChecklist")} />;
+  if (error || !data) {
+    return (
+      <JourneyCard title={t("rbTitle")}>
+        <p role="alert" className="mb-3 text-sm text-rose-700 dark:text-rose-300">{error || loadError}</p>
+        <Button variant="outline" onClick={() => void reload()}>{tm("retry")}</Button>
+      </JourneyCard>
+    );
+  }
+
+  const mandatory = data.requirements.filter((item) => item.isRequired && item.status !== "not_required");
+  const unfinished = mandatory.filter((item) => item.status !== "done");
+  const needsReview = data.requirements.filter((item) => item.status !== "not_required" && item.verificationStatus !== "verified");
+  const done = mandatory.length - unfinished.length;
+  const pct = mandatory.length ? Math.round((done / mandatory.length) * 100) : 0;
+  const next = unfinished.find((item) => item.status === "todo") ?? unfinished[0] ?? needsReview[0];
+  const visible = filter === "required" ? unfinished : filter === "review" ? needsReview : data.requirements;
+  const stats = [
+    { label: tm("mandatory"), value: mandatory.length, icon: ClipboardList, color: "text-indigo-700 dark:text-indigo-300" },
+    { label: tm("completed"), value: done, icon: CircleCheck, color: "text-emerald-700 dark:text-emerald-300" },
+    { label: tm("review"), value: needsReview.length, icon: ScanSearch, color: "text-amber-700 dark:text-amber-300" },
+  ];
   return (
     <div className="space-y-4">
-      <JourneyCard
-        title={t("rbTitle")}
-        subtitle={t("rbSubtitle2")}
-      >
-        <div className="flex flex-wrap gap-1.5">
-          {apps.map((a) => (
-            <Button variant="unstyled"
-              key={a.id}
-              type="button"
-              onClick={() => setSelected(a.id)}
-              className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition ${
-                selected === a.id
-                  ? "border-indigo-600 bg-indigo-600 text-white"
-                  : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-              }`}
-            >
-              {a.universityName}
+      <JourneyCard title={t("rbTitle")} subtitle={data.application.universityName}>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
+          <div className="min-w-0">
+            <dl className="mb-3 grid gap-2 min-[400px]:grid-cols-3">
+              {stats.map(({ label, value, icon: Icon, color }) => (
+                <div key={label} className="min-w-0 rounded-surface border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/40">
+                  <dt className="flex gap-1.5 break-words text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <Icon className={`size-4 shrink-0 ${color}`} aria-hidden />{label}
+                  </dt>
+                  <dd className={`mt-1 text-xl font-bold tabular-nums ${color}`}>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            {mandatory.length > 0 && <ProgressBar pct={pct} tone={pct === 100 ? "good" : "brand"} />}
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              {mandatory.length ? tm("progress", { done, total: mandatory.length }) : tm("noMandatory")}
+            </p>
+          </div>
+          <section className="min-w-0 rounded-surface border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-400/30 dark:bg-indigo-400/10">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">{tm("nextStep")}</h3>
+            <p className="mt-1 break-words font-semibold text-slate-900 dark:text-indigo-50">
+              {next?.title ?? (mandatory.length ? tm("completedMandatory") : tm("openWorkspaceHint"))}
+            </p>
+            {next?.instructions && <p className="mt-1 break-words text-sm text-slate-600 dark:text-slate-300">{next.instructions}</p>}
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => {
+              if (!next) return onOpenWorkspace(data.application.id);
+              setFilter("all");
+              setFocusRequest({ id: next.id });
+            }}>
+              {next ? tm("viewRequirement") : t("rbOpenWorkspace")} <ArrowRight className="size-4" aria-hidden />
+            </Button>
+          </section>
+        </div>
+      </JourneyCard>
+      <JourneyCard title={tm("checklist")}>
+        <div role="group" aria-label={tm("filterRequirements")} className="mb-4 flex flex-wrap gap-2">
+          {([
+            ["required", tm("remaining")],
+            ["review", tm("review")],
+            ["all", tm("all")],
+          ] as const).map(([id, label]) => (
+            <Button key={id} size="sm" variant={filter === id ? "primary" : "outline"} aria-pressed={filter === id} onClick={() => setFilter(id)}>
+              {label}
             </Button>
           ))}
         </div>
-      </JourneyCard>
-
-      {detailLoading && <Loading label={t("rbLoadingChecklist")} />}
-      {error && <p className="rounded-control bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
-
-      {data && !detailLoading && (
-        <JourneyCard
-          title={data.application.universityName}
-          subtitle={data.application.programName ?? undefined}
-          action={
-            <div className="text-right">
-              <p className="text-xl font-extrabold text-slate-900 dark:text-white">{data.progress.pct}%</p>
-              <p className="text-sm font-bold uppercase text-slate-500">
-                {t("rbDone", { done: data.progress.done, total: data.progress.total })}
-              </p>
-            </div>
-          }
-        >
-          <ProgressBar pct={data.progress.pct} tone={data.progress.pct >= 100 ? "good" : "brand"} />
-
-          <div className="mt-4 space-y-4">
-            {SECTION_ORDER.filter((s) => data.requirements.some((r) => r.section === s)).map((section) => {
-              const items = data.requirements.filter((r) => r.section === section);
-              const s = data.progress.sections.find((x) => x.key === section);
+        {visible.length === 0 ? <Empty title={tm("noRequirements")} /> : (
+          <div className="space-y-4">
+            {REQUIREMENT_SECTIONS.map((section) => {
+              const items = visible.filter((item) => item.section === section);
+              if (!items.length) return null;
               return (
-                <div key={section}>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{t(`sec${section[0].toUpperCase()}${section.slice(1)}`)}</h3>
-                    {s && (
-                      <span className="text-xs text-slate-500">
-                        {s.done}/{s.total}
-                      </span>
-                    )}
-                  </div>
-                  <ul className="space-y-1.5">
-                    {items.map((r) => (
-                      <li
-                        key={r.id}
-                        className="flex flex-wrap items-start gap-2 rounded-control border border-slate-200 px-3 py-2 dark:border-slate-700"
-                      >
-                        <StatusIcon state={r.status} className="mt-0.5 h-4 w-4" />
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className={`text-sm font-medium ${
-                              r.status === "done" ? "text-slate-500 line-through" : "text-slate-800 dark:text-slate-100"
-                            }`}
-                          >
-                            {r.title}
-                            {!r.isRequired && <span className="ml-1 text-xs uppercase text-slate-500">{t("rbOptional")}</span>}
-                          </p>
-                          {r.instructions && <p className="whitespace-pre-line text-sm text-slate-500 dark:text-slate-400">{r.instructions}</p>}
-                          <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                            <SourceTag
-                              url={r.sourceUrl}
-                              name={r.sourceName}
-                              lastVerified={r.lastVerifiedAt}
-                              verificationStatus={r.verificationStatus}
-                            />
-                            {r.dueDate && <Pill tone={toneForDays(daysTo(r.dueDate))}>{daysLabel(daysTo(r.dueDate), locale)}</Pill>}
-                          </div>
-                        </div>
-                      </li>
-                    ))}
+                <section key={section}>
+                  <h3 className="mb-1.5 text-sm font-bold text-slate-700 dark:text-slate-200">{t(`rbSection.${section}`)}</h3>
+                  <ul className="space-y-2">
+                    {items.map((item) => {
+                      const tool = item.section === "documents" ? "vault"
+                        : item.section === "essays" ? "sop"
+                        : item.section === "recommendations" ? "recommendations" : null;
+                      return (
+                        <li key={item.id}>
+                          <details id={`material-requirement-${item.id}`} className="rounded-surface border border-slate-200 dark:border-slate-700">
+                            <summary className="min-h-11 cursor-pointer rounded-surface p-3 text-sm text-indigo-700 hover:bg-indigo-50/70 focus-visible:outline-2 focus-visible:outline-indigo-600 dark:text-indigo-300 dark:hover:bg-indigo-400/10">
+                              <span className="ml-1 inline-flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 align-middle">
+                                <StatusIcon state={item.status} />
+                                <span className="min-w-0 break-words font-semibold text-slate-800 dark:text-slate-100">{item.title}</span>
+                                <Pill tone={item.isRequired && item.status !== "not_required" ? "brand" : "slate"}>
+                                  {t(item.isRequired && item.status !== "not_required" ? "rbRequired" : "rbOptional")}
+                                </Pill>
+                                {item.status === "done" && <Pill tone="good">{tm("completed")}</Pill>}
+                                {item.verificationStatus !== "verified" && item.status !== "not_required" && <Pill tone="warn">{tm("review")}</Pill>}
+                              </span>
+                            </summary>
+                            <div className="space-y-2 border-t border-slate-200 px-3 py-3 dark:border-slate-700">
+                              {item.instructions && <p className="whitespace-pre-line break-words text-sm text-slate-600 dark:text-slate-300">{item.instructions}</p>}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <SourceTag url={item.sourceUrl} name={item.sourceName} lastVerified={item.lastVerifiedAt} verificationStatus={item.verificationStatus} />
+                                {item.dueDate && <Pill tone={toneForDays(daysTo(item.dueDate))}>{daysLabel(daysTo(item.dueDate), locale)}</Pill>}
+                              </div>
+                              {tool && canOpenMaterial(tool) && (
+                                <Button size="sm" variant="outline" onClick={() => onOpenMaterial(tool)}>
+                                  {tm(tool)} <ArrowRight className="size-4" aria-hidden />
+                                </Button>
+                              )}
+                            </div>
+                          </details>
+                        </li>
+                      );
+                    })}
                   </ul>
-                </div>
+                </section>
               );
             })}
           </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => onOpenWorkspace(data.application.id)}>{t("rbOpenWorkspace")}</Button>
-            {data.university?.applicationUrl && (
-              <a
-                href={data.university.applicationUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-control border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                <ExternalLink className="h-3.5 w-3.5" /> {t("rbOfficialLink")}
-              </a>
-            )}
-          </div>
-        </JourneyCard>
-      )}
-      {/* Standing small print: this panel can be wrong — say so where it is read. */}
-      <AppNote kind="catalogue" className="mt-2" />
+        )}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => onOpenWorkspace(data.application.id)}>{t("rbOpenWorkspace")}</Button>
+          {data.university?.applicationUrl && (
+            <a href={data.university.applicationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-control px-3 text-sm font-semibold text-indigo-700 hover:underline dark:text-indigo-300">
+              <ExternalLink className="size-4 shrink-0" aria-hidden /> {t("rbOfficialLink")}
+            </a>
+          )}
+        </div>
+      </JourneyCard>
+      <AppNote kind="catalogue" />
     </div>
   );
 }

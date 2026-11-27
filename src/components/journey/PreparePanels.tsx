@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
-import { CalendarPlus, Check, ExternalLink, Link2, Plus, Trash2 } from "lucide-react";
+import { CalendarPlus, Check, ExternalLink, Link2, Plus, Search, Trash2 } from "lucide-react";
 import { getJson, sendJson, useResource } from "./useResource";
 import { ApostilleReadinessCard } from "@/components/ApostilleReadinessCard";
 import { SmartTimelineCalendar } from "@/components/SmartTimelineCalendar";
@@ -45,7 +45,7 @@ interface VaultData {
   summary: { total: number; verified: number; expiring: number; expired: number };
 }
 
-export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: { profileId: number; applicationId?: number | null; onNavigateTab: (t: string) => void }) {
+export function DocumentVaultPanel({ profileId, applicationId, onOpenRequirements }: { profileId: number; applicationId?: number | null; onOpenRequirements?: () => void }) {
   const t = useTranslations("journey");
   const { locale } = useLocaleContext();
   const { data, loading, error, reload } = useResource<VaultData>(
@@ -54,12 +54,24 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
     { initial: { docTypes: [], documents: [], summary: { total: 0, verified: 0, expiring: 0, expired: 0 } }, errorFallback: t("dvLoadError") }
   );
   const [form, setForm] = useState({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  const tm = useTranslations("materials");
+  const [query, setQuery] = useState("");
+  const [linkFilter, setLinkFilter] = useState("all");
+  const searchTerm = query.trim().toLocaleLowerCase(locale);
+  const matches = data.documents.filter((doc) => {
+    const linked = doc.usedBy.some((link) => link.applicationId === applicationId);
+    if (applicationId != null && linkFilter !== "all" && linked !== (linkFilter === "linked")) return false;
+    const type = t(`doc${doc.docType[0].toUpperCase()}${doc.docType.slice(1)}`);
+    return [doc.title, type, doc.fileUrl].some((value) => value?.toLocaleLowerCase(locale).includes(searchTerm));
+  });
 
   const add = async () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || busy) return;
     setBusy(true);
+    setActionError("");
     try {
       await sendJson(
         "/api/vault/documents",
@@ -67,6 +79,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
         t("dvAddError")
       );
       setForm({ docType: "passport", title: "", issuedAt: "", expiresAt: "" });
+      setAdding(false);
       await reload();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : t("dvAddError"));
@@ -76,10 +89,15 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
   };
 
   const patchDoc = async (body: Record<string, unknown>) => {
-    const result = await sendJson<{ schollyPointsAwarded?: number }>("/api/vault/documents",
-      { method: "PATCH", body: JSON.stringify(body) }, t("dvUpdateError"));
-    if (result.schollyPointsAwarded) announceSchollyPointsChanged(profileId, result.schollyPointsAwarded);
-    await reload();
+    setActionError("");
+    try {
+      const result = await sendJson<{ schollyPointsAwarded?: number }>("/api/vault/documents",
+        { method: "PATCH", body: JSON.stringify(body) }, t("dvUpdateError"));
+      if (result.schollyPointsAwarded) announceSchollyPointsChanged(profileId, result.schollyPointsAwarded);
+      await reload();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t("dvUpdateError"));
+    }
   };
 
   const toggleApplicationLink = (doc: VaultDoc) => {
@@ -93,8 +111,13 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
   };
 
   const remove = async (id: number) => {
-    await fetch(`/api/vault/documents?profileId=${profileId}&id=${id}`, { method: "DELETE" });
-    await reload();
+    setActionError("");
+    try {
+      await sendJson(`/api/vault/documents?profileId=${profileId}&id=${id}`, { method: "DELETE" }, t("dvUpdateError"));
+      await reload();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : t("dvUpdateError"));
+    }
   };
 
   if (loading && data.documents.length === 0) return <Loading label={t("dvLoading")} />;
@@ -105,64 +128,103 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
         title={t("dvTitle")}
         subtitle={t("dvSubtitle")}
         action={
-          <div className="flex flex-wrap gap-2 text-xs font-bold">
-            <Pill tone="slate">{t("dvDocumentsPill", { n: data.summary.total })}</Pill>
-            {data.summary.expiring > 0 && <Pill tone="warn">{t("dvExpiringPill", { n: data.summary.expiring })}</Pill>}
-            {data.summary.expired > 0 && <Pill tone="bad">{t("dvExpiredPill", { n: data.summary.expired })}</Pill>}
-          </div>
+          <Button size="sm" onClick={() => {
+            setActionError("");
+            setAdding(true);
+          }}>
+            <Plus className="size-4 shrink-0" aria-hidden /> {t("dvAdd")}
+          </Button>
         }
       >
         {error && <ErrorNote message={error} />}
-        <InlineAlert message={actionError} onDismiss={() => setActionError("")} className="mb-3" />
-
-        <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label={t("dvFieldType")}>
-            <select className={inputClass} value={form.docType} onChange={(e) => setForm({ ...form, docType: e.target.value })}>
-              {data.docTypes.map((dt) => (
-                <option key={dt} value={dt}>
-                  {t(`doc${dt[0].toUpperCase()}${dt.slice(1)}`)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={t("dvFieldTitle")}>
-            <input className={inputClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={t("dvTitlePlaceholder")} />
-          </Field>
-          <Field label={t("dvFieldIssued")}>
-            <input type="date" className={inputClass} value={form.issuedAt} onChange={(e) => setForm({ ...form, issuedAt: e.target.value })} />
-          </Field>
-          <Field label={t("dvFieldExpires")} hint={t("dvExpiresHint")}>
-            <input type="date" className={inputClass} value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
-          </Field>
+        {!adding && <InlineAlert message={actionError} onDismiss={() => setActionError("")} className="mb-3" />}
+        <div className="flex flex-wrap gap-2">
+          <Pill tone="slate">{t("dvDocumentsPill", { n: data.summary.total })}</Pill>
+          {data.summary.expiring > 0 && <Pill tone="warn">{t("dvExpiringPill", { n: data.summary.expiring })}</Pill>}
+          {data.summary.expired > 0 && <Pill tone="bad">{t("dvExpiredPill", { n: data.summary.expired })}</Pill>}
         </div>
-        {applicationId != null && (
-          <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">{t("dvNewDocLinksToApplication")}</p>
-        )}
-        <Button onClick={add} disabled={busy || !form.title.trim()}>
-          <Plus className="h-3.5 w-3.5" /> {t("dvAdd")}
-        </Button>
       </JourneyCard>
 
-      <DocumentTemplatesCard />
+      {adding && (
+        <PanelDialog title={t("dvAdd")} busy={busy} error={actionError} onClose={() => {
+          setActionError("");
+          setAdding(false);
+        }}>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => {
+            event.preventDefault();
+            void add();
+          }}>
+            <Field label={t("dvFieldType")}>
+              <select className={inputClass} value={form.docType} onChange={(e) => setForm({ ...form, docType: e.target.value })}>
+                {data.docTypes.map((dt) => (
+                  <option key={dt} value={dt}>
+                    {t(`doc${dt[0].toUpperCase()}${dt.slice(1)}`)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t("dvFieldTitle")}>
+              <input className={inputClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={t("dvTitlePlaceholder")} />
+            </Field>
+            <Field label={t("dvFieldIssued")}>
+              <input type="date" className={inputClass} value={form.issuedAt} onChange={(e) => setForm({ ...form, issuedAt: e.target.value })} />
+            </Field>
+            <Field label={t("dvFieldExpires")} hint={t("dvExpiresHint")}>
+              <input type="date" className={inputClass} value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
+            </Field>
+            {applicationId != null && (
+              <p className="text-sm text-slate-600 dark:text-slate-300 sm:col-span-2">{t("dvNewDocLinksToApplication")}</p>
+            )}
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={busy || !form.title.trim()}>{t("dvAdd")}</Button>
+            </div>
+          </form>
+        </PanelDialog>
+      )}
 
       {data.documents.length === 0 ? (
         <Empty title={t("dvEmptyTitle")} hint={t("dvEmptyHint")} />
       ) : (
         <JourneyCard
           title={t("dvYourDocs")}
-          action={
-            <Button size="sm" variant="outline" onClick={() => onNavigateTab("requirements")}>
+          action={onOpenRequirements && (
+            <Button size="sm" variant="outline" onClick={onOpenRequirements}>
               {t("dvSeeNeeds")}
             </Button>
-          }
+          )}
         >
-          <ul className="space-y-2">
-            {data.documents.map((d) => (
+          <div className="mb-3 grid gap-3 rounded-surface border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40 sm:grid-cols-2">
+            <Field label={tm("searchDocuments")}>
+              <span className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" aria-hidden />
+                <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} className={`${inputClass} pl-9`} />
+              </span>
+            </Field>
+            {applicationId != null && (
+              <Field label={tm("documentLink")}>
+                <select className={inputClass} value={linkFilter} onChange={(e) => setLinkFilter(e.target.value)}>
+                  <option value="all">{tm("allDocuments")}</option>
+                  <option value="linked">{tm("linkedDocuments")}</option>
+                  <option value="unlinked">{tm("unlinkedDocuments")}</option>
+                </select>
+              </Field>
+            )}
+          </div>
+          <p role="status" className="mb-2 text-sm text-slate-600 dark:text-slate-300">{tm("documentCount", { count: matches.length })}</p>
+          {matches.length === 0 ? <Empty title={tm("noDocuments")} /> : <ul className="space-y-2">
+            {matches.map((d) => (
               <li key={d.id} className="sb-card-hover rounded-surface border border-slate-200 p-3 dark:border-slate-700">
                 <div className="flex flex-wrap items-start gap-2">
                   <StatusIcon state={d.status} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{d.title}</p>
+                    <p className="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">{d.title}</p>
+                    {applicationId != null && (
+                      <span className="mt-1 inline-block">
+                        {d.usedBy.some((link) => link.applicationId === applicationId)
+                          ? <Pill tone="brand">{tm("linkedDocuments")}</Pill>
+                          : <Pill tone="slate">{tm("unlinkedDocuments")}</Pill>}
+                      </span>
+                    )}
                     <p className="text-sm text-slate-500 dark:text-slate-400">
                       {t(`doc${d.docType[0].toUpperCase()}${d.docType.slice(1)}`)}
                       {d.expiresAt && t("dvExpires", { date: d.expiresAt })}
@@ -224,7 +286,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
                 </div>
               </li>
             ))}
-          </ul>
+          </ul>}
           <p className="mt-3 text-sm text-slate-500">
             {t("dvPrivacyNote")}
           </p>
@@ -235,6 +297,7 @@ export function DocumentVaultPanel({ profileId, applicationId, onNavigateTab }: 
           diploma and transcript carry an e-Apostille and a certified
           translation, and the bank statement is dated inside its window. This
           turns a planned visa date into the exact dates those must be ready. */}
+      <DocumentTemplatesCard />
       <ApostilleReadinessCard profileId={profileId} />
     </div>
   );
