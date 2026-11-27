@@ -505,7 +505,7 @@ export function ApplicationsHub({ profile, pane, setPane, navigate, hidden, work
     >
       {active === "tracker" && (
         <div className="space-y-4">
-          <ApplicationCenter activeProfile={profile} onOpenWorkspace={openWorkspace} />
+          <ApplicationCenter key={profile.id} activeProfile={profile} onOpenWorkspace={openWorkspace} />
           {/* Priority 5.1 — the waiver studio now lives in the Financial Plan
               destination (tab "Fee waivers"); the tracker stays about
               applications, and this one-line pointer keeps the tool reachable. */}

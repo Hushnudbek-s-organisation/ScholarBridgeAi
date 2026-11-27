@@ -7,19 +7,19 @@
  * requirement feeds automatically, and a final submission checklist that
  * refuses to mark an application t("recStatusSubmitted") while required items are open.
  */
-import React, { useCallback, useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
-import { ArrowLeft, Check, ExternalLink, Lock, RefreshCw } from "lucide-react";
-import { m as Motion, useReducedMotion } from "framer-motion";
-import { SectionTransition } from "@/components/motion";
-import { Empty, JourneyCard, Loading, Pill, ProgressBar, SourceTag, daysLabel, toneForDays } from "@/components/ui/journey";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { ArrowLeft, ArrowRight, Check, ExternalLink, Lock, RefreshCw } from "lucide-react";
+import { Empty, Field, JourneyCard, Loading, Pill, ProgressBar, ProgressRing, SourceTag, daysLabel, inputClass, toneForDays } from "@/components/ui/journey";
 import { Button } from "@/components/ui/Button";
-import { MotionButton } from "@/components/ui/MotionButton";
+import { PanelDialog } from "@/components/ui/PanelDialog";
+import { applicationDaysTo, applicationDeadlineOrder, applicationDecision, applicationPhase, type WorkspaceSection, type WorkspaceSummary } from "@/lib/journey/workspace";
+import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 import { announceSchollySubmission } from "@/lib/scholly-client-events";
 import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
 
 interface WorkspaceData {
-  tabs: { id: string; label: string; icon: string }[];
+  tabs: { id: WorkspaceSection; label: string; icon: string }[];
   application: {
     id: number;
     universityName: string;
@@ -33,17 +33,7 @@ interface WorkspaceData {
     applicationFeePaid: boolean;
     feeAmount: number | null;
   } | null;
-  workspaces: {
-    id: number;
-    universityName: string;
-    programName: string | null;
-    deadline: string | null;
-    status: string;
-    submittedAt: string | null;
-    progressPct: number;
-    done: number;
-    total: number;
-  }[];
+  workspaces: WorkspaceSummary[];
   progress: {
     pct: number;
     done: number;
@@ -83,6 +73,23 @@ interface WorkspaceData {
 
 const SECTION_ORDER = ["academic", "english", "testing", "documents", "essays", "recommendations", "finance", "application"];
 
+const PREP_TABS = ["requirements", "documents", "essays", "recommendations", "tests", "finance"] as const;
+const FINAL_TABS = ["deadlines", "submission", "decision"] as const;
+
+type PrepTab = typeof PREP_TABS[number];
+const SECTION_KEYS: Record<PrepTab, string[]> = {
+  requirements: ["academic", "application"],
+  documents: ["documents"],
+  essays: ["essays"],
+  recommendations: ["recommendations"],
+  tests: ["english", "testing"],
+  finance: ["finance"],
+};
+
+function tabForSection(section: string): PrepTab {
+  return PREP_TABS.find((tab) => SECTION_KEYS[tab].includes(section)) ?? "requirements";
+}
+
 export function ApplicationWorkspacePanel({
   profileId,
   applicationId,
@@ -96,18 +103,20 @@ export function ApplicationWorkspacePanel({
 }) {
   const t = useTranslations("journey");
   const [data, setData] = useState<WorkspaceData | null>(null);
-  const reduceMotion = useReducedMotion();
-  const [tab, setTab] = useState("overview");
+  const ta = useTranslations("applications");
+  const format = useFormatter();
+  const locale = useLocale();
+  const panelId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [tab, setTab] = useState<WorkspaceSection>("overview");
+  const [focusItem, setFocusItem] = useState<number | null>(null);
+  const [confirmSubmission, setConfirmSubmission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // `load` never touches `loading` itself: the mount effect calls it with no
-  // state write (react-hooks/set-state-in-effect), and the explicit refresh
-  // paths go through `reload` below.
-  // Loader without state writes, so the mount effect stays lint-clean while
-  // `reload` can still drive an explicit refresh.
+  // Keep the current workspace visible while a saved change reloads its data.
   const load = useCallback(async () => {
     const qs = new URLSearchParams({ profileId: String(profileId) });
     if (applicationId) qs.set("applicationId", String(applicationId));
@@ -118,7 +127,6 @@ export function ApplicationWorkspacePanel({
   }, [profileId, applicationId, t]);
 
   const reload = useCallback(async () => {
-    setLoading(true);
     try {
       setData(await load());
       setError(null);
@@ -149,9 +157,36 @@ export function ApplicationWorkspacePanel({
     };
   }, [load, t]);
 
+  useEffect(() => {
+    if (data?.application?.id) titleRef.current?.focus({ preventScroll: true });
+  }, [data?.application?.id]);
+
+  useEffect(() => {
+    if (focusItem == null) return;
+    document.getElementById(`${panelId}-req-${focusItem}`)?.focus();
+  }, [focusItem, panelId, tab]);
+
+  const selectTab = (next: WorkspaceSection) => {
+    setFocusItem(null);
+    setTab(next);
+  };
+  const openRequirement = (section: string, key: string) => {
+    const requirement = data?.requirements.find((item) => item.section === section && item.itemKey === key);
+    setTab(tabForSection(section));
+    setFocusItem(requirement?.id ?? null);
+  };
+  const formatDate = (date: string) => format.dateTime(new Date(`${date.slice(0, 10)}T00:00:00Z`), { dateStyle: "medium", timeZone: "UTC" });
+  const statusLabel = (status: string) => {
+    const decision = applicationDecision(status);
+    return decision ? ta(`result.${decision}`) : ta.has(`status.${status}` as never) ? ta(`status.${status}` as never) : ta("statusLabel");
+  };
+  const dayText = (date: string) => daysLabel(applicationDaysTo(date), locale);
+  const tabLabel = (value: WorkspaceSection) => t(`awSections.${value}`);
+
   const patchRequirement = async (id: number, status: string) => {
     setBusy(true);
     setMessage(null);
+    setError(null);
     try {
       const res = await fetch("/api/requirements", {
         method: "PATCH",
@@ -191,9 +226,10 @@ export function ApplicationWorkspacePanel({
   };
 
   const markSubmitted = async () => {
-    if (!data?.application) return;
+    if (!data?.application || busy || !data.readyToSubmit || data.application.submittedAt || data.application.status === "withdrawn") return;
     setBusy(true);
     setMessage(null);
+    setError(null);
     try {
       const res = await fetch("/api/workspace", {
         method: "PATCH",
@@ -209,7 +245,9 @@ export function ApplicationWorkspacePanel({
         );
         return;
       }
+      setConfirmSubmission(false);
       setMessage(t("awMarkedSubmitted"));
+      notifyApplicationsChanged(profileId);
       announceSchollyPointsChanged(profileId, json.schollyPointsAwarded);
       if (!data.application.submittedAt && json.status === "submitted" && json.id === data.application.id) {
         announceSchollySubmission(profileId, data.application.id);
@@ -235,45 +273,38 @@ export function ApplicationWorkspacePanel({
     );
   if (!data) return null;
 
-  // ---- List mode ---------------------------------------------------------
   if (!applicationId) {
+    const isActive = (row: WorkspaceSummary) => applicationPhase(row) === "preparing";
+    const workspaces = [...data.workspaces].sort((a, b) =>
+      applicationDeadlineOrder(a, isActive(a)) - applicationDeadlineOrder(b, isActive(b)) ||
+      (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999")
+    );
     return (
-      <JourneyCard
-        title={t("awListTitle")}
-        subtitle={t("awListSubtitle")}
-      >
-        {data.workspaces.length === 0 ? (
-          <Empty
-            title={t("awEmptyTitle")}
-            hint={t("awEmptyHint")}
-            action={<Button onClick={() => onNavigateTab("applications")}>{t("ceStartApplication")}</Button>}
-          />
+      <JourneyCard title={t("awListTitle")} subtitle={t("awListSubtitle")}>
+        {workspaces.length === 0 ? (
+          <Empty title={t("awEmptyTitle")} hint={t("awEmptyHint")}
+            action={<Button onClick={() => onNavigateTab("applications")}>{t("ceStartApplication")}</Button>} />
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {data.workspaces.map((w) => (
-              <li key={w.id}>
-                <Button variant="unstyled"
-                  type="button"
-                  onClick={() => onSelect(w.id)}
-                  className="w-full rounded-surface border border-slate-200 p-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 dark:border-slate-700 dark:hover:border-indigo-700"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 break-words text-sm font-semibold text-slate-900 dark:text-white">
-                      {w.universityName || t("awUniversityFallback")}
-                    </span>
-                    {w.submittedAt ? (
-                      <Pill tone="good">{t("recStatusSubmitted")}</Pill>
-                    ) : w.deadline ? (
-                      <Pill tone={toneForDays(daysTo(w.deadline))}>{daysTo(w.deadline)}d</Pill>
-                    ) : null}
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {workspaces.map((workspace) => (
+              <li key={workspace.id} className="min-w-0 space-y-2 rounded-surface border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h3 className="min-w-0 break-words font-bold text-slate-900 dark:text-white">{workspace.universityName || t("awUniversityFallback")}</h3>
+                  <Pill tone={workspace.submittedAt ? "info" : "brand"}>{statusLabel(workspace.status)}</Pill>
+                </div>
+                <p className="break-words text-sm text-slate-600 dark:text-slate-300">{workspace.programName || ta("noProgram")}</p>
+                <div className="flex flex-wrap gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  {workspace.deadline ? <time dateTime={workspace.deadline}>{formatDate(workspace.deadline)}</time> : ta("trackerNoDate")}
+                  {workspace.deadline && isActive(workspace) && <Pill tone={toneForDays(applicationDaysTo(workspace.deadline))}>{dayText(workspace.deadline)}</Pill>}
+                </div>
+                {workspace.submittedAt ? <p className="text-sm">{t("recStatusSubmitted")}</p> : workspace.total > 0 ? (
+                  <div className="space-y-1">
+                    <p className="flex flex-wrap justify-between gap-x-2 text-sm text-slate-600 dark:text-slate-300"><span>{t("awReqsDone", { done: workspace.done, total: workspace.total })}</span><strong>{workspace.progressPct}%</strong></p>
+                    <ProgressBar pct={workspace.progressPct} size="sm" animate={false} tone={workspace.progressPct >= 100 ? "good" : "brand"} />
                   </div>
-                  {w.programName && <p className="break-words text-sm text-slate-500">{w.programName}</p>}
-                  <div className="mt-2">
-                    <ProgressBar pct={w.progressPct} size="sm" tone={w.progressPct >= 100 ? "good" : "brand"} />
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {w.submittedAt ? t("recStatusSubmitted") : t("awReqsDone", { done: w.done, total: w.total })}
-                  </p>
+                ) : <p className="text-sm text-slate-600 dark:text-slate-300">{ta("trackerNoProgress")}</p>}
+                <Button size="sm" variant="secondary" onClick={() => onSelect(workspace.id)}>
+                  {ta("openWorkspace")}<ArrowRight className="size-4" aria-hidden />
                 </Button>
               </li>
             ))}
@@ -287,136 +318,151 @@ export function ApplicationWorkspacePanel({
   const app = data.application;
   if (!app) return <Empty title={t("awNotFound")} />;
 
-  const sections = SECTION_ORDER.map((key) => ({
+  const sections = [...new Set([...SECTION_ORDER, ...data.requirements.map((item) => item.section)])].map((key) => ({
     key,
-    label: key.charAt(0).toUpperCase() + key.slice(1),
+    label: t.has(`awRequirementGroups.${key}` as never) ? t(`awRequirementGroups.${key}` as never) : key,
     items: data.requirements.filter((r) => r.section === key),
   })).filter((s) => s.items.length > 0);
-  const sectionKeys: Record<string, string[]> = {
-    requirements: SECTION_ORDER,
-    documents: ["documents"], essays: ["essays"], recommendations: ["recommendations"],
-    tests: ["english", "testing"], finance: ["finance"],
-  };
-  const visibleSections = sections.filter((s) => sectionKeys[tab]?.includes(s.key));
+  const visibleSections = sections.filter((section) => tab === "requirements" || tabForSection(section.key) === tab);
+  const stillPreparing = applicationPhase(app) === "preparing";
+  const firstRequired = data.progress.missing.find((item) => item.isRequired);
+  const pendingRequests = data.recommendations.some((request) => request.status !== "submitted");
+  const checklistUrl = app.portalUrl && /^https?:\/\//i.test(app.portalUrl) ? app.portalUrl : null;
+  const deadlines = [
+    ...(app.deadline ? [{ key: "application", title: t("awAppDeadline"), date: app.deadline, completed: Boolean(app.submittedAt) }] : []),
+    ...data.deadlines.map((item) => ({ key: String(item.id), title: item.title, date: item.dueDate, completed: false })),
+    ...(data.offer?.responseDeadline ? [{ key: "response", title: t("opRespondBy"), date: data.offer.responseDeadline, completed: false }] : []),
+    ...(data.offer?.depositDueDate ? [{ key: "deposit", title: t("opDepositDue"), date: data.offer.depositDueDate, completed: false }] : []),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+
+  const tabTotals = (value: PrepTab) => data.progress.sections
+    .filter((section) => tabForSection(section.key) === value)
+    .reduce((counts, section) => ({ done: counts.done + section.done, total: counts.total + section.total }), { done: 0, total: 0 });
+
+  const workspaceLinks = (items: readonly WorkspaceSection[]) => items.map((key) => (
+    <Button
+      key={key}
+      variant={tab === key ? "secondary" : "ghost"}
+      aria-current={tab === key ? "page" : undefined}
+      className="min-h-11 w-full justify-start whitespace-normal text-left"
+      onClick={() => selectTab(key)}
+    >
+      <span className="min-w-0 flex-1 break-words">{tabLabel(key)}</span>
+      {key in SECTION_KEYS && (() => {
+        const counts = tabTotals(key as PrepTab);
+        return counts.total > 0 ? <span className="text-xs tabular-nums">{counts.done}/{counts.total}</span> : null;
+      })()}
+    </Button>
+  ));
 
   return (
     <div className="space-y-4">
-      <JourneyCard>
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <JourneyCard tone="hero">
+        <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="min-w-0">
-            <Button variant="unstyled"
-              type="button"
-              onClick={() => onSelect(0)}
-              className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-            >
-              <ArrowLeft className="h-3 w-3" />{t("awAllWorkspaces")}</Button>
-            <h2 className="break-words text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">{app.universityName}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {[app.programName, app.applicationRound, app.intakeTerm].filter(Boolean).join(" · ")}
+            <Button size="sm" variant="ghost" onClick={() => onSelect(0)} className="mb-1 min-h-11 px-0 text-indigo-700 dark:text-indigo-300">
+              <ArrowLeft className="size-4" aria-hidden />{t("awAllWorkspaces")}
+            </Button>
+            <h2 ref={titleRef} tabIndex={-1} className="break-words text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">{app.universityName}</h2>
+            <p className="mt-1 break-words text-sm text-slate-600 dark:text-slate-300">
+              {[app.programName, app.applicationRound, app.intakeTerm].filter(Boolean).join(" · ") || ta("noProgram")}
             </p>
-            {app.deadline && (
-              <p className="mt-1 break-words text-sm font-semibold text-slate-600 dark:text-slate-300">
-                {t("awDeadlineLabel")} {app.deadline} · {daysLabel(daysTo(app.deadline))}
-              </p>
-            )}
-          </div>
-          <div className="min-w-0 flex-1 sm:min-w-[180px] sm:max-w-xs">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("awProgressLabel")}</span>
-              <span className="text-lg font-extrabold text-slate-900 dark:text-white">{data.progress.pct}%</span>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <Pill tone={app.submittedAt ? "info" : "brand"}>{statusLabel(app.status)}</Pill>
+              {app.deadline ? <time dateTime={app.deadline}>{t("awDeadlineLabel")} {formatDate(app.deadline)}</time> : <span>{ta("trackerNoDate")}</span>}
+              {app.deadline && stillPreparing && <Pill tone={toneForDays(applicationDaysTo(app.deadline))}>{dayText(app.deadline)}</Pill>}
             </div>
-            <ProgressBar pct={data.progress.pct} size="lg" tone={data.progress.pct >= 100 ? "good" : "brand"} />
-            <p className="mt-1 text-sm text-slate-500">
-              {t("awReqsComplete", { done: data.progress.done, total: data.progress.total })}
-            </p>
+          </div>
+          <div className="w-fit max-w-full rounded-surface border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+            {app.submittedAt ? <Pill tone="info">{t("recStatusSubmitted")}</Pill> : data.progress.total ? (
+              <ProgressRing pct={data.progress.pct} size={65} strokeWidth={6} tone={data.progress.pct === 100 ? "good" : "brand"}
+                label={t("awProgressLabel")} caption={t("awReqsComplete", { done: data.progress.done, total: data.progress.total })} />
+            ) : <p className="text-sm text-slate-600 dark:text-slate-300">{ta("trackerNoProgress")}</p>}
           </div>
         </div>
-
-        <nav className="mt-4 flex flex-wrap gap-1.5" aria-label={t("awTabsAria")}>
-          {data.tabs.map((t) => {
-            const sectionProgress = data.progress.sections.find((s) => s.key === t.id);
-            const isActive = tab === t.id;
-            return (
-              <MotionButton variant="unstyled"
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                aria-current={isActive ? "true" : undefined}
-                whileHover={reduceMotion ? undefined : { y: -1 }}
-                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-                className={`relative rounded-control border px-2.5 py-1.5 text-xs font-semibold transition ${
-                  isActive
-                    ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                }`}
-              >
-                {isActive && (
-                  <Motion.span
-                    layoutId="workspace-tab-pill"
-                    className="absolute inset-0 rounded-control bg-indigo-600"
-                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                  />
-                )}
-                <span className="relative">
-                  <span aria-hidden>{t.icon}</span> {t.label}
-                  {sectionProgress && sectionProgress.total > 0 && (
-                    <span className="ml-1 opacity-70">
-                      {sectionProgress.done}/{sectionProgress.total}
-                    </span>
-                  )}
-                </span>
-              </MotionButton>
-            );
-          })}
-        </nav>
       </JourneyCard>
 
-      {message && <p className="rounded-control bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{message}</p>}
-      {error && <p className="rounded-control bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
-
-      {/* Every tab body fades in place (no vertical travel) so the header and
-          the tab strip never jump while switching. */}
-      <SectionTransition transitionKey={tab}>
-      {/* ---- Overview ---------------------------------------------------- */}
-      {tab === "overview" && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <JourneyCard title={t("awStandTitle")} subtitle={t("awStandSubtitle")}>
-            <ul className="space-y-2">
-              {data.progress.sections.map((s) => (
-                <li key={s.key}>
-                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    <span>{s.label}</span>
-                    <span>
-                      {s.done}/{s.total}
-                    </span>
-                  </div>
-                  <ProgressBar pct={s.pct} size="sm" tone={s.pct >= 100 ? "good" : "brand"} />
-                </li>
-              ))}
-            </ul>
-          </JourneyCard>
-          <JourneyCard title={t("awMissingTitle")} subtitle={t("awMissingSubtitle")}>
-            {data.progress.missing.length === 0 ? (
-              <Empty title={t("awNothingMissing")} hint={t("awNothingMissingHint")} />
-            ) : (
-              <ul className="space-y-1.5">
-                {data.progress.missing.slice(0, 10).map((m) => (
-                  <li key={`${m.section}-${m.key}`} className="flex items-center gap-2 text-sm">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${m.isRequired ? "bg-rose-400" : "bg-slate-300"}`} aria-hidden />
-                    <span className="min-w-0 flex-1 break-words text-slate-700 dark:text-slate-200">{m.title}</span>
-                    <Pill tone="slate">{m.section}</Pill>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </JourneyCard>
+      {message && <p role="status" className="rounded-control bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{message}</p>}
+      {error && !confirmSubmission && <p role="alert" className="rounded-control bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">{error}</p>}
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(10rem,12rem)_minmax(0,1fr)]">
+        <nav className="hidden min-w-0 space-y-1 rounded-surface border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900 xl:block" aria-label={t("awTabsAria")}>
+          {workspaceLinks(["overview"])}
+          <p className="px-3 pt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">{t("awPrepareGroup")}</p>
+          {workspaceLinks(PREP_TABS)}
+          <p className="px-3 pt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">{t("awFinishGroup")}</p>
+          {workspaceLinks(FINAL_TABS)}
+        </nav>
+        <div className="rounded-surface border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900 xl:hidden">
+          <Field label={t("awTabsAria")}>
+            <select className={`${inputClass} min-h-11`} value={tab} onChange={(event) => selectTab(event.target.value as WorkspaceSection)}>
+              <option value="overview">{tabLabel("overview")}</option>
+              <optgroup label={t("awPrepareGroup")}>{PREP_TABS.map((key) => <option key={key} value={key}>{tabLabel(key)}</option>)}</optgroup>
+              <optgroup label={t("awFinishGroup")}>{FINAL_TABS.map((key) => <option key={key} value={key}>{tabLabel(key)}</option>)}</optgroup>
+            </select>
+          </Field>
         </div>
-      )}
-
+        <div className="min-w-0">
+          {tab === "overview" && (
+            <div className="space-y-4">
+              <JourneyCard title={t("awNextStep")}>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <section className="min-w-0 space-y-2 rounded-surface bg-slate-50 p-3 dark:bg-slate-800/60">
+                    {app.status === "withdrawn" ? <p className="text-sm">{ta("result.withdrawn")}</p> : !stillPreparing ? (
+                      <>
+                        <h3 className="font-semibold">{t("awFollowDecision")}</h3>
+                        <Button size="sm" variant="secondary" onClick={() => selectTab("decision")}>{tabLabel("decision")}<ArrowRight className="size-4" aria-hidden /></Button>
+                      </>
+                    ) : firstRequired ? (
+                      <>
+                        <h3 className="break-words font-semibold">{firstRequired.title}</h3>
+                        <p className="text-sm text-slate-600 dark:text-slate-300">{tabLabel(tabForSection(firstRequired.section))}</p>
+                        <Button size="sm" variant="secondary" onClick={() => openRequirement(firstRequired.section, firstRequired.key)}>{t("awOpenItem")}<ArrowRight className="size-4" aria-hidden /></Button>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="font-semibold">{t(data.readyToSubmit ? "awReviewSubmission" : pendingRequests ? "awOutstandingRequests" : "awReviewRequirements")}</h3>
+                        <Button size="sm" variant="secondary" onClick={() => selectTab(data.readyToSubmit ? "submission" : pendingRequests ? "recommendations" : "requirements")}>{tabLabel(data.readyToSubmit ? "submission" : pendingRequests ? "recommendations" : "requirements")}<ArrowRight className="size-4" aria-hidden /></Button>
+                      </>
+                    )}
+                  </section>
+                  <section className="min-w-0 space-y-2 rounded-surface bg-slate-50 p-3 dark:bg-slate-800/60">
+                    <h3 className="font-semibold">{t("awReadiness")}</h3>
+                    {app.submittedAt ? <Pill tone="info">{t("recStatusSubmitted")}</Pill> : data.readyToSubmit ? <Pill tone="good">{t("awReady")}</Pill> : (
+                      <>
+                        <Pill tone="warn">{t("awNotReady")}</Pill>
+                        {data.progress.blockers.length > 0 && <p className="text-sm text-slate-600 dark:text-slate-300">{t("awOpenBlockers", { count: data.progress.blockers.length })}</p>}
+                      </>
+                    )}
+                    <div><Button size="sm" variant="outline" onClick={() => selectTab("submission")}>{t("awSubmitTitle")}</Button></div>
+                  </section>
+                </div>
+              </JourneyCard>
+              <JourneyCard title={t("awStandTitle")}>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {PREP_TABS.map((key) => {
+                    const counts = tabTotals(key);
+                    const percent = counts.total ? Math.round(counts.done / counts.total * 100) : null;
+                    return (
+                      <Button key={key} variant="outline" className="items-stretch flex-col !gap-2 p-3 text-left" onClick={() => selectTab(key)}>
+                        <span className="flex items-center justify-between gap-2"><span className="min-w-0 break-words">{tabLabel(key)}</span><ArrowRight className="size-4 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden /></span>
+                        <span className="text-xs font-normal text-slate-600 dark:text-slate-300">{percent == null ? ta("trackerNoProgress") : t("awReqsDone", counts)}</span>
+                        {percent != null && <span aria-hidden className="block h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                          <span className={`block h-full rounded-full ${percent === 100 ? "bg-emerald-500" : "bg-indigo-500"}`} style={{ width: `${percent}%` }} />
+                        </span>}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </JourneyCard>
+              <JourneyCard title={tabLabel("deadlines")} action={<Button size="sm" variant="outline" onClick={() => selectTab("deadlines")}>{t("awViewDates")}</Button>}>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{app.deadline ? <time dateTime={app.deadline}>{formatDate(app.deadline)}</time> : ta("trackerNoDate")}</p>
+              </JourneyCard>
+            </div>
+          )}
       {/* ---- Requirements / grouped sections ------------------------------ */}
-      {["requirements", "documents", "essays", "recommendations", "tests", "finance"].includes(tab) && (
+      {tab in SECTION_KEYS && (
         <JourneyCard
-          title={t("awReqsTabTitle")}
+          title={tabLabel(tab)}
           subtitle={t("awReqsTabSubtitle")}
           action={
             <Button
@@ -454,15 +500,17 @@ export function ApplicationWorkspacePanel({
                   {s.items.map((r) => (
                     <li
                       key={r.id}
-                      className="flex flex-wrap items-start gap-3 rounded-control border border-slate-200 px-3 py-2 dark:border-slate-700"
+                      id={`${panelId}-req-${r.id}`}
+                      tabIndex={-1}
+                      className="flex flex-wrap items-start gap-3 rounded-control border border-slate-200 bg-slate-50/70 px-3 py-2 focus-visible:outline-2 focus-visible:outline-indigo-500 dark:border-slate-700 dark:bg-slate-800/40"
                     >
                       <Button variant="unstyled"
                         type="button"
                         disabled={busy||r.itemKey==="published.requirement_group"}
                         onClick={() => patchRequirement(r.id, r.status === "done" ? "todo" : "done")}
-                        aria-label={r.itemKey==="published.requirement_group"?t("awDerivedPolicy"):r.status === "done" ? `Mark ${r.title} as not done` : `Mark ${r.title} as done`}
+                        aria-label={r.itemKey==="published.requirement_group"?t("awDerivedPolicy"):t(r.status === "done" ? "awMarkNotDoneAria" : "awMarkDoneAria", { title: r.title })}
                         title={r.itemKey==="published.requirement_group"?t("awDerivedPolicy"):undefined}
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-control border ${
+                        className={`mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-control border ${
                           r.status === "done"
                             ? "border-emerald-500 bg-emerald-700 text-white sb-ink-on-bright"
                             : r.status === "not_required"
@@ -470,7 +518,7 @@ export function ApplicationWorkspacePanel({
                               : "border-slate-300 dark:border-slate-600"
                         }`}
                       >
-                        {r.status === "done" && <Check className="h-3 w-3" />}
+                        {r.status === "done" && <Check className="size-4" aria-hidden />}
                         {r.status === "not_required" && <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />}
                       </Button>
                       <div className="min-w-0 flex-1">
@@ -491,12 +539,12 @@ export function ApplicationWorkspacePanel({
                             verificationStatus={r.verificationStatus}
                           />
                           {r.dueDate && (
-                            <Pill tone={toneForDays(daysTo(r.dueDate))}>{daysLabel(daysTo(r.dueDate))}</Pill>
+                            <Pill tone={toneForDays(applicationDaysTo(r.dueDate))}>{dayText(r.dueDate)}</Pill>
                           )}
                         </div>
                       </div>
-                      <div className="flex shrink-0 gap-1">
-                        {r.status !== "done" && r.status !== "not_required" && (
+                      <div className="flex flex-wrap gap-1 sm:shrink-0">
+                        {r.itemKey !== "published.requirement_group" && r.status !== "done" && r.itemKey !== "published.requirement_group" && r.status !== "not_required" && (
                           <Button size="sm" variant="ghost" disabled={busy} onClick={() => patchRequirement(r.id, "in_progress")}>{t("start")}</Button>
                         )}
                         {r.status !== "not_required" && (
@@ -522,25 +570,20 @@ export function ApplicationWorkspacePanel({
       {tab === "deadlines" && (
         <div className="grid gap-4 lg:grid-cols-2">
           <JourneyCard title={t("tabDeadlines")} subtitle={t("awDeadlinesSubtitle")}>
-            {data.deadlines.length === 0 && !app.deadline ? (
+            {deadlines.length === 0 ? (
               <Empty title={t("awNoDates")} hint={t("awNoDatesHint")} />
             ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                {app.deadline && (
-                  <li className="flex items-center gap-2 py-2 text-sm">
-                    <Pill tone={toneForDays(daysTo(app.deadline))}>{daysLabel(daysTo(app.deadline))}</Pill>
-                    <span className="flex-1 text-slate-700 dark:text-slate-200">{t("awAppDeadline")}</span>
-                    <span className="text-xs text-slate-500">{app.deadline}</span>
-                  </li>
-                )}
-                {data.deadlines.map((d) => (
-                  <li key={d.id} className="flex items-center gap-2 py-2 text-sm">
-                    <Pill tone={toneForDays(daysTo(d.dueDate))}>{daysLabel(daysTo(d.dueDate))}</Pill>
-                    <span className="flex-1 text-slate-700 dark:text-slate-200">{d.title}</span>
-                    <span className="text-xs text-slate-500">{d.dueDate}</span>
+              <ol className="ml-1 border-l-2 border-slate-200 pl-4 dark:border-slate-700">
+                {deadlines.map((deadline) => (
+                  <li key={deadline.key} className="relative flex min-w-0 flex-wrap items-start justify-between gap-2 py-2 text-sm before:absolute before:-left-[21px] before:top-4 before:size-2 before:rounded-full before:bg-indigo-500">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold text-slate-900 dark:text-white">{deadline.title}</p>
+                      <time className="text-slate-600 dark:text-slate-300" dateTime={deadline.date}>{formatDate(deadline.date)}</time>
+                    </div>
+                    {deadline.completed ? <Pill tone="info">{t("recStatusSubmitted")}</Pill> : <Pill tone={toneForDays(applicationDaysTo(deadline.date))}>{dayText(deadline.date)}</Pill>}
                   </li>
                 ))}
-              </ul>
+              </ol>
             )}
           </JourneyCard>
           <JourneyCard title={t("awReverseTitle")} subtitle={t("awReverseSubtitle")}>
@@ -568,57 +611,42 @@ export function ApplicationWorkspacePanel({
           title={t("awSubmitTitle")}
           subtitle={t("awSubmitSubtitle")}
         >
-          <ul className="mb-4 space-y-2">
-            {data.submissionChecklist.map((c) => (
-              <li key={c.key} className="flex items-center gap-2 text-sm">
-                <span
-                  className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${
-                    c.ok ? "bg-emerald-700 text-white sb-ink-on-bright" : "bg-slate-200 text-slate-500 dark:bg-slate-700"
-                  }`}
-                >
-                  {c.ok ? "✓" : ""}
-                </span>
-                <span className={c.ok ? "text-slate-500 line-through" : "font-medium text-slate-800 dark:text-slate-100"}>
-                  {c.label}
-                </span>
-              </li>
-            ))}
+          <ul className="mb-4 divide-y divide-slate-200 dark:divide-slate-700">
+            {data.submissionChecklist.map((item) => {
+              const section = item.key === "fee" ? "requirements" : item.key as PrepTab;
+              return (
+                <li key={item.key} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span className="min-w-0 break-words font-medium text-slate-800 dark:text-slate-100">{t(`awChecklist.${item.key}` as never)}</span>
+                  {item.ok ? <Pill tone="good"><Check className="size-3" aria-hidden />{t("awChecked")}</Pill> : <Button
+                    size="sm" variant="outline" onClick={() => item.key === "fee" ? openRequirement("application", "application.fee") : selectTab(section)}
+                  >{t("awOpenItem")}<ArrowRight className="size-3.5" aria-hidden /></Button>}
+                </li>
+              );
+            })}
           </ul>
 
           {app.submittedAt ? (
             <div className="rounded-surface border border-emerald-300 bg-emerald-50 px-3 py-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/40">
-              <p className="font-bold text-emerald-700 dark:text-emerald-300">
-                Submitted {new Date(app.submittedAt).toLocaleDateString()}
-              </p>
-              <p className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-300/80">{t("awConfirmationNote")}</p>
+              <p className="font-bold text-emerald-700 dark:text-emerald-300">{t("awSubmittedOn", { date: formatDate(app.submittedAt) })}</p>
+              <p className="mt-0.5 text-sm text-emerald-800 dark:text-emerald-300">{t("awConfirmationNote")}</p>
               <p className="mt-2 text-sm leading-relaxed text-emerald-900 dark:text-emerald-100">{t("awPostSubmitPortal")}</p>
             </div>
           ) : (
             <>
-              <Button
-                variant="success"
-                disabled={busy || !data.readyToSubmit}
-                onClick={markSubmitted}
-                title={data.readyToSubmit ? t("awMarkSubmittedTitle") : t("awMarkSubmittedTitleBlocked")}
-              >
-                <Lock className="h-3.5 w-3.5" />{t("awMarkSubmittedBtn")}</Button>
-              {!data.readyToSubmit && (
-                <p className="mt-2 text-sm text-slate-500">
-                  Still open: {data.progress.blockers.slice(0, 4).join(", ")}
-                  {data.progress.blockers.length > 4 && ` and ${data.progress.blockers.length - 4} more`}
-                </p>
-              )}
+              <Button variant="success" disabled={busy || !data.readyToSubmit || !stillPreparing}
+                onClick={() => setConfirmSubmission(true)}
+                title={data.readyToSubmit ? t("awMarkSubmittedTitle") : t("awMarkSubmittedTitleBlocked")}>
+                <Lock className="size-4" aria-hidden />{t("awMarkSubmittedBtn")}
+              </Button>
+              {!data.readyToSubmit && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t("awReviewRequirements")}</p>}
             </>
           )}
 
-          {app.portalUrl && (
-            <a
-              href={app.portalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
-            >
-              <ExternalLink className="h-3 w-3" />{t("awPortalLink")}</a>
+          {checklistUrl && (
+            <a href={checklistUrl} target="_blank" rel="noopener noreferrer"
+              className="mt-2 flex min-h-11 w-fit items-center gap-1.5 text-sm font-semibold text-indigo-700 underline dark:text-indigo-300">
+              <ExternalLink className="size-4" aria-hidden />{t("awPortalLink")}
+            </a>
           )}
         </JourneyCard>
       )}
@@ -626,7 +654,29 @@ export function ApplicationWorkspacePanel({
       {/* ---- Decision (spec §23) ----------------------------------------- */}
       {tab === "decision" && (
         <JourneyCard title={t("tabDecision")} subtitle={t("awDecisionSubtitle")}>
-          {data.offer ? <div className="mb-3 space-y-2"><Pill tone={data.offer.status === "accepted" ? "good" : data.offer.status === "pending" ? "warn" : "slate"}>{t(`opStatus_${data.offer.status}` as never)}</Pill>{data.offer.status === "accepted" && <p className="text-sm text-slate-600 dark:text-slate-300">{t("awAcceptedNote")}</p>}<Button variant="outline" onClick={() => onNavigateTab("offers")}>{t("awOpenOffers")}</Button></div> : <Empty title={t("awNoDecision")} hint={t("awNoDecisionHint")} />}
+          {data.offer ? (
+            <div className="mb-4 space-y-3">
+              <Pill tone={data.offer.status === "accepted" ? "good" : data.offer.status === "pending" ? "warn" : "slate"}>
+                {t(`opStatus_${data.offer.status}` as never)}
+              </Pill>
+              <dl className="grid gap-2 sm:grid-cols-2">
+                {[
+                  [t("opDecidedOn"), data.offer.decidedAt ? formatDate(data.offer.decidedAt) : null],
+                  [t("opRespondBy"), data.offer.responseDeadline ? formatDate(data.offer.responseDeadline) : null],
+                  [t("opDepositAmount"), data.offer.depositAmount == null ? null : format.number(data.offer.depositAmount, { style: "currency", currency: "USD" })],
+                  [t("opDepositDue"), data.offer.depositDueDate ? formatDate(data.offer.depositDueDate) : null],
+                  [t("opTuitionCommitment"), data.offer.tuitionCommitment == null ? null : format.number(data.offer.tuitionCommitment, { style: "currency", currency: "USD" })],
+                ].filter(([, value]) => value != null).map(([label, value]) => (
+                  <div key={label} className="min-w-0 rounded-control bg-slate-50 p-3 dark:bg-slate-800/60">
+                    <dt className="text-sm text-slate-600 dark:text-slate-300">{label}</dt>
+                    <dd className="break-words font-semibold tabular-nums">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {data.offer.status === "accepted" && <p className="text-sm text-slate-600 dark:text-slate-300">{t("awAcceptedNote")}</p>}
+              <Button variant="outline" onClick={() => onNavigateTab("offers")}>{t("awOpenOffers")}</Button>
+            </div>
+          ) : <Empty title={t("awNoDecision")} hint={t("awNoDecisionHint")} />}
           <details open={!data.offer} className="rounded-surface border border-slate-200 p-3 dark:border-slate-700">
             <summary className="cursor-pointer text-sm font-bold text-indigo-700 dark:text-indigo-300">{data.offer ? t("awEditDecision") : t("awRecordDecision")}</summary>
             <form onSubmit={saveOffer} className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -641,7 +691,17 @@ export function ApplicationWorkspacePanel({
           </details>
         </JourneyCard>
       )}
-      </SectionTransition>
+        </div>
+      </div>
+      {confirmSubmission && <PanelDialog title={t("awMarkSubmittedBtn")} busy={busy} error={error ?? undefined} onClose={() => setConfirmSubmission(false)}>
+        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void markSubmitted(); }}>
+          <label className="flex min-h-11 items-start gap-2 text-sm">
+            <input type="checkbox" required className="mt-0.5 size-5 shrink-0 accent-indigo-600" />
+            {t("awConfirmPortalSubmit")}
+          </label>
+          <Button type="submit" variant="success" disabled={busy}>{t("awMarkSubmittedBtn")}</Button>
+        </form>
+      </PanelDialog>}
     </div>
   );
 }
@@ -654,11 +714,4 @@ function WorkspaceList({ title, empty, rows, onOpen, action }: { title: string; 
       <Button size="sm" variant="outline" className="mt-3" onClick={onOpen}>{action}</Button>
     </div>
   );
-}
-
-function daysTo(iso: string | null): number | null {
-  if (!iso) return null;
-  const now = new Date();
-  const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return Math.round((new Date(`${iso.slice(0, 10)}T00:00:00Z`).getTime() - start) / 86400000);
 }

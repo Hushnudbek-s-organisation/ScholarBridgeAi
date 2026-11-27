@@ -1,65 +1,29 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  CheckCircle2,
-  Loader2,
-  Plus,
-  Target,
-  Trash2,
-  Trophy,
-} from "lucide-react";
-import { useTranslations } from "next-intl";
-import { StudentProfile } from "./Navbar";
+import { useCallback, useState } from "react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { ArrowRight, CalendarDays, Plus, Search, Trash2, Trophy } from "lucide-react";
+import type { StudentProfile } from "./Navbar";
 import { RecLetterPanel } from "./RecLetterPanel";
 import { Button } from "@/components/ui/Button";
+import { PanelDialog } from "@/components/ui/PanelDialog";
+import { Empty, ErrorNote, Field, JourneyCard, Loading, Pill, ProgressBar, daysLabel, inputClass, toneForDays } from "@/components/ui/journey";
+import { getJson, sendJson, useResource } from "@/components/journey/useResource";
 import { notifyApplicationsChanged } from "@/lib/applicationEvents";
 import { announceSchollySubmission } from "@/lib/scholly-client-events";
 import { announceSchollyPointsChanged } from "@/lib/scholly-points-client";
+import { APPLICATION_DECISIONS, applicationDaysTo, applicationDeadlineOrder, applicationDecision, applicationPhase, type ApplicationDecision, type WorkspaceSummary } from "@/lib/journey/workspace";
 
-/**
- * Universal application tracker (#12) and private outcome history.
- *
- * Each row walks the real lifecycle (not started → preparing → essay →
- * documents → submitted → decision) and, once a decision arrives, the student
- * may record the result. Sharing is unchecked by default and requires an
- * explicit choice for each result; shared examples do not change fit scores or
- * estimate admission chances.
- */
+const STATUSES = ["not_started", "preparing", "essay", "documents", "recommendations", "fee_paid", "submitted", "interview", "decision", "withdrawn"] as const;
+const ROUNDS = ["RD", "ED", "EA", "Rolling", "Winter", "Summer", "Spring"];
 
-const STATUSES: { value: string; chip: string }[] = [
-  { value: "not_started", chip: "bg-slate-100 text-slate-600" },
-  { value: "preparing", chip: "bg-slate-100 text-slate-700" },
-  { value: "essay", chip: "bg-amber-100 text-amber-800" },
-  { value: "documents", chip: "bg-amber-100 text-amber-800" },
-  { value: "recommendations", chip: "bg-amber-100 text-amber-800" },
-  { value: "fee_paid", chip: "bg-sky-100 text-sky-800" },
-  { value: "submitted", chip: "bg-sky-100 text-sky-800" },
-  { value: "interview", chip: "bg-violet-100 text-violet-800" },
-  { value: "decision", chip: "bg-emerald-100 text-emerald-800" },
-  { value: "withdrawn", chip: "bg-slate-200 text-slate-600" },
-];
-
-/** Result options offered when a decision arrives. */
-const RESULTS = ["accepted", "rejected", "waitlisted", "deferred", "withdrawn"] as const;
-
-/** Small helper: a visually hidden <label> keeps the compact form accessible. */
-const srLabel = "sr-only";
-
-const RESULT_STYLE: Record<string, string> = {
-  accepted: "bg-emerald-100 text-emerald-800",
-  rejected: "bg-rose-100 text-rose-800",
-  waitlisted: "bg-amber-100 text-amber-800",
-  deferred: "bg-sky-100 text-sky-800",
-  withdrawn: "bg-slate-200 text-slate-600",
-};
-
-interface Outcome {
-  id: number;
-  result: string;
-  scholarshipAmountUsd: number | null;
-  shareConsent: boolean;
-}
+const PHASES = [
+  { key: "preparing", bar: "bg-indigo-500 dark:bg-indigo-400", tone: "brand" },
+  { key: "awaiting", bar: "bg-sky-600 dark:bg-sky-400", tone: "info" },
+  { key: "closed", bar: "bg-emerald-600 dark:bg-emerald-400", tone: "good" },
+] as const;
+const RESULT_TONES = { accepted: "good", rejected: "bad", waitlisted: "warn", deferred: "info", withdrawn: "slate" } as const;
+const EMPTY_DATA: TrackerData = { applications: [], workspaces: [], savedUniversities: [] };
 
 interface ApplicationRow {
   id: number;
@@ -71,536 +35,295 @@ interface ApplicationRow {
   deadline: string | null;
   status: string;
   submittedAt: string | null;
-  outcome: Outcome | null;
+  outcome: { result: ApplicationDecision } | null;
 }
 
-/** One saved-university row from /api/saved-universities. */
 interface SavedUniRow {
   id: number;
   universityId: number;
   university?: { name?: string; country?: string } | null;
 }
 
-interface ApplicationCenterProps {
-  activeProfile: StudentProfile | null;
-  /**
-   * Opens the selected application in its workspace. The tracker row stays the
-   * single source of truth for status; the workspace is a view of the same
-   * record, so the two can never disagree.
-   */
-  onOpenWorkspace?: (id: number) => void;
+interface TrackerData {
+  applications: ApplicationRow[];
+  workspaces: WorkspaceSummary[];
+  savedUniversities: SavedUniRow[];
 }
 
-export function ApplicationCenter({ activeProfile, onOpenWorkspace }: ApplicationCenterProps) {
+type Dialog = { type: "add" } | { type: "remove" | "outcome"; row: ApplicationRow };
+
+export function ApplicationCenter({ activeProfile, onOpenWorkspace }: {
+  activeProfile: StudentProfile | null;
+  onOpenWorkspace?: (id: number) => void;
+}) {
   const t = useTranslations("applications");
-  const [rows, setRows] = useState<ApplicationRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState({ universityName: "", programName: "", deadline: "", applicationRound: "RD" });
-  const [reporting, setReporting] = useState<number | null>(null);
-  const [result, setResult] = useState("accepted");
-  const [scholarship, setScholarship] = useState("");
-  const [consent, setConsent] = useState(false);
+  const tj = useTranslations("journey");
+  const format = useFormatter();
+  const locale = useLocale();
+  const profileId = activeProfile?.id;
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [sort, setSort] = useState("deadline");
+  const [dialog, setDialog] = useState<Dialog | null>(null);
   const [busy, setBusy] = useState(false);
-  // Analytics extras (spec §33): upcoming deadlines + scholarship matches.
-  // Fetched, never hardcoded — null until the response arrives.
-  const [deadlineCount, setDeadlineCount] = useState<number | null>(null);
-  const [scholarshipMatchCount, setScholarshipMatchCount] = useState<number | null>(null);
-  // 2.5 — the shortlist feeds the tracker: saved universities that do not
-  // have an application row yet are offered as one-click starters.
-  const [savedRows, setSavedRows] = useState<SavedUniRow[]>([]);
-  const [startingAppId, setStartingAppId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [result, setResult] = useState<ApplicationDecision>("accepted");
 
-  useEffect(() => {
-    if (!activeProfile?.id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [dlRes, schRes] = await Promise.all([
-          fetch(`/api/deadlines?profileId=${activeProfile.id}`),
-          fetch(`/api/scholarships?profileId=${activeProfile.id}&summary=match-count`),
-        ]);
-        if (cancelled) return;
-        if (dlRes.ok) {
-          const dl = await dlRes.json();
-          const s = dl.summary;
-          setDeadlineCount(s ? (s.critical ?? 0) + (s.soon ?? 0) : null);
-        }
-        if (schRes.ok) {
-          const sch = await schRes.json();
-          if (typeof sch.matchCount === "number") setScholarshipMatchCount(sch.matchCount);
-        }
-      } catch {
-        // Leave the stats as "—" rather than showing a wrong number.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeProfile?.id]);
-
-  const activeProfileId = activeProfile?.id;
   const load = useCallback(async () => {
-    if (!activeProfileId) return;
-    setLoading(true);
-    try {
-      const [res, savedRes] = await Promise.all([
-        fetch(`/api/applications?profileId=${activeProfileId}`),
-        fetch(`/api/saved-universities?profileId=${activeProfileId}`),
-      ]);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("loadError"));
-      setRows(data.applications ?? []);
-      // The shortlist read is auxiliary — a failure here must not fail the
-      // tracker itself, it just leaves the start strip empty.
-      if (savedRes.ok) {
-        const savedData = await savedRes.json().catch(() => null);
-        setSavedRows(Array.isArray(savedData?.savedUniversities) ? savedData.savedUniversities : []);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("loadError"));
-    } finally {
-      setLoading(false);
-    }
-  }, [activeProfileId, t]);
+    const [tracker, progress, saved] = await Promise.all([
+      getJson<Pick<TrackerData, "applications">>(`/api/applications?profileId=${profileId}`, t("loadError"), { noCache: true }),
+      getJson<Pick<TrackerData, "workspaces">>(`/api/workspace?profileId=${profileId}`, t("loadError"), { noCache: true }).catch(() => null),
+      getJson<Pick<TrackerData, "savedUniversities">>(`/api/saved-universities?profileId=${profileId}`, t("loadError"), { noCache: true }).catch(() => null),
+    ]);
+    if (!Array.isArray(tracker.applications)) throw new Error(t("loadError"));
+    return { applications: tracker.applications, workspaces: progress?.workspaces ?? [], savedUniversities: saved?.savedUniversities ?? [] };
+  }, [profileId, t]);
 
-  // Saved universities still missing an application row.
-  const startableSaved = savedRows.filter(
-    (s) => !rows.some((r) => r.universityId != null && r.universityId === s.universityId)
-  );
-
-  // One click: create the application (the API enriches it with the
-  // university's real fee / portal / nearest deadline), then open its
-  // workspace — the same flow the explorer card uses.
-  const startFromSaved = async (saved: SavedUniRow) => {
-    if (!activeProfileId || startingAppId !== null) return;
-    setStartingAppId(saved.universityId);
-    setError("");
-    try {
-      const res = await fetch("/api/applications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId: activeProfileId, universityId: saved.universityId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("addError"));
-      await load();
-      notifyApplicationsChanged(activeProfileId);
-      if (data.application?.id && onOpenWorkspace) onOpenWorkspace(data.application.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("addError"));
-    } finally {
-      setStartingAppId(null);
-    }
+  const { data, loading, error, reload } = useResource(load, [profileId], { initial: EMPTY_DATA, enabled: profileId != null });
+  const phase = (row: ApplicationRow) => applicationPhase(row, row.outcome?.result);
+  const statusLabel = (status: string) => {
+    const decision = applicationDecision(status);
+    return decision ? t(`result.${decision}`) : t.has(`status.${status}` as never) ? t(`status.${status}` as never) : t("statusLabel");
   };
-
-  useEffect(() => {
-    void Promise.resolve().then(load);
-  }, [load]);
-
-  const addApplication = async () => {
-    if (!activeProfile?.id || !draft.universityName.trim()) return;
-    setBusy(true);
-    setError("");
-    try {
-      const res = await fetch("/api/applications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId: activeProfile.id, ...draft }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("addError"));
-      announceSchollyPointsChanged(activeProfile.id, data.schollyPointsAwarded);
-      setDraft({ universityName: "", programName: "", deadline: "", applicationRound: "RD" });
-      setAdding(false);
-      await load();
-      notifyApplicationsChanged(activeProfile.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("addError"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const setStatus = async (id: number, status: string) => {
-    const prior = rows.find(row => row.id === id);
-    try {
-      const res = await fetch("/api/applications", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status }),
-      });
-      if (!res.ok) throw new Error(t("statusError"));
-      const saved = await res.json().catch(() => null);
-      if (activeProfileId && typeof saved?.schollyPointsAwarded === "number") {
-        announceSchollyPointsChanged(activeProfileId, saved.schollyPointsAwarded);
-      }
-      if (activeProfileId && prior && !prior.submittedAt && prior.status !== "submitted" && status === "submitted") {
-        if (saved?.application?.status === "submitted" && saved.application.submittedAt) {
-          announceSchollySubmission(activeProfileId, id);
-        }
-      }
-      await load();
-      notifyApplicationsChanged(activeProfile?.id ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("statusError"));
-    }
-  };
-
-  const remove = async (id: number) => {
-    try {
-      const res = await fetch(`/api/applications?id=${id}`, { method: "DELETE" });
-      // A failed delete is an error, NOT a success. The old code ignored
-      // res.ok and then reloaded, making the row briefly disappear and come
-      // back — and never telling the student that nothing was deleted.
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(typeof data?.error === "string" && data.error ? data.error : t("deleteError"));
-      }
-      await load();
-      notifyApplicationsChanged(activeProfile?.id ?? null);
-    } catch {
-      setError(t("deleteError"));
-    }
-  };
-
-  const reportResult = async () => {
-    if (!reporting) return;
-    setBusy(true);
-    setError("");
-    try {
-      const res = await fetch("/api/applications/outcome", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          applicationId: reporting,
-          result,
-          scholarshipAmountUsd: scholarship ? Number(scholarship) : null,
-          shareConsent: consent,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("resultError"));
-      setReporting(null);
-      setScholarship("");
-      setConsent(false);
-      await load();
-      notifyApplicationsChanged(activeProfile?.id ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("resultError"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const submitted = rows.filter((r) => r.status === "submitted" || r.status === "decision").length;
-  const decided = rows.filter((r) => r.outcome).length;
-  const accepted = rows.filter((r) => r.outcome?.result === "accepted").length;
-
-  if (!activeProfile) {
-    return (
-      <div className="rounded-overlay border border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Sign in to track your applications.
-      </div>
-    );
+  const { applications, workspaces, savedUniversities } = data;
+  const byId = new Map(workspaces.map((workspace) => [workspace.id, workspace]));
+  const linked = new Set(applications.map((row) => row.universityId));
+  const available = savedUniversities.filter((entry) => !linked.has(entry.universityId) && entry.university?.name);
+  const counts = { preparing: 0, awaiting: 0, closed: 0 };
+  let nearest: ApplicationRow | undefined;
+  for (const row of applications) {
+    const group = phase(row);
+    counts[group]++;
+    if (group === "preparing" && row.deadline && (applicationDaysTo(row.deadline) ?? -1) >= 0 &&
+      (!nearest?.deadline || row.deadline < nearest.deadline)) nearest = row;
   }
+  const search = query.trim().toLocaleLowerCase(locale);
+  const matching = applications.filter((row) =>
+    (filter === "all" || phase(row) === filter) &&
+    `${row.universityName} ${row.programName ?? ""}`.toLocaleLowerCase(locale).includes(search)
+  ).sort((a, b) => {
+    if (sort === "newest") return b.id - a.id;
+    if (sort === "name") return a.universityName.localeCompare(b.universityName, locale) || b.id - a.id;
+    return applicationDeadlineOrder(a, phase(a) === "preparing") - applicationDeadlineOrder(b, phase(b) === "preparing") ||
+      (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999") || b.id - a.id;
+  });
+
+  const nearestSummary = nearest ? byId.get(nearest.id) : undefined;
+  const formatDeadline = (date: string) => format.dateTime(new Date(`${date.slice(0, 10)}T00:00:00Z`), { dateStyle: "medium", timeZone: "UTC" });
+
+  const mutate = async (action: () => Promise<void>, fallback: string) => {
+    if (busy || profileId == null) return;
+    setBusy(true);
+    setActionError("");
+    setFeedback("");
+    try {
+      await action();
+      await reload();
+      notifyApplicationsChanged(profileId);
+      setFeedback(t("trackerUpdated"));
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : fallback);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = async (payload: Record<string, unknown>, open: boolean) => {
+    await mutate(async () => {
+      const saved = await sendJson<{ application?: { id: number }; schollyPointsAwarded?: number }>("/api/applications", {
+        method: "POST", body: JSON.stringify({ profileId, ...payload }),
+      }, t("addError"));
+      if (profileId != null && typeof saved.schollyPointsAwarded === "number") announceSchollyPointsChanged(profileId, saved.schollyPointsAwarded);
+      setDialog(null);
+      if (open && saved.application?.id) onOpenWorkspace?.(saved.application.id);
+      else {
+        setQuery("");
+        setFilter("all");
+        setSort("newest");
+      }
+    }, t("addError"));
+  };
+
+  const setStatus = async (row: ApplicationRow, status: string) => {
+    await mutate(async () => {
+      const saved = await sendJson<{ application?: ApplicationRow; schollyPointsAwarded?: number }>("/api/applications", {
+        method: "PATCH", body: JSON.stringify({ id: row.id, status }),
+      }, t("statusError"));
+      if (profileId != null && typeof saved.schollyPointsAwarded === "number") announceSchollyPointsChanged(profileId, saved.schollyPointsAwarded);
+      if (profileId != null && !row.submittedAt && row.status !== "submitted" && saved.application?.status === "submitted" && saved.application.submittedAt) {
+        announceSchollySubmission(profileId, row.id);
+      }
+    }, t("statusError"));
+  };
+
+  const openDialog = (next: Dialog) => {
+    setActionError("");
+    setResult("accepted");
+    setDialog(next);
+  };
+
+  if (profileId == null) return <Empty title={t("trackerSignIn")} />;
 
   return (
     <div className="space-y-4">
-      {/* 2.5 — one-click "start application" from the shortlist, so the
-          explorer's ⭐ and the tracker never live on different planets. */}
-      {!loading && startableSaved.length > 0 && (
-        <div className="rounded-overlay border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/40 dark:bg-indigo-950/30">
-          <p className="min-w-0 break-words text-sm font-extrabold text-indigo-800 dark:text-indigo-200">
-            {t("savedStripTitle")}
-          </p>
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {startableSaved.slice(0, 6).map((saved) => (
-              <li
-                key={saved.id}
-                className="flex max-w-full flex-wrap items-center gap-1.5 rounded-surface border border-indigo-200 bg-white px-2.5 py-1.5 dark:border-indigo-500/40 dark:bg-slate-900"
-              >
-                <span className="min-w-0 break-words text-xs font-bold text-slate-800 dark:text-slate-100">
-                  {saved.university?.name ?? ""}
-                  {saved.university?.country ? (
-                    <span className="font-medium text-slate-500"> · {saved.university.country}</span>
-                  ) : null}
-                </span>
-                <Button variant="unstyled"
-                  type="button"
-                  disabled={startingAppId !== null}
-                  onClick={() => void startFromSaved(saved)}
-                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-control bg-indigo-600 px-2.5 text-xs font-bold text-white transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:opacity-50"
-                >
-                  {startingAppId === saved.universityId ? (
-                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                  ) : null}
-                  {t("startApplicationShort")}
-                </Button>
-              </li>
-            ))}
+      {feedback && <p role="status" className="rounded-control bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">{feedback}</p>}
+      {actionError && !dialog && <div role="alert"><ErrorNote message={actionError} /></div>}
+      {error && <div className="space-y-2" role="alert"><ErrorNote message={error} /><Button variant="outline" onClick={() => void reload()}>{tj("awTryAgain")}</Button></div>}
+
+      {!error && (!loading || applications.length > 0) && (
+        <JourneyCard tone="hero" title={t("trackerOverview")}>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+            <div className="min-w-0 space-y-3">
+              <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[{ label: t("trackerTotal"), value: applications.length }, ...PHASES.map(({ key }) => ({ label: t(`trackerPhases.${key}`), value: counts[key] }))].map(({ label, value }) => (
+                  <div key={label} className="min-w-0 rounded-surface border border-slate-200 bg-white p-2.5 dark:border-slate-700 dark:bg-slate-900">
+                    <dt className="break-words text-xs font-semibold text-slate-600 dark:text-slate-300">{label}</dt>
+                    <dd className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {applications.length > 0 && <div className="flex h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" aria-hidden>
+                {PHASES.map(({ key, bar }) => <span key={key} className={bar} style={{ width: `${counts[key] / applications.length * 100}%` }} />)}
+              </div>}
+            </div>
+            <section className="min-w-0 space-y-2 rounded-surface border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <h3 className="flex items-center gap-2 text-sm font-bold"><CalendarDays aria-hidden className="size-4 shrink-0 text-indigo-600 dark:text-indigo-300" />{t("trackerNearest")}</h3>
+              {nearest?.deadline ? (
+                <>
+                  <p className="break-words font-semibold text-slate-900 dark:text-white">{nearest.universityName}</p>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <time dateTime={nearest.deadline}>{formatDeadline(nearest.deadline)}</time>
+                    <Pill tone={toneForDays(applicationDaysTo(nearest.deadline))}>{daysLabel(applicationDaysTo(nearest.deadline), locale)}</Pill>
+                  </div>
+                  {nearestSummary && nearestSummary.blockers > 0 && <p className="text-sm text-slate-600 dark:text-slate-300">{t("trackerOpenItems", { count: nearestSummary.blockers })}</p>}
+                  {onOpenWorkspace && <Button size="sm" variant="secondary" onClick={() => onOpenWorkspace(nearest.id)}>{t("openWorkspace")}<ArrowRight aria-hidden className="size-4" /></Button>}
+                </>
+              ) : <p className="text-sm text-slate-600 dark:text-slate-300">{t("trackerNoNearest")}</p>}
+            </section>
+          </div>
+        </JourneyCard>
+      )}
+
+      <JourneyCard title={t("title")} action={<Button onClick={() => openDialog({ type: "add" })} disabled={busy}><Plus aria-hidden className="size-4" />{t("add")}</Button>}>
+        {loading && applications.length === 0 ? <Loading label={t("loading")} /> : !error && applications.length === 0 ? <Empty title={t("empty")} /> : applications.length > 0 && (
+          <div className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)]">
+              <Field label={t("trackerSearch")}><span className="relative block"><Search aria-hidden className="pointer-events-none absolute left-3 top-3.5 size-4 text-slate-500" /><input type="search" className={`${inputClass} min-h-11 pl-9`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("trackerSearchHint")} /></span></Field>
+              <Field label={t("trackerFilter")}><select value={filter} className={`${inputClass} min-h-11`} onChange={(e) => setFilter(e.target.value)}><option value="all">{t("trackerAll")}</option>{PHASES.map(({ key }) => <option key={key} value={key}>{t(`trackerPhases.${key}`)}</option>)}</select></Field>
+              <Field label={t("trackerSort")}><select value={sort} className={`${inputClass} min-h-11`} onChange={(e) => setSort(e.target.value)}><option value="deadline">{t("trackerSortDeadline")}</option><option value="newest">{t("trackerSortNewest")}</option><option value="name">{t("trackerSortName")}</option></select></Field>
+            </div>
+            <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{t("trackerCount", { count: matching.length })}</p>
+            {matching.length ? (
+              <ul className="space-y-2">
+                {matching.map((row) => {
+                  const workspace = byId.get(row.id);
+                  const currentPhase = PHASES.find(({ key }) => key === phase(row))!;
+                  const knownDecision = applicationDecision(row.status);
+                  const days = applicationDaysTo(row.deadline);
+                  const canReport = !row.outcome && !knownDecision && Boolean(row.submittedAt || ["submitted", "interview", "decision"].includes(row.status));
+                  return (
+                    <li key={row.id} className="min-w-0 rounded-surface border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                      <div className="grid min-w-0 grid-cols-2 items-start gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,.8fr)_minmax(0,1fr)_auto] lg:items-center">
+                        <div className="col-span-2 min-w-0 lg:col-span-1">
+                          <h3 className="break-words font-bold text-slate-900 dark:text-white">{row.universityName}</h3>
+                          <p className="mt-0.5 break-words text-sm text-slate-600 dark:text-slate-300">{[row.programName, row.applicationRound, row.intakeTerm].filter(Boolean).join(" · ") || t("noProgram")}</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <Pill tone={knownDecision ? RESULT_TONES[knownDecision] : currentPhase.tone}>{statusLabel(row.status)}</Pill>
+                            {row.outcome && !knownDecision && <Pill tone={RESULT_TONES[row.outcome.result]}>{t(`result.${row.outcome.result}`)}</Pill>}
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <p className="text-slate-600 dark:text-slate-300">{t("formDeadline")}</p>
+                          <p className="break-words font-semibold">{row.deadline ? <time dateTime={row.deadline}>{formatDeadline(row.deadline)}</time> : t("trackerNoDate")}</p>
+                          {row.deadline && currentPhase.key === "preparing" && <Pill tone={toneForDays(days)}>{daysLabel(days, locale)}</Pill>}
+                        </div>
+                        <div className="min-w-0 space-y-1.5 text-sm">
+                          {row.submittedAt ? <Pill tone="info">{tj("recStatusSubmitted")}</Pill> : workspace?.total ? <>
+                            <p className="flex flex-wrap justify-between gap-x-2 text-slate-600 dark:text-slate-300"><span>{tj("awReqsDone", { done: workspace.done, total: workspace.total })}</span><strong className="tabular-nums">{workspace.progressPct}%</strong></p>
+                            <ProgressBar pct={workspace.progressPct} size="sm" tone={workspace.progressPct === 100 ? "good" : "brand"} animate={false} />
+                          </> : <p className="text-slate-600 dark:text-slate-300">{t("trackerNoProgress")}</p>}
+                        </div>
+                        {onOpenWorkspace && <Button size="sm" variant="secondary" className="col-span-2 justify-self-start lg:col-span-1 lg:justify-self-end" onClick={() => onOpenWorkspace(row.id)}>{t("openWorkspace")}<ArrowRight aria-hidden className="size-4" /></Button>}
+                      </div>
+                      <details className="mt-1">
+                        <summary className="min-h-11 cursor-pointer py-2.5 text-sm font-semibold text-indigo-700 dark:text-indigo-300">{t("trackerActions")}</summary>
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="min-w-0 max-w-full"><Field label={t("trackerFilter")}><select aria-label={t("statusLabelFor", { name: row.universityName })} className={`${inputClass} min-h-11`} value={row.status} disabled={busy} onChange={(e) => void setStatus(row, e.target.value)}>
+                            {!STATUSES.some((status) => status === row.status) && <option value={row.status}>{statusLabel(row.status)}</option>}
+                            {STATUSES.filter((status) => status !== "submitted" || row.status === status || !onOpenWorkspace).map((status) => <option key={status} value={status}>{t(`status.${status}`)}</option>)}
+                          </select></Field></div>
+                          {canReport && <Button size="sm" variant="outline" className="min-h-11" disabled={busy} onClick={() => openDialog({ type: "outcome", row })}><Trophy aria-hidden className="size-4" />{t("reportResult")}</Button>}
+                          <Button size="sm" variant="ghost" className="min-h-11 text-rose-700 dark:text-rose-300" disabled={busy} onClick={() => openDialog({ type: "remove", row })}><Trash2 aria-hidden className="size-4" />{t("deleteLabel")}</Button>
+                        </div>
+                      </details>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <Empty title={t("trackerNoMatches")} hint={t("trackerNoMatchesHint")} />}
+          </div>
+        )}
+      </JourneyCard>
+
+      {available.length > 0 && <JourneyCard>
+        <details>
+          <summary className="min-h-11 cursor-pointer py-2.5 font-bold text-indigo-700 dark:text-indigo-300">{t("savedStripTitle")}</summary>
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+            {available.map((saved) => <li key={saved.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+              <div className="min-w-0 break-words"><p className="font-semibold">{saved.university?.name}</p>{saved.university?.country && <p className="text-sm text-slate-600 dark:text-slate-300">{saved.university.country}</p>}</div>
+              <Button size="sm" variant="outline" className="min-h-11" disabled={busy} onClick={() => void create({ universityId: saved.universityId }, true)}>{t("startApplicationShort")}</Button>
+            </li>)}
           </ul>
-        </div>
-      )}
+        </details>
+      </JourneyCard>}
 
-      {/* 2 columns on phones: seven full-width metric tiles stacked ~560px
-          of scrolling before the first application card. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {[
-          { label: t("statApplied"), value: rows.length },
-          { label: t("statSubmitted"), value: submitted },
-          { label: t("statInProgress"), value: Math.max(0, rows.length - submitted) },
-          { label: t("statDecisions"), value: decided },
-          { label: t("statAccepted"), value: accepted },
-          { label: t("statScholarships"), value: scholarshipMatchCount },
-          { label: t("statDeadlines"), value: deadlineCount },
-        ].map((stat) => (
-          <div key={stat.label} className="rounded-overlay border border-slate-200 bg-white p-4 text-center">
-            <div className="text-2xl font-extrabold text-slate-900">
-              {stat.value === null || stat.value === undefined ? "—" : stat.value}
-            </div>
-            <div className="break-words text-xs font-bold uppercase leading-tight tracking-wide text-slate-500">{stat.label}</div>
+      <JourneyCard>
+        <details><summary className="min-h-11 cursor-pointer py-2.5 font-semibold text-indigo-700 dark:text-indigo-300">{t("trackerLetter")}</summary><RecLetterPanel /></details>
+      </JourneyCard>
+
+      {dialog?.type === "add" && <PanelDialog title={t("add")} busy={busy} error={actionError} onClose={() => setDialog(null)}>
+        <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => {
+          event.preventDefault();
+          const values = Object.fromEntries(new FormData(event.currentTarget));
+          if (!String(values.universityName ?? "").trim()) { setActionError(t("trackerNeedUniversity")); return; }
+          void create(values, false);
+        }}>
+          <Field label={t("formUniversity")}><input name="universityName" className={inputClass} required maxLength={200} /></Field>
+          <Field label={t("formProgram")}><input name="programName" className={inputClass} maxLength={200} /></Field>
+          <Field label={t("formDeadline")}><input name="deadline" type="date" className={inputClass} /></Field>
+          <Field label={t("formRound")}><select name="applicationRound" className={inputClass}>{ROUNDS.map((round) => <option key={round}>{round}</option>)}</select></Field>
+          <Button className="sm:col-span-2 sm:justify-self-end" type="submit" disabled={busy}>{t("addSubmit")}</Button>
+        </form>
+      </PanelDialog>}
+
+      {dialog?.type === "outcome" && <PanelDialog title={t("resultsQuestion")} busy={busy} error={actionError} onClose={() => setDialog(null)}>
+        <form className="space-y-3" onSubmit={(event) => {
+          event.preventDefault();
+          const values = new FormData(event.currentTarget);
+          void mutate(async () => {
+            await sendJson("/api/applications/outcome", { method: "POST", body: JSON.stringify({
+              applicationId: dialog.row.id, result, scholarshipAmountUsd: values.get("scholarship") ? Number(values.get("scholarship")) : null, shareConsent: values.has("consent"),
+            }) }, t("resultError"));
+            setDialog(null);
+          }, t("resultError"));
+        }}>
+          <div className="flex flex-wrap gap-2">
+            {APPLICATION_DECISIONS.map((value) => <Button key={value} size="sm" variant={result === value ? "secondary" : "outline"} aria-pressed={result === value} onClick={() => setResult(value)}>{t(`result.${value}`)}</Button>)}
           </div>
-        ))}
-      </div>
+          <Field label={t("formScholarship")}><input name="scholarship" type="number" min="0" step="1" className={inputClass} /></Field>
+          <label className="flex min-h-11 items-start gap-2 text-sm"><input name="consent" type="checkbox" className="mt-0.5 size-5 shrink-0 accent-indigo-600" />{t("consent")}</label>
+          <Button type="submit" disabled={busy}>{t("saveResult")}</Button>
+        </form>
+      </PanelDialog>}
 
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-          <Target className="h-5 w-5 text-indigo-600" />
-          {t("title")}
-        </h2>
-        <Button variant="unstyled"
-          onClick={() => setAdding((v) => !v)}
-          className="flex items-center gap-1.5 rounded-surface bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" /> {t("add")}
-        </Button>
-      </div>
-
-      {error && (
-        <div className="rounded-surface border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>
-      )}
-
-      {adding && (
-        <div className="grid gap-3 rounded-overlay border border-indigo-200 bg-indigo-50/50 p-4 sm:grid-cols-4">
-          <div>
-            <label htmlFor="app-university" className={srLabel}>
-              {t("formUniversity")}
-            </label>
-            <input
-              id="app-university"
-              required
-              aria-required="true"
-              className="w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
-              placeholder={t("formUniversity")}
-              value={draft.universityName}
-              onChange={(e) => setDraft({ ...draft, universityName: e.target.value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="app-program" className={srLabel}>
-              {t("formProgram")}
-            </label>
-            <input
-              id="app-program"
-              className="w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
-              placeholder={t("formProgram")}
-              value={draft.programName}
-              onChange={(e) => setDraft({ ...draft, programName: e.target.value })}
-            />
-          </div>
-          <div>
-            <label htmlFor="app-deadline" className={srLabel}>
-              {t("formDeadline")}
-            </label>
-            <input
-              id="app-deadline"
-              className="w-full rounded-control border border-slate-200 px-3 py-2 text-sm"
-              type="date"
-              value={draft.deadline}
-              onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
-            />
-          </div>
-          <div className="flex gap-2">
-            <label htmlFor="app-round" className={srLabel}>
-              {t("formRound")}
-            </label>
-            <select
-              id="app-round"
-              className="flex-1 rounded-control border border-slate-200 px-3 py-2 text-sm"
-              value={draft.applicationRound}
-              onChange={(e) => setDraft({ ...draft, applicationRound: e.target.value })}
-            >
-              {["RD", "ED", "EA", "Rolling", "Winter", "Summer", "Spring"].map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-            <Button variant="unstyled"
-              onClick={() => void addApplication()}
-              disabled={busy}
-              className="rounded-control bg-indigo-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("addSubmit")}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {loading && !rows.length && (
-        <div className="flex items-center gap-2 rounded-surface border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
-        </div>
-      )}
-
-      {!loading && !rows.length && (
-        <div className="rounded-surface border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
-          {t("empty")}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {rows.map((row) => {
-          const status = STATUSES.find((s) => s.value === row.status) ?? STATUSES[0];
-          return (
-            <div key={row.id} className="rounded-overlay border border-slate-200 bg-white p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-bold text-slate-900">{row.universityName}</h3>
-                  <p className="text-sm text-slate-500">
-                    {[row.programName, row.applicationRound, row.intakeTerm].filter(Boolean).join(" · ") ||
-                      t("noProgram")}
-                    {row.deadline ? ` · ${t("deadlineOn", { date: row.deadline })}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.chip}`}>
-                    {t(`status.${status.value}`)}
-                  </span>
-                  {row.outcome && (
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-                        RESULT_STYLE[row.outcome.result] ?? "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {t(`result.${row.outcome.result}`)}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {onOpenWorkspace && (
-                  <Button variant="unstyled"
-                    onClick={() => onOpenWorkspace(row.id)}
-                    className="flex min-h-9 items-center gap-1.5 rounded-control bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700"
-                  >
-                    <Target className="h-3.5 w-3.5" /> {t("openWorkspace")}
-                  </Button>
-                )}
-
-                <select
-                  aria-label={t("statusLabelFor", { name: row.universityName })}
-                  className="rounded-control border border-slate-200 px-2 py-1.5 text-sm"
-                  value={row.status}
-                  onChange={(e) => void setStatus(row.id, e.target.value)}
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {t(`status.${s.value}`)}
-                    </option>
-                  ))}
-                </select>
-
-                {!row.outcome && (row.status === "submitted" || row.status === "decision") && (
-                  <Button variant="unstyled"
-                    onClick={() => {
-                      setReporting(row.id);
-                      setResult("accepted");
-                      setConsent(false);
-                    }}
-                    className="flex items-center gap-1.5 rounded-control bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-800"
-                  >
-                    <Trophy className="h-3.5 w-3.5" /> {t("reportResult")}
-                  </Button>
-                )}
-
-                <Button variant="unstyled"
-                  aria-label={t("deleteLabel")}
-                  onClick={() => void remove(row.id)}
-                  className="ml-auto rounded-control p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {reporting && (
-        <div className="rounded-overlay border border-emerald-200 bg-emerald-50/60 p-4">
-          <h3 className="font-bold text-slate-900">{t("resultsQuestion")}</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {RESULTS.map((r) => (
-              <Button variant="unstyled"
-                key={r}
-                aria-pressed={result === r}
-                onClick={() => setResult(r)}
-                className={`rounded-control px-3 py-1.5 text-xs font-bold ${
-                  result === r ? "bg-emerald-700 text-white" : "bg-white text-slate-700 border border-slate-200"
-                }`}
-              >
-                {t(`result.${r}`)}
-              </Button>
-            ))}
-          </div>
-
-          <label htmlFor="app-scholarship" className={srLabel}>
-            {t("formScholarship")}
-          </label>
-          <input
-            id="app-scholarship"
-            className="mt-3 w-full max-w-xs rounded-control border border-slate-200 px-3 py-2 text-sm"
-            placeholder={t("formScholarship")}
-            type="number"
-            value={scholarship}
-            onChange={(e) => setScholarship(e.target.value)}
-          />
-
-          <label className="mt-3 flex min-h-11 cursor-pointer items-start gap-2 text-sm leading-relaxed text-slate-700">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              className="mt-0.5 h-6 w-6 shrink-0 accent-indigo-600"
-            />
-            <span>{t("consent")}</span>
-          </label>
-
-          <div className="mt-3 flex gap-2">
-            <Button variant="unstyled"
-              onClick={() => void reportResult()}
-              disabled={busy}
-              className="flex min-h-11 items-center gap-1.5 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              {t("saveResult")}
-            </Button>
-            <Button variant="unstyled"
-              onClick={() => setReporting(null)}
-              className="min-h-11 rounded-control border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
-            >
-              {t("cancel")}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* #20 Recommendation letter helper — brief built from real profile data */}
-      <RecLetterPanel />
+      {dialog?.type === "remove" && <PanelDialog title={t("deleteLabel")} busy={busy} error={actionError} onClose={() => setDialog(null)}>
+        <p className="mb-4 break-words text-sm">{t("trackerConfirmRemove", { name: dialog.row.universityName })}</p>
+        <Button variant="danger" disabled={busy} onClick={() => void mutate(async () => {
+          await sendJson(`/api/applications?id=${dialog.row.id}`, { method: "DELETE" }, t("deleteError"));
+          setDialog(null);
+        }, t("deleteError"))}>{t("deleteLabel")}</Button>
+      </PanelDialog>}
     </div>
   );
 }

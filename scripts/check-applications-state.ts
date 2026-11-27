@@ -143,7 +143,8 @@ async function main() {
     ];
     for (const file of files) assert.match(read(file), /notifyApplicationsChanged\(/);
     assert.match(read("src/components/hubs/index.tsx"), /onApplicationsChanged\(/);
-    assert.match(read("src/components/ApplicationCenter.tsx"), /if \(!res\.ok\) \{\s*const data = await res\.json\(\)/, "a failed DELETE reports an error");
+    assert.match(read("src/components/ApplicationCenter.tsx"), /await sendJson\([^\n]+method: "DELETE"[^\n]+t\("deleteError"\)\)/, "DELETE uses the shared error-reporting fetch");
+    assert.match(read("src/components/journey/useResource.ts"), /if \(!res\.ok\) throw new Error\(json\?\.error \|\| fallback\)/, "a failed mutation reports an error");
   });
 
   await check("UZ/RU/EN have the state copy", () => {

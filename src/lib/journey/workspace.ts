@@ -21,6 +21,48 @@ export type WorkspaceSection =
   | "submission"
   | "decision";
 
+export interface WorkspaceSummary {
+  id: number;
+  universityName: string;
+  programName: string | null;
+  deadline: string | null;
+  status: string;
+  submittedAt: string | null;
+  progressPct: number;
+  done: number;
+  total: number;
+  blockers: number;
+}
+
+export function applicationDaysTo(date: string | null): number | null {
+  if (!date) return null;
+  const deadline = Date.parse(`${date.slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(deadline)) return null;
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((deadline - today) / 86_400_000);
+}
+
+export const APPLICATION_DECISIONS = ["accepted", "rejected", "waitlisted", "deferred", "withdrawn"] as const;
+export type ApplicationDecision = typeof APPLICATION_DECISIONS[number];
+
+export function applicationDecision(status: string): ApplicationDecision | undefined {
+  return APPLICATION_DECISIONS.find((decision) => decision === status);
+}
+
+export function applicationPhase(row: { status: string; submittedAt: string | null }, outcome?: ApplicationDecision) {
+  const decision = applicationDecision(row.status) ?? outcome;
+  if (decision === "waitlisted" || decision === "deferred") return "awaiting" as const;
+  if (decision || row.status === "decision") return "closed" as const;
+  return row.submittedAt || row.status === "submitted" || row.status === "interview" ? "awaiting" as const : "preparing" as const;
+}
+
+export function applicationDeadlineOrder({ deadline }: { deadline: string | null }, stillPreparing: boolean) {
+  if (!stillPreparing) return 3;
+  const days = applicationDaysTo(deadline);
+  return days == null ? 2 : days < 0 ? 1 : 0;
+}
+
 export const WORKSPACE_TABS: { id: WorkspaceSection; label: string; icon: string }[] = [
   { id: "overview", label: "Overview", icon: "📋" },
   { id: "requirements", label: "Requirements", icon: "✅" },

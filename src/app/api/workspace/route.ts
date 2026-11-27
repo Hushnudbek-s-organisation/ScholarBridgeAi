@@ -18,7 +18,6 @@ import {
 import { dateOnly, guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
 import { computeWorkspaceProgress, isRecommendationPlaceholder, WORKSPACE_TABS } from "@/lib/journey/workspace";
 import { reversePlan } from "@/lib/journey/planning";
-import { summarizeStatuses } from "@/lib/calculations";
 import { updateTrackedApplication } from "@/lib/scholly-application-reward.server";
 
 export const dynamic = "force-dynamic";
@@ -55,36 +54,60 @@ export async function GET(req: Request) {
           deadline: applications.deadline,
           status: applications.status,
           submittedAt: applications.submittedAt,
+          applicationFeePaid: applications.applicationFeePaid,
           updatedAt: applications.updatedAt,
         })
         .from(applications)
         .where(owned)
         .orderBy(desc(applications.updatedAt));
 
-      const ids = rows.map((r) => r.id);
-      const reqCounts = ids.length
-        ? await db
-            .select({
-              applicationId: applicationRequirements.applicationId,
-              total: applicationRequirements.id,
-              done: applicationRequirements.status,
-            })
-            .from(applicationRequirements)
-            .where(and(eq(applicationRequirements.profileId, profileId), inArray(applicationRequirements.applicationId, ids)))
-        : [];
+      const ids = rows.map((row) => row.id);
+      const [requirements, requests] = ids.length ? await Promise.all([
+        db.select({
+          applicationId: applicationRequirements.applicationId,
+          key: applicationRequirements.itemKey,
+          section: applicationRequirements.section,
+          status: applicationRequirements.status,
+          isRequired: applicationRequirements.isRequired,
+          linkedType: applicationRequirements.linkedType,
+        }).from(applicationRequirements)
+          .where(and(eq(applicationRequirements.profileId, profileId), inArray(applicationRequirements.applicationId, ids))),
+        db.select({
+          applicationId: recommendationRequests.applicationId,
+          status: recommendationRequests.status,
+        }).from(recommendationRequests)
+          .where(and(eq(recommendationRequests.profileId, profileId), inArray(recommendationRequests.applicationId, ids))),
+      ]) : [[], []];
 
-      const workspaces = rows.map((r) => {
-        const mine = reqCounts.filter((x) => x.applicationId === r.id);
-        const completion = summarizeStatuses(
-          mine,
-          (item) => item.done === "done" || item.done === "not_required"
-        );
+      const requirementsByApp = new Map<number, typeof requirements>();
+      for (const requirement of requirements) {
+        const items = requirementsByApp.get(requirement.applicationId) ?? [];
+        items.push(requirement);
+        requirementsByApp.set(requirement.applicationId, items);
+      }
+      const requestsByApp = new Map<number, { total: number; submitted: number }>();
+      for (const request of requests) {
+        if (request.applicationId == null) continue;
+        const counts = requestsByApp.get(request.applicationId) ?? { total: 0, submitted: 0 };
+        counts.total++;
+        if (request.status === "submitted") counts.submitted++;
+        requestsByApp.set(request.applicationId, counts);
+      }
+      const workspaces = rows.map(({ applicationFeePaid, ...row }) => {
+        const recs = requestsByApp.get(row.id);
+        const progress = computeWorkspaceProgress(requirementsByApp.get(row.id) ?? [], {}, {
+          recommendationsSubmitted: recs?.submitted,
+          recommendationsTotal: recs?.total,
+          applicationFeePaid,
+          submitted: !!row.submittedAt,
+        });
         return {
-          ...r,
-          deadline: r.deadline ? String(r.deadline).slice(0, 10) : null,
-          progressPct: r.submittedAt ? 100 : completion.pct,
-          done: completion.done,
-          total: completion.total,
+          ...row,
+          deadline: row.deadline ? String(row.deadline).slice(0, 10) : null,
+          progressPct: progress.pct,
+          done: progress.done,
+          total: progress.total,
+          blockers: progress.blockers.length,
         };
       });
       return NextResponse.json({ tabs: WORKSPACE_TABS, workspaces });
