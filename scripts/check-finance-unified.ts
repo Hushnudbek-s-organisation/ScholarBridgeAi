@@ -1,3 +1,4 @@
+import { buildFundingScenario } from "../src/lib/journey/funding";
 /**
  * Unified finance model — behavior guard (§7, §5, §13).
  *
@@ -224,6 +225,19 @@ check("the shared state vocabulary is exactly the five honest states", () => {
     ],
   );
   assert.deepEqual([...states].sort(), ["total_fits", "total_over", "tuition_only", "tuition_over", "unknown"].sort());
+});
+
+check("restricted grants can be reassigned and item order cannot alter the result", () => {
+  const lines = ["tuition", "living", "books"].map(key => ({ key, label: key, cost: 5000 }));
+  const items = [["A", '["tuition","living"]'], ["B", '["tuition","books"]'], ["C", '["books"]']].map(([name, covers]) =>
+    ({ kind: "scholarship" as const, name, amountUsd: 5000, status: "confirmed" as const, covers }));
+  const one = buildFundingScenario({ annualCost: 15000, lines, items });
+  const two = buildFundingScenario({ annualCost: 15000, lines, items: [...items].reverse() });
+  assert.equal(one.securedGap, 0);
+  assert.equal(one.securedAllocatedTotal, 15000);
+  assert.deepEqual(one.byLine, two.byLine);
+  const malformed = buildFundingScenario({ annualCost: 15000, lines, items: [{ ...items[0], covers: "malformed" }] });
+  assert.equal(malformed.securedAllocatedTotal, 0);
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

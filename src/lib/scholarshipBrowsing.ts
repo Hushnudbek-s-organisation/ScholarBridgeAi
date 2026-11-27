@@ -1,7 +1,7 @@
 import type { Locale } from "@/i18n/config";
 import { calendarDate } from "./examRecords";
 import { todayYmd, ymdOf } from "./catalogueOrder";
-import { computeScholarshipStatus, type ScholarshipApplicationStatus, type ScholarshipLike } from "./scholarshipStatus";
+import { exactScholarshipDeadline, computeScholarshipStatus, type ScholarshipApplicationStatus, type ScholarshipLike } from "./scholarshipStatus";
 import { safeAcademicLink } from "./universityCardSummary";
 
 export const SCHOLARSHIP_ACTIONABLE_STATUSES = ["open", "rolling"] as const;
@@ -47,7 +47,7 @@ export function scholarshipWindow(row: Window, status: ScholarshipApplicationSta
     return { opensOn, closesOn: null };
   }
   const directDate = dateValue(row.deadlineDate) ?? dateValue(row.deadlineRangeEnd);
-  if (directDate) return { opensOn, closesOn: directDate };
+  if (directDate) return { opensOn, closesOn: directDate, ...exactScholarshipDeadline(row) };
   const dates = roundDates(row.rounds);
   return { opensOn, closesOn: (status === "closed" ? dates.at(-1) : dates.find((date) => date >= today)) ?? null };
 }

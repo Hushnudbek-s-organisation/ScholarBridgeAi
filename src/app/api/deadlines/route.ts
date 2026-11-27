@@ -1,3 +1,6 @@
+import { scholarshipAcceptsApplications, scholarshipBrowsingWindow } from "@/lib/scholarshipBrowsing";
+import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
+import { hasUniversityMatchEvidence } from "@/lib/matching";
 import {prepareAwardCoverage} from "@/lib/awardCoverageContext.server";
 import { NextResponse } from "next/server";
 import { requireProfileAccess } from "@/lib/auth";
@@ -15,7 +18,7 @@ import {
   testPlans,
 } from "@/db/schema";
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
-import { computeScholarshipStatus, statusLabel } from "@/lib/scholarshipStatus";
+import { statusLabel } from "@/lib/scholarshipStatus";
 import { daysUntil } from "@/lib/nextActions";
 import { parseListColumn } from "@/lib/chancing";
 import { countriesMatch } from "@/lib/countries";
@@ -113,6 +116,7 @@ function scoreUniversityRow(
     matchProfile: Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
     targetMajor: string;
     degreeLevel: string | null;
+    universityFacts: Awaited<ReturnType<typeof loadCatalogueFacts>>;
   }
 ) {
   const assessedAt = new Date().toISOString();
@@ -143,9 +147,9 @@ function scoreUniversityRow(
     assessedAt,
     asOfDate: assessedAt.slice(0, 10),
   });
-  const match = calculateUniversityMatch(scoring.matchProfile, toUniversityData(u));
+  const match = calculateUniversityMatch(scoring.matchProfile, toUniversityData(u, scoring.universityFacts.get(u.id), { degreeLevel: scoring.degreeLevel }));
   return {
-    matchScore: match.matchScore,
+    matchScore: hasUniversityMatchEvidence(match.breakdown) ? match.matchScore : null,
     assessment,
   };
 }
@@ -220,6 +224,7 @@ export async function GET(req: Request) {
       matchProfile: Awaited<ReturnType<typeof toMatchProfileWithActivities>>;
       targetMajor: string;
       degreeLevel: string | null;
+      universityFacts: Awaited<ReturnType<typeof loadCatalogueFacts>>;
     } | null = null;
     if (profile) {
       try {
@@ -229,6 +234,7 @@ export async function GET(req: Request) {
           matchProfile,
           targetMajor: (profile.targetMajor ?? "").trim(),
           degreeLevel: profile.degreeLevel ?? null,
+          universityFacts: await loadCatalogueFacts("university", savedUniIds),
         };
       } catch {
         scoring = null;
@@ -261,6 +267,7 @@ export async function GET(req: Request) {
       const countries = preferredCountries;
       try {
         const pool = await db.select().from(universities).where(eq(universities.isActive, true));
+        scoring.universityFacts = await loadCatalogueFacts("university", pool.map(row => row.id));
         recommendedUnis = pool
           .filter((u) => !savedUniIds.includes(u.id))
           .filter((u) => supportsDegreeLevel(u.degreeLevel, scoring!.degreeLevel))
@@ -348,15 +355,15 @@ export async function GET(req: Request) {
 
     // --- Scholarships: the student's saved awards (+ a small recommended
     //     full-coverage shortlist when they have barely saved anything) ---
-    const scholarshipDates = allScholarships.map((s) => ({
-      s,
-      date: isoDateOr(s.deadlineDate) ?? isoDateOr(s.deadlineRangeEnd) ?? isoDateOr(s.deadlineRangeStart),
-    }));
+    const scholarshipDates = allScholarships.map(s => {
+      const window = scholarshipBrowsingWindow(s, now);
+      return { s, date: window.closesOn, window };
+    });
     // Unverified dates may be stale or copied from prior cycles. Keep an
     // explicitly saved item visible with its provenance, but recommend only
     // verified dates from the active catalogue.
     const verifiedDatedScholarships = scholarshipDates.filter(
-      ({ s, date }) => s.isActive && s.verificationStatus === "verified" && date !== null && (daysUntil(now, date) ?? -1) >= 0,
+      ({ s, date, window }) => s.isActive && s.verificationStatus === "verified" && date !== null && scholarshipAcceptsApplications(window.computedStatus),
     );
     const awardCoverage=await prepareAwardCoverage(req,profile,savedUniRefs,allScholarships.map(s=>s.id));
     const coverageOf = new Map<number, SavedUniCoverage | null>();
@@ -371,9 +378,9 @@ export async function GET(req: Request) {
       }
       return coverageOf.get(s.id) ?? null;
     };
-    for (const { s, date } of scholarshipDates) {
+    for (const { s, date, window } of scholarshipDates) {
       if (!savedSchSet.has(s.id)) continue;
-      const status = computeScholarshipStatus(s);
+      const status = window.computedStatus;
       const cov = coverageFor(s);
       items.push({
         id: `sch-${s.id}`,
@@ -382,6 +389,7 @@ export async function GET(req: Request) {
         subtitle: localizeScholarshipProvider(s.provider, locale),
         date,
         status: statusLabel(status).toUpperCase(),
+        ...("closesAt" in window ? { closesAt: window.closesAt, timezone: window.timezone, applicantScope: window.applicantScope } : {}),
         daysRemaining: daysUntil(now, date),
         source: s.sourceUrl || s.websiteUrl || null,
         saved: true,
@@ -400,7 +408,7 @@ export async function GET(req: Request) {
       // sees WHAT could fund their plan without drowning in the catalogue.
       const candidates = verifiedDatedScholarships
         .filter(({ s }) => !savedSchSet.has(s.id))
-        .map(({ s, date }) => ({ s, date, cov: coverageFor(s) }))
+        .map(({ s, date, window }) => ({ s, date, window, cov: coverageFor(s) }))
         .filter((x) => (savedUniRefs.length > 0 ? (x.cov ? coverageTier(x.cov) >= 2 : false) : /\bfull\b/i.test(x.s.coverageType || "") ))
         .sort((a, b) => {
           const ta = a.cov ? coverageTier(a.cov) : 0;
@@ -409,8 +417,8 @@ export async function GET(req: Request) {
           return (a.date ?? "").localeCompare(b.date ?? "");
         })
         .slice(0, 3);
-      for (const { s, date } of candidates) {
-        const status = computeScholarshipStatus(s);
+      for (const { s, date, window } of candidates) {
+        const status = window.computedStatus;
         const cov = coverageFor(s);
         items.push({
           id: `sch-${s.id}`,
@@ -419,6 +427,7 @@ export async function GET(req: Request) {
           subtitle: localizeScholarshipProvider(s.provider, locale),
           date,
           status: statusLabel(status).toUpperCase(),
+          ...("closesAt" in window ? { closesAt: window.closesAt, timezone: window.timezone, applicantScope: window.applicantScope } : {}),
           daysRemaining: daysUntil(now, date),
           source: s.sourceUrl || s.websiteUrl || null,
           saved: false,

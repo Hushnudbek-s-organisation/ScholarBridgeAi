@@ -1,3 +1,6 @@
+import { scholarshipAcceptsApplications, scholarshipBrowsingWindow } from "@/lib/scholarshipBrowsing";
+import { scholarshipAssessment } from "@/lib/scholarshipAssessment";
+import { hasUniversityMatchEvidence } from "@/lib/matching";
 import {prepareAwardCoverage,awardCoverageRequestKey} from "@/lib/awardCoverageContext.server";
 import {getCachedProfileForMatching} from "@/lib/catalogCache";
 import { loadDocumentReviewContext, documentIdentity } from "@/lib/documentReviews.server";
@@ -35,7 +38,7 @@ import { EMPTY_JOURNEY_COUNTS, resolveJourney, type JourneyCounts } from "@/lib/
 import { profileReadiness, testGap, type ReadinessInput } from "@/lib/journey/readiness";
 import { countActivities, profileStrength } from "@/lib/chancing";
 import { chancingProfileWithActivities, toMatchProfileWithActivities, toMatchProfile, toUniversityData } from "@/lib/profileMapping";
-import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
+import { calculateUniversityMatch } from "@/lib/matching";
 import { adaptLegacyField, eligibilityCutoff } from "@/lib/typedEvidence";
 import { getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import { sharedDashboardRecommendationCacheKey, getRevisionFencedDashboardRecommendations } from "@/lib/dashboardRecommendationCache";
@@ -302,8 +305,7 @@ export async function GET(req: Request) {
       profile ? chancingProfileWithActivities(profile) : Promise.resolve(null),
       profile
         ? db.select({ rubricTotal: essayVersions.rubricTotal }).from(essayVersions)
-            .where(eq(essayVersions.profileId, profile.id))
-            .orderBy(desc(essayVersions.versionNumber), desc(essayVersions.id)).limit(1).then((rows) => rows[0])
+            .where(and(eq(essayVersions.profileId, profile.id), isNotNull(essayVersions.rubricTotal))).limit(1).then((rows) => rows[0])
         : Promise.resolve(undefined),
       testGapsFor(profileId, profile),
     ]);
@@ -319,7 +321,8 @@ export async function GET(req: Request) {
       gpaScale: profile?.gpaScale ?? null,
       degreeLevel: profile?.degreeLevel ?? null,
       ieltsScore: profile?.ieltsScore ?? null,
-      toeflScore: profile?.toeflScore ?? null,
+      toeflScore: chancingProfile?.toeflScore ?? null,
+      toeflScale: profile?.applicantContext?.toefl?.scale,
       duolingoScore: profile?.duolingoScore ?? null,
       satScore: profile?.satScore ?? null,
       actScore: profile?.actScore ?? null,
@@ -352,6 +355,9 @@ export async function GET(req: Request) {
       : null;
     const readiness = {
       ...checklist,
+      // Checklist inventory stays distinct from the fixed activity milestones.
+      documentInventory: { ready: readinessInput.documentsReady, total: readinessInput.documentsTotal },
+      applicationActivity: { started: readinessInput.applicationsStarted, submitted: readinessInput.applicationsSubmitted },
       /** Shared profile readiness (the Readiness pane's number). */
       // `overall` is the display integer; `overallPrecise` is the unrounded
       // average so the dashboard tile can print the same precise value the
@@ -633,7 +639,7 @@ async function recommendedFor(
   const chancingProfile = derivedProfiles?.chancingProfile ?? await chancingProfileWithActivities(profile);
   // Memo key for the fit/positioning scores below: changes with any
   // score-relevant profile edit, so a dashboard refresh re-scores.
-  const fingerprint = profileMatchFingerprint(profile);
+  const fingerprint = profileMatchFingerprint(matchProfile);
 
   // Which profile facts exist, and which would unlock a better list.
   const basis: string[] = [];
@@ -697,7 +703,7 @@ async function recommendedFor(
     scored = pool
       .filter((u) => supportsDegreeLevel(u.degreeLevel, degreeLevel))
       .map((u) => {
-        const uniData = toUniversityData(u);
+        const uniData = toUniversityData(u, universityBundle?.facts.get(u.id), { degreeLevel });
         const match = memoizeMatch("fit", fingerprint, u.id, uniData as unknown as Record<string, unknown>, () =>
           calculateUniversityMatch(matchProfile, uniData)
         );
@@ -707,6 +713,7 @@ async function recommendedFor(
           combinedScore: match.matchScore,
         };
       })
+      .filter(row => hasUniversityMatchEvidence(row.match.breakdown))
       .sort((a, b) => b.combinedScore - a.combinedScore || b.match.matchScore - a.match.matchScore)
       .slice(0, uniLimit);
   }
@@ -765,6 +772,7 @@ async function recommendedFor(
   const seenScholarships = new Set<string>();
   const relevantScholarships = schRows
     .filter((s) => {
+      if (s.verificationStatus !== "verified" || !scholarshipAcceptsApplications(scholarshipBrowsingWindow(s).computedStatus)) return false;
       if (!degreeMatches(s.degreeLevels, degreeLevel)) return false;
       // Citizenship: "open to all" is a fact we can state; a LIST of eligible
       // countries needs the student's citizenship to compare; an EMPTY list is
@@ -781,7 +789,7 @@ async function recommendedFor(
     })
     .map((s) => ({
       row: s,
-      match: calculateScholarshipMatch(matchProfile, s),
+      assessment: scholarshipAssessment(matchProfile, matchProfile, s, awardCoverage.facts.get(s.id) ?? [], todayIso),
       // Coverage of the student's SAVED universities (shared rules with the
       // Scholarship Hub and the deadlines feed — one source of truth).
       cov: evaluateScholarshipForSavedUnis(
@@ -789,17 +797,18 @@ async function recommendedFor(
         awardCoverage.references
       ),
     }))
+    .filter(({ assessment }) => assessment.bucket !== "below" && assessment.matchScore != null)
     // Four tiers, then fit score: full coverage AT a saved university always
     // leads; then other awards that apply at a saved university; then general
     // full-coverage awards; only inside a tier does the engine's fit score decide.
     .sort(
       (a, b) =>
         coverageTier(b.cov) - coverageTier(a.cov) ||
-        b.match.matchScore - a.match.matchScore ||
+        (b.assessment.matchScore ?? 0) - (a.assessment.matchScore ?? 0) ||
         a.row.id - b.row.id
     )
     .slice(0, 6)
-    .map(({ row: s, match, cov }) => ({
+    .map(({ row: s, assessment, cov }) => ({
       id: s.id,
       title: s.title,
       saved: savedScholarshipIds.has(s.id),
@@ -818,10 +827,14 @@ async function recommendedFor(
       tuitionCoverage: s.tuitionCoverage,
       sourceUrl: s.sourceUrl,
       lastVerifiedAt: s.lastVerifiedAt,
-      matchScore: match.matchScore,
-      matchReasons: translateReasons(locale, "scholarship", match.reasonDetails, match.reasons),
-      matchIssues: translateReasons(locale, "scholarship", match.issueDetails, match.potentialIssues),
-      matchBreakdown: match.breakdown,
+      matchScore: assessment.matchScore,
+      chanceBucket: assessment.bucket,
+      eligibilityChecks: assessment.checks,
+      eligibilityBasis: assessment.eligibilityBasis,
+      fitVersion: assessment.fitVersion,
+      matchReasons: translateReasons(locale, "scholarship", assessment.fit.reasonDetails, assessment.fit.reasons),
+      matchIssues: translateReasons(locale, "scholarship", assessment.fit.issueDetails, assessment.fit.potentialIssues),
+      matchBreakdown: assessment.fit.breakdown,
       // A legacy/unverified minGpa must NEVER auto-reject a student. Only a
       // field-level verified official minimum may produce a false cutoff; the
       // number is still shown (gpaCutoffValue) so no useful data is hidden.

@@ -1,3 +1,4 @@
+import { CATALOGUE_FIT_VERSION, hasUniversityMatchEvidence } from "@/lib/matching";
 import { ensureCatalogRevision } from "@/lib/catalogCache";
 import { postgresId } from "@/lib/pagination";
 import { hasVerifiedProgramEvidence } from "@/lib/catalogEvidence";
@@ -252,6 +253,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // privately: only the owner (or an admin) gets a personalised score; the
     // public payload stays unpersonalised, exactly like GET /api/universities.
     let match: {
+      fitVersion: string;
       score: number;
       reasons: string[];
       issues: string[];
@@ -308,13 +310,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             ...uni,
             ...resolvedUsdUniversityCosts(uni),
           };
-          const result = calculateUniversityMatch(cachedProfile.matchProfile, toUniversityData(row));
-          match = {
+          const result = calculateUniversityMatch(cachedProfile.matchProfile, toUniversityData(row, bundle?.facts.get(uniId), { ...requirementContext, degreeLevel: requirementContext.degreeLevel ?? cachedProfile.matchProfile.degreeLevel }));
+          match = hasUniversityMatchEvidence(result.breakdown) ? {
             score: result.matchScore,
+            fitVersion: CATALOGUE_FIT_VERSION,
             reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
             issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
             breakdown: result.breakdown,
-          };
+          } : null;
           const discovery=universityProgrammeDiscovery(row,bundle?.programsByUni?.get(uniId)??[],cachedProfile.profileData,cachedProfile.chancingProfile,experimental);
           programmeDiscovery=discovery.programmeDiscovery;
           assessment=assessmentForDiscovery(row,uniId,bundle?.programsByUni?.get(uniId)??[],programmeDiscovery?.selectedProgrammeId??null,cachedProfile.profileData);
@@ -324,15 +327,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             // The row was already read above — scoring it needs no second
             // full-table scan. `toUniversityData` maps exactly the same shape
             // the catalogue list scores, so both screens show one number.
-            const row = toUniversityData({ ...uni, ...resolvedUsdUniversityCosts(uni) });
+            const bundle = await getCachedUniversitiesBundleForAssessment();
+            const row = toUniversityData({ ...uni, ...resolvedUsdUniversityCosts(uni) }, bundle.facts.get(uniId), { ...requirementContext, degreeLevel: requirementContext.degreeLevel ?? p.degreeLevel });
             const result = calculateUniversityMatch(await toMatchProfileWithActivities(p), row);
-            match = {
+            match = hasUniversityMatchEvidence(result.breakdown) ? {
               score: result.matchScore,
+              fitVersion: CATALOGUE_FIT_VERSION,
               reasons: translateReasons(locale, "university", result.reasonDetails, result.reasons),
               issues: translateReasons(locale, "university", result.issueDetails, result.potentialIssues),
               breakdown: result.breakdown,
-            };
-            const bundle=await getCachedUniversitiesBundleForAssessment();
+            } : null;
             const discovery=universityProgrammeDiscovery(uni,bundle.programsByUni?.get(uniId)??[],p,await chancingProfileWithActivities(p),experimental);
             programmeDiscovery=discovery.programmeDiscovery;
             assessment=assessmentForDiscovery(uni,uniId,bundle.programsByUni?.get(uniId)??[],programmeDiscovery?.selectedProgrammeId??null,p);

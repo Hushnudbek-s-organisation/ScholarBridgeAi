@@ -11,7 +11,7 @@ test("funding defaults to confirmed, keeps restricted gaps, and fences optimisti
  const url=new URL(process.env.E2E_DATABASE_URL!);expect(url.hostname).toBe("127.0.0.1");expect(url.pathname).toMatch(/^\/sb_e2e_\d+$/);
  const db=new Client({connectionString:url.toString()});await db.connect();
  expect((await page.request.post("/api/auth/sign-in",{data:{email:f.studentEmail,password:f.studentPassword}})).status()).toBe(200);
- const saved=(await db.query("SELECT award_amount,award_currency,award_period FROM scholarships WHERE id=$1",[f.scholarshipId])).rows[0];
+ const saved=(await db.query("SELECT award_amount,award_currency,award_period,verification_status FROM scholarships WHERE id=$1",[f.scholarshipId])).rows[0];
  const ids:number[]=[];
  let release:(()=>void)|undefined;
  const base=`/api/funding?profileId=${f.studentId}`;
@@ -29,7 +29,8 @@ test("funding defaults to confirmed, keeps restricted gaps, and fences optimisti
   expect((await page.request.get(`/api/funding?profileId=${f.otherProfileId}`)).status()).toBe(403);
   // Known monthly value is not an annual award; reference FX is not a fixed
   // USD award. Keep discovery, but do not silently add either to an annual plan.
-  await db.query("UPDATE scholarships SET award_amount=1000000,award_currency='USD',award_period='month' WHERE id=$1",[f.scholarshipId]);
+  expect((await read()).gapActions.scholarships.some((award: { id: number }) => award.id === f.scholarshipId)).toBe(false);
+  await db.query("UPDATE scholarships SET award_amount=1000000,award_currency='USD',award_period='month',verification_status='verified' WHERE id=$1",[f.scholarshipId]);
   const candidate=(await read()).gapActions.scholarships.find((value:{id:number})=>value.id===f.scholarshipId);expect(candidate).toBeTruthy();expect(candidate.annualComparable).toBe(false);expect(candidate.coversGap).toBe(false);expect(candidate.discoveryOnly).toBe(true);expect(candidate.eligibility).toBe("unknown");
   await db.query("UPDATE scholarships SET award_currency='EUR',award_period='year' WHERE id=$1",[f.scholarshipId]);expect((await read()).gapActions.scholarships.find((value:{id:number})=>value.id===f.scholarshipId).annualComparable).toBe(false);
   await db.query("UPDATE scholarships SET award_currency='USD',award_period='year' WHERE id=$1",[f.scholarshipId]);expect((await read()).gapActions.scholarships.find((value:{id:number})=>value.id===f.scholarshipId).annualComparable).toBe(true);
@@ -74,7 +75,7 @@ test("funding defaults to confirmed, keeps restricted gaps, and fences optimisti
  }finally{
   release?.();await page.unroute("**/api/funding?**");
   for(const id of ids)expect((await page.request.delete(base+`&id=${id}`)).status()).toBe(200);
-  await db.query("UPDATE scholarships SET award_amount=$1,award_currency=$2,award_period=$3 WHERE id=$4",[saved.award_amount,saved.award_currency,saved.award_period,f.scholarshipId]);
+  await db.query("UPDATE scholarships SET award_amount=$1,award_currency=$2,award_period=$3,verification_status=$4 WHERE id=$5",[saved.award_amount,saved.award_currency,saved.award_period,saved.verification_status,f.scholarshipId]);
   await db.end();
  }
 });

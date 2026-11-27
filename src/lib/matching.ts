@@ -395,6 +395,12 @@ function breakdownOf(rawScore: number, components: MatchComponent[]): MatchBreak
   };
 }
 
+export const CATALOGUE_FIT_VERSION = "catalogue-fit-2026-11-27";
+
+export function hasUniversityMatchEvidence(breakdown: MatchBreakdown | undefined): boolean {
+  return breakdown?.components.some(part => part.compared && part.key !== "base" && part.key !== "funding_requirement") ?? false;
+}
+
 export function calculateUniversityMatch(profile: StudentProfileData, uni: UniversityData) {
   // Base 70 = "nothing is wrong and nothing stands out": neutral, not a claim.
   let score = 70;
@@ -616,7 +622,7 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
       weight: 7,
       points: 0,
     });
-    components.push(component("funding_requirement", 0, "financial_plan_missing"));
+    components.push(component("funding_requirement", 0, "financial_plan_missing", false));
   } else if (needsAid && totalUniCost != null && budget == null) {
     potentialIssues.push({
       code: "financial_budget_missing",
@@ -625,7 +631,7 @@ export function calculateUniversityMatch(profile: StudentProfileData, uni: Unive
       weight: 7,
       points: 0,
     });
-    components.push(component("funding_requirement", 0, "financial_budget_missing"));
+    components.push(component("funding_requirement", 0, "financial_budget_missing", false));
   } else {
     // Compared only when the profile actually stated a funding position —
     // "not asked yet" must stay an unknown, not a silent pass.
@@ -779,7 +785,7 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
         weight: 5,
         points: 0,
       });
-      components.push(component("level", 0, "level_unclear"));
+      components.push(component("level", 0, "level_unclear", false));
     }
   } else {
     components.push(component("level", 0, null, false));
@@ -820,7 +826,7 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
           weight: 5,
           points: 0,
         });
-        components.push(component("major_eligibility", 0, "major_unclear"));
+        components.push(component("major_eligibility", 0, "major_unclear", false));
       } else if (bestSimilarity == null) {
         potentialIssues.push({
           code: "major_missing",
@@ -829,7 +835,7 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
           weight: 5,
           points: 0,
         });
-        components.push(component("major_eligibility", 0, "major_missing"));
+        components.push(component("major_eligibility", 0, "major_missing", false));
       } else {
         // The award is worth +8 only when the field really is eligible; the
         // overlap ratio grades how close a near-miss is (a partial word match
@@ -874,7 +880,7 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
       components.push(component("need_basis", -10, "need_not_applicable"));
     } else {
       potentialIssues.push({ code: "financial_need_unknown", params: {}, text: "This award is need-based — add your financial-aid need to assess the fit", weight: 5, points: 0 });
-      components.push(component("need_basis", 0, "financial_need_unknown"));
+      components.push(component("need_basis", 0, "financial_need_unknown", false));
     }
   } else {
     components.push(component("need_basis", 0, null, false));
@@ -888,7 +894,7 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
       components.push(component("funding_coverage", 8, "full_funding_match"));
     } else {
       potentialIssues.push({ code: "full_funding_unclear", params: {}, text: "You require full funding — this award's coverage may not cover tuition and living costs", weight: 5, points: 0 });
-      components.push(component("funding_coverage", 0, "full_funding_unclear"));
+      components.push(component("funding_coverage", 0, "full_funding_unclear", false));
     }
   } else {
     components.push(component("funding_coverage", 0, null, false));
@@ -923,11 +929,9 @@ export function calculateScholarshipMatch(profile: StudentProfileData, scholarsh
 
   const rawScore = roundTo(score, 1);
   const matchScore = Math.min(98, Math.max(30, Math.round(rawScore)));
-  const isEligible = matchScore >= 60;
 
   return {
     matchScore,
-    isEligible,
     rawScore,
     breakdown: breakdownOf(rawScore, components),
     reasons: reasons.slice(0, 4).map((r) => r.text),

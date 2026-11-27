@@ -924,7 +924,7 @@ export async function handlePaymeRequest(body: PaymeRequest) {
       .where(and(
         eq(payments.provider, "payme"),
         eq(payments.status, "pending"),
-        sql`COALESCE(${payments.providerCreatedAt}, ${payments.createdAt}) <= ${expiredBefore}`
+        sql`COALESCE(${payments.providerCreatedAt}, ${payments.createdAt}) <= (${expiredBefore.toISOString()}::timestamptz AT TIME ZONE 'UTC')`
       ));
     const providerTime = sql`COALESCE(${payments.providerCreatedAt}, ${payments.createdAt})`;
     const rows = await db
@@ -933,7 +933,7 @@ export async function handlePaymeRequest(body: PaymeRequest) {
       .where(and(
         eq(payments.provider, "payme"),
         sql`${payments.providerTransactionId} <> ''`,
-        sql`${providerTime} BETWEEN ${fromDate} AND ${toDate}`
+        sql`${providerTime} BETWEEN (${fromDate.toISOString()}::timestamptz AT TIME ZONE 'UTC') AND (${toDate.toISOString()}::timestamptz AT TIME ZONE 'UTC')`
       ))
       .orderBy(asc(providerTime), asc(payments.id));
     return {

@@ -51,9 +51,10 @@ test("funding amount precision and invalid-input feedback are accessible in EN U
  for(const[locale,copy]of [["en",en],["uz",uz],["ru",ru]] as const){
   await page.context().addCookies([{name:"scholarbridge_locale",value:locale,url:process.env.E2E_BASE_URL!}]);
   await page.setViewportSize({width:390,height:844});await page.goto("/#funding");await page.reload();await expect(page.locator("html")).toHaveAttribute("lang",locale);
+  await page.getByRole("button", { name: copy.journey.fpAddFundingTitle, exact: true }).click();
   const amount=page.getByRole("spinbutton",{name:copy.journey.fpFieldAmount,exact:true});await expect(amount).toBeVisible();await expect(amount).toHaveAccessibleDescription(copy.journey.fpUsdRounding);
   await page.getByPlaceholder(copy.journey.fpNamePlaceholder,{exact:true}).fill("FICTIONAL invalid amount draft");await amount.fill("-1");
-  await page.getByRole("button",{name:copy.journey.fpAdd,exact:true}).click();await expect(page.getByText(copy.journey.fpUsdAmountInvalid,{exact:true})).toBeVisible();
+  await page.getByRole("button",{name:copy.journey.fpSaveSource,exact:true}).click();await expect(page.getByText(copy.journey.fpUsdAmountInvalid,{exact:true})).toBeVisible();
   expect(posts).toBe(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
  }
 });

@@ -32,6 +32,7 @@ export interface ProfileMatchFingerprintSource {
   needsFinancialAid?: boolean | null;
   requiresFullScholarship?: boolean | null;
   updatedAt?: string | Date | null;
+  savedActivities?: readonly { category?: string | null; role?: string | null; achievements?: string | null }[] | null;
 }
 
 const norm = (value: unknown): string => {
@@ -64,5 +65,6 @@ export function profileMatchFingerprint(p: ProfileMatchFingerprintSource | null 
     norm(p.needsFinancialAid),
     norm(p.requiresFullScholarship),
     norm(p.updatedAt),
+    JSON.stringify(p.savedActivities ?? []),
   ].join("|");
 }

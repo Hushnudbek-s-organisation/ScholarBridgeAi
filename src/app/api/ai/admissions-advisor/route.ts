@@ -1,3 +1,4 @@
+import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { isLocale } from "@/i18n/config";
@@ -26,7 +27,7 @@ import {
 } from "@/lib/advisor";
 import { ADMISSION_PROBABILITY } from "@/lib/chancing";
 import { buildNextActions, daysUntil, type NextActionsContext } from "@/lib/nextActions";
-import { calculateUniversityMatch } from "@/lib/matching";
+import { calculateUniversityMatch, hasUniversityMatchEvidence } from "@/lib/matching";
 import { chancingProfileWithActivities, toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 
 /**
@@ -75,8 +76,10 @@ export async function POST(req: Request) {
     const comparisons: AdvisorFitComparison[] = [];
     if (uniIds.length > 0) {
       const uniRows = await db.select().from(universities).where(inArray(universities.id, uniIds));
+      const facts = await loadCatalogueFacts("university", uniIds);
       for (const uni of uniRows) {
-        const fit = calculateUniversityMatch(matchProfile, toUniversityData(uni));
+        const fit = calculateUniversityMatch(matchProfile, toUniversityData(uni, facts.get(uni.id), { degreeLevel: matchProfile.degreeLevel }));
+        if (!hasUniversityMatchEvidence(fit.breakdown)) continue;
         comparisons.push({
           universityId: uni.id,
           universityName: uni.name,

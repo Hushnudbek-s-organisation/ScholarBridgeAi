@@ -80,6 +80,30 @@ export interface ScholarshipLike {
   applicationStatus?: string | null;
 }
 
+/** Exact publisher rounds use an offset-bearing instant and carry their
+ * publisher-local day and audience. Old date-only rows retain day semantics. */
+export function exactScholarshipDeadline(s: Pick<ScholarshipLike, "rounds" | "deadlineDate">) {
+  const date = ymdOf(s.deadlineDate);
+  if (!date || !s.rounds) return null;
+  try {
+    const rounds: unknown = JSON.parse(s.rounds);
+    if (!Array.isArray(rounds)) return null;
+    const matching = rounds.filter(round => round?.deadline === date);
+    if (matching.length !== 1) return null;
+    const { deadlineAt, timezone, applicantScope } = matching[0];
+    if (typeof deadlineAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/.test(deadlineAt)
+      || typeof timezone !== "string" || typeof applicantScope !== "string") return null;
+    const at = new Date(deadlineAt);
+    if (!Number.isFinite(at.getTime()) || !timezone.trim() || !applicantScope.trim()) return null;
+    const parts = new Intl.DateTimeFormat("en", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(at);
+    const part = (key: string) => parts.find(p => p.type === key)?.value;
+    if (`${part("year")}-${part("month")}-${part("day")}` !== date) return null;
+    return { closesAt: at.toISOString(), timezone, applicantScope };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Days from `today` to a stored date — NEGATIVE when the date is in the past.
  *
@@ -117,6 +141,8 @@ export function computeScholarshipStatus(
 
   // Exact deadline known. The deadline day itself is still open.
   if (deadlineIn != null) {
+    const exact = exactScholarshipDeadline(s);
+    if (exact) return now.getTime() < Date.parse(exact.closesAt) ? "open" : "closed";
     if (deadlineIn >= 0) return "open";
     return "closed";
   }

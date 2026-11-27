@@ -1,25 +1,19 @@
-import { evaluateResolvedAcademicCriteria, originalAcademicRequirementInput } from "@/lib/academicDecision";
+import { toUniversityData } from "@/lib/profileMapping";
+import { scholarshipAssessment } from "@/lib/scholarshipAssessment";
 import { todayYmd } from "@/lib/catalogueOrder";
-import { compareDegreeLevels } from "@/lib/degreeLevels";
-import { parseEligibilityScope } from "@/lib/eligibilityScope";
-import type { RequirementEvaluation } from "@/lib/requirementGroups";
 import { compareScholarshipDeadlines, compareScholarshipStatus, publishedYearlyScholarshipUsd, scholarshipWindow } from "@/lib/scholarshipBrowsing";
 import { safeAcademicLink } from "@/lib/universityCardSummary";
-import { resolveAcademicRequirements } from "@/lib/universityDetailRequirements";
 import { findCatalogueMatches } from "@/lib/catalogueSearch";
 import {prepareAwardCoverage} from "@/lib/awardCoverageContext.server";
 import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
 import {
-  calculateScholarshipMatch,
   calculateUniversityMatch,
-  type UniversityData,
+  CATALOGUE_FIT_VERSION, hasUniversityMatchEvidence, type UniversityData,
 } from "@/lib/matching";
 import { fitBucket, type ChanceBucket } from "@/lib/scholarshipGates";
 import { combinedRelevance } from "@/lib/scholarshipRanking";
-import { memoizeMatch } from "@/lib/matchMemo";
-import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
 import { seedDatabase } from "@/db/seed";
@@ -75,12 +69,6 @@ function listParam(searchParams: URLSearchParams, ...names: string[]): string[] 
 }
 
 const requirementRank: Record<ChanceBucket, number> = { meets: 0, unknown: 1, below: 2 };
-
-function countedChecks(result: RequirementEvaluation, fields: Set<string>): number {
-  if (result.field) fields.add(result.field);
-  if (result.children.length) return result.children.reduce((total, child) => total + countedChecks(child, fields), 0);
-  return Number(result.state === "met" || result.state === "unmet");
-}
 
 function compareScore(a: number | null, b: number | null): number {
   if (a == null) return b == null ? 0 : 1;
@@ -188,35 +176,16 @@ export async function GET(req: Request) {
       filters.fit = [];
     }
 
-    const profileFingerprint = profileData ? profileMatchFingerprint(profileData) : "anonymous";
-    const academicProfile = originalProfile ? originalAcademicRequirementInput(originalProfile) : null;
     const now = new Date();
     const today = todayYmd(now);
-    const fitInputs = (row: (typeof allScholarships)[number]) => {
-      const facts = bundle.facts.get(row.id) ?? [];
-      const academics = facts.length ? resolveAcademicRequirements(facts, { degreeLevel: profileData?.degreeLevel }) : null;
-      const summary = academics?.requirementGroup ? null : academics?.summary;
-      const gpa = summary?.gpa;
-      return {
-        academics,
-        scholarship: {
-          ...row,
-          minGpa: gpa && ["4", "4.0", "GPA 4.0"].includes(gpa.unit ?? "") ? gpa.single : null,
-          minIelts: summary?.ielts?.single ?? null,
-        },
-      };
-    };
-    const matchFor = (row: ReturnType<typeof fitInputs>["scholarship"]) => {
-      if (!matchProfile || row.verificationStatus !== "verified") return null;
-      const result = memoizeMatch("scholarship-fit", profileFingerprint, row.id, row as unknown as Record<string, unknown>, () =>
-        calculateScholarshipMatch(matchProfile, row)
-      );
-      return result.breakdown.comparedDimensions > 0 ? result : null;
-    };
+    const assessmentFor = (row: (typeof allScholarships)[number]) =>
+      matchProfile && originalProfile && row.verificationStatus === "verified"
+        ? scholarshipAssessment(matchProfile, originalProfile, row, bundle.facts.get(row.id) ?? [], today)
+        : null;
 
     if (searchParams.get("summary") === "match-count") {
-      const matchCount = matchProfile ? bundle.entries.reduce((count, row) =>
-        count + Number((matchFor(fitInputs(row).scholarship)?.matchScore ?? 0) >= 60), 0) : 0;
+      const matchCount = bundle.entries.reduce((count, row) =>
+        count + Number((assessmentFor(row)?.matchScore ?? 0) >= 60), 0);
       return privateNoStoreJson({ matchCount });
     }
 
@@ -292,7 +261,7 @@ export async function GET(req: Request) {
     let unisById: Map<number, UniversityData> | null = null;
     if (matchProfile && allScholarships.some((s) => s.universityId != null)) {
       const uniBundle = await getCachedUniversitiesBundle();
-      unisById = new Map(uniBundle.unis.map((uni) => [uni.id, uni as unknown as UniversityData]));
+      unisById = new Map(uniBundle.unis.map(uni => [uni.id, toUniversityData(uni, uniBundle.facts.get(uni.id), { degreeLevel: matchProfile?.degreeLevel })]));
     }
     const uniMatchMemo = new Map<number, number | null>();
     const universityMatchFor = (universityId: number | null): number | null => {
@@ -301,7 +270,8 @@ export async function GET(req: Request) {
       const uni = unisById?.get(universityId);
       // An award linked to a university that is not in the catalogue has no
       // university part — it is not scored as a zero.
-      const score = uni ? calculateUniversityMatch(matchProfile, uni).matchScore ?? null : null;
+      const fit = uni ? calculateUniversityMatch(matchProfile, uni) : null;
+      const score = fit && hasUniversityMatchEvidence(fit.breakdown) ? fit.matchScore : null;
       uniMatchMemo.set(universityId, score);
       return score;
     };
@@ -309,27 +279,13 @@ export async function GET(req: Request) {
     const mapped = allScholarships.map((s) => {
       const isVerified = s.verificationStatus === "verified";
       // The cached catalogue already suppresses unverified money, dates and links.
-      const { academics, scholarship } = matchProfile && isVerified ? fitInputs(s) : { academics: null, scholarship: s };
-      const matchInfo = matchFor(scholarship);
-      const matchScore = matchInfo?.matchScore ?? null;
+      const assessment = assessmentFor(s);
+      const academics = assessment?.academic;
+      const matchInfo = assessment?.fit;
+      const matchScore = assessment?.matchScore ?? null;
       const statusInfo = withStatus(s, locale, now);
       const window = scholarshipWindow(s, statusInfo.computedStatus, today);
-
-      const academicCheck = academicProfile && academics ? evaluateResolvedAcademicCriteria(academics, academicProfile, today) : null;
-      const degreeRestricted = parseEligibilityScope(s.degreeLevels).scope === "restricted";
-      const degree = degreeRestricted ? compareDegreeLevels(matchProfile?.degreeLevel, s.degreeLevels) : "unknown";
-      const academicFields = new Set<string>();
-      const checked = (academicCheck ? countedChecks(academicCheck, academicFields) : 0) + Number(degree !== "unknown");
-      const unreviewedMinimum =
-        (s.minGpa != null && s.minGpa > 0 && !academicFields.has("gpa")) ||
-        (s.minIelts != null && s.minIelts > 0 && !academicFields.has("ielts"));
-      const hasAcademicCheck = Boolean(academics?.requirementGroup || Object.values(academics?.summary ?? {}).some(Boolean));
-      const incomplete = unreviewedMinimum || (hasAcademicCheck && academicCheck?.state === "unknown") ||
-        (degreeRestricted && degree === "unknown");
-      const chanceBucket: ChanceBucket | null = !matchProfile ? null
-        : !isVerified ? "unknown"
-        : degree === "mismatch" || academicCheck?.state === "unmet" ? "below"
-        : incomplete || checked === 0 ? "unknown" : "meets";
+      const chanceBucket: ChanceBucket | null = matchProfile ? assessment?.bucket ?? "unknown" : null;
       const universityFit = isVerified ? universityMatchFor(s.universityId) : null;
       const relevance = combinedRelevance({
         fit: matchScore, university: universityFit, chance: chanceBucket === "unknown" ? null : chanceBucket,
@@ -341,7 +297,9 @@ export async function GET(req: Request) {
       return {
         ...s,
         ...window,
-        checkedRequirements: checked,
+        checkedRequirements: assessment?.checked ?? 0,
+        eligibilityChecks: assessment?.checks ?? [],
+        eligibilityBasis: assessment?.eligibilityBasis ?? null,
         requirementFacts: Object.entries(academics?.evidence ?? {}).flatMap(([fieldKey, fact]) =>
           fact.isOfficialMinimum ? [{ ...fact, fieldKey }] : []
         ),
@@ -353,6 +311,7 @@ export async function GET(req: Request) {
         isFullCoverage: cov ? cov.isFullCoverage : false,
         covTier: cov ? coverageTier(cov) : 0,
         matchScore,
+        fitVersion: CATALOGUE_FIT_VERSION,
         isEligible: chanceBucket === "meets" ? true : chanceBucket === "below" ? false : null,
         matchReasons: translateReasons(locale, "scholarship", matchInfo?.reasonDetails, matchInfo?.reasons),
         matchIssues: translateReasons(locale, "scholarship", matchInfo?.issueDetails, matchInfo?.potentialIssues),

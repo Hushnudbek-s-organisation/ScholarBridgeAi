@@ -16,7 +16,7 @@ import {
   applicationDocumentLinks,
 } from "@/db/schema";
 import { dateOnly, guardStudent, idParam, jsonError, oneOf, readBody, serverError, text } from "@/lib/journey/api";
-import { computeWorkspaceProgress, isRecommendationPlaceholder, WORKSPACE_TABS } from "@/lib/journey/workspace";
+import { computeWorkspaceProgress, isRecommendationPlaceholder, parseApplicationFee, WORKSPACE_TABS } from "@/lib/journey/workspace";
 import { reversePlan } from "@/lib/journey/planning";
 import { updateTrackedApplication } from "@/lib/scholly-application-reward.server";
 
@@ -105,6 +105,7 @@ export async function GET(req: Request) {
           ...row,
           deadline: row.deadline ? String(row.deadline).slice(0, 10) : null,
           progressPct: progress.pct,
+          requiredChecklist: progress.requiredChecklist,
           done: progress.done,
           total: progress.total,
           blockers: progress.blockers.length,
@@ -346,7 +347,11 @@ export async function PATCH(req: Request) {
     if (b.value.status !== undefined) patch.status = oneOf(b.value.status, APPLICATION_STATUSES, app.status);
     if (b.value.portalUrl !== undefined) patch.portalUrl = text(b.value.portalUrl);
     if (b.value.notes !== undefined) patch.notes = text(b.value.notes);
-    if (b.value.feeAmount !== undefined) patch.feeAmount = Number(b.value.feeAmount) || null;
+    if (b.value.feeAmount !== undefined) {
+      const amount = parseApplicationFee(b.value.feeAmount);
+      if (amount === undefined) return jsonError(400, "Invalid application fee", "bad_request");
+      patch.feeAmount = amount;
+    }
     if (b.value.applicationFeePaid !== undefined) patch.applicationFeePaid = !!b.value.applicationFeePaid;
     if (b.value.deadline !== undefined) patch.deadline = dateOnly(b.value.deadline)?.toISOString().slice(0, 10) ?? null;
 

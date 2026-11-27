@@ -25,7 +25,12 @@ import {
   studentProfiles,
   universities,
 } from "@/db/schema";
-import { calculateScholarshipMatch } from "@/lib/matching";
+import { scholarshipAssessment } from "@/lib/scholarshipAssessment";
+import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
+import { scholarshipAcceptsApplications, scholarshipBrowsingWindow } from "@/lib/scholarshipBrowsing";
+import { todayYmd } from "@/lib/catalogueOrder";
+import { resolveAcademicRequirements } from "@/lib/universityDetailRequirements";
+import { examRule, validExamNumber } from "@/lib/examRecords";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { createNotification, profileLang } from "@/lib/notifications";
 import { NOTIFY_TEXTS, type NotifyLang } from "@/lib/notificationTexts";
@@ -118,8 +123,9 @@ async function sweepProfile(profileId: number, _windowDays: number, now: Date): 
   const savedIds = saved.map((s) => s.scholarshipId);
   const savedRows = savedIds.length ? await db.select().from(scholarships).where(inArray(scholarships.id, savedIds)) : [];
   for (const sch of savedRows) {
-    if (!sch.deadlineDate) continue;
-    const due = String(sch.deadlineDate).slice(0, 10);
+    const window = scholarshipBrowsingWindow(sch, now);
+    if (!sch.isActive || sch.verificationStatus !== "verified" || !window.closesOn || !scholarshipAcceptsApplications(window.computedStatus)) continue;
+    const due = window.closesOn;
     const daysLeft = calendarDaysUntil(due, now, tz);
     if (daysLeft === null) continue;
     const bucket = reminderBucket(daysLeft, offsets);
@@ -157,13 +163,16 @@ async function sweepProfile(profileId: number, _windowDays: number, now: Date): 
     const savedSet = new Set(savedIds);
 
     if (countries.length > 0) {
-      const candidates = await db.select().from(scholarships).where(inArray(scholarships.country, countries));
+      const rows = await db.select().from(scholarships).where(and(
+        inArray(scholarships.country, countries), eq(scholarships.isActive, true), eq(scholarships.verificationStatus, "verified")));
+      const candidates = rows.filter(row => !savedSet.has(row.id) &&
+        scholarshipAcceptsApplications(scholarshipBrowsingWindow(row, now).computedStatus));
+      const facts = await loadCatalogueFacts("scholarship", candidates.map(row => row.id));
       let notified = 0;
       for (const sch of candidates) {
         if (notified >= 3) break; // never spam in one sweep
-        if (savedSet.has(sch.id)) continue;
-        const match = calculateScholarshipMatch(matchProfile, sch);
-        if (match.matchScore == null || match.matchScore < 60) continue;
+        const match = scholarshipAssessment(matchProfile, matchProfile, sch, facts.get(sch.id) ?? [], todayYmd(now));
+        if (match.bucket === "below" || match.matchScore == null || match.matchScore < 60) continue;
         const t = NOTIFY_TEXTS.newMatch(lang, { title: sch.title, country: sch.country, score: match.matchScore });
         if (await notifyOnce(profileId, "scholarship_opened", `/scholarships?id=${sch.id}`, t.title, t.body)) {
           created++;
@@ -172,12 +181,19 @@ async function sweepProfile(profileId: number, _windowDays: number, now: Date): 
       }
     }
 
-    const withMinIelts = uniRows.filter((u) => u.minIelts != null);
-    if (withMinIelts.length > 0) {
-      const score = profile.ieltsScore == null ? null : Number(profile.ieltsScore);
-      const missing = score == null ? withMinIelts.length : withMinIelts.filter((u) => score < Number(u.minIelts)).length;
+    const universityFacts = await loadCatalogueFacts("university", uniRows.map(row => row.id));
+    const minima = uniRows.flatMap(row => {
+      if (!row.isActive) return [];
+      const academic = resolveAcademicRequirements(universityFacts.get(row.id) ?? [], { degreeLevel: profile.degreeLevel });
+      const minimum = academic.summary.ielts?.single;
+      if (academic.requirementGroup || minimum == null || academic.summary.toefl || academic.summary.duolingo || academic.summary.pte || academic.summary.cambridgeEnglish) return [];
+      return [minimum];
+    });
+    if (minima.length > 0) {
+      const score = validExamNumber(profile.ieltsScore, examRule("ielts")) ? profile.ieltsScore : null;
+      const missing = minima.filter(minimum => score == null || score < minimum).length;
       if (missing > 0) {
-        const highest = Math.max(...withMinIelts.map((u) => Number(u.minIelts)));
+        const highest = Math.max(...minima);
         const t = NOTIFY_TEXTS.ieltsGap(lang, { score, missing, highest });
         if (await notifyOnce(profileId, "requirement_gap", "/profile?gap=ielts", t.title, t.body)) created++;
       }
@@ -302,13 +318,15 @@ export async function notifyScholarshipDeadlineChanged(
 }
 
 /** Scholarship status became "open" → tell everyone who saved it. */
-export async function notifyScholarshipOpened(sch: { id: number; title: string; deadlineDate?: Date | string | null }): Promise<number> {
-  const cycle = isoDay(sch.deadlineDate) ?? "open";
+export async function notifyScholarshipOpened(sch: typeof scholarships.$inferSelect): Promise<number> {
+  const window = scholarshipBrowsingWindow(sch);
+  if (!sch.isActive || sch.verificationStatus !== "verified" || !scholarshipAcceptsApplications(window.computedStatus)) return 0;
+  const cycle = window.closesOn ?? "open";
   let sent = 0;
   for (const profileId of await saversOf(sch.id)) {
     try {
       const lang = await profileLang(profileId);
-      const t = NOTIFY_TEXTS.scholarshipOpened(lang, { title: sch.title, deadline: sch.deadlineDate ?? null });
+      const t = NOTIFY_TEXTS.scholarshipOpened(lang, { title: sch.title, deadline: window.closesOn });
       if (await notifyOnce(profileId, "scholarship_opened", `/scholarships?id=${sch.id}&opened=${cycle}`, t.title, t.body)) sent++;
     } catch (err) {
       console.warn("[notify] scholarship_opened failed:", err instanceof Error ? err.message : err);

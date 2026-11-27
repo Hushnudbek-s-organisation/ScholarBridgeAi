@@ -1,3 +1,4 @@
+import { examRule, validExamNumber } from "./examRecords";
 import {subjectSimilarity} from "./subjectAffinity";
 /**
  * Profile data utilities and a transparent profile-record coverage view.
@@ -265,9 +266,13 @@ export function profileStrength(
     ...(!degreeLevel ? ["degreeLevel"] : []),
   ];
   const activity = countActivities(profile);
-  const hasAnyTest = [profile.ieltsScore, profile.toeflScore, profile.duolingoScore, profile.satScore, profile.actScore, profile.greScore]
-    .some((value) => Number(value) > 0);
-  const hasBudget = Number(profile.budgetAnnualUsd) > 0;
+  const hasAnyTest = validExamNumber(profile.ieltsScore, examRule("ielts")) ||
+    validExamNumber(profile.duolingoScore, examRule("duolingo")) ||
+    validExamNumber(profile.satScore, examRule("sat")) ||
+    validExamNumber(profile.actScore, examRule("act")) ||
+    validExamNumber(profile.greScore, examRule("gre")) ||
+    validExamNumber(profile.toeflScore, examRule("toefl", profile.applicantContext?.toefl?.scale));
+  const hasBudget = profile.budgetAnnualUsd != null && Number.isFinite(profile.budgetAnnualUsd) && profile.budgetAnnualUsd >= 0;
   const hasFundingNeed =
     profile.needsFinancialAid != null || profile.requiresFullScholarship != null || profile.needScholarship != null;
   const financeMissing = [

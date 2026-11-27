@@ -1,3 +1,4 @@
+import { examRule, validExamNumber } from "@/lib/examRecords";
 /**
  * Profile information coverage and university-catalogue test comparisons.
  *
@@ -66,6 +67,7 @@ export interface ReadinessInput {
   applicationsSubmitted: number;
   /** Optional planning fields; the number of scholarships is not a target. */
   familyBudget?: number | null;
+  toeflScale?: string | null;
   fundingPreference?: boolean | null;
 }
 
@@ -129,6 +131,7 @@ export function profileReadiness(input: ReadinessInput): {
   const hasGpa = Number(input.gpa) > 0;
   const hasScale = Number(input.gpaScale) > 0;
   const hasDegree = Boolean(input.degreeLevel?.trim());
+  const hasBudget = input.familyBudget != null && Number.isFinite(input.familyBudget) && input.familyBudget >= 0;
   const categories: ReadinessCategory[] = [
     make(
       "academic",
@@ -143,14 +146,14 @@ export function profileReadiness(input: ReadinessInput): {
     ),
     make(
       "english",
-      Number([input.ieltsScore, input.toeflScore, input.duolingoScore].some((value) => Number(value) > 0)),
+      Number(validExamNumber(input.ieltsScore, examRule("ielts")) || validExamNumber(input.toeflScore, examRule("toefl", input.toeflScale)) || validExamNumber(input.duolingoScore, examRule("duolingo"))),
       1,
       ["englishPolicy"],
       "tests",
     ),
     make(
       "testing",
-      Number([input.satScore, input.actScore, input.greScore].some((value) => Number(value) > 0)),
+      Number(validExamNumber(input.satScore, examRule("sat")) || validExamNumber(input.actScore, examRule("act")) || validExamNumber(input.greScore, examRule("gre"))),
       1,
       ["standardizedPolicy"],
       "tests",
@@ -185,10 +188,10 @@ export function profileReadiness(input: ReadinessInput): {
     ),
     make(
       "finance",
-      Number(Number(input.familyBudget) > 0) + Number(input.fundingPreference != null),
+      Number(hasBudget) + Number(input.fundingPreference != null),
       2,
       [
-        ...(!(Number(input.familyBudget) > 0) ? ["budgetPlan"] : []),
+        ...(!hasBudget ? ["budgetPlan"] : []),
         ...(input.fundingPreference == null ? ["fundingPreference"] : []),
       ],
       "funding",

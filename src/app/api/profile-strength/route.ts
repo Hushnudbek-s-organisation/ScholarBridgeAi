@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { essayVersions, studentProfiles } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
@@ -27,8 +27,7 @@ export async function GET(req: Request) {
       db
         .select({ rubricTotal: essayVersions.rubricTotal })
         .from(essayVersions)
-        .where(eq(essayVersions.profileId, profileId))
-        .orderBy(desc(essayVersions.versionNumber), desc(essayVersions.id))
+        .where(and(eq(essayVersions.profileId, profileId), isNotNull(essayVersions.rubricTotal)))
         .limit(1),
     ]);
     const row = rows[0];

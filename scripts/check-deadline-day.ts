@@ -223,7 +223,7 @@ check("every consumer passes through the shared engine", () => {
   for (const file of ["src/app/api/deadlines/route.ts", "src/lib/refresh.ts", "src/app/api/scholarships/route.ts"]) {
     const source = readFileSync(join(ROOT, file), "utf8");
     assert.ok(
-      source.includes("computeScholarshipStatus") || source.includes("withStatus"),
+      source.includes("computeScholarshipStatus") || source.includes("withStatus") || source.includes("scholarshipBrowsingWindow"),
       `${file} computes a status of its own`
     );
   }
@@ -235,6 +235,16 @@ check("ymdOf and todayYmd are UTC and total", () => {
   assert.equal(ymdOf("not a date"), null);
   assert.equal(ymdOf(null), null);
   assert.match(todayYmd(), /^\d{4}-\d{2}-\d{2}$/);
+});
+
+check("an exact sourced deadline uses its instant and a legacy row still uses its date", () => {
+  const legacy = { deadlineDate: "2026-11-30", deadlineType: "exact", isActive: true } as Parameters<typeof computeScholarshipStatus>[0];
+  const exact = { ...legacy, rounds: JSON.stringify([{
+    deadline: "2026-11-30", deadlineAt: "2026-11-30T01:00:00Z", timezone: "Asia/Shanghai", applicantScope: "international",
+  }]) };
+  assert.equal(computeScholarshipStatus(exact, new Date("2026-11-30T00:59:59Z")), "open");
+  assert.equal(computeScholarshipStatus(exact, new Date("2026-11-30T01:00:00Z")), "closed");
+  assert.equal(computeScholarshipStatus(legacy, new Date("2026-11-30T01:01:00Z")), "open");
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

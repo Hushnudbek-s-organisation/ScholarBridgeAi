@@ -9,7 +9,7 @@ import {
   universityPrograms,
 } from "@/db/schema";
 import { requireProfileAccess } from "@/lib/auth";
-import { applyMatchScenario, calculateUniversityMatch, type MatchScenario } from "@/lib/matching";
+import { applyMatchScenario, calculateUniversityMatch, CATALOGUE_FIT_VERSION, hasUniversityMatchEvidence, type MatchScenario } from "@/lib/matching";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { memoizeMatch } from "@/lib/matchMemo";
@@ -149,7 +149,14 @@ export async function GET(req: Request) {
       ];
     }
 
-    const allCatalogUnis = (await getCachedUniversitiesBundleForAssessment()).unis;
+    const catalogue = await getCachedUniversitiesBundleForAssessment();
+    const allCatalogUnis = catalogue.unis;
+    const fitUniversity = (row: (typeof allCatalogUnis)[number]) => {
+      const input = toUniversityData(row, catalogue.facts.get(row.id), { degreeLevel: matchProfile.degreeLevel });
+      return memoizeMatch("fit", fingerprint, row.id, input as unknown as Record<string, unknown>, () =>
+        calculateUniversityMatch(matchProfile, input)
+      );
+    };
 
     let unis = universityIds.length
       ? allCatalogUnis.filter((u) => universityIds.includes(u.id))
@@ -169,13 +176,11 @@ export async function GET(req: Request) {
         );
       }
       const scoredPool = pool
-        .map((u) => ({
-          uni: u,
-          fit: memoizeMatch("fit", fingerprint, u.id, toUniversityData(u) as unknown as Record<string, unknown>, () =>
-            calculateUniversityMatch(matchProfile, toUniversityData(u))
-          ),
-        }))
-        .sort((a, b) => b.fit.matchScore - a.fit.matchScore)
+        .map((uni) => {
+          const fit = fitUniversity(uni);
+          return { uni, score: hasUniversityMatchEvidence(fit.breakdown) ? fit.matchScore : -1 };
+        })
+        .sort((a, b) => b.score - a.score)
         .slice(0, 12)
         .map((x) => x.uni);
 
@@ -279,9 +284,7 @@ export async function GET(req: Request) {
     };
 
     const results = unis.map((uni) => {
-      const fit = memoizeMatch("fit", fingerprint, uni.id, toUniversityData(uni) as unknown as Record<string, unknown>, () =>
-        calculateUniversityMatch(matchProfile, toUniversityData(uni))
-      );
+      const fit = fitUniversity(uni);
       const qsBenchmark = matchQsUniversityBenchmark(uni);
       const uniPrograms = programsByUniId.get(uni.id) ?? [];
 
@@ -336,7 +339,8 @@ export async function GET(req: Request) {
         worldRanking: verifiedQsRank(uni)?.rank ?? qsBenchmark.qsRank,
         officialWebsiteUrl: uni.officialWebsiteUrl || uni.websiteUrl || qsBenchmark.officialUrl,
         /** University-level profile fit — a comparison, never an admission chance. */
-        fitScore: fit.matchScore,
+        fitScore: hasUniversityMatchEvidence(fit.breakdown) ? fit.matchScore : null,
+        fitVersion: CATALOGUE_FIT_VERSION,
         fitReasons: translateReasons(locale, "university", fit.reasonDetails, fit.reasons),
         fitIssues: translateReasons(locale, "university", fit.issueDetails, fit.potentialIssues),
         comparedDimensions: fit.breakdown.comparedDimensions,

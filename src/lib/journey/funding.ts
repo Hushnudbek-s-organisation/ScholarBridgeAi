@@ -130,6 +130,61 @@ export interface FundingPlanResult {
   openActions: { name: string; kind: FundingKind; amountUsd: number; status: FundingStatus }[];
 }
 
+/** Maximise covered cost using residual paths, which can move a flexible
+ * grant off a line that a more restricted grant could cover instead. Grouping
+ * by allowed lines makes the result independent of funding item order. */
+function allocateFunding(lines: AnnualFundingCostLine[], items: FundingItemLike[]): (number | null)[] {
+  const scopes = new Map<string, number>();
+  for (const item of items) {
+    if (item.status === "declined" || !Number.isFinite(item.amountUsd) || item.amountUsd <= 0) continue;
+    const covers = parseCovers(item.covers);
+    if (!covers) continue;
+    const eligible = lines.flatMap((line, i) =>
+      line.cost != null && line.cost > 0 && (!covers.length || covers.includes(line.key)) ? [i] : []);
+    if (!eligible.length) continue;
+    const scope = eligible.join(",");
+    scopes.set(scope, (scopes.get(scope) ?? 0) + nonNegativeFinite(item.amountUsd));
+  }
+
+  const sorted = [...scopes].sort(([a], [b]) => a.length - b.length || a.localeCompare(b));
+  const firstLine = sorted.length + 1;
+  const sink = firstLine + lines.length;
+  const residual = Array.from({ length: sink + 1 }, () => new Map<number, number>());
+  const add = (from: number, to: number, capacity: number) => {
+    residual[from].set(to, capacity);
+    residual[to].set(from, 0);
+  };
+  for (let i = 0; i < sorted.length; i++) {
+    const [scope, amount] = sorted[i];
+    add(0, i + 1, amount);
+    for (const line of scope.split(",")) add(i + 1, firstLine + Number(line), amount);
+  }
+  lines.forEach((line, i) => add(firstLine + i, sink, line.cost ?? 0));
+
+  for (;;) {
+    const previous = new Map([[0, 0]]);
+    const queue = [0];
+    for (let i = 0; i < queue.length && !previous.has(sink); i++) {
+      for (const [to, capacity] of residual[queue[i]]) {
+        if (capacity <= 1e-8 || previous.has(to)) continue;
+        previous.set(to, queue[i]);
+        queue.push(to);
+      }
+    }
+    if (!previous.has(sink)) break;
+    let flow = Infinity;
+    for (let to = sink; to !== 0; to = previous.get(to)!) {
+      flow = Math.min(flow, residual[previous.get(to)!].get(to)!);
+    }
+    for (let to = sink; to !== 0; to = previous.get(to)!) {
+      const from = previous.get(to)!;
+      residual[from].set(to, residual[from].get(to)! - flow);
+      residual[to].set(from, residual[to].get(from)! + flow);
+    }
+  }
+  return lines.map((line, i) => line.cost == null ? null : residual[sink].get(firstLine + i)!);
+}
+
 export function buildFundingPlan(input: {
   annualCost: number | null;
   currency?: string;
@@ -152,38 +207,7 @@ export function buildFundingPlan(input: {
   const securedTotal = sum(items.filter((i) => isSecured(i.status)));
   const projectedTotal = sum(items.filter((i) => i.status !== "declined"));
 
-  // Allocate each dollar at most once. Explicitly scoped items go to their
-  // declared lines first; unscoped items are then distributed, in line order,
-  // over any remaining costs. Unused restricted funding does not spill over.
-  const available = items.map((item) => ({
-    amount: item.status === "declined" ? 0 : nonNegativeFinite(item.amountUsd),
-    covers: parseCovers(item.covers),
-  }));
-  const coveredByLine: (number | null)[] = lines.map((line) => line.cost == null ? null : 0);
-  const allocate = (itemIndex: number, lineIndex: number) => {
-    const cost = lines[lineIndex].cost;
-    const covered = coveredByLine[lineIndex];
-    // Never allocate against an unknown cost as though it were a $0 line.
-    if (cost == null || covered == null) return;
-    const left = Math.max(0, cost - covered);
-    const amount = Math.min(left, available[itemIndex].amount);
-    if (amount <= 0) return;
-    coveredByLine[lineIndex] = covered + amount;
-    available[itemIndex].amount -= amount;
-  };
-
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-    for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
-      if (available[itemIndex].covers.length > 0 && available[itemIndex].covers.includes(lines[lineIndex].key)) {
-        allocate(itemIndex, lineIndex);
-      }
-    }
-  }
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-    for (let itemIndex = 0; itemIndex < items.length; itemIndex += 1) {
-      if (available[itemIndex].covers.length === 0) allocate(itemIndex, lineIndex);
-    }
-  }
+  const coveredByLine = allocateFunding(lines, items);
 
   const byLine = lines.map((line, index) => ({
     key: line.key,
@@ -362,12 +386,12 @@ function nullableNonNegativeFinite(value: number): number | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function parseCovers(raw: string | null | undefined): string[] {
+function parseCovers(raw: string | null | undefined): string[] | null {
   if (!raw) return [];
   try {
     const v = JSON.parse(raw);
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    return Array.isArray(v) && v.every((x): x is string => typeof x === "string" && !!x.trim()) ? v : null;
   } catch {
-    return [];
+    return null;
   }
 }

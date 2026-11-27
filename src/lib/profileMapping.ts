@@ -1,3 +1,6 @@
+import type { CatalogueFact } from "@/lib/evidencePolicy";
+import type { FactContext } from "@/lib/factResolver";
+import { resolveAcademicRequirements } from "@/lib/universityDetailRequirements";
 /**
  * One mapping from database rows to the shapes the engines expect.
  *
@@ -48,7 +51,7 @@ type UniversityMappingRow = Pick<
     | "annualTuition" | "tuitionCurrency" | "tuitionPeriod"
     | "annualLivingEst" | "livingCostCurrency" | "livingCostPeriod"
     | "accommodationCostUsd" | "accommodationCost" | "accommodationCostCurrency" | "accommodationCostPeriod"
-    | "applicationFee" | "applicationFeeCurrency"
+    | "applicationFee" | "applicationFeeCurrency" | "verificationStatus"
   >>;
 
 /**
@@ -218,7 +221,15 @@ export async function toMatchProfileWithActivities(row: ProfileRow): Promise<Stu
  * Typed as a real return value (not `as never`) so a renamed or missing column
  * becomes a compile error instead of a silently wrong score.
  */
-export function toUniversityData(row: UniversityMappingRow): UniversityData {
+export function toUniversityData(
+  row: UniversityMappingRow,
+  facts: CatalogueFact[] = [],
+  context: FactContext = {},
+): UniversityData {
+  const requirements = resolveAcademicRequirements(facts, context);
+  const summary = requirements.requirementGroup ? null : requirements.summary;
+  const gpa = summary?.gpa;
+  const verified = row.verificationStatus === "verified";
   return {
     id: row.id,
     name: row.name,
@@ -228,25 +239,25 @@ export function toUniversityData(row: UniversityMappingRow): UniversityData {
     worldRanking: row.worldRanking,
     degreeLevel: row.degreeLevel,
     programMajor: row.programMajor,
-    annualTuitionUsd: row.annualTuitionUsd,
-    annualLivingEstUsd: row.annualLivingEstUsd,
-    annualTuition: row.annualTuition != null ? Number(row.annualTuition) : null,
+    annualTuitionUsd: verified ? row.annualTuitionUsd : null,
+    annualLivingEstUsd: verified ? row.annualLivingEstUsd : null,
+    annualTuition: verified && row.annualTuition != null ? Number(row.annualTuition) : null,
     tuitionCurrency: row.tuitionCurrency,
     tuitionPeriod: row.tuitionPeriod,
-    annualLivingEst: row.annualLivingEst != null ? Number(row.annualLivingEst) : null,
+    annualLivingEst: verified && row.annualLivingEst != null ? Number(row.annualLivingEst) : null,
     livingCostCurrency: row.livingCostCurrency,
     livingCostPeriod: row.livingCostPeriod,
-    accommodationCostUsd: row.accommodationCostUsd,
-    accommodationCost: row.accommodationCost != null ? Number(row.accommodationCost) : null,
+    accommodationCostUsd: verified ? row.accommodationCostUsd : null,
+    accommodationCost: verified && row.accommodationCost != null ? Number(row.accommodationCost) : null,
     accommodationCostCurrency: row.accommodationCostCurrency,
     accommodationCostPeriod: row.accommodationCostPeriod,
-    applicationFee: row.applicationFee,
+    applicationFee: verified ? row.applicationFee : null,
     applicationFeeCurrency: row.applicationFeeCurrency,
-    minGpa: row.minGpa,
-    minIelts: row.minIelts,
-    minSat: row.minSat,
+    minGpa: gpa && ["4", "4.0", "GPA 4.0"].includes(gpa.unit ?? "") ? gpa.single : null,
+    minIelts: summary?.ielts?.single ?? null,
+    minSat: summary?.sat?.single ?? null,
     acceptanceRate: row.acceptanceRate,
-    postStudyWorkVisaYears: row.postStudyWorkVisaYears,
+    postStudyWorkVisaYears: verified ? row.postStudyWorkVisaYears : null,
     description: row.description,
     highlights: row.highlights,
     websiteUrl: row.websiteUrl,

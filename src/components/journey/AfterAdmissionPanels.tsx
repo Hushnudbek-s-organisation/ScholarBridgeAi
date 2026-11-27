@@ -1005,7 +1005,10 @@ export function FinancialPlanPanel({ profileId, applicationId, onNavigateTab }: 
               </Field>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t("fpFieldAmount")}>
-                  <input className={inputClass} type="number" min="0" max="2147483647" step="any" required aria-describedby={amountDescriptionId} value={form.amountUsd} onChange={(event) => setForm({ ...form, amountUsd: event.target.value })} />
+                  <input className={inputClass} type="number" min="0" max="2147483647" step="any" required
+                    aria-label={t("fpFieldAmount")} aria-describedby={amountDescriptionId}
+                    value={form.amountUsd} onChange={(event) => setForm({ ...form, amountUsd: event.target.value })}
+                    onInvalid={() => setActionError(t("fpUsdAmountInvalid"))} />
                   <span id={amountDescriptionId} className="mt-1 block text-xs text-slate-600 dark:text-slate-300">{t("fpUsdRounding")}</span>
                 </Field>
                 <Field label={t("fpFieldStatus")}>

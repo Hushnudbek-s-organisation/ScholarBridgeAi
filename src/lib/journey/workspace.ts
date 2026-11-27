@@ -21,6 +21,14 @@ export type WorkspaceSection =
   | "submission"
   | "decision";
 
+/** Match the database's nullable whole-unit application fee. */
+export function parseApplicationFee(value: unknown): number | null | undefined {
+  if (value == null || (typeof value === "string" && !value.trim())) return null;
+  if (typeof value !== "number" && (typeof value !== "string" || !/^\d+$/.test(value.trim()))) return undefined;
+  const amount = Number(value);
+  return Number.isSafeInteger(amount) && amount >= 0 && amount <= 2_147_483_647 ? amount : undefined;
+}
+
 export interface WorkspaceSummary {
   id: number;
   universityName: string;
@@ -118,6 +126,7 @@ export interface WorkspaceProgress {
   sections: SectionProgress[];
   /** Everything still open — the exact requirement, not just the group. */
   missing: { key: string; section: string; title: string; isRequired: boolean; status: string }[];
+  requiredChecklist: { done: number; total: number; pct: number | null };
   readyToSubmit: boolean;
   blockers: string[];
 }
@@ -232,6 +241,9 @@ export function computeWorkspaceProgress(
   const recommendationBlockers = Math.max(0, recommendationsTotal - recommendationsSubmitted);
   if (recommendationBlockers > 0) blockers.push(`${recommendationBlockers} recommendation request(s) not submitted`);
   if (!feeSatisfied) blockers.push("Application fee not paid or marked complete");
+  const mandatory = countedRows.filter((row) => row.isRequired && row.status !== "not_required");
+  const requiredTotal = mandatory.length + recommendationsTotal;
+  const requiredDone = mandatory.filter(isDone).length + recommendationsSubmitted;
   const requirementsSatisfied = rows.length > 0 && requiredRows.every(isDone);
 
   return {
@@ -240,6 +252,7 @@ export function computeWorkspaceProgress(
     total,
     sections,
     missing,
+    requiredChecklist: { done: requiredDone, total: requiredTotal, pct: requiredTotal ? Math.round(100 * requiredDone / requiredTotal) : null },
     // Submission requires a real tracked checklist, every required row closed,
     // every tracked recommendation submitted and any required fee satisfied.
     // `submitted` affects the progress bar above, never bypasses this gate.

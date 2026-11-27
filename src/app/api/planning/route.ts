@@ -1,3 +1,4 @@
+import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { verifiedQsRankNumber } from "@/lib/universityRank";
@@ -19,7 +20,7 @@ import {
   resolveMultiCurrencyScholarshipAmount,
 } from "@/lib/countryCostBenchmarks";
 import { countriesMatch } from "@/lib/countries";
-import { calculateUniversityMatch } from "@/lib/matching";
+import { calculateUniversityMatch, hasUniversityMatchEvidence } from "@/lib/matching";
 import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { ADMISSION_PROBABILITY } from "@/lib/chancing";
 
@@ -365,10 +366,11 @@ export async function GET(req: Request) {
       return tied.length === 1 ? tied[0].id : null;
     };
 
-    const chanced = compareList.map((u) => {
+    const compareFacts = await loadCatalogueFacts("university", compareList.map(row => row.id));
+    const chanced = compareList.flatMap((u) => {
       const uni = uniRows.find((r) => r.id === u.id)!;
-      const match = calculateUniversityMatch(matchProfile, toUniversityData(uni)).matchScore;
-      return { id: u.id, match };
+      const fit = calculateUniversityMatch(matchProfile, toUniversityData(uni, compareFacts.get(uni.id), { degreeLevel: matchProfile.degreeLevel }));
+      return hasUniversityMatchEvidence(fit.breakdown) ? [{ id: u.id, match: fit.matchScore }] : [];
     });
 
     const matchRow: CompareRow = {

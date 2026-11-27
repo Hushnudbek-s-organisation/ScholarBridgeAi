@@ -1,3 +1,4 @@
+import { scholarshipBrowsingWindow } from "@/lib/scholarshipBrowsing";
 import {normalizeScholarshipAwardPeriod} from "@/lib/usdCosts";
 import { NextResponse } from "next/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -120,7 +121,13 @@ export async function GET(req: Request) {
     const candidates = await db.select().from(scholarships).where(eq(scholarships.isActive, true));
     const activeCountry = countryParam ?? uni?.country ?? null;
     const globalCountry = /^(global|international|all|worldwide|multiple countries)$/i;
+    const now = new Date();
     const matched = candidates
+      .filter((s) => {
+        if (s.verificationStatus !== "verified" || (uni && s.universityId != null && s.universityId !== uni.id)) return false;
+        const { computedStatus } = scholarshipBrowsingWindow(s, now);
+        return computedStatus === "open" || computedStatus === "rolling";
+      })
       .filter((s) => savedIds.includes(s.id) || Boolean(activeCountry && countriesMatch(s.country, activeCountry)) || globalCountry.test((s.country ?? "").trim()))
       .map((s) => ({
         saved: savedIds.includes(s.id),
@@ -135,9 +142,7 @@ export async function GET(req: Request) {
         tuitionCoverage: s.tuitionCoverage || "Not specified",
         deadlineDate: s.deadlineDate ? String(s.deadlineDate).slice(0, 10) : null,
       }))
-      .filter((s): s is typeof s & { amountUsdValue: number } => s.amountUsdValue != null && s.amountUsdValue > 0)
-      .sort((a, b) => b.amountUsdValue - a.amountUsdValue)
-      .slice(0, 8);
+      .filter((s): s is typeof s & { amountUsdValue: number } => s.amountUsdValue != null && s.amountUsdValue > 0);
 
     // A scholarship BIGGER than the gap is the best possible answer — the old
     // `<= gap` filter hid it (a $25k award vanishes when $15k is short).
@@ -148,14 +153,14 @@ export async function GET(req: Request) {
       gap: number | null,
       homeCountry: string | null,
     ): (typeof matched)[number][] => {
-      if (gap == null || list.length === 0) return [];
+      if (gap == null || gap <= 0 || list.length === 0) return [];
       const home = (x: (typeof list)[number]) => Number(Boolean(homeCountry && x.country === homeCountry));
       const closers = list
         .filter((x) => x.annualComparable&&x.amountUsdValue >= gap)
-        .sort((a, b) => home(b) - home(a) || a.amountUsdValue - b.amountUsdValue);
+        .sort((a, b) => home(b) - home(a) || a.amountUsdValue - b.amountUsdValue || a.id - b.id);
       const partials = list
         .filter((x) => !x.annualComparable||x.amountUsdValue < gap)
-        .sort((a, b) => home(b) - home(a) || b.amountUsdValue - a.amountUsdValue);
+        .sort((a, b) => Number(b.annualComparable) - Number(a.annualComparable) || home(b) - home(a) || b.amountUsdValue - a.amountUsdValue || a.id - b.id);
       return [...closers, ...partials].slice(0, 5);
     };
 
@@ -184,7 +189,8 @@ export async function GET(req: Request) {
           const gap = plan.fundingGap;
           return gapCandidates(matched, gap, uni && !countryParam ? (uni.country as string | null) : null).map((s) => ({
             ...s,
-            coversGap: s.annualComparable&&gap != null && s.amountUsdValue >= gap,
+            coversGap: false,
+            couldCoverGapByAmount: s.annualComparable && gap != null && s.amountUsdValue >= gap,
           }));
         })(),
         tab: "scholarships",

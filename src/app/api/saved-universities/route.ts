@@ -1,3 +1,5 @@
+import { loadCatalogueFacts } from "@/lib/catalogueFacts.server";
+import { CATALOGUE_FIT_VERSION, hasUniversityMatchEvidence } from "@/lib/matching";
 import { readJsonBody } from "@/lib/request";
 import { NextResponse } from "next/server";
 import { requireProfileAccess, requireRowAccess } from "@/lib/auth";
@@ -70,15 +72,17 @@ export async function GET(req: Request) {
     // Fit is computed from the current profile and available catalogue data;
     // do not persist or return a stale score or an admissions-style tier.
     const matchProfile = profile ? await toMatchProfileWithActivities(profile) : null;
+    const facts = await loadCatalogueFacts("university", saved.map(row => row.university.id));
     const locale = localeFromRequest(req);
     const withLiveMatch = saved.map((row) => {
       const live = matchProfile
-        ? calculateUniversityMatch(matchProfile, toUniversityData(row.university))
+        ? calculateUniversityMatch(matchProfile, toUniversityData(row.university, facts.get(row.university.id), { degreeLevel: matchProfile.degreeLevel }))
         : null;
       // The nested university row arrives translated (en keeps source values).
       return {
         ...row,
-        matchScore: live?.matchScore ?? null,
+        matchScore: live && hasUniversityMatchEvidence(live.breakdown) ? live.matchScore : null,
+        fitVersion: CATALOGUE_FIT_VERSION,
         university: localizeUniversityRow(row.university as never, locale),
       };
     });

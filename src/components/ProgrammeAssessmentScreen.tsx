@@ -116,7 +116,7 @@ type UniversityRow = {
   flagEmoji?: string;
   worldRanking?: number | null;
   officialWebsiteUrl?: string;
-  fitScore: number;
+  fitScore: number | null;
   fitReasons: string[];
   fitIssues: string[];
   matchBreakdown?: { comparedDimensions: number; totalDimensions: number; evidenceCoveragePct: number };

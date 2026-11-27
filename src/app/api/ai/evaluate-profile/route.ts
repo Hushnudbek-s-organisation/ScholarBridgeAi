@@ -1,3 +1,6 @@
+import { scholarshipAssessment } from "@/lib/scholarshipAssessment";
+import { scholarshipAcceptsApplications, scholarshipBrowsingWindow } from "@/lib/scholarshipBrowsing";
+import { todayYmd } from "@/lib/catalogueOrder";
 import { NextResponse } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { eq } from "drizzle-orm";
@@ -8,8 +11,8 @@ import { normalizeAiReply } from "@/lib/ai/format-reply";
 import { guardAiRequest } from "@/lib/ai/guard";
 import { localeToLanguageName, type Locale } from "@/i18n/config";
 import { asLocale, translateReasons } from "@/lib/engineText";
-import { calculateScholarshipMatch, calculateUniversityMatch } from "@/lib/matching";
-import { toMatchProfileWithActivities } from "@/lib/profileMapping";
+import { calculateUniversityMatch, hasUniversityMatchEvidence } from "@/lib/matching";
+import { toMatchProfileWithActivities, toUniversityData } from "@/lib/profileMapping";
 import { getCachedScholarshipsBundle, getCachedUniversitiesBundle } from "@/lib/catalogCache";
 import {
   buildProfileReport,
@@ -32,11 +35,13 @@ async function loadFacts(profile: typeof studentProfiles.$inferSelect, locale: L
   ]);
   // Both bundles contain the student-facing catalogue visibility boundary
   // (active rows only) and are invalidated by admin catalogue writes.
+  const now = new Date();
   const uniRows = universityBundle.unis.filter((row) => row.isActive !== false);
   const scholarshipRows = scholarshipBundle.entries;
 
   const scored = uniRows
-    .map((uni) => ({ uni, match: calculateUniversityMatch(matchProfile, uni) }))
+    .map((uni) => ({ uni, match: calculateUniversityMatch(matchProfile, toUniversityData(uni, universityBundle.facts.get(uni.id), { degreeLevel: matchProfile.degreeLevel })) }))
+    .filter(({ match }) => hasUniversityMatchEvidence(match.breakdown))
     .sort((a, b) => b.match.matchScore - a.match.matchScore);
 
   const toFact = (row: (typeof scored)[number]): ReportMatchFact => ({
@@ -47,8 +52,10 @@ async function loadFacts(profile: typeof studentProfiles.$inferSelect, locale: L
     issue: translateReasons(locale, "university", row.match.issueDetails, row.match.potentialIssues)[0] ?? null,
   });
   const scholarshipFacts: ReportScholarshipFact[] = scholarshipRows
-    .map((row) => ({ row, match: calculateScholarshipMatch(matchProfile, row) }))
-    .sort((a, b) => b.match.matchScore - a.match.matchScore)
+    .filter(row => scholarshipAcceptsApplications(scholarshipBrowsingWindow(row, now).computedStatus))
+    .map(row => ({ row, match: scholarshipAssessment(matchProfile, matchProfile, row, scholarshipBundle.facts.get(row.id) ?? [], todayYmd(now)) }))
+    .filter(({ match }) => match.bucket !== "below" && match.matchScore != null)
+    .sort((a, b) => (b.match.matchScore ?? 0) - (a.match.matchScore ?? 0))
     .slice(0, 4)
     .map(({ row }) => ({
       title: row.title,

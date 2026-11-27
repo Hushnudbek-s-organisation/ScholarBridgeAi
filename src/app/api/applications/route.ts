@@ -1,3 +1,4 @@
+import { parseApplicationFee } from "@/lib/journey/workspace";
 import { bumpCacheRevision } from "@/lib/cacheRevision";
 import { NextResponse } from "next/server";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
@@ -93,6 +94,8 @@ export async function POST(req: Request) {
     const capped = await enforceFreeCap(profileId, "application_workspaces");
     if (capped) return capped;
 
+    let feeAmount = parseApplicationFee(body.feeAmount);
+    if (feeAmount === undefined) return NextResponse.json({ error: "Invalid application fee" }, { status: 400 });
     const universityId = positiveInt(body.universityId);
     let universityName = clampString(body.universityName, 200);
 
@@ -155,7 +158,7 @@ export async function POST(req: Request) {
       }
       if (body.programName == null && uni.programMajor) body.programName = uni.programMajor;
       if (body.feeAmount == null && uni.applicationFee != null) {
-        body.feeAmount = Math.round(Number(uni.applicationFee));
+        feeAmount = parseApplicationFee(Math.round(Number(uni.applicationFee))) ?? null;
       }
 
       // Keep the shortlist and the tracker in sync: starting an application
@@ -186,7 +189,7 @@ export async function POST(req: Request) {
           status,
           submittedAt: status === "submitted" ? new Date() : null,
           applicationFeePaid: Boolean(body.applicationFeePaid),
-          feeAmount: positiveInt(body.feeAmount),
+          feeAmount,
           portalUrl: clampString(body.portalUrl, 500) || null,
           notes: clampString(body.notes, 2000) || null,
         })
@@ -221,6 +224,8 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: access.error, code: access.code }, { status: access.status });
     }
 
+    const feeAmount = parseApplicationFee(body.feeAmount);
+    if (feeAmount === undefined) return NextResponse.json({ error: "Invalid application fee" }, { status: 400 });
     const status = APPLICATION_STATUSES.includes(body.status) ? String(body.status) : undefined;
 
     const { application: row, schollyPointsAwarded } = await db.transaction(tx =>
@@ -238,7 +243,7 @@ export async function PATCH(req: Request) {
             : undefined,
         applicationFeePaid:
           body.applicationFeePaid !== undefined ? Boolean(body.applicationFeePaid) : undefined,
-        feeAmount: body.feeAmount !== undefined ? positiveInt(body.feeAmount) : undefined,
+        feeAmount: body.feeAmount !== undefined ? feeAmount : undefined,
         portalUrl: body.portalUrl !== undefined ? clampString(body.portalUrl, 500) || null : undefined,
         notes: body.notes !== undefined ? clampString(body.notes, 2000) || null : undefined,
         updatedAt: new Date(),

@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { savedScholarships, savedUniversities, scholarshipDecisions, scholarships, studentProfiles, universities } from "@/db/schema";
-import { calculateScholarshipMatch } from "@/lib/matching";
+import { scholarshipAssessment } from "@/lib/scholarshipAssessment";
+import { todayYmd } from "@/lib/catalogueOrder";
 import { toMatchProfileWithActivities } from "@/lib/profileMapping";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
 import { withStatus } from "@/lib/scholarshipStatus";
@@ -68,8 +69,9 @@ export async function GET(req: Request) {
     const savedIds = new Set(saved.map((s) => s.scholarshipId));
 
     const all = rows.filter((s) => s.verificationStatus === "verified").map((s) => {
-      const m = calculateScholarshipMatch(matchProfile, s);
-      const st = withStatus(s);
+      const assessment = scholarshipAssessment(matchProfile, matchProfile, s, awardCoverage.facts.get(s.id) ?? [], todayYmd(now));
+      const m = assessment.fit;
+      const st = withStatus(s, locale, now);
       const cov = evaluateScholarshipForSavedUnis({ ...s, amountUsdValue: resolvedUsdScholarshipAmount(s),catalogueFacts:awardCoverage.facts.get(s.id)??[] }, awardCoverage.references);
       const item: AutopilotScholarship = {
         id: s.id,
@@ -88,13 +90,18 @@ export async function GET(req: Request) {
         requiredDocuments: s.requiredDocuments,
         recurrence: s.recurrence,
         computedStatus: st.computedStatus,
-        matchScore: m.matchScore,
+        matchScore: assessment.matchScore,
       };
       return {
         ...item,
         websiteUrl: s.applicationUrl || s.websiteUrl,
         statusLabel: localizeStatusValue(st.statusLabel, locale),
-        isEligible: m.isEligible,
+        isEligible: assessment.isEligible,
+        chanceBucket: assessment.bucket,
+        eligibilityBasis: assessment.eligibilityBasis,
+        matchBreakdown: m.breakdown,
+        fitVersion: assessment.fitVersion,
+        eligibilityChecks: assessment.checks,
         reasons: translateReasons(locale, "scholarship", m.reasonDetails, m.reasons).slice(0, 3),
         issues: translateReasons(locale, "scholarship", m.issueDetails, m.potentialIssues).slice(0, 2),
         tags: autopilotTags(item, now),

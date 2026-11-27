@@ -16,7 +16,7 @@
 
 import EmbeddedPostgres from "embedded-postgres";
 import { execSync } from "child_process";
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { eq, and, inArray, like } from "drizzle-orm";
 
 let passed = 0;
@@ -100,6 +100,14 @@ async function main() {
   pool.on("error", () => undefined);
   const schema = await import("../src/db/schema");
   const { signSessionToken } = await import("../src/lib/auth");
+
+  // Drizzle's base schema does not contain the evidence tables managed by SQL migrations.
+  const evidenceMigration = readFileSync("supabase/security_evidence_research_2026-11-06.sql", "utf8");
+  const evidenceStart = evidenceMigration.indexOf("CREATE TABLE IF NOT EXISTS public.catalogue_facts");
+  const evidenceEnd = evidenceMigration.indexOf("ALTER TABLE public.catalogue_facts", evidenceStart);
+  if (evidenceStart < 0 || evidenceEnd <= evidenceStart) throw new Error("Catalogue facts DDL not found");
+  await pool.query(evidenceMigration.slice(evidenceStart, evidenceEnd));
+  await pool.query("ALTER TABLE public.catalogue_facts ADD COLUMN applicant_scope text");
 
   // Opportunity catalogue initialization is a startup/seed responsibility, not
   // a public GET side effect. Exercise the seeder concurrently against an empty
@@ -416,6 +424,7 @@ async function main() {
     postStudyWorkVisaYears: number | null;
     worldRanking: number | null;
     matchScore: number | null;
+    fitVersion: string;
   };
   const catalogue = async (query = "", init: RequestInit = {}) => {
     // This suite writes to `universities` and `student_profiles` with raw SQL
@@ -543,6 +552,22 @@ async function main() {
     const unfiltered = await catalogue();
     check("universities: the unfiltered admin/public list still contains both rows", includesUniversity(unfiltered, uniA.id) && includesUniversity(unfiltered, uniB.id));
 
+    const institutionOnly = await catalogue("maxTuition=2000");
+    check("universities: unscoped tuition includes the verified institution price", includesUniversity(institutionOnly, uniB.id) && !includesUniversity(institutionOnly, uniA.id));
+    const missingProgrammeTuition = await catalogue(`${bachelorQuery}&maxTuition=2000`);
+    check("universities: an institution price does not certify a programme price", missingProgrammeTuition.status === 200 && missingProgrammeTuition.rows.length === 0);
+
+    const [feeSource] = await db.insert(schema.sources).values({
+      url: "https://phase12-lmu-fixture.example/fixtures/bachelor-fees",
+      title: "Integration fixture programme and fees",
+      isOfficial: true,
+      isVerified: true,
+    }).returning();
+    const [programme] = await db.insert(schema.universityPrograms).values({
+      universityId: uniB.id, name: "Scope fixture", degree: "Bachelor", tuitionAmount: 1500,
+      sourceUrl: feeSource.url, isVerified: true, verificationStatus: "verified", lastVerifiedAt: new Date(),
+    }).returning();
+    await db.insert(schema.programSources).values({ programId: programme.id, sourceId: feeSource.id, sourceType: "tuition" });
     for (const numericFilter of ["maxTuition=2000", "minRank=1", "maxRank=100"]) {
       const list = await catalogue(`${bachelorQuery}&${numericFilter}`);
       check(`universities: ${numericFilter} still excludes NULL, not the verified row`, includesUniversity(list, uniB.id) && !list.rows.some((row) => row.id === uniA.id), `status ${list.status}; expected ${uniB.id}; rows ${JSON.stringify(list.rows.map((row) => ({ id: row.id, tuition: row.annualTuitionUsd, rank: row.worldRanking })))}`);
@@ -553,6 +578,8 @@ async function main() {
       const list = await catalogue(`${bachelorQuery}&sort=${sort}`);
       check(`universities: ${sort} still puts NULL tuition last`, list.status === 200 && list.rows[0]?.id === uniB.id && list.rows.at(-1)?.id === uniA.id, `status ${list.status}; expected first=${uniB.id}, last=${uniA.id}; rows ${JSON.stringify(list.rows.map((row) => ({ id: row.id, tuition: row.annualTuitionUsd })))}`);
     }
+    await db.delete(schema.universityPrograms).where(eq(schema.universityPrograms.id, programme.id));
+    await db.delete(schema.sources).where(eq(schema.sources.id, feeSource.id));
     const firstPage = await catalogue("degreeLevel=Bachelor&page=1&perPage=1");
     const lastPage = await catalogue("degreeLevel=Bachelor&page=2&perPage=1");
     check("universities: public rank sorting keeps NULL rank on the final page, not missing", firstPage.status === 200 && firstPage.rows[0]?.id === uniB.id && firstPage.body?.total === 2 && includesUniversity(lastPage, uniA.id) && lastPage.body?.page === 2, `first=${JSON.stringify(firstPage.body)} last=${JSON.stringify(lastPage.body)}`);
@@ -641,6 +668,22 @@ async function main() {
       "universities: the profile payload states the same tuition as the card",
       detailResponse.status === 200 && detailBody.money?.annualTuition === 5000,
       `status ${detailResponse.status}; money ${JSON.stringify(detailBody.money)}`
+    );
+    const { GET: getSavedUniversities } = await import("../src/app/api/saved-universities/route");
+    const explorerMatch = (await catalogue(`profileId=${profile.id}`)).rows.find(row => row.id === uniA.id);
+    const personalizedDetail = await getUniversityDetail(
+      new Request(`http://localhost/api/universities/${uniA.id}?profileId=${profile.id}`, { headers: { cookie } }),
+      { params: Promise.resolve({ id: String(uniA.id) }) }
+    );
+    const detailMatch = (await personalizedDetail.json()).match;
+    const savedResponse = await call(getSavedUniversities, `/api/saved-universities?profileId=${profile.id}`);
+    const savedMatch = savedResponse.body?.savedUniversities?.find((row: { universityId: number }) => row.universityId === uniA.id);
+    check(
+      "universities: Explorer, Detail and Saved use the same fit score and version for one student",
+      personalizedDetail.status === 200 && savedResponse.status === 200 && typeof explorerMatch?.matchScore === "number" &&
+      explorerMatch.matchScore === detailMatch?.score && explorerMatch.matchScore === savedMatch?.matchScore &&
+      explorerMatch.fitVersion === detailMatch?.fitVersion && explorerMatch.fitVersion === savedMatch?.fitVersion,
+      JSON.stringify({ explorer: explorerMatch?.matchScore, detail: detailMatch?.score, saved: savedMatch?.matchScore })
     );
     await db.update(schema.universities).set({
       annualTuition: uniA.annualTuition,
@@ -2198,18 +2241,28 @@ async function main() {
   const [uniC] = await db
     .insert(schema.universities)
     .values({
-      name: "ETH Zurich",
+      name: "Synthetic Zurich University",
       country: "Switzerland",
       city: "Zurich",
       worldRanking: 20,
       qsRankYear: 2026,
       programMajor: "Computer Science",
       description: "A public research university.",
-      websiteUrl: "https://ethz.ch",
+      websiteUrl: "https://university.example/requirements",
+      verificationStatus: "verified",
       minIelts: 8.0,
       minGpa: 3.5,
     })
     .returning();
+
+  await db.insert(schema.sources).values({
+    url: uniC.websiteUrl, domain: "university.example", title: "Synthetic admissions test source", isOfficial: true, isVerified: true,
+  });
+  await pool.query(`
+    INSERT INTO public.catalogue_facts
+      (entity_type, entity_id, field_key, value_numeric, unit, source_url, verified_at, verification_status, value_type)
+    VALUES ('university', $1, 'min_ielts', 8, '9', $2, (now() AT TIME ZONE 'UTC') - interval '1 minute', 'verified', 'official_requirement')
+  `, [uniC.id, uniC.websiteUrl]);
 
   // uniA is already saved for the profile by the seed above.
   await db.insert(schema.savedUniversities).values([
@@ -2230,8 +2283,18 @@ async function main() {
       description: "A grant for international students in Germany.",
       requirements: "Bachelor degree with a strong GPA.",
       websiteUrl: "https://example.org/test-foundation",
+      degreeLevels: '["Bachelor"]',
+      verificationStatus: "verified",
     })
     .returning();
+
+
+  const [closedScholarship] = await db.insert(schema.scholarships).values({
+    title: "Closed scholarship fixture", provider: "Test Foundation", country: "Germany",
+    description: "Closed fixture", requirements: "Bachelor", degreeLevels: '["Bachelor"]',
+    websiteUrl: "https://example.org/closed-fixture", verificationStatus: "verified",
+    deadlineDate: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+  }).returning();
 
   // Two essay versions: 61 -> 76 (a 15-point improvement).
   await db.insert(schema.essayVersions).values([
@@ -2261,6 +2324,10 @@ async function main() {
     .from(schema.notifications)
     .where(andEq(profile.id, "scholarship_opened", `/scholarships?id=${sch2.id}`));
   check("sweep: scholarship_opened names the matching scholarship", schN !== undefined && /Test Foundation Grant/.test(schN.title), schN?.title);
+  const [closedNotice] = await db.select().from(schema.notifications)
+    .where(andEq(profile.id, "scholarship_opened", `/scholarships?id=${closedScholarship.id}`));
+  check("sweep: a closed verified scholarship does not trigger an open notification", closedNotice === undefined);
+
 
   const [essayN] = await db
     .select()
@@ -2463,13 +2530,45 @@ async function main() {
 
   // The catalogue bundle is cached for 5 minutes and only an admin write
   // invalidates it; the fixtures above were inserted directly, so drop it.
-  const { invalidateCatalogCache } = await import("../src/lib/catalogCache");
-  invalidateCatalogCache();
+  const { invalidateCatalogCache, invalidateProfileMatchCache } = await import("../src/lib/catalogCache");
+  await invalidateCatalogCache("scholarships");
+  const [previousProfile] = await db.select({ applicantContext: schema.studentProfiles.applicantContext })
+    .from(schema.studentProfiles).where(eq(schema.studentProfiles.id, profile.id));
+  await db.update(schema.studentProfiles).set({
+    applicantContext: { ...previousProfile?.applicantContext, gpa: { value: 3.7, minimum: 0, maximum: 4 } },
+  }).where(eq(schema.studentProfiles.id, profile.id));
+  invalidateProfileMatchCache(profile.id);
 
-  const rankedCatalog = await call(
-    scholarshipsRoute.GET as any,
-    `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&perPage=20&facets=1`
-  );
+  const rankedPath = `/api/scholarships?profileId=${profile.id}&search=${encodeURIComponent("Beacon Combined Ranking")}&perPage=20&facets=1`;
+  const legacyRankedCatalog = await call(scholarshipsRoute.GET as any, rankedPath);
+  const legacyRows = legacyRankedCatalog.body?.scholarships ?? [];
+  check("scholarships: legacy minimum columns without official evidence stay unknown",
+    legacyRankedCatalog.status === 200 && legacyRows.length === 3 &&
+      legacyRows.every((row: { chanceBucket: string }) => row.chanceBucket === "unknown"));
+
+  const [eligibilitySource] = await db.insert(schema.sources).values({
+    url: "https://example.org/phase-m", domain: "example.org", title: "Integration fixture scholarship requirements",
+    isOfficial: true, isVerified: true,
+  }).returning();
+  await pool.query(`
+    INSERT INTO public.catalogue_facts
+      (entity_type, entity_id, field_key, value_numeric, unit, degree_level,
+       source_url, verified_at, verification_status, value_type)
+    SELECT 'scholarship', award_id, key, threshold, unit, 'Bachelor',
+           $2, now() AT TIME ZONE 'UTC' - interval '1 minute', 'verified', 'official_requirement'
+    FROM unnest($1::integer[]) AS award_id
+    CROSS JOIN (VALUES ('min_gpa', 3.5, '4'), ('min_ielts', 6.5, '9')) AS requirements(key, threshold, unit)
+  `, [phaseMRows.map(({ id }) => id), eligibilitySource.url]);
+  await invalidateCatalogCache("scholarships");
+
+  await pool.query(`
+    INSERT INTO public.catalogue_facts
+      (entity_type, entity_id, field_key, value_numeric, unit, degree_level, source_url, verified_at, verification_status, value_type)
+    VALUES ('university', $1, 'min_ielts', 7, '9', 'Bachelor', $3, (now() AT TIME ZONE 'UTC') - interval '1 minute', 'verified', 'official_requirement'),
+           ('university', $2, 'min_ielts', 8, '9', 'Bachelor', $3, (now() AT TIME ZONE 'UTC') - interval '1 minute', 'verified', 'official_requirement')
+  `, [uniA.id, uniB.id, eligibilitySource.url]);
+  await invalidateCatalogCache("universities");
+  const rankedCatalog = await call(scholarshipsRoute.GET as any, rankedPath);
   const rankedRows: any[] = rankedCatalog.body?.scholarships ?? [];
   const rowA = rankedRows.find((row) => row.id === awardA.id);
   const rowB = rankedRows.find((row) => row.id === awardB.id);
@@ -2489,8 +2588,14 @@ async function main() {
   // The university score must follow the matcher, not a guess: compute both and
   // assert the route placed the better-matching university's award first.
   const { calculateUniversityMatch } = await import("../src/lib/matching");
-  const uniScoreA = calculateUniversityMatch(profile as any, uniA as any).matchScore;
-  const uniScoreB = calculateUniversityMatch(profile as any, uniB as any).matchScore;
+  const { getCachedUniversitiesBundle } = await import("../src/lib/catalogCache");
+  const { toUniversityData } = await import("../src/lib/profileMapping");
+  const fitBundle = await getCachedUniversitiesBundle();
+  const uniScore = (id: number) => calculateUniversityMatch(profile as any,
+    toUniversityData(fitBundle.unis.find(row => row.id === id)!, fitBundle.facts.get(id), { degreeLevel: "Bachelor" })
+  ).matchScore;
+  const uniScoreA = uniScore(uniA.id);
+  const uniScoreB = uniScore(uniB.id);
   const expectedFirst = uniScoreA >= uniScoreB ? rowA : rowB;
   const expectedSecond = uniScoreA >= uniScoreB ? rowB : rowA;
   check(
@@ -2552,12 +2657,36 @@ async function main() {
       (anonChance.body?.scholarships ?? []).every((row: any) => row.chanceBucket == null && row.relevanceScore == null)
   );
 
+  await pool.query("DELETE FROM public.catalogue_facts WHERE entity_type = 'scholarship' AND entity_id = ANY($1::integer[])", [phaseMRows.map(({ id }) => id)]);
+  await pool.query("DELETE FROM public.catalogue_facts WHERE entity_type = 'university' AND source_url = $1", [eligibilitySource.url]);
+  await invalidateCatalogCache("universities");
+  await db.delete(schema.sources).where(eq(schema.sources.id, eligibilitySource.id));
+  await db.update(schema.studentProfiles).set({ applicantContext: previousProfile?.applicantContext ?? null })
+    .where(eq(schema.studentProfiles.id, profile.id));
+  invalidateProfileMatchCache(profile.id);
   await db.delete(schema.scholarships).where(inArray(schema.scholarships.id, [
     searchTarget.id,
     ...focusedRows.map((row: any) => row.id),
     inactiveScholarship.id,
     ...phaseMRows.map((row: any) => row.id),
   ]));
+
+  const [yenchingFixture] = await db.insert(schema.scholarships).values({
+    title: "Yenching Academy Fellowship (fixture)", provider: "Peking University", country: "China",
+    description: "Disposable catalogue row", requirements: "Fixture", deadlineDate: "2026-11-30",
+    sourceUrl: "https://yenchingacademy.pku.edu.cn/ADMISSIONS.htm",
+    websiteUrl: "https://yenchingacademy.pku.edu.cn/ADMISSIONS.htm", verificationStatus: "verified",
+  }).returning();
+  const deadlineReview = readFileSync("data/official-review/2026-11-27-yenching-deadline-time.sql", "utf8");
+  await pool.query(deadlineReview);
+  await pool.query(deadlineReview);
+  const [timedAward] = await db.select().from(schema.scholarships).where(eq(schema.scholarships.id, yenchingFixture.id));
+  const { computeScholarshipStatus } = await import("../src/lib/scholarshipStatus");
+  check("deadline review stays idempotent and closes at the source instant",
+    JSON.parse(timedAward.rounds ?? "[]").length === 1 &&
+    computeScholarshipStatus(timedAward, new Date("2026-11-30T00:59:59Z")) === "open" &&
+    computeScholarshipStatus(timedAward, new Date("2026-11-30T01:00:00Z")) === "closed");
+  await db.delete(schema.scholarships).where(eq(schema.scholarships.id, yenchingFixture.id));
 
   // ---- Phase N: the dictionary installs itself into a fresh database ------
   // The live deployment never needs a manual import step: the channel

@@ -1,3 +1,4 @@
+import { parseApplicationFee } from "../src/lib/journey/workspace";
 import {unsafeSql} from "./lib/sql-safety";
 /**
  * Journey Core regression test — deterministic, no DB, no network.
@@ -1589,6 +1590,13 @@ check("the database migration is additive — it only creates journey tables", (
 });
 
 // ---------------------------------------------------------------------------
+
+check("an explicit free application is distinct from invalid and unknown fees", () => {
+  assert.equal(parseApplicationFee(0), 0);
+  assert.equal(parseApplicationFee("0"), 0);
+  assert.equal(parseApplicationFee(null), null);
+  for (const value of [false, "bad", -1, 1.2, 2 ** 31]) assert.equal(parseApplicationFee(value), undefined);
+});
 
 if (failures.length) {
   console.log(`\njourney test FAILED: ${failures.length} failure(s)`);
