@@ -67,6 +67,9 @@ const VisaCenterPanel = dynamic(() => import("@/components/journey/ExplorePanels
 const ApostilleReadinessCard = dynamic(() => import("@/components/ApostilleReadinessCard").then((m) => m.ApostilleReadinessCard), { loading: panelLoading });
 const ArrivalPlanPanel = dynamic(() => import("@/components/journey/ArrivalPlanPanel").then((m) => m.ArrivalPlanPanel), { loading: panelLoading });
 const ApplicationWorkspacePanel = dynamic(() => import("@/components/journey/ApplicationWorkspacePanel").then((m) => m.ApplicationWorkspacePanel), { loading: panelLoading });
+const ForumSection = dynamic(() => import("@/components/ForumSection").then((m) => m.ForumSection), { loading: panelLoading });
+const CoursesSection = dynamic(() => import("@/components/CoursesSection").then((m) => m.CoursesSection), { loading: panelLoading });
+const LearningProvidersPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.LearningProvidersPanel), { loading: panelLoading });
 const FinancialPlanPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.FinancialPlanPanel), { loading: panelLoading });
 const OffersPanel = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.OffersPanel), { loading: panelLoading });
 const PostAdmissionOfferMatrix = dynamic(() => import("@/components/journey/AfterAdmissionPanels").then((m) => m.PostAdmissionOfferMatrix), { loading: panelLoading });
@@ -971,16 +974,45 @@ export function GuidanceHub({ profile, pane, setPane, navigate, hidden }: HubPro
 /* =========================================================================
  * HELP & LEARNING → Community & Learning
  * ====================================================================== */
-export function CommunityHub({ profile }: HubProps) {
+export function CommunityHub({ profile, pane, setPane, hidden }: HubProps) {
   const t = useTranslations("hubs");
-  const { label } = usePanes("community");
+  const td = useTranslations("disclaimers");
+  const { panes, visible, label } = usePanes("community");
+  const active = useActivePane(pane, visible, hidden);
+  const [courseTool, setCourseTool] = useState<"courses" | "providers">("courses");
   if (!profile) return <MissingProfile />;
+
   return (
-    <HubPage title={label} intro={t("introCommunity")}>
-      <a href="https://t.me/scholarbridge_uz" target="_blank" rel="noopener noreferrer"
-        className="inline-flex min-h-11 items-center rounded-control bg-blue-700 px-4 text-sm font-semibold text-white">
-        Telegram ↗
-      </a>
+    <HubPage
+      title={label}
+      intro={t("introCommunity")}
+      primaryLabel={active !== "forum" ? t("primaryCommunity") : undefined}
+      onPrimary={active !== "forum" ? () => setPane("forum") : undefined}
+      panes={panes}
+      activePane={active || undefined}
+      onPaneChange={setPane}
+      hiddenPanes={hidden}
+      note={{ tone: "info", text: td("community") }}
+    >
+      {active === "forum" && <ForumSection activeProfile={profile} isModerator={profile.isAdmin ?? false} />}
+      {active === "courses" && (
+        <div className="space-y-4">
+          <SubPills
+            ariaLabel={label}
+            value={courseTool}
+            onChange={(id) => setCourseTool(id as "courses" | "providers")}
+            options={[
+              { id: "courses", label: t("pillCourses") },
+              { id: "providers", label: t("pillProviders") },
+            ]}
+          />
+          {courseTool === "courses" ? (
+            <CoursesSection activeProfile={profile} />
+          ) : (
+            <LearningProvidersPanel key={`lp-${profile.id}`} profileId={profile.id} />
+          )}
+        </div>
+      )}
     </HubPage>
   );
 }
