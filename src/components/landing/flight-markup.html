@@ -8,10 +8,50 @@
     </defs>
   </svg>
 
+  <!-- Film Grain -->
+  <div class="page-grain" aria-hidden="true"></div>
+
+  <!-- 4 Study-Abroad Photographic Worlds -->
   <div class="scene-stage" aria-hidden="true">
     <div class="scene-layer is-active" id="sceneLayer0"></div>
+    <div class="scene-layer" id="sceneLayer1"></div>
+    <div class="scene-layer" id="sceneLayer2"></div>
+    <div class="scene-layer" id="sceneLayer3"></div>
     <div class="scene-scrim"></div>
+    <canvas id="constellationCanvas"></canvas>
   </div>
+
+  <!-- Scroll Flight Path Jet -->
+  <div class="flight-overlay" aria-hidden="true">
+    <svg class="flight-svg" viewBox="0 0 1440 900" preserveAspectRatio="none">
+      <path id="scrollFlightCurve"
+        d="M 1180 90 C 960 220, 420 280, 640 460 C 860 640, 1120 560, 760 850"
+        fill="none"
+        stroke="rgba(56, 189, 248, 0.20)"
+        stroke-width="1.6"
+        stroke-dasharray="7 7" />
+      <path id="scrollFlightActive"
+        d="M 1180 90 C 960 220, 420 280, 640 460 C 860 640, 1120 560, 760 850"
+        fill="none"
+        stroke="url(#gaugeGrad)"
+        stroke-width="2.4" />
+    </svg>
+  </div>
+  <div class="flight-jet-wrap" id="flightJet" aria-hidden="true">
+    <svg viewBox="0 0 44 44" width="42" height="42" fill="none">
+      <path d="M39 22L7 9L14 22L7 35L39 22Z" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M14 22H26" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <!-- Right-Edge Altimeter -->
+  <aside class="altimeter-hud" aria-hidden="true">
+    <div class="altimeter-badge liquid-glass">
+      <span class="altimeter-badge__dot"></span>
+      <span id="altimeterPct">000 %</span>
+    </div>
+    <div class="altimeter-track liquid-glass" id="altimeterTicks"></div>
+  </aside>
 
   <!-- Floating 3-Part Liquid-Glass Navbar -->
   <header class="nav-shell">
@@ -26,10 +66,17 @@
       </a>
 
       <div class="nav-center-pill liquid-glass">
-        <a href="/universities" class="nav-link" data-i18n="nav_universities">Universitetlar</a>
-        <a href="/scholarships" class="nav-link" data-i18n="nav_scholarships">Grantlar</a>
-        <a href="#steps" class="nav-link" data-i18n="nav_how">Qanday ishlaydi</a>
-        <a href="/features" class="nav-link" data-i18n="nav_features">Imkoniyatlar</a>
+        <a href="#hero" class="nav-link is-active" data-i18n="nav_calc">1. Kalkulyator</a>
+        <a href="#steps" class="nav-link" data-i18n="nav_steps">2. 4 Qadam</a>
+        <a href="#workspace" class="nav-link" data-i18n="nav_workspace">3. Platforma</a>
+        <a href="#start" class="nav-link" data-i18n="nav_start">4. Boshlash</a>
+        <span class="nav-divider"></span>
+        <div class="scene-pills" role="group" aria-label="Study Abroad Background Scene">
+          <button type="button" class="scene-pill is-active" data-scene="0">01 Orbit</button>
+          <button type="button" class="scene-pill" data-scene="1">02 Campus</button>
+          <button type="button" class="scene-pill" data-scene="2">03 Aurora</button>
+          <button type="button" class="scene-pill" data-scene="3">04 Flight</button>
+        </div>
       </div>
 
       <div class="nav-right-cluster"><button class="scene-pill flight-theme" type="button" data-flight-theme aria-label="Switch to light mode">◐</button><button class="scene-pill flight-mobile-menu" type="button" aria-expanded="false" aria-label="Open navigation menu" aria-controls="flight-page-sections" data-flight-menu>☰</button><button class="btn-halo flight-sign-in flight-sign-in-desktop" type="button" data-flight-sign-in>Sign in</button>
@@ -49,10 +96,7 @@
         </button>
       </div>
     </nav>
-  <nav id="flight-page-sections" class="flight-page-sections liquid-glass" aria-label="Page sections"><button class="btn-halo flight-sign-in flight-sign-in-mobile" type="button" data-flight-sign-in>Sign in</button><a href="/universities" class="nav-link" data-i18n="nav_universities">Universitetlar</a>
-        <a href="/scholarships" class="nav-link" data-i18n="nav_scholarships">Grantlar</a>
-        <a href="#steps" class="nav-link" data-i18n="nav_how">Qanday ishlaydi</a>
-        <a href="/features" class="nav-link" data-i18n="nav_features">Imkoniyatlar</a></nav></header>
+  <nav id="flight-page-sections" class="flight-page-sections liquid-glass" aria-label="Page sections"><button class="btn-halo flight-sign-in flight-sign-in-mobile" type="button" data-flight-sign-in>Sign in</button><a href="#hero" data-i18n="nav_calc">Kalkulyator</a><a href="#steps" data-i18n="nav_steps">4 qadam</a><a href="#workspace" data-i18n="nav_workspace">Platforma</a><a href="#start" data-i18n="nav_start">Boshlash</a><a href="/universities" data-i18n="nav_universities">Universitetlar</a><a href="/scholarships" data-i18n="nav_scholarships">Grantlar</a></nav></header>
 
   <main>
     <!-- ======================================================================
@@ -68,7 +112,7 @@
 
           <h1 class="hero-h1">
             <span data-i18n="s1_h1_prefix">Xalqaro universitet va</span>
-            <span class="rotating-slot" id="heroRotatingWord" data-i18n="hero_subject">To‘liq Grantlar</span>
+            <span class="rotating-slot" id="heroRotatingWord">To‘liq Grantlar</span>
             <span class="serif-italic" data-i18n="s1_h1_suffix">— aniq rejada.</span>
           </h1>
 
@@ -76,6 +120,21 @@
             GPA, IELTS va byudjetingizni kiriting — sizga mos universitetlar, to‘liq grantlar va keyingi qadamlarni bir zumda ko‘ring.
           </p>
 
+          <!-- Student Example Switcher -->
+          <div class="preset-switcher-bar" role="group" aria-label="Student Examples">
+            <button type="button" class="preset-pill liquid-glass is-active" data-preset="aziza">
+              <span class="preset-avatar">AS</span>
+              <span data-i18n="preset_aziza">Aziza · GPA 4.8 · IELTS 7.5 · ≤ $8k</span>
+            </button>
+            <button type="button" class="preset-pill liquid-glass" data-preset="jasur">
+              <span class="preset-avatar" style="background:linear-gradient(135deg,#34d399,#38bdf8)">JM</span>
+              <span data-i18n="preset_jasur">Jasur · GPA 4.5 · IELTS 7.0 · To‘liq grant</span>
+            </button>
+            <button type="button" class="preset-pill liquid-glass" data-preset="madina">
+              <span class="preset-avatar" style="background:linear-gradient(135deg,#f5d08a,#fb7185)">MK</span>
+              <span data-i18n="preset_madina">Madina · GPA 4.9 · IELTS 8.0 · ≤ $15k</span>
+            </button>
+          </div>
         </div>
 
         <!-- SIMPLE 2-CARD INTERACTIVE CALCULATOR -->
@@ -88,14 +147,30 @@
                 <span class="status-chip" data-i18n="c1_ready">✓ Jonli hisob-kitob</span>
               </div>
 
-              <p data-i18n="fit_scope">Talablarni dastur sahifasida tekshiring.</p>
+              <div class="fit-summary-banner">
+                <div class="circular-gauge">
+                  <svg viewBox="0 0 84 84">
+                    <circle class="circular-gauge__bg" cx="42" cy="42" r="36"></circle>
+                    <circle class="circular-gauge__fill" id="fitGaugeCircle" cx="42" cy="42" r="36"></circle>
+                  </svg>
+                  <div class="circular-gauge__center">
+                    <span class="circular-gauge__val" id="liveFitScore">—</span>
+                    <span class="circular-gauge__lbl" data-i18n="c1_gauge_lbl">MOSLIK</span>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:15px;font-weight:600;color:#fff;margin-bottom:3px">
+                    <span data-i18n="c1_banner_t">Namuna bo‘yicha moslik:</span>
+                    <span id="inlineFitText" style="color:var(--emerald)">—</span>
+                  </div>
+                  <div style="font-size:12.5px;color:var(--text-secondary)" data-i18n="c1_banner_s">
+                    GPA, IELTS va byudjetni o‘zgartirib, namunadagi natijani ko‘ring.
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="slider-stack">
-              <div class="fit-inputs">
-                <label><span data-i18n="fit_degree">Daraja</span><select id="fitDegree"><option value="Bachelor" data-i18n="fit_bachelor">Bakalavriat</option><option value="Master" data-i18n="fit_master">Magistratura</option><option value="PhD" data-i18n="fit_phd">Doktorantura</option></select></label>
-                <label><span data-i18n="fit_major">Yo‘nalish</span><select id="fitMajor"><option value="" data-i18n="fit_all">Barchasi</option><option>Computer Science</option><option>Engineering</option><option>Business</option></select></label>
-              </div>
               <div class="slider-item">
                 <div class="slider-meta">
                   <span data-i18n="c1_gpa_lbl">GPA (5.0 shkalada)</span>
@@ -117,7 +192,7 @@
                   <span data-i18n="c1_budget_lbl">Yillik kontrakt byudjeti</span>
                   <strong id="budgetValLabel">≤ $8k/yil</strong>
                 </div>
-                <input type="range" class="glass-slider" id="budgetSlider" min="0" max="150" step="1" value="8" aria-label="Budget" />
+                <input type="range" class="glass-slider" id="budgetSlider" min="0" max="25" step="1" value="8" aria-label="Budget" />
               </div>
             </div>
           </article>
@@ -130,19 +205,37 @@
                 <span class="status-chip status-chip--cyan" data-i18n="c2_chip">TOP-3 Moslik</span>
               </div>
 
-              <div class="match-list" id="liveMatchList" aria-live="polite"></div>
+              <div class="match-list" id="liveMatchList"></div>
             </div>
 
             <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
               <span style="font-size:12.5px;color:var(--text-secondary)" data-i18n="c2_foot">
                 Namuna. Amaldagi talablar va narxlar katalogda.
               </span>
-              <a id="fitUniversityLink" href="/universities" class="btn-halo" data-i18n="nav_universities">Universitetlar</a>
-              <a id="fitScholarshipLink" href="/scholarships" class="btn-halo" data-i18n="nav_scholarships">Grantlar</a>
+              <button type="button" class="btn-halo" style="padding:8px 16px;font-size:12.5px" data-flight-start>
+                <span data-i18n="c2_btn">Barcha mos dasturlarni ko‘rish ↗</span>
+              </button>
             </div>
           </article>
         </div>
 
+        <!-- Edge-Faded Giant Ticker -->
+        <div class="giant-ticker-mask" aria-hidden="true">
+          <div class="giant-ticker-track">
+            <span class="giant-ticker-item">TU Munich <strong>UNIVERSITIES</strong> ·</span>
+            <span class="giant-ticker-item">Stipendium Hungaricum <strong>SCHOLARSHIPS</strong> ·</span>
+            <span class="giant-ticker-item">ETH Zurich <strong>UNIVERSITIES</strong> ·</span>
+            <span class="giant-ticker-item">NUS Singapore <strong>PROGRAMMES</strong> ·</span>
+            <span class="giant-ticker-item">KAIST Korea <strong>GKS</strong> ·</span>
+            <span class="giant-ticker-item">DAAD Germany <strong>FUNDING</strong> ·</span>
+            <span class="giant-ticker-item">TU Munich <strong>UNIVERSITIES</strong> ·</span>
+            <span class="giant-ticker-item">Stipendium Hungaricum <strong>SCHOLARSHIPS</strong> ·</span>
+            <span class="giant-ticker-item">ETH Zurich <strong>UNIVERSITIES</strong> ·</span>
+            <span class="giant-ticker-item">NUS Singapore <strong>PROGRAMMES</strong> ·</span>
+            <span class="giant-ticker-item">KAIST Korea <strong>GKS</strong> ·</span>
+            <span class="giant-ticker-item">DAAD Germany <strong>FUNDING</strong> ·</span>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -195,7 +288,7 @@
             </div>
             <div class="bento-card__bottom">
               <div class="bento-mini-pills">
-                <span class="bento-mini-pill" style="color:var(--emerald)">TU Munich</span>
+                <span class="bento-mini-pill" style="color:var(--emerald)">TU Munich 91%</span>
                 <span class="bento-mini-pill" style="color:var(--gold)" data-i18n="b2_p2">Stipendium Grant</span>
               </div>
               <h3 class="bento-card__title" data-i18n="b2_title">2. Mos universitet va grantni tanlang</h3>
@@ -213,7 +306,7 @@
             </div>
             <div class="bento-card__bottom">
               <div class="bento-mini-pills">
-                <span class="bento-mini-pill" style="color:var(--gold)">SOP Studio</span>
+                <span class="bento-mini-pill" style="color:var(--gold)">SOP AI: 9.1 / 10</span>
                 <span class="bento-mini-pill" style="color:var(--accent)" data-i18n="b3_p2">Dedlayn: 14 kun</span>
               </div>
               <h3 class="bento-card__title" data-i18n="b3_title">3. Hujjat va SOP inshoni tayyorlang</h3>
@@ -261,14 +354,8 @@
       </div>
 
       <div class="marquee-rows-stack">
-        <div class="flight-tools-grid">
-          <a class="flight-tool liquid-glass" href="/universities" data-i18n="nav_universities">Universitetlar</a>
-          <a class="flight-tool liquid-glass" href="/scholarships" data-i18n="nav_scholarships">Grantlar</a>
-          <a class="flight-tool liquid-glass" href="/features" data-i18n="nav_features">Imkoniyatlar</a>
-          <a class="flight-tool liquid-glass" href="/?start=1" data-i18n="cta_start">Boshlash</a>
-          <a class="flight-tool liquid-glass" href="/about" data-i18n="nav_about">Metodologiya</a>
-          <a class="flight-tool liquid-glass" href="https://t.me/scholarbridge_uz" data-i18n="nav_telegram">Telegram</a>
-        </div>
+        <div class="ui-marquee-row ui-marquee-row--left" id="marqueeRowTop"></div>
+        <div class="ui-marquee-row ui-marquee-row--right" id="marqueeRowBottom"></div>
       </div>
     </section>
 
@@ -346,20 +433,12 @@
           </div>
         </div>
 
-        <div class="flight-faq liquid-glass">
-          <h2 data-i18n="faq_title">Ko‘p so‘raladigan savollar</h2>
-          <details><summary data-i18n="faq_guest_q">Katalogdan akkauntsiz foydalansam bo‘ladimi?</summary><p data-i18n="faq_guest_a">Ha, qidiruv, filtrlar va rasmiy havolalar hamma uchun ochiq.</p></details>
-          <details><summary data-i18n="faq_data_q">Nega ayrim narxlar va talablar ko‘rsatilmaydi?</summary><p data-i18n="faq_data_a">Talablar dastur va ariza davriga bog‘liq. Amaldagi ma’lumotni rasmiy manbadan tekshiring.</p></details>
-        </div>
-
         <footer class="footer-minimal">
           <div>© 2026 ScholarBridge AI · Global Admissions &amp; Scholarship Platform</div>
           <div style="display:flex;gap:18px;flex-wrap:wrap">
-            <a href="/universities" class="nav-link" data-i18n="nav_universities">Universitetlar</a>
-        <a href="/scholarships" class="nav-link" data-i18n="nav_scholarships">Grantlar</a>
-        <a href="#steps" class="nav-link" data-i18n="nav_how">Qanday ishlaydi</a>
-        <a href="/features" class="nav-link" data-i18n="nav_features">Imkoniyatlar</a>
-            <a href="/about" data-i18n="nav_about">Metodologiya</a>
+            <a href="#hero" data-i18n="nav_calc">1. Kalkulyator</a>
+            <a href="#steps" data-i18n="nav_steps">2. 4 Qadam</a>
+            <a href="#workspace" data-i18n="nav_workspace">3. Platforma</a>
             <a href="/terms" data-i18n="terms">Terms</a><a href="/privacy" data-i18n="privacy">Privacy</a><a href="https://t.me/scholarbridge_uz" target="_blank" rel="noopener">@scholarbridge_uz</a>
           </div>
         </footer>

@@ -781,7 +781,10 @@ export function JourneyControlCenter({
         primaryDetail={primaryStep ? nextStepDetail(primaryStep) : t("ccNothingOutstandingHint")}
         primaryLabel={primaryStep ? actionLabelForStep(t, primaryStep.id, primaryStep.tab) : t("ccContinue", { stage: currentStageLabel })}
         primaryTab={primaryStep?.tab ?? journey.continueTab}
+        currentStage={currentStageLabel}
         onNavigate={onNavigateTab}
+        getStepTitle={nextStepTitle}
+        getStepDetail={nextStepDetail}
       />
 
       <details className="sb-dashboard-disclosure">

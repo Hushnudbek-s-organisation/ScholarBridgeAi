@@ -1582,16 +1582,6 @@
 .sb-flight-landing .lang-btn,
 .sb-flight-landing .nav-link,
 .sb-flight-landing .match-row,
-.sb-flight-landing .btn-halo,
-.sb-flight-landing .flight-faq summary { min-height: 44px; }
+.sb-flight-landing .btn-halo { min-height: 44px; }
 .sb-flight-landing .flight-theme,
 .sb-flight-landing .flight-mobile-menu { min-width: 44px; }
-.sb-flight-landing .fit-inputs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; }
-.sb-flight-landing .fit-inputs label { display:grid; min-width:0; gap:.35rem; }
-.sb-flight-landing .fit-inputs select { min-height:44px; min-width:0; padding:.45rem; border:1px solid var(--glass-border); border-radius:.6rem; background-color:#111d2b; color:#fff; }
-.sb-flight-landing .flight-tools-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-.sb-flight-landing .flight-tool { padding:1.15rem; border-radius:1rem; color:inherit; font-weight:650; }
-.sb-flight-landing .flight-faq { margin:1.5rem 0; padding:1.25rem; border-radius:1.25rem; }
-.sb-flight-landing .flight-faq summary { cursor:pointer; padding:.6rem 0; }
-.sb-flight-landing .flight-faq p { color:var(--text-secondary); }
-@media(max-width:620px) { .sb-flight-landing .flight-tools-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
