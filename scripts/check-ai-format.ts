@@ -248,17 +248,14 @@ check("AiFormattedText is a safe renderer (no dangerouslySetInnerHTML, safe link
   assert.match(comp, /normalizeAiReply/);
 });
 
-check("AI chat bubble renders through AiFormattedText (no whitespace-pre-wrap for AI)", () => {
+check("completed AI chat replies use AiFormattedText and streaming preserves line breaks", () => {
   const comp = read("src/components/AiChatMentor.tsx");
-  assert.match(comp, /<AiFormattedText text=\{m\.text\} \/>/);
-  // whitespace-pre-wrap may remain only on the USER bubble branch (1 spot total),
-  // i.e. on the ternary line right after `m.sender === "user"`.
-  const lines = comp.split("\n");
-  const preWrapIdx = lines.findIndex((l) => l.includes("whitespace-pre-wrap"));
-  assert.notEqual(preWrapIdx, -1, "user bubble keeps pre-wrap");
-  assert.equal(lines.filter((l) => l.includes("whitespace-pre-wrap")).length, 1, "AI bubble has no pre-wrap");
-  const previousLine = lines[preWrapIdx - 1] ?? "";
-  assert.ok(previousLine.includes('m.sender === "user"'), "pre-wrap sits on the user branch");
+  assert.match(comp, /m\.sender === "ai" && !m\.error\s*\?\s*<AiFormattedText text=\{m\.text\} \/>/);
+  const messageStyles = comp.match(/m\.sender === "user"\s*\?\s*"([^"]*)"\s*:\s*m\.error\s*\?\s*"([^"]*)"\s*:\s*"([^"]*)"/);
+  assert.ok(messageStyles, "completed message style branches must be present");
+  assert.match(messageStyles[1], /\bwhitespace-pre-wrap\b/, "user bubble keeps line breaks");
+  assert.doesNotMatch(messageStyles[3], /\bwhitespace-pre-wrap\b/, "formatted replies manage their own whitespace");
+  assert.match(comp, /streamText\s*&&\s*<p\s+className="[^"]*\bwhitespace-pre-wrap\b[^"]*">\s*\{streamText\}/);
 });
 
 check("SOP studio renders draft+review through AiFormattedText and copies plain text", () => {
