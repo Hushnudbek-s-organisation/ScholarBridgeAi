@@ -14,6 +14,8 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { LEGACY_SECTION_ALIASES, resolveNavTarget } from "../src/lib/navSections";
+import { parseUniversitySort } from "../src/lib/universitySort";
 
 const ROOT = join(import.meta.dirname, "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -52,7 +54,10 @@ function collect() {
   }
 
   // 3. Navigation sections / sub-panes / utility screens.
-  const nav = ids(read("src/lib/navSections.ts"), /\bid:\s*"([a-zA-Z0-9_-]+)"/g);
+  const nav = [...new Set([
+    ...ids(read("src/lib/navSections.ts"), /\bid:\s*"([a-zA-Z0-9_-]+)"/g),
+    ...Object.keys(LEGACY_SECTION_ALIASES).filter((alias) => resolveNavTarget(alias) !== null),
+  ])].sort();
 
   // 4. Admin tabs.
   const adminSrc = read("src/components/AdminPanel.tsx");
@@ -70,6 +75,10 @@ function collect() {
     for (const m of src.matchAll(/searchParams\.get\(\s*["']([\w-]+)["']\s*\)/g)) queryParams.add(`searchParams:${m[1]}`);
     for (const m of src.matchAll(/params\.get\(\s*["']([\w-]+)["']\s*\)/g)) queryParams.add(`param:${m[1]}`);
     for (const m of src.matchAll(/URLSearchParams[^;]{0,120}["']([\w-]+)["']/g)) queryParams.add(`query:${m[1]}`);
+  }
+  const legacyRank = parseUniversitySort("rank");
+  if (legacyRank.explicit && legacyRank.sort === "rank_asc" && queryParams.has("searchParams:sort")) {
+    queryParams.add("query:rank");
   }
 
   // 7. Named user actions / integrations (route path is the stable id).

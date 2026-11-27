@@ -199,7 +199,7 @@ check("languages never share an entry; English stays a passthrough", () => {
   assert.equal(en, uniRow, "en returns the exact input reference (byte-identical payloads)");
 });
 
-check("scholarship rows keep their canonical title next to the translated one", () => {
+check("scholarship rows keep the awarding organisation’s title and translate metadata", () => {
   invalidateLocalizeMemo();
   const row = {
     id: 7,
@@ -218,7 +218,7 @@ check("scholarship rows keep their canonical title next to the translated one", 
   };
   const localized = localizeScholarshipRow(row, "uz") as typeof row & { officialTitle?: string | null };
   assert.equal(localized.officialTitle, row.title, "the official name stays available");
-  assert.notEqual(localized.title, row.title, "the display title is translated");
+  assert.equal(localized.title, row.title, "the visible title matches the awarding organisation’s title");
   assert.equal(localized.fundingType, "Natijaga asoslangan (merit)", "funding type is translated");
   assert.equal(localized.matchScore, 55, "scores pass through untouched");
   assert.match(localized.degreeLevels, /Magistratura/, "degree levels inside the JSON column are translated");
