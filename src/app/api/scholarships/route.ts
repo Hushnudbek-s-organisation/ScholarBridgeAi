@@ -9,9 +9,12 @@ import { presentedCatalogueFacts } from "@/lib/catalogueFacts.server";
 import { privateNoStoreJson } from "@/lib/apiResponse";
 import { authenticate } from "@/lib/auth";
 import {
+  calculateScholarshipMatch,
   calculateUniversityMatch,
   CATALOGUE_FIT_VERSION, hasUniversityMatchEvidence, type UniversityData,
 } from "@/lib/matching";
+import { memoizeMatch } from "@/lib/matchMemo";
+import { profileMatchFingerprint } from "@/lib/profileMatchFingerprint";
 import { fitBucket, type ChanceBucket } from "@/lib/scholarshipGates";
 import { combinedRelevance } from "@/lib/scholarshipRanking";
 import { localeFromRequest, translateReasons } from "@/lib/engineText";
@@ -178,9 +181,12 @@ export async function GET(req: Request) {
 
     const now = new Date();
     const today = todayYmd(now);
+    const fingerprint = profileMatchFingerprint(matchProfile);
+    const computeFit: typeof calculateScholarshipMatch = (profile, award) =>
+      memoizeMatch("scholarship-fit", fingerprint, award.id, { ...award }, () => calculateScholarshipMatch(profile, award));
     const assessmentFor = (row: (typeof allScholarships)[number]) =>
       matchProfile && originalProfile && row.verificationStatus === "verified"
-        ? scholarshipAssessment(matchProfile, originalProfile, row, bundle.facts.get(row.id) ?? [], today)
+        ? scholarshipAssessment(matchProfile, originalProfile, row, bundle.facts.get(row.id) ?? [], today, computeFit)
         : null;
 
     if (searchParams.get("summary") === "match-count") {

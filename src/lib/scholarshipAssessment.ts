@@ -19,6 +19,7 @@ export function scholarshipAssessment(
   award: Award,
   facts: CatalogueFact[],
   today: string,
+  computeFit = calculateScholarshipMatch,
 ) {
   const scope = { degreeLevel: profile.degreeLevel };
   const academic = resolveAcademicRequirements(facts, scope);
@@ -29,7 +30,7 @@ export function scholarshipAssessment(
     minGpa: gpa && ["4", "4.0", "GPA 4.0"].includes(gpa.unit ?? "") ? gpa.single : null,
     minIelts: summary?.ielts?.single ?? null,
   };
-  const fit = calculateScholarshipMatch(profile, fitInput);
+  const fit = computeFit(profile, fitInput);
   const checks: { field: string; state: RequirementState }[] = [];
   const evaluation = evaluateRecordedAcademicCriteria(academic, academicProfile, today);
   const reviewed = new Set<string>();
